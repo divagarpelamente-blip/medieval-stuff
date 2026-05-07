@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600;700&display=swap');
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: #f5f5f4;
+  background-color: #0c0a09;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  @apply bg-stone-950 bg-medieval-pattern;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Cinzel', serif;
+  @apply text-medieval-gold;
+}
+
+.glass-card {
+  @apply bg-stone-900/80 backdrop-blur-md border border-stone-800 shadow-xl;
+}
+
+.medieval-button {
+  @apply bg-medieval-wood hover:bg-medieval-woodDark text-medieval-gold font-bold py-2 px-4 rounded border-2 border-medieval-gold shadow-lg transition-all active:scale-95;
+}
