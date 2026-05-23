@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Edit3, Save, Trash2, CheckSquare, Square, X, FileSpreadsheet, Menu, ArrowRight, Plus } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Edit3, Save, Trash2, CheckSquare, Square, X, FileSpreadsheet, Menu, ArrowRight, Plus, Copy } from 'lucide-react';
 
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -30,6 +30,7 @@ const RecordsTable = ({ userId }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [isCopyModal, setIsCopyModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [detailsRecord, setDetailsRecord] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -484,12 +485,28 @@ const RecordsTable = ({ userId }) => {
           )}
 
           {selectedIds.size > 0 && (
-            <button 
-              onClick={handleBulkDeleteClick}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-red-800 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md"
-            >
-              <Trash2 size={14} /> Delete ({selectedIds.size})
-            </button>
+            <>
+              <button 
+                onClick={() => {
+                  const selectedId = Array.from(selectedIds)[0];
+                  const record = records.find(r => r.id === selectedId);
+                  if (record) {
+                    setIsCopyModal(true);
+                    setEditingRecord(record);
+                    setShowEditModal(true);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-800 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md"
+              >
+                <Copy size={14} /> Copy
+              </button>
+              <button 
+                onClick={handleBulkDeleteClick}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-800 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md"
+              >
+                <Trash2 size={14} /> Delete ({selectedIds.size})
+              </button>
+            </>
           )}
         </div>
 
@@ -864,22 +881,26 @@ const RecordsTable = ({ userId }) => {
         onClose={() => {
           setShowEditModal(false);
           setEditingRecord(null);
+          setIsCopyModal(false);
         }}
-        title="Quick Edit Transaction"
+        title={isCopyModal ? "Duplicate Transaction" : "Quick Edit Transaction"}
         size="max-w-4xl"
       >
         {editingRecord && (
           <RecordForm
             userId={userId}
             editingRecord={editingRecord}
+            isCopy={isCopyModal}
             onCancel={() => {
               setShowEditModal(false);
               setEditingRecord(null);
+              setIsCopyModal(false);
             }}
             onSuccess={async () => {
               setShowEditModal(false);
               setEditingRecord(null);
-              toast.success('Royal ledger updated successfully!');
+              setIsCopyModal(false);
+              toast.success(isCopyModal ? 'Transaction duplicated successfully!' : 'Royal ledger updated successfully!');
               await fetchRecords();
             }}
           />

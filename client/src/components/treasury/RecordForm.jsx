@@ -3,7 +3,7 @@ import { Save, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { MONTHS, TRANSACTION_TYPES, PAYMENT_METHODS, RECORD_STATUSES, QUEST_TYPES, toDbQuestType } from '../../utils/constants';
 
-const RecordForm = ({ onSuccess, onCancel, userId, editingRecord }) => {
+const RecordForm = ({ onSuccess, onCancel, userId, editingRecord, isCopy }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [accounts, setAccounts] = useState([]);
@@ -220,7 +220,7 @@ const RecordForm = ({ onSuccess, onCancel, userId, editingRecord }) => {
       };
 
       // 1. Insert or Update Record
-      if (editingRecord) {
+      if (editingRecord && !isCopy) {
         const fullPayload = { ...recordToInsert, flow_type: formData.flow_type || null };
         let updateError;
         try {
