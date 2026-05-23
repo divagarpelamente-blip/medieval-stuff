@@ -1,82 +1,134 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabaseClient';
 import Auth from './components/Auth';
-import TreasuryCard from './components/TreasuryCard';
-import { Layout, Wallet, User as UserIcon, LogOut, ShieldAlert } from 'lucide-react';
+import HUD from './components/HUD';
+import BottomNav from './components/BottomNav';
+import IsometricMap from './components/IsometricMap';
+import Modal from './components/Modal';
+import TreasuryView from './components/TreasuryView';
+import SettingsView from './components/SettingsView';
+import DashboardView from './components/DashboardView';
+import TransactionsView from './components/treasury/TransactionsView';
+import { Toaster, toast } from 'react-hot-toast';
+import { buildingRegistry } from './utils/buildingRegistry';
+import bgMap from './assets/Medieval_Town_Backround.png';
+
+const GUEST_SESSION = {
+  user: {
+    id: '00000000-0000-0000-0000-000000000000',
+    email: 'guest@medieval.stuff'
+  }
+};
 
 function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [buildings, setBuildings] = useState([]);
+  const [activeTab, setActiveTab] = useState('quests'); // Default to quests (which shows the map)
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
 
   useEffect(() => {
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchUserData(session.user.id);
-      setLoading(false);
-    });
+    const initSession = async () => {
+      try {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession) {
+          setSession(activeSession);
+          await fetchUserData(activeSession.user.id);
+        } else {
+          const lastEmail = localStorage.getItem('medieval_last_logged_in_email');
+          if (lastEmail && lastEmail !== GUEST_SESSION.user.email) {
+            const DEFAULT_PASSWORD = 'medieval_kingdom_bypass';
+            const { data, error } = await supabase.auth.signInWithPassword({ 
+              email: lastEmail, 
+              password: DEFAULT_PASSWORD 
+            });
+            if (!error && data?.session) {
+              setSession(data.session);
+              await fetchUserData(data.session.user.id);
+            } else {
+              setSession(GUEST_SESSION);
+              await fetchUserData(GUEST_SESSION.user.id);
+            }
+          } else {
+            setSession(GUEST_SESSION);
+            await fetchUserData(GUEST_SESSION.user.id);
+          }
+        }
+      } catch (err) {
+        console.error('Init session error:', err);
+        setSession(GUEST_SESSION);
+        await fetchUserData(GUEST_SESSION.user.id);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) fetchUserData(session.user.id);
-      else {
-        setProfile(null);
-        setBuildings([]);
+    initSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (newSession) {
+        setSession(newSession);
+        fetchUserData(newSession.user.id);
+      } else {
+        setSession(GUEST_SESSION);
+        fetchUserData(GUEST_SESSION.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Visual timer for gold ticking
   useEffect(() => {
     if (!buildings.length) return;
-    
     const interval = setInterval(() => {
       setBuildings(prev => prev.map(b => ({
         ...b,
         stored_resources: b.stored_resources + (12 * b.level) / 60
       })));
     }, 1000);
-
     return () => clearInterval(interval);
   }, [buildings.length]);
 
   const fetchUserData = async (userId) => {
     try {
-      // Fetch Profile
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
+        .from('profiles').select('*').eq('id', userId).single();
       if (profileError) throw profileError;
+
+      // Sync settings from DB to localStorage
+      if (profileData && profileData.settings) {
+        const dbSettings = profileData.settings;
+        if (dbSettings.responsible_users) {
+          localStorage.setItem('medieval_responsible_users', JSON.stringify(dbSettings.responsible_users));
+        }
+        if (dbSettings.transaction_types) {
+          localStorage.setItem('medieval_transaction_types', JSON.stringify(dbSettings.transaction_types));
+        }
+        if (dbSettings.flow_types) {
+          localStorage.setItem('medieval_flow_types', JSON.stringify(dbSettings.flow_types));
+        }
+        if (dbSettings.quest_types) {
+          localStorage.setItem('medieval_quest_types', JSON.stringify(dbSettings.quest_types));
+        }
+        if (dbSettings.entity_quest_types) {
+          localStorage.setItem('medieval_entity_quest_types', JSON.stringify(dbSettings.entity_quest_types));
+        }
+      }
+
       setProfile(profileData);
 
-      // Fetch Buildings
       const { data: buildingsData, error: buildingsError } = await supabase
-        .from('buildings')
-        .select('*')
-        .eq('profile_id', userId);
-
+        .from('buildings').select('*').eq('profile_id', userId);
       if (buildingsError) throw buildingsError;
       
-      // Calculate real stored gold based on time elapsed
       const now = new Date();
       const updatedBuildings = buildingsData.map(b => {
         const lastCol = new Date(b.last_collection);
         const secondsElapsed = (now - lastCol) / 1000;
-        const incomePerSecond = (12 * b.level) / 60; // 12 gold/min base
-        return {
-          ...b,
-          stored_resources: secondsElapsed * incomePerSecond
-        };
+        const incomePerSecond = (12 * b.level) / 60;
+        return { ...b, stored_resources: secondsElapsed * incomePerSecond };
       });
-
       setBuildings(updatedBuildings);
     } catch (err) {
       console.error('Error fetching data:', err.message);
@@ -85,59 +137,32 @@ function App() {
 
   const handleCollectGold = async (buildingId, amount) => {
     if (!profile || amount <= 0) return;
-
     try {
-      // 1. Update Profile Gold
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ gold: profile.gold + Math.floor(amount) })
-        .eq('id', session.user.id);
-
-      if (profileError) throw profileError;
-
-      // 2. Reset Building Storage
-      const { error: buildingError } = await supabase
-        .from('buildings')
-        .update({ stored_resources: 0, last_collection: new Date().toISOString() })
-        .eq('id', buildingId);
-
-      if (buildingError) throw buildingError;
-
-      // Refresh data
+      await supabase.from('profiles').update({ gold: profile.gold + Math.floor(amount) }).eq('id', session.user.id);
+      await supabase.from('buildings').update({ stored_resources: 0, last_collection: new Date().toISOString() }).eq('id', buildingId);
       fetchUserData(session.user.id);
     } catch (err) {
-      alert('Failed to collect gold: ' + err.message);
+      toast.error('Failed to collect gold: ' + err.message);
     }
   };
 
   const handleUpgradeBuilding = async (building) => {
     const cost = Math.floor(100 * Math.pow(building.level, 1.8));
-    
     if (profile.gold < cost) return;
-
     try {
-      // 1. Deduct Gold
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ gold: profile.gold - cost })
-        .eq('id', session.user.id);
-
-      if (profileError) throw profileError;
-
-      // 2. Increase Level
-      const { error: buildingError } = await supabase
-        .from('buildings')
-        .update({ 
-          level: building.level + 1,
-          last_collection: new Date().toISOString() // Reset timer on upgrade for balance
-        })
-        .eq('id', building.id);
-
-      if (buildingError) throw buildingError;
-
+      await supabase.from('profiles').update({ gold: profile.gold - cost }).eq('id', session.user.id);
+      await supabase.from('buildings').update({ level: building.level + 1, last_collection: new Date().toISOString() }).eq('id', building.id);
       fetchUserData(session.user.id);
     } catch (err) {
-      alert('Upgrade failed: ' + err.message);
+      toast.error('Upgrade failed: ' + err.message);
+    }
+  };
+
+  const handleBuildingClick = (buildingType) => {
+    if (buildingType === 'treasury') {
+      setActiveTab('treasury');
+    } else {
+      setSelectedBuilding(buildingType);
     }
   };
 
@@ -145,106 +170,180 @@ function App() {
     await supabase.auth.signOut();
   };
 
+  const handleSwitchUser = async (email) => {
+    try {
+      const DEFAULT_PASSWORD = 'medieval_kingdom_bypass';
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password: DEFAULT_PASSWORD 
+      });
+
+      if (signInError) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ 
+          email, 
+          password: DEFAULT_PASSWORD 
+        });
+        
+        if (signUpError) throw signUpError;
+        
+        if (signUpData?.session) {
+          setSession(signUpData.session);
+          fetchUserData(signUpData.session.user.id);
+          toast.success(`Switched to new user: ${email}`);
+        } else {
+          toast.success(`User summoned successfully!`);
+        }
+      } else {
+        setSession(data.session);
+        fetchUserData(data.session.user.id);
+        toast.success(`Switched to user: ${email}`);
+      }
+    } catch (err) {
+      console.error('Error switching user:', err);
+      toast.error('Failed to switch user: ' + err.message);
+    }
+  };
+
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 border-4 border-medieval-gold border-t-transparent rounded-full animate-spin" />
-        <p className="font-medieval text-medieval-gold tracking-widest uppercase text-sm">Loading Realm...</p>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 border-4 border-[#ffd700] border-t-transparent rounded-full animate-spin" />
+        <p className="title-font text-[#ffd700] tracking-widest uppercase text-sm">Carregando Eldoria...</p>
       </div>
     );
   }
 
-  if (!session) {
-    return <Auth onAuthSuccess={() => {}} />;
-  }
+  if (!session) return <Auth onAuthSuccess={(s) => { setSession(s); if (s) fetchUserData(s.user.id); }} />;
+
+  const treasuryBuilding = buildings.find(b => b.type === 'treasury');
+
+  // Check if active tab is a placeholder view that shows an announcement banner over the map
+  const showComingSoonOverlay = ['quests', 'achievements'].includes(activeTab);
 
   return (
-    <div className="min-h-screen text-stone-100 flex flex-col">
-      {/* Top Header */}
-      <header className="h-16 glass-card border-x-0 border-t-0 flex items-center px-8 justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-medieval-gold rounded-full flex items-center justify-center border-2 border-medieval-goldLight shadow-lg">
-            <span className="text-stone-950 font-bold text-xl">M</span>
+    <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          style: {
+            background: '#f4e4bc',
+            color: '#4b2c20',
+            borderColor: '#8b4513',
+            borderWidth: '2px'
+          },
+          success: {
+            iconTheme: { primary: '#059669', secondary: '#f4e4bc' },
+          },
+          error: {
+            iconTheme: { primary: '#dc2626', secondary: '#f4e4bc' },
+          },
+        }}
+      />
+      <div className="game-viewport">
+        {/* Loading Screen Overlay (simulated for internal state changes) */}
+        {!profile && (
+          <div className="absolute inset-0 bg-black z-[1000] flex flex-col justify-center items-center">
+            <div className="w-12 h-12 border-5 border-white border-b-[#ffd700] rounded-full animate-spin" />
+            <p className="title-font mt-4 text-[#ffd700]">Loading Kingdom...</p>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Medieval Stuff</h1>
-        </div>
+        )}
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 bg-stone-950/50 px-4 py-2 rounded-full border border-stone-800 shadow-inner">
-            <Wallet className="text-medieval-gold" size={18} />
-            <span className="font-mono font-bold text-medieval-goldLight text-lg">
-              {profile?.gold.toLocaleString() || '0'}
-            </span>
-          </div>
+        {/* HUD Superior */}
+        <HUD profile={profile} />
+
+        {/* Mapa Isométrico */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          {/* Background Map - Now using the high-quality generated landscape */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${bgMap})` }}
+          />
           
-          <div className="flex items-center gap-2 border-l border-stone-800 pl-6">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-bold text-stone-500 uppercase">Lord</p>
-              <p className="text-sm font-semibold truncate max-w-[120px]">{session.user.email.split('@')[0]}</p>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-all text-stone-400 group"
-              title="Leave Kingdom"
-            >
-              <LogOut size={20} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-grow p-8 max-w-7xl mx-auto w-full">
-        <div className="mb-12 flex justify-between items-end">
-          <div>
-            <h2 className="text-4xl font-bold mb-2">Your Kingdom</h2>
-            <p className="text-stone-400 text-lg">Prosperity awaits your command, My Lord.</p>
-          </div>
-          <div className="flex gap-4">
-             <div className="bg-stone-900 px-4 py-2 rounded-lg border border-stone-800">
-                <p className="text-[10px] text-stone-500 uppercase font-black tracking-tighter">Kingdom Rank</p>
-                <p className="text-medieval-gold font-medieval font-bold">Level {profile?.level || 1}</p>
-             </div>
-          </div>
+          <IsometricMap 
+            onBuildingClick={handleBuildingClick}
+            buildings={buildings}
+          />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {buildings.length > 0 ? (
-            buildings.map((building) => (
-              building.type === 'treasury' && (
-                <TreasuryCard 
-                  key={building.id}
-                  gold={Math.floor(building.stored_resources)} 
-                  incomeRate={12 * building.level} 
-                  level={building.level}
-                  onCollect={() => handleCollectGold(building.id, building.stored_resources)} 
-                  onUpgrade={() => handleUpgradeBuilding(building)}
-                  upgradeCost={Math.floor(100 * Math.pow(building.level, 1.8))}
-                  currentBalance={profile.gold}
-                />
-              )
-            ))
-          ) : (
-            <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-3xl opacity-50">
-               <ShieldAlert size={48} className="text-stone-600 mb-4" />
-               <p className="font-medieval text-xl">No Buildings Found</p>
-               <p className="text-stone-500 text-sm">Have you executed the SQL setup in Supabase?</p>
-            </div>
-          )}
-          
-          {/* Locked Buildings Placeholders */}
-          <div className="glass-card p-6 rounded-2xl border-dashed border-stone-700 flex flex-col items-center justify-center opacity-40 grayscale group cursor-not-allowed">
-            <div className="w-16 h-16 bg-stone-800 rounded-full flex items-center justify-center mb-4 border border-stone-700">
-              <Layout className="text-stone-600" />
-            </div>
-            <p className="text-stone-500 font-bold font-medieval">Barracks</p>
-            <p className="text-stone-600 text-xs">Reach Level 5 to Unlock</p>
+        {/* Placeholder Info Overlay (Banner for non-active buttons) */}
+        {showComingSoonOverlay && activeTab !== 'quests' && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 bg-stone-900/90 backdrop-blur-md border-2 border-[#d4af37]/40 px-6 py-3 rounded-2xl text-center shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
+            <h4 className="title-font text-[#ffd700] text-sm uppercase tracking-widest font-black">
+              {activeTab === 'achievements' ? 'Achievements Tab' : 'Transactions Ledger'}
+            </h4>
+            <p className="text-[10px] text-gray-400 italic mt-0.5">"The royal architects are building this wing, Sire." (Coming Soon)</p>
           </div>
-        </div>
-      </main>
+        )}
 
-      <footer className="p-12 text-center text-stone-700 text-xs uppercase tracking-widest border-t border-stone-900 mt-20">
-        <p>Medieval Stuff &bull; Built with Gold and Honor &copy; 2026</p>
-      </footer>
+        {/* Navegação Inferior */}
+        <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {/* Modais de Edifícios */}
+        {selectedBuilding && buildingRegistry[selectedBuilding] && (
+          <Modal 
+            isOpen={!!selectedBuilding} 
+            onClose={() => setSelectedBuilding(null)}
+            title={buildingRegistry[selectedBuilding].title}
+            size={buildingRegistry[selectedBuilding].modalSize}
+            footer={buildingRegistry[selectedBuilding].footer}
+          >
+            {buildingRegistry[selectedBuilding].renderContent({
+              userId: profile?.id,
+              profile,
+              building: buildings.find(b => b.type === selectedBuilding),
+              onUpgrade: handleUpgradeBuilding,
+              onCollect: handleCollectGold,
+              onAction: (actionType, details) => {
+                console.log(`Action initiated from building ${selectedBuilding}:`, actionType, details);
+              }
+            })}
+          </Modal>
+        )}
+
+        {/* Settings Full-Screen View Overlay */}
+        {activeTab === 'settings' && (
+          <SettingsView 
+            onBack={() => setActiveTab('quests')}
+            userId={profile?.id}
+            userEmail={session?.user?.email}
+            onSwitchUser={handleSwitchUser}
+          />
+        )}
+
+        {/* Dashboard Full-Screen View Overlay */}
+        {activeTab === 'dashboard' && (
+          <DashboardView 
+            onBack={() => setActiveTab('quests')}
+            userId={profile?.id}
+            profile={profile}
+            onRefresh={() => fetchUserData(session.user.id)}
+          />
+        )}
+
+        {/* Treasury Full-Screen View Overlay */}
+        {activeTab === 'treasury' && (
+          <TreasuryView 
+            onBack={() => setActiveTab('quests')}
+            treasuryData={treasuryBuilding}
+            profile={profile}
+            onRefresh={() => fetchUserData(session.user.id)}
+            initialLedgerMode="menu"
+            initialShowLedger={false}
+          />
+        )}
+
+        {/* Transactions Full-Screen View Overlay */}
+        {activeTab === 'transactions' && (
+          <TransactionsView 
+            onBack={() => setActiveTab('quests')}
+            userId={profile?.id}
+            profile={profile}
+            onRefresh={() => fetchUserData(session.user.id)}
+          />
+        )}
+
+      </div>
     </div>
   );
 }

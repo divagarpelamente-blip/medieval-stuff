@@ -1,16 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&family=Inter:wght@300;400;600;700&display=swap');
 
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
 :root {
+  --gold: #ffd700;
+  --diamond: #00f2ff;
+  --exp: #32CD32;
+  --wood: #5d4037;
+  --stone: #455a64;
+  --red-badge: #ff4444;
+
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: dark;
   color: #f5f5f4;
-  background-color: #0c0a09;
+  background-color: #0a0a0a;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -22,18 +29,174 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  @apply bg-stone-950 bg-medieval-pattern;
+  @apply bg-[#0a0a0a];
+  overflow: hidden;
 }
+
+.medieval-font { font-family: 'MedievalSharp', cursive; }
+.title-font { font-family: 'Cinzel', serif; }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Cinzel', serif;
-  @apply text-medieval-gold;
+  color: #4b2c20;
+}
+
+.game-viewport {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  /* Sky to Grass Background mimicking the reference image */
+  background: linear-gradient(to bottom, 
+    #87ceeb 0%, 
+    #b3e5fc 30%, 
+    #aed581 60%, 
+    #55a630 100%
+  );
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responsive adjustments for iPad/Desktop */
+@media (min-width: 768px) {
+  body {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #050505;
+    overflow: hidden;
+  }
+
+  .game-viewport {
+    width: 1024px;
+    height: 768px; /* Classic iPad Resolution */
+    max-width: 95vw;
+    max-height: 90vh;
+    position: relative;
+    border-radius: 3.5rem;
+    border: 14px solid #1c1917;
+    box-shadow: 0 50px 100px -20px rgba(0,0,0,1), 0 0 40px rgba(212, 175, 55, 0.15);
+  }
+  
+  /* Notch simulation for iPad */
+  .game-viewport::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 25px;
+    background: #1c1917;
+    border-radius: 0 0 15px 15px;
+    z-index: 100;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-pulse-custom {
+  animation: pulse 1.5s infinite;
 }
 
 .glass-card {
-  @apply bg-stone-900/80 backdrop-blur-md border border-stone-800 shadow-xl;
+  @apply bg-black/60 backdrop-blur-md border border-white/10 shadow-xl;
 }
 
-.medieval-button {
-  @apply bg-medieval-wood hover:bg-medieval-woodDark text-medieval-gold font-bold py-2 px-4 rounded border-2 border-medieval-gold shadow-lg transition-all active:scale-95;
+.quest-tracker {
+  background: var(--tudor-cream);
+  border: 3px solid var(--tudor-brown);
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 0 var(--tudor-brown);
+}
+
+.quest-tracker p:first-child {
+  color: var(--tudor-brown);
+  opacity: 0.6;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.quest-tracker p:last-child {
+  color: var(--tudor-brown);
+  font-weight: 700;
+}
+
+.resource-pill {
+  display: flex;
+  items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid var(--tudor-brown);
+  padding: 0.4rem 1rem;
+  border-radius: 9999px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.resource-pill span {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  color: var(--tudor-brown);
+}
+.resource-pill.gold {
+  border-color: #fdd835;
+}
+
+.resource-pill.diamond {
+  border-color: #00e5ff;
+}
+
+@keyframes fire {
+  from { transform: translateX(0) scale(1); opacity: 0.8; }
+  to { transform: translateX(10px) scale(1.5); opacity: 0; }
+}
+
+/* Custom Scrollbars to fit the parchment and wood medieval aesthetic */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(75, 44, 32, 0.05);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 44, 32, 0.4);
+  border-radius: 4px;
+  border: 1px solid rgba(244, 228, 188, 0.5);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 44, 32, 0.6);
+}
+
+/* Extremely subtle/low-visibility scrollbar */
+.custom-scrollbar-subtle::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar-subtle::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar-subtle::-webkit-scrollbar-thumb {
+  background: rgba(75, 44, 32, 0.15);
+  border-radius: 2px;
+}
+.custom-scrollbar-subtle::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 44, 32, 0.4);
 }
