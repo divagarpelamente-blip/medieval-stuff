@@ -1,4 +1,3 @@
-import React from 'react';
 
 const HitZone = ({ onClick, style, label, disabled = true }) => (
   <div 
@@ -17,7 +16,7 @@ const HitZone = ({ onClick, style, label, disabled = true }) => (
   </div>
 );
 
-const IsometricMap = ({ onMineClick }) => {
+const IsometricMap = ({ onMineClick, onTreasuryClick }) => {
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* 1. Gold Mine (Active) */}
@@ -28,10 +27,11 @@ const IsometricMap = ({ onMineClick }) => {
         style={{ top: '22%', left: '8%', width: '18%', height: '22%' }}
       />
 
-      {/* 2. Treasury (Disabled) */}
+      {/* 2. Treasury (Active) */}
       <HitZone 
         label="Royal Treasury"
-        disabled={true}
+        onClick={onTreasuryClick}
+        disabled={false}
         style={{ top: '48%', left: '12%', width: '32%', height: '38%' }}
       />
 

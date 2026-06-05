@@ -1,4 +1,3 @@
-import React from 'react';
 
 const HUD = ({ profile, diamonds = 1000 }) => {
   const level = profile?.level || 1;
