@@ -19,6 +19,15 @@ const saveLocal = (key, val) => {
   }
 };
 
+// Purge legacy local storage keys that no longer map to the new Engine structure
+['classOptions', 'subClassOptions', 'statusOptions', 'monthOptions'].forEach(key => {
+  try {
+    localStorage.removeItem(`eldoria_${key}`);
+  } catch {
+    // Ignore
+  }
+});
+
 export const useKingdomStore = create((set, get) => ({
   gold: 1000,
   gems: 100,
@@ -31,9 +40,9 @@ export const useKingdomStore = create((set, get) => ({
 
   // Dropdown manage lists
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
-  statusOptions: loadLocal('statusOptions', ['Pending', 'Overdue', 'Paid on Time', 'Paid Late']),
-  classOptions: loadLocal('classOptions', ['Income', 'Expense', 'Savings', 'Debt']),
-  subClassOptions: loadLocal('subClassOptions', ['Cash receipt', 'Cash payment', 'Credit receipt', 'Credit payment']),
+  statusOptions: ['Pending', 'Overdue', 'Paid on Time', 'Paid Late'],
+  classOptions: ['Income', 'Expense', 'Savings', 'Debt'],
+  subClassOptions: ['Cash receipt', 'Cash payment', 'Credit receipt', 'Credit payment'],
   entityOptions: loadLocal('entityOptions', [
     'Salary', 'Bonus', 'Shows', 'Cinema', 'Restaurant', 'Trips', 'Streaming',
     'Rent', 'Landlord', 'Energy', 'IMI', 'Repairs', 'Water', 'Gas', 'Internet',
@@ -57,10 +66,10 @@ export const useKingdomStore = create((set, get) => ({
     "Cofidis": "Other Banking",
     "Jota": "Burrowed", "Mae": "Burrowed"
   }),
-  monthOptions: loadLocal('monthOptions', [
+  monthOptions: [
     'January', 'February', 'March', 'April', 'May', 'June', 
     'July', 'August', 'September', 'October', 'November', 'December'
-  ]),
+  ],
 
   // Actions to manage options
   addOption: (type, value, extraData) => {
@@ -71,7 +80,11 @@ export const useKingdomStore = create((set, get) => ({
 
     const updated = [...currentList, value];
     set({ [key]: updated });
-    saveLocal(key, updated);
+    
+    // Only persist user-customizable options
+    if (['fromOptions', 'entityOptions', 'categoryOptions'].includes(key)) {
+      saveLocal(key, updated);
+    }
 
     // If adding an entity, we also add its category mapping
     if (type === 'entity' && extraData?.category) {
@@ -88,7 +101,10 @@ export const useKingdomStore = create((set, get) => ({
 
     const updated = currentList.filter(v => v !== value);
     set({ [key]: updated });
-    saveLocal(key, updated);
+    
+    if (['fromOptions', 'entityOptions', 'categoryOptions'].includes(key)) {
+      saveLocal(key, updated);
+    }
 
     if (type === 'entity') {
       const updatedMappings = { ...get().entityMappings };
