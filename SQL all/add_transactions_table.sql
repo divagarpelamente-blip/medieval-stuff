@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     sub_class TEXT,
     entity TEXT,
     category TEXT,
-    sub_category TEXT,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

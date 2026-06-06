@@ -92,7 +92,7 @@ client/src/utils/locales/
 
 1. **Explicit Locale Freeze**: Inside [i18n.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/i18n.js), secondary imports are commented out and the configuration strictly registers only the English namespace resource. The active runtime language (`lng`) and fallback (`fallbackLng`) are hardlocked to `'en'`.
 2. **Semantic Keys & Nested Tokenization**: All display text is systematically mapped to key calls. Hardcoded layout table headers inside [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx) (e.g. in the ledger and transaction history views) are refactored to use nested translation lookups:
-   - `t('ledger.headers.from')`, `t('ledger.headers.type')`, `t('ledger.headers.amount')`, etc.
+   - `t('ledger.headers.from')`, `t('ledger.headers.class')`, `t('ledger.headers.amount')`, etc.
    - These keys are centralized under the `ledger.headers` namespace inside the definitive [en.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/utils/locales/en.js) dictionary.
 3. **Custom Interpolation Delimiters**: Configured with `{` and `}` delimiters inside [i18n.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/i18n.js) to match the existing variables template structure (e.g. `t('success_added_gold', { amount: 100 })` maps to `Added {amount} Gold!`).
 4. **Dynamic Property Proxy Wrapper**: In [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx), the `t` translator hook runs behind a **JavaScript Proxy**. This intercepts property access (like `t.quests` or `t.manage_from`) and seamlessly maps it to target the active English dictionary keys, maintaining backwards compatibility with legacy layout styles.
@@ -154,7 +154,6 @@ Persistence and trigger logic is handled in the relational schema defined in **[
    | xp          INTEGER                |          | sub_class       TEXT               |
    | updated_at  TIMESTAMPTZ            |          | entity          TEXT               |
    +------------------------------------+          | category        TEXT               |
-                                                   | sub_category    TEXT               |
                                                    | status          TEXT               |
                                                    | created_at      TIMESTAMPTZ        |
                                                    +------------------------------------+
@@ -178,10 +177,12 @@ Contains the detailed financial ledger records.
 
 - `id` (`UUID`, PK, default: `gen_random_uuid()`)
 - `profile_id` (`UUID`, FK referencing `profiles.id`)
-- `class` (`TEXT` - unrestricted, supports `'Income'`, `'Expense'`, `'Savings'`, `'Debt'`)
+- `class` (Transaction Class) (`TEXT` - Core classification, supports `'Income'`, `'Expense'`, `'Savings'`, `'Debt'`)
+- `sub_class` (Transaction Subclass) (`TEXT` - e.g. `'Cash receipt'`, `'Credit payment'`)
+- `category` (Transaction Category) (`TEXT` - High-level grouping, e.g. `'Payroll'`, `'Housing'`)
+- `entity` (`TEXT` - Specific destination/origin, e.g. `'Salary'`, `'Rent'`)
 - `amount` (`BIGINT`) - Amount in gold coins.
-- `sub_class` / `entity` / `category` / `sub_category` (`TEXT`)
-- `status` (`TEXT` - e.g. `'Pending'`, `'Paid on Time'`).
+- `status` (`TEXT` - e.g. `'Pending'`, `'Paid on Time'`, `'Completed'`).
 
 ### Automated Database Triggers
 
@@ -220,9 +221,9 @@ All key indicators (Inflows, Outflows, Net Balance, Efficiency Rate, Receivables
 
 ### C. Refactored SVG Visualizations
 
-- **Vertical Column Bar Chart (Flow by Category)**: Category labels sit on the horizontal X-axis. Positive incomes project upwards (emerald) and negative expenses project downwards (rose) from a zero baseline in the middle of the Y-axis. Vertical Y-axis gridlines scale dynamically based on the max volume.
-- **Spline Area Chart (Time Evolution)**: Connects chronological points across selected periods using horizontal cubic Bezier curves (`getBezierPath`). Renders separate splines for Income and Expense, filling the area beneath them with gradient masks at `0.35` opacity. Incorporates mouse hotspot nodes for triggering interactive tooltips.
-- **Hollow Center Donut Chart (Top Entities)**: Replaces the top entities list with a 5-slice SVG donut chart mapping total gold volumes. The hollow center embeds a wrapped text node displaying `[Calculated %] of Total Income Used`.
+- **Vertical Column Bar Chart (Flow by Category)**: Aggregates `dashboardFilteredTransactions` by the new `tx.category` groupings (e.g., Payroll, Housing, Markets). Category labels sit on the horizontal X-axis. Positive incomes project upwards (emerald) and negative expenses project downwards (rose) from a zero baseline in the middle of the Y-axis. Vertical Y-axis gridlines scale dynamically based on the max volume.
+- **Spline Area Chart (Time Evolution)**: Connects chronological points across selected periods using horizontal cubic Bezier curves (`getBezierPath`). Renders separate splines isolating `tx.class === 'Income'` versus all other expenses, filling the area beneath them with gradient masks at `0.35` opacity. Incorporates mouse hotspot nodes for triggering interactive tooltips.
+- **Hollow Center Donut Chart (Top Entities)**: Replaces the top entities list with a 5-slice SVG donut chart mapping total gold volumes grouped by `tx.entity` (e.g., Salary, Supermarket, Transport). The hollow center embeds a wrapped text node displaying `[Calculated %] of Total Income Used`.
 
 ---
 

@@ -12,7 +12,6 @@ DECLARE
     v_category TEXT;
     v_from TEXT;
     v_status TEXT;
-    v_sub_category TEXT := '';
     v_amount NUMERIC;
     v_date DATE;
     v_desc TEXT;
@@ -143,7 +142,16 @@ BEGIN
         v_desc := 'Mockup ' || v_entity || ' transaction';
 
         -- Insert transaction (database trigger auto-calculates month, year, quarter, and profile Gold/XP)
-        INSERT INTO public.transactions (profile_id, class, amount, "from", date, status, sub_class, entity, category, sub_category, description)
-        VALUES ('00000000-0000-0000-0000-000000000000', v_class, v_amount, v_from, v_date, v_status, v_sub_class, v_entity, v_category, v_sub_category, v_desc);
+        INSERT INTO public.transactions (
+            profile_id, class, sub_class, entity, category, 
+            amount, "from", date, month, year, quarter, status, description
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000000', v_class, v_sub_class, v_entity, v_category,
+            v_amount, v_from, v_date,
+            TRIM(to_char(v_date, 'Month')),
+            EXTRACT(YEAR FROM v_date),
+            'Q' || EXTRACT(QUARTER FROM v_date),
+            v_status, v_desc
+        );
     END LOOP;
 END $$;
