@@ -93,6 +93,7 @@ function App() {
   
   // Actions
   const fetchKingdomData = useKingdomStore((state) => state.fetchKingdomData);
+  const fetchDashboardTransactions = useKingdomStore((state) => state.fetchDashboardTransactions);
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
 
@@ -284,6 +285,13 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   useEffect(() => {
     fetchKingdomData(GUEST_PROFILE_ID);
   }, [fetchKingdomData]);
+
+  // Fetch heavy transaction array only when visiting the dashboard
+  useEffect(() => {
+    if (activeTab === 'dashboard' && transactions.length === 0) {
+      fetchDashboardTransactions(GUEST_PROFILE_ID);
+    }
+  }, [activeTab, fetchDashboardTransactions, transactions.length]);
 
   // Global key listener to return to previous screen on Escape
   useEffect(() => {

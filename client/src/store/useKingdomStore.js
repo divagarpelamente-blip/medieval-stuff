@@ -114,44 +114,53 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Fetch complete profile and historical state from Supabase
+  // Fetch lightweight profile data (single-row polling mechanics)
   fetchKingdomData: async (profileId) => {
     set({ isLoading: true });
     try {
-      const [profileRes, transRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', profileId)
-          .single(),
-        supabase
-          .from('transactions')
-          .select('*')
-          .eq('profile_id', profileId)
-          .order('created_at', { ascending: false })
-      ]);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', profileId)
+        .single();
 
-      if (profileRes.error) {
-        console.error('Error fetching profile:', profileRes.error);
-      }
-      if (transRes.error) {
-        console.error('Error fetching transactions:', transRes.error);
+      if (error) {
+        console.error('Error fetching profile:', error);
       }
 
-      const profileData = profileRes.data;
-      if (profileData) {
+      if (data) {
         set({
-          email: profileData.email || 'guest@medieval.stuff',
-          gold: profileData.gold ? Number(profileData.gold) : 1000,
-          level: profileData.level || 1,
-          xp: profileData.xp || 0,
+          email: data.email || 'guest@medieval.stuff',
+          gold: data.gold ? Number(data.gold) : 1000,
+          level: data.level || 1,
+          xp: data.xp || 0,
         });
-      }
-      if (transRes.data) {
-        set({ transactions: transRes.data });
       }
     } catch (err) {
       console.error('Failed to fetch kingdom data:', err);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // Isolated multi-row syncing mechanism for the Dashboard Engine
+  fetchDashboardTransactions: async (profileId) => {
+    set({ isLoading: true });
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('profile_id', profileId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+      }
+      if (data) {
+        set({ transactions: data });
+      }
+    } catch (err) {
+      console.error('Failed to fetch dashboard transactions:', err);
     } finally {
       set({ isLoading: false });
     }
