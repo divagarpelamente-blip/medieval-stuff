@@ -26,9 +26,10 @@ function App() {
   const [filterMonth, setFilterMonth] = useState('All');
   const [filterQuarter, setFilterQuarter] = useState('All');
   const [filterFrom, setFilterFrom] = useState('All');
-  const [filterType, setFilterType] = useState('All');
-  const [filterDate, setFilterDate] = useState('');
-  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterClass, setFilterClass] = useState('All');
+  const [filterSubClass, setFilterSubClass] = useState('All');
+  const [filterEntity, setFilterEntity] = useState('All');
 
   // Dashboard Page Sub-Tabs and Granularity state
   const [dashSubTab, setDashSubTab] = useState('overview'); // overview, income_expense, payables_receivables
@@ -48,10 +49,10 @@ function App() {
   // Bind Zustand options
   const fromOptions = useKingdomStore((state) => state.fromOptions);
   const statusOptions = useKingdomStore((state) => state.statusOptions);
-  const categoryOptions = useKingdomStore((state) => state.categoryOptions);
-  const subcategoryOptions = useKingdomStore((state) => state.subcategoryOptions);
+  const classOptions = useKingdomStore((state) => state.classOptions);
+  const subClassOptions = useKingdomStore((state) => state.subClassOptions);
   const entityOptions = useKingdomStore((state) => state.entityOptions);
-  const entityCategoryOptions = useKingdomStore((state) => state.entityCategoryOptions);
+  const categoryOptions = useKingdomStore((state) => state.categoryOptions);
   const entityMappings = useKingdomStore((state) => state.entityMappings);
   const monthOptions = useKingdomStore((state) => state.monthOptions);
 
@@ -127,9 +128,10 @@ function App() {
     if (filterMonth !== 'All' && tx.month !== filterMonth) return false;
     if (filterQuarter !== 'All' && tx.quarter !== filterQuarter) return false;
     if (filterFrom !== 'All' && tx.from !== filterFrom) return false;
-    if (filterType !== 'All' && tx.class !== filterType) return false;
-    if (filterDate && tx.date !== filterDate) return false;
-    if (filterCategory !== 'All' && tx.class !== filterCategory) return false;
+    if (filterStatus !== 'All' && tx.status !== filterStatus) return false;
+    if (filterClass !== 'All' && tx.class !== filterClass) return false;
+    if (filterSubClass !== 'All' && tx.sub_class !== filterSubClass) return false;
+    if (filterEntity !== 'All' && tx.entity !== filterEntity) return false;
     return true;
   }).sort((a, b) => {
     const dateA = new Date(a.date || a.created_at);
@@ -320,30 +322,30 @@ function App() {
   }, [statusOptions, txStatus]);
 
   useEffect(() => {
-    if (categoryOptions && !categoryOptions.includes(txClass)) {
-      setTxClass(categoryOptions[0] || '');
+    if (classOptions && !classOptions.includes(txClass)) {
+      setTxClass(classOptions[0] || '');
     }
-  }, [categoryOptions, txClass]);
+  }, [classOptions, txClass]);
 
   useEffect(() => {
-    if (subcategoryOptions && !subcategoryOptions.includes(txSubClass)) {
-      setTxSubClass(subcategoryOptions[0] || '');
+    if (subClassOptions && !subClassOptions.includes(txSubClass)) {
+      setTxSubClass(subClassOptions[0] || '');
     }
-  }, [subcategoryOptions, txSubClass]);
+  }, [subClassOptions, txSubClass]);
 
   useEffect(() => {
     if (entityOptions && !entityOptions.includes(txEntity)) {
       const firstEntity = entityOptions[0] || '';
       setTxEntity(firstEntity);
-      setTxCategory(entityMappings[firstEntity] || entityCategoryOptions[0] || '');
+      setTxCategory(entityMappings[firstEntity] || categoryOptions[0] || '');
     }
-  }, [entityOptions, entityMappings, txEntity, entityCategoryOptions]);
+  }, [entityOptions, entityMappings, txEntity, categoryOptions]);
 
   useEffect(() => {
-    if (entityCategoryOptions && !entityCategoryOptions.includes(txCategory)) {
-      setTxCategory(entityCategoryOptions[0] || '');
+    if (categoryOptions && !categoryOptions.includes(txCategory)) {
+      setTxCategory(categoryOptions[0] || '');
     }
-  }, [entityCategoryOptions, txCategory]);
+  }, [categoryOptions, txCategory]);
 
   const renderSettingsPanel = () => {
     let title = '';
@@ -359,22 +361,22 @@ function App() {
         title = t.manage_status;
         currentList = statusOptions;
         break;
-      case 'category':
+      case 'class':
         title = t.manage_category;
-        currentList = categoryOptions;
+        currentList = classOptions;
         break;
-      case 'subcategory':
+      case 'subClass':
         title = t.manage_subcategory;
-        currentList = subcategoryOptions;
+        currentList = subClassOptions;
         break;
       case 'entity':
         title = t.manage_entity;
         currentList = entityOptions;
         showEntityCategorySelector = true;
         break;
-      case 'entityCategory':
+      case 'category':
         title = t.manage_entityCategory;
-        currentList = entityCategoryOptions;
+        currentList = categoryOptions;
         break;
       case 'month':
         title = t.manage_month;
@@ -442,7 +444,7 @@ function App() {
                   onChange={(e) => setNewEntityCatVal(e.target.value)}
                   className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                 >
-                  {entityCategoryOptions.map((opt) => (
+                  {categoryOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
@@ -508,8 +510,8 @@ function App() {
     setTxFrom(fromOptions[0] || 'Pedro');
     setTxDate(new Date().toISOString().split('T')[0]);
     setTxStatus(statusOptions[0] || 'Pending');
-    setTxClass(categoryOptions[0] || 'Income');
-    setTxSubClass(subcategoryOptions[0] || 'Cash receipt');
+    setTxClass(classOptions[0] || 'Income');
+    setTxSubClass(subClassOptions[0] || 'Cash receipt');
     setTxEntity(entityOptions[0] || 'Salary');
     setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
     setTxDescription('');
@@ -739,12 +741,12 @@ function App() {
       setTxAmount('');
       setTxDescription('');
       setTxFrom(fromOptions[0] || 'Pedro');
-      setTxSubClass(subcategoryOptions[0] || 'Cash receipt');
+      setTxSubClass(subClassOptions[0] || 'Cash receipt');
       setTxEntity(entityOptions[0] || 'Salary');
       setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
       setTxDate(new Date().toISOString().split('T')[0]);
       setTxStatus(statusOptions[0] || 'Pending');
-      setTxClass(categoryOptions[0] || 'Income');
+      setTxClass(classOptions[0] || 'Income');
       setIsMineModalOpen(false);
       setIsNewTxModalOpen(false);
     } else {
@@ -839,10 +841,10 @@ function App() {
                   {[
                     { id: 'from', label: t.manage_from, icon: '👤' },
                     { id: 'status', label: t.manage_status, icon: '📊' },
-                    { id: 'category', label: t.manage_category, icon: '📁' },
-                    { id: 'subcategory', label: t.manage_subcategory, icon: '📂' },
+                    { id: 'class', label: t.manage_category, icon: '📁' },
+                    { id: 'subClass', label: t.manage_subcategory, icon: '📂' },
                     { id: 'entity', label: t.manage_entity, icon: '🏢' },
-                    { id: 'entityCategory', label: t.manage_entityCategory, icon: '🏷️' },
+                    { id: 'category', label: t.manage_entityCategory, icon: '🏷️' },
                     { id: 'month', label: t.manage_month, icon: '📅' }
                   ].map((btn) => {
                     const isSel = selectedSettingType === btn.id;
@@ -904,53 +906,6 @@ function App() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Row 1 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Type Selection */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.class}
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 h-11 md:h-[38px]">
-                    <button
-                      type="button"
-                      onClick={() => setTxClass('income')}
-                      className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txClass === 'income'
-                          ? 'bg-emerald-800/20 border-emerald-600 text-emerald-800 shadow-sm'
-                          : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50'
-                      }`}
-                    >
-                      🟢 {t.income}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTxClass('expense')}
-                      className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txClass === 'expense'
-                          ? 'bg-rose-800/20 border-rose-600 text-rose-800 shadow-sm'
-                          : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50'
-                      }`}
-                    >
-                      🔴 {t.expense}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Amount */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.amount_gold}
-                  </label>
-                  <input
-                    type="number"
-                    value={txAmount}
-                    onChange={(e) => setTxAmount(e.target.value)}
-                    placeholder={t('placeholder.amount')}
-                    required
-                    min="1"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                  />
-                </div>
-
                 {/* From */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
@@ -980,10 +935,23 @@ function App() {
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
-              </div>
 
-              {/* Row 2 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Amount */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    {t.amount_gold}
+                  </label>
+                  <input
+                    type="number"
+                    value={txAmount}
+                    onChange={(e) => setTxAmount(e.target.value)}
+                    placeholder={t('placeholder.amount')}
+                    required
+                    min="1"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                  />
+                </div>
+
                 {/* Status */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
@@ -999,8 +967,11 @@ function App() {
                     ))}
                   </select>
                 </div>
+              </div>
 
-                {/* Category */}
+              {/* Row 2 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Class */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.class}
@@ -1010,7 +981,7 @@ function App() {
                     onChange={(e) => setTxClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
-                    {categoryOptions.map((opt) => (
+                    {classOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
@@ -1026,7 +997,7 @@ function App() {
                     onChange={(e) => setTxSubClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
-                    {subcategoryOptions.map((opt) => (
+                    {subClassOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
@@ -1040,35 +1011,27 @@ function App() {
                   <select
                     value={txEntity}
                     onChange={(e) => handleEntityChange(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
                   >
-                    {entityOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 3 */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Entity Category */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.category}
-                  </label>
-                  <select
-                    value={txCategory}
-                    onChange={(e) => setTxCategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    {entityCategoryOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
+                    {Object.entries(
+                      entityOptions.reduce((acc, opt) => {
+                        const cat = entityMappings[opt] || 'Uncategorized';
+                        if (!acc[cat]) acc[cat] = [];
+                        acc[cat].push(opt);
+                        return acc;
+                      }, {})
+                    ).map(([cat, opts]) => (
+                      <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
+                        {opts.map((opt) => (
+                          <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
 
                 {/* Description / Notes */}
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.description}
                   </label>
@@ -1110,27 +1073,29 @@ function App() {
                       <thead>
                         <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.date')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.month')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.year')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.quarter')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_class')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_category')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t.description}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
                         {transactions.map((tx) => (
                           <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
                             <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.date || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-serif italic text-stone-600">{tx.month || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.year || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                tx.status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                tx.status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                tx.status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                tx.status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                'bg-stone-100 text-stone-800 border border-stone-200'
+                              }`}>
+                                {tx.status || 'Completed'}
+                              </span>
+                            </td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                                 tx.class === 'Income' 
@@ -1140,26 +1105,14 @@ function App() {
                                 {tx.class}
                               </span>
                             </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                tx.status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                tx.status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
-                                tx.status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                                tx.status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
-                                'bg-stone-100 text-stone-800 border border-stone-200'
-                              }`}>
-                                {tx.status}
-                              </span>
-                            </td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.sub_class || '-'}</td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-medium">{tx.category || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-medium">{tx.sub_category || '-'}</td>
                             <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
                               tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'
                             }`}>
                               {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
                             </td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1233,53 +1186,6 @@ function App() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Row 1 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Type Selection */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.class}
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 h-11 md:h-[38px]">
-                    <button
-                      type="button"
-                      onClick={() => setTxClass('income')}
-                      className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txClass === 'income'
-                          ? 'bg-emerald-800/20 border-emerald-600 text-emerald-800 shadow-sm cursor-pointer'
-                          : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50 cursor-pointer'
-                      }`}
-                    >
-                      🟢 {t.income}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTxClass('expense')}
-                      className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txClass === 'expense'
-                          ? 'bg-rose-800/20 border-rose-600 text-rose-800 shadow-sm cursor-pointer'
-                          : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50 cursor-pointer'
-                      }`}
-                    >
-                      🔴 {t.expense}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Amount */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.amount_gold}
-                  </label>
-                  <input
-                    type="number"
-                    value={txAmount}
-                    onChange={(e) => setTxAmount(e.target.value)}
-                    placeholder={t('placeholder.amount')}
-                    required
-                    min="1"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                  />
-                </div>
-
                 {/* From */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
@@ -1309,10 +1215,23 @@ function App() {
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
-              </div>
 
-              {/* Row 2 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Amount */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    {t.amount_gold}
+                  </label>
+                  <input
+                    type="number"
+                    value={txAmount}
+                    onChange={(e) => setTxAmount(e.target.value)}
+                    placeholder={t('placeholder.amount')}
+                    required
+                    min="1"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                  />
+                </div>
+
                 {/* Status */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
@@ -1328,8 +1247,11 @@ function App() {
                     ))}
                   </select>
                 </div>
+              </div>
 
-                {/* Category */}
+              {/* Row 2 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Class */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.class}
@@ -1339,7 +1261,7 @@ function App() {
                     onChange={(e) => setTxClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
-                    {categoryOptions.map((opt) => (
+                    {classOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
@@ -1355,7 +1277,7 @@ function App() {
                     onChange={(e) => setTxSubClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
-                    {subcategoryOptions.map((opt) => (
+                    {subClassOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
@@ -1369,35 +1291,27 @@ function App() {
                   <select
                     value={txEntity}
                     onChange={(e) => handleEntityChange(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
                   >
-                    {entityOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 3 */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Entity Category */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.category}
-                  </label>
-                  <select
-                    value={txCategory}
-                    onChange={(e) => setTxCategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    {entityCategoryOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
+                    {Object.entries(
+                      entityOptions.reduce((acc, opt) => {
+                        const cat = entityMappings[opt] || 'Uncategorized';
+                        if (!acc[cat]) acc[cat] = [];
+                        acc[cat].push(opt);
+                        return acc;
+                      }, {})
+                    ).map(([cat, opts]) => (
+                      <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
+                        {opts.map((opt) => (
+                          <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
 
                 {/* Description / Notes */}
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.description}
                   </label>
@@ -2007,9 +1921,10 @@ function App() {
                           setFilterMonth('All');
                           setFilterQuarter('All');
                           setFilterFrom('All');
-                          setFilterType('All');
-                          setFilterDate('');
-                          setFilterCategory('All');
+                          setFilterStatus('All');
+                          setFilterClass('All');
+                          setFilterSubClass('All');
+                          setFilterEntity('All');
                           toast.success(t.filters_cleared);
                         }}
                         className="text-[9px] font-black text-rose-800 hover:text-rose-955 uppercase transition-colors cursor-pointer"
@@ -2074,41 +1989,55 @@ function App() {
                         </select>
                       </div>
 
-                      {/* Type */}
+                      {/* Status */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.type_label}</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.status}</label>
                         <select
-                          value={filterType}
-                          onChange={(e) => setFilterType(e.target.value)}
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">{t.all_types}</option>
-                          <option value="income">{t.income}</option>
-                          <option value="expense">{t.expense}</option>
+                          <option value="All">{t.all_types || 'All Statuses'}</option>
+                          {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
 
-                      {/* Date */}
+                      {/* Class */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.date_label}</label>
-                        <input
-                          type="date"
-                          value={filterDate}
-                          onChange={(e) => setFilterDate(e.target.value)}
-                          className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-0.5 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513] h-[26px]"
-                        />
-                      </div>
-
-                      {/* Category */}
-                      <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.category_label}</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.class}</label>
                         <select
-                          value={filterCategory}
-                          onChange={(e) => setFilterCategory(e.target.value)}
+                          value={filterClass}
+                          onChange={(e) => setFilterClass(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">{t.all_categories}</option>
-                          {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                          <option value="All">{t.all_types || 'All Classes'}</option>
+                          {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Sub Class */}
+                      <div>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.sub_class}</label>
+                        <select
+                          value={filterSubClass}
+                          onChange={(e) => setFilterSubClass(e.target.value)}
+                          className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
+                        >
+                          <option value="All">{t.all_types || 'All Sub Classes'}</option>
+                          {subClassOptions.map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Entity */}
+                      <div>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.entity}</label>
+                        <select
+                          value={filterEntity}
+                          onChange={(e) => setFilterEntity(e.target.value)}
+                          className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
+                        >
+                          <option value="All">{t.all_types || 'All Entities'}</option>
+                          {entityOptions.map(e => <option key={e} value={e}>{e}</option>)}
                         </select>
                       </div>
                     </div>
@@ -2124,19 +2053,29 @@ function App() {
                         <thead>
                           <tr className="bg-[#8b4513] border-b border-[#8b4513]/20 text-[#ffd700] font-black uppercase tracking-wider title-font sticky top-0 z-20">
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_class')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_category')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t.description}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
                           {filteredTransactions.map((tx) => (
                             <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
                               <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                  tx.status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                  tx.status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                  tx.status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                  tx.status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                  'bg-stone-100 text-stone-800 border border-stone-200'
+                                }`}>
+                                  {tx.status || 'Completed'}
+                                </span>
+                              </td>
                               <td className="py-2 px-3 whitespace-nowrap">
                                 <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                                   tx.class === 'Income' 
@@ -2146,16 +2085,14 @@ function App() {
                                   {tx.class}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.date || '-'}</td>
-                              <td className="py-2 px-3 whitespace-nowrap font-serif italic text-stone-600">{tx.month || '-'}</td>
-                              <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.year || '-'}</td>
-                              <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
-                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.class}</td>
+                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.sub_class || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                               <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
                                 tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'
                               }`}>
                                 {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                               </td>
+                              <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2216,3 +2153,4 @@ function App() {
 }
 
 export default App;
+

@@ -32,34 +32,30 @@ export const useKingdomStore = create((set, get) => ({
   // Dropdown manage lists
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
   statusOptions: loadLocal('statusOptions', ['Pending', 'Overdue', 'Paid on Time', 'Paid Late']),
-  categoryOptions: loadLocal('categoryOptions', ['Income', 'Expense', 'Savings', 'Debt']),
-  subcategoryOptions: loadLocal('subcategoryOptions', ['Cash receipt', 'Cash payment', 'Credit receipt', 'Credit payment']),
+  classOptions: loadLocal('classOptions', ['Income', 'Expense', 'Savings', 'Debt']),
+  subClassOptions: loadLocal('subClassOptions', ['Cash receipt', 'Cash payment', 'Credit receipt', 'Credit payment']),
   entityOptions: loadLocal('entityOptions', [
-    'Salary', 'Bonus', 'CGD', 'Universo', 'ActiveBank', 'WizInk', 
-    'Inter(Brasil)', 'Cofidis', 'Jota', 'Mae', 'Rent', 'Endesa', 
-    'Digal', 'Simas', 'NOS', 'Gasoline', 'Repairs', 'Fees', 'Via Verde'
+    'Salary', 'Bonus', 'Shows', 'Cinema', 'Restaurant', 'Trips', 'Streaming',
+    'Rent', 'Landlord', 'Energy', 'IMI', 'Repairs', 'Water', 'Gas', 'Internet',
+    'Health Insurance', 'Medicine', 'Health Fees', 'Medical Appointments', 'Medical Exams',
+    'Supermarket', 'Tools and Equipment', 'Clothing', 'Gasoline', 'Transport Insurance', 
+    'Uber/Glovo/Taxi', 'Vehicle repairs', 'Tolls', 'Parking', 'Bus', 'CGD', 'Universo', 
+    'ActiveBank', 'WizInk', 'Inter(Brasil)', 'Cofidis', 'Jota', 'Mae'
   ]),
-  entityCategoryOptions: loadLocal('entityCategoryOptions', ['Payroll', 'Bank (Credit Card)', 'Rent', 'Utilities', 'Transports']),
+  categoryOptions: loadLocal('categoryOptions', [
+    'Payroll', 'Entertainment', 'Housing', 'Health', 'Markets', 
+    'Transport', 'Banking', 'Other Banking', 'Burrowed'
+  ]),
   entityMappings: loadLocal('entityMappings', {
-    'Salary': 'Payroll',
-    'Bonus': 'Payroll',
-    'CGD': 'Bank (Credit Card)',
-    'Universo': 'Bank (Credit Card)',
-    'ActiveBank': 'Bank (Credit Card)',
-    'WizInk': 'Bank (Credit Card)',
-    'Inter(Brasil)': 'Bank (Credit Card)',
-    'Cofidis': 'Bank (Credit Card)',
-    'Jota': 'Bank (Credit Card)',
-    'Mae': 'Bank (Credit Card)',
-    'Rent': 'Rent',
-    'Endesa': 'Utilities',
-    'Digal': 'Utilities',
-    'Simas': 'Utilities',
-    'NOS': 'Utilities',
-    'Gasoline': 'Transports',
-    'Repairs': 'Transports',
-    'Fees': 'Transports',
-    'Via Verde': 'Transports'
+    "Salary": "Payroll", "Bonus": "Payroll",
+    "Shows": "Entertainment", "Cinema": "Entertainment", "Restaurant": "Entertainment", "Trips": "Entertainment", "Streaming": "Entertainment",
+    "Rent": "Housing", "Landlord": "Housing", "Energy": "Housing", "IMI": "Housing", "Repairs": "Housing", "Water": "Housing", "Gas": "Housing", "Internet": "Housing",
+    "Health Insurance": "Health", "Medicine": "Health", "Health Fees": "Health", "Medical Appointments": "Health", "Medical Exams": "Health",
+    "Supermarket": "Markets", "Tools and Equipment": "Markets", "Clothing": "Markets",
+    "Gasoline": "Transport", "Transport Insurance": "Transport", "Uber/Glovo/Taxi": "Transport", "Vehicle repairs": "Transport", "Tolls": "Transport", "Parking": "Transport", "Bus": "Transport",
+    "CGD": "Banking", "Universo": "Banking", "ActiveBank": "Banking", "WizInk": "Banking", "Inter(Brasil)": "Banking",
+    "Cofidis": "Other Banking",
+    "Jota": "Burrowed", "Mae": "Burrowed"
   }),
   monthOptions: loadLocal('monthOptions', [
     'January', 'February', 'March', 'April', 'May', 'June', 
@@ -78,8 +74,8 @@ export const useKingdomStore = create((set, get) => ({
     saveLocal(key, updated);
 
     // If adding an entity, we also add its category mapping
-    if (type === 'entity' && extraData?.entityCategory) {
-      const updatedMappings = { ...get().entityMappings, [value]: extraData.entityCategory };
+    if (type === 'entity' && extraData?.category) {
+      const updatedMappings = { ...get().entityMappings, [value]: extraData.category };
       set({ entityMappings: updatedMappings });
       saveLocal('entityMappings', updatedMappings);
     }

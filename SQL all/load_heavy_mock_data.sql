@@ -21,9 +21,13 @@ DECLARE
     froms TEXT[] := ARRAY['Pedro', 'Reni', 'Consolidated'];
     statuses TEXT[] := ARRAY['Pending', 'Overdue', 'Paid on Time', 'Paid Late', 'Completed'];
     entities TEXT[] := ARRAY[
-        'Salary', 'Bonus', 'CGD', 'Universo', 'ActiveBank', 'WizInk', 
-        'Inter(Brasil)', 'Cofidis', 'Jota', 'Mae', 'Rent', 'Endesa', 
-        'Digal', 'Simas', 'NOS', 'Gasoline', 'Repairs', 'Fees', 'Via Verde'
+        'Salary', 'Bonus', 'Shows', 'Cinema', 'Restaurant', 'Trips', 'Streaming',
+        'Rent', 'Maintenance', 'Pillows', 'Health Insurance', 'Pharmacy', 'Doctor',
+        'Hypermarket', 'Market', 'Fish Market', 'Butcher', 'Baker', 'Fair',
+        'Fuel', 'Transport Insurance', 'Tolls', 'Maintenance Car', 'Public Transport',
+        'Account Cost', 'Card Annuity', 'Interest Paid', 'IRS', 'IUC', 'Fines',
+        'Interests Received', 'State Support', 'Gifts',
+        'Dad', 'Mom', 'Family', 'Friends'
     ];
 BEGIN
     -- 1. Ensure the Guest user exists
@@ -55,38 +59,58 @@ BEGIN
         v_entity := entities[1 + floor(random() * array_length(entities, 1))::INT];
         
         -- Map entity category, type, category, subcategory and amount realistically
-        CASE v_entity
-            WHEN 'Salary', 'Bonus' THEN 
+        CASE
+            WHEN v_entity IN ('Salary', 'Bonus') THEN 
                 v_category := 'Payroll';
                 v_class := 'Income';
                 v_sub_class := 'Cash receipt';
-                v_amount := 800 + floor(random() * 1800); -- Higher amounts for salaries/bonuses
-            WHEN 'CGD', 'Universo', 'ActiveBank', 'WizInk', 'Inter(Brasil)', 'Cofidis', 'Jota', 'Mae' THEN 
-                v_category := 'Bank (Credit Card)';
-                IF random() < 0.85 THEN
+                v_amount := 800 + floor(random() * 1800);
+            WHEN v_entity IN ('Shows', 'Cinema', 'Restaurant', 'Trips', 'Streaming') THEN 
+                v_category := 'Entertainment';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
+                v_amount := 15 + floor(random() * 60);
+            WHEN v_entity IN ('Rent', 'Maintenance', 'Pillows') THEN 
+                v_category := 'Housing';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
+                v_amount := 40 + floor(random() * 300);
+            WHEN v_entity IN ('Health Insurance', 'Pharmacy', 'Doctor') THEN 
+                v_category := 'Health';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
+                v_amount := 20 + floor(random() * 150);
+            WHEN v_entity IN ('Hypermarket', 'Market', 'Fish Market', 'Butcher', 'Baker', 'Fair') THEN 
+                v_category := 'Markets';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
+                v_amount := 30 + floor(random() * 120);
+            WHEN v_entity IN ('Fuel', 'Transport Insurance', 'Tolls', 'Maintenance Car', 'Public Transport') THEN 
+                v_category := 'Transport';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
+                v_amount := 10 + floor(random() * 70);
+            WHEN v_entity IN ('Account Cost', 'Card Annuity', 'Interest Paid', 'IRS', 'IUC', 'Fines') THEN 
+                v_category := 'Banking';
+                v_class := 'Expense';
+                v_sub_class := 'Credit payment';
+                v_amount := 40 + floor(random() * 300);
+            WHEN v_entity IN ('Interests Received', 'State Support', 'Gifts') THEN 
+                v_category := 'Other Banking';
+                v_class := 'Income';
+                v_sub_class := 'Cash receipt';
+                v_amount := 60 + floor(random() * 200);
+            WHEN v_entity IN ('Dad', 'Mom', 'Family', 'Friends') THEN 
+                v_category := 'Burrowed';
+                IF random() < 0.5 THEN
                     v_class := 'Expense';
-                    v_sub_class := 'Credit payment';
-                    v_amount := 30 + floor(random() * 450);
+                    v_sub_class := 'Cash payment';
+                    v_amount := 20 + floor(random() * 150);
                 ELSE
                     v_class := 'Income';
-                    v_sub_class := 'Credit receipt';
-                    v_amount := 10 + floor(random() * 150);
+                    v_sub_class := 'Cash receipt';
+                    v_amount := 20 + floor(random() * 150);
                 END IF;
-            WHEN 'Rent' THEN 
-                v_category := 'Rent';
-                v_class := 'Expense';
-                v_sub_class := 'Cash payment';
-                v_amount := 350 + floor(random() * 250);
-            WHEN 'Endesa', 'Digal', 'Simas', 'NOS' THEN 
-                v_category := 'Utilities';
-                v_class := 'Expense';
-                v_sub_class := 'Cash payment';
-                v_amount := 20 + floor(random() * 110);
-            ELSE -- 'Gasoline', 'Repairs', 'Fees', 'Via Verde'
-                v_category := 'Transports';
-                v_class := 'Expense';
-                v_sub_class := 'Cash payment';
-                v_amount := 10 + floor(random() * 120);
         END CASE;
 
         -- Select random origin/from

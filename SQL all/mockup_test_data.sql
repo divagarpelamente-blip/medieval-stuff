@@ -38,6 +38,6 @@ DELETE FROM public.transactions WHERE profile_id = '00000000-0000-0000-0000-0000
 -- 5. Insert mock transactions matching the new schema
 INSERT INTO public.transactions (profile_id, class, amount, "from", date, status, sub_class, entity, category, sub_category, description)
 VALUES
-    ('00000000-0000-0000-0000-000000000000', 'Income',  1000, 'Market Stall A', '2026-05-15', 'Completed', 'Central Market', 'Blacksmith Guild', 'Guild', 'Ore Sales', 'Venda de ferro refinado'),
-    ('00000000-0000-0000-0000-000000000000', 'Income',  500,  'Mine Cart 3',    '2026-05-20', 'Completed', 'Gold Mine', 'Mine Foreman', 'Internal', 'Gold Extraction', 'Extração de pepitas da veia sul'),
-    ('00000000-0000-0000-0000-000000000000', 'Expense', 200,  'Tavern Keep',    '2026-05-22', 'Completed', 'The Tavern', 'Tavern Owner', 'Merchant', 'Supplies', 'Compra de rações e cerveja para mineiros');
+    ('00000000-0000-0000-0000-000000000000', 'Income',  1000, 'Pedro', '2026-05-15', 'Completed', 'Cash receipt', 'Salary', 'Payroll', 'Monthly', 'Ordenado de Maio'),
+    ('00000000-0000-0000-0000-000000000000', 'Income',  500,  'Consolidated',    '2026-05-20', 'Completed', 'Cash receipt', 'Bonus', 'Payroll', 'Annual', 'Bónus de performance'),
+    ('00000000-0000-0000-0000-000000000000', 'Expense', 200,  'Reni',    '2026-05-22', 'Completed', 'Cash payment', 'Hypermarket', 'Markets', 'Supplies', 'Compras para o mês');
