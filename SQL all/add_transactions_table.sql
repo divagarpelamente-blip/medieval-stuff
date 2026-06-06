@@ -9,11 +9,13 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     month TEXT,
     year INTEGER,
     quarter TEXT,
-    status TEXT DEFAULT 'Completed',
-    "Transaction Class" TEXT NOT NULL,
-    "Transaction Subclass" TEXT,
+    payment_status TEXT DEFAULT 'Completed',
+    transaction_type TEXT NOT NULL,
+    transaction_subtype TEXT,
     entity TEXT,
-    "Transaction Category" TEXT,
+    transaction_category TEXT,
+    transaction_nature TEXT CHECK (transaction_nature IN ('cash','accrual')),
+    transaction_flow TEXT CHECK (transaction_flow IN ('inflow','outflow')),
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -43,9 +45,9 @@ BEGIN
     NEW.month := TRIM(to_char(NEW.date, 'Month'));
     NEW.quarter := 'Q' || EXTRACT(QUARTER FROM NEW.date);
     
-    -- Default status if null
-    IF NEW.status IS NULL OR NEW.status = '' THEN
-        NEW.status := 'Completed';
+    -- Default payment_status if null
+    IF NEW.payment_status IS NULL OR NEW.payment_status = '' THEN
+        NEW.payment_status := 'Completed';
     END IF;
 
     RETURN NEW;
@@ -68,7 +70,7 @@ DECLARE
     max_xp NUMERIC;
 BEGIN
     -- 4.1 Update gold balance
-    IF NEW."Transaction Class" = 'Income' THEN
+    IF NEW.transaction_type = 'Income' THEN
         UPDATE public.profiles
         SET gold = gold + CAST(NEW.amount AS BIGINT)
         WHERE id = NEW.profile_id;

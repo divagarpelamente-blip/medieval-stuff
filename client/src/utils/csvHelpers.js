@@ -5,12 +5,13 @@ export const handleExportCSV = (transactions, t) => {
     'amount',
     'from',
     'date',
-    'status',
-    'class',
-    'sub_class',
+    'payment_status',
+    'transaction_type',
+    'transaction_subtype',
     'entity',
-    'class',
-    'sub_class',
+    'transaction_category',
+    'transaction_nature',
+    'transaction_flow',
     'description'
   ];
 
@@ -20,9 +21,6 @@ export const handleExportCSV = (transactions, t) => {
     transactions.forEach((tx) => {
       const row = headers.map((header) => {
         let val = tx[header];
-        if (header === 'class' && tx.class !== undefined) {
-          val = tx.class;
-        }
         if (val === null || val === undefined) {
           return '';
         }
@@ -124,16 +122,16 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
         headers.forEach((header, idx) => {
           let val = row[idx] ? row[idx].trim() : '';
           // normalize header keys
-          if (header === 'entity class' || header === 'class') {
-            tx.class = val;
+          if (header === 'transaction_type' || header === 'entity class' || header === 'class' || header === 'classe') {
+            tx.transaction_type = val;
           } else if (header === 'from (origem)' || header === 'from') {
             tx.from = val;
-          } else if (header === 'classe' || header === 'class') {
-            tx.class = val;
-          } else if (header === 'sub classe' || header === 'sub_class') {
-            tx.subClass = val;
-          } else if (header === 'sub class' || header === 'sub_class') {
-            tx.subCategory = val;
+          } else if (header === 'transaction_subtype' || header === 'sub classe' || header === 'sub_class' || header === 'sub class') {
+            tx.transaction_subtype = val;
+          } else if (header === 'transaction_category' || header === 'category') {
+            tx.transaction_category = val;
+          } else if (header === 'payment_status' || header === 'status') {
+            tx.payment_status = val;
           } else if (header === 'ouro' || header === 'coins' || header === 'amount') {
             tx.amount = Number(val);
           } else {
@@ -142,20 +140,24 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
         });
 
         // Validation
-        if (!tx.class || !['Income', 'Expense', 'Savings', 'Debt'].includes(tx.class)) {
-          tx.class = 'Expense'; // default fallback
+        if (!tx.transaction_type || !['Income', 'Expense', 'Savings', 'Debt'].includes(tx.transaction_type)) {
+          tx.transaction_type = 'Expense'; // default fallback
         }
         if (!tx.amount || isNaN(tx.amount)) {
           tx.amount = 0; // default fallback
         }
-        if (!tx.class) {
-          tx.class = 'Internal';
-        }
-        if (!tx.subCategory) {
-          tx.subCategory = '';
-        }
         if (!tx.from) {
           tx.from = fromOptions[0] || 'Pedro';
+        }
+
+        // Derive nature and flow if they are missing
+        const isReceipt = tx.transaction_subtype ? tx.transaction_subtype.toLowerCase().includes('receipt') : false;
+        const isIncome = tx.transaction_type === 'Income';
+        if (!tx.transaction_nature) {
+          tx.transaction_nature = (tx.transaction_subtype && tx.transaction_subtype.toLowerCase().includes('cash')) ? 'cash' : 'accrual';
+        }
+        if (!tx.transaction_flow) {
+          tx.transaction_flow = (isIncome || isReceipt) ? 'inflow' : 'outflow';
         }
 
         listToInsert.push(tx);

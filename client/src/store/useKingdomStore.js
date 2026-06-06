@@ -122,7 +122,7 @@ export const useKingdomStore = create((set, get) => ({
         .from('profiles')
         .select('*')
         .eq('id', profileId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching profile:', error);
@@ -175,15 +175,16 @@ export const useKingdomStore = create((set, get) => ({
         .insert([
           {
             profile_id: profileId,
-            class: transactionData.class,
+            transaction_type: transactionData.transaction_type,
             amount: Number(transactionData.amount),
             from: transactionData.from,
             date: transactionData.date || null,
-            status: transactionData.status || 'Completed',
-            sub_class: transactionData.subClass,
+            payment_status: transactionData.payment_status || 'Completed',
+            transaction_subtype: transactionData.transaction_subtype,
             entity: transactionData.entity,
-            category: transactionData.category,
-            sub_category: transactionData.subCategory || '',
+            transaction_category: transactionData.transaction_category,
+            transaction_nature: transactionData.transaction_nature,
+            transaction_flow: transactionData.transaction_flow,
             description: transactionData.description
           }
         ])
@@ -228,15 +229,16 @@ export const useKingdomStore = create((set, get) => ({
     try {
       const formatted = transactionsList.map((tx) => ({
         profile_id: profileId,
-        class: tx.class,
+        transaction_type: tx.transaction_type,
         amount: Number(tx.amount),
         from: tx.from,
         date: tx.date || null,
-        status: tx.status || 'Completed',
-        sub_class: tx.subClass,
+        payment_status: tx.payment_status || 'Completed',
+        transaction_subtype: tx.transaction_subtype,
         entity: tx.entity,
-        category: tx.category,
-        sub_category: tx.subCategory || '',
+        transaction_category: tx.transaction_category,
+        transaction_nature: tx.transaction_nature,
+        transaction_flow: tx.transaction_flow,
         description: tx.description
       }));
 

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
     "client": "npm run dev --prefix client",
-    "server": "npm run dev --prefix server"
+    "server": "npm run dev --prefix server",
+    "save": "node auto_commit.js",
+    "push": "node auto_commit.js && git push"
   },
   "keywords": [],
   "author": "",

@@ -72,6 +72,8 @@ function App() {
   const [txCategory, setTxCategory] = useState('Payroll');
   const [txSubCategory] = useState('');
   const [txDescription, setTxDescription] = useState('');
+  const [txNature, setTxNature] = useState('cash');
+  const [txFlow, setTxFlow] = useState('outflow');
 
   // Auto-fill Entity Category when Entity changes
   const handleEntityChange = (entityVal) => {
@@ -131,9 +133,9 @@ function App() {
     if (filterMonth !== 'All' && tx.month !== filterMonth) return false;
     if (filterQuarter !== 'All' && tx.quarter !== filterQuarter) return false;
     if (filterFrom !== 'All' && tx.from !== filterFrom) return false;
-    if (filterStatus !== 'All' && tx.status !== filterStatus) return false;
-    if (filterClass !== 'All' && tx['Transaction Class'] !== filterClass) return false;
-    if (filterSubClass !== 'All' && tx['Transaction Subclass'] !== filterSubClass) return false;
+    if (filterStatus !== 'All' && tx.payment_status !== filterStatus) return false;
+    if (filterClass !== 'All' && tx.transaction_type !== filterClass) return false;
+    if (filterSubClass !== 'All' && tx.transaction_subtype !== filterSubClass) return false;
     if (filterEntity !== 'All' && tx.entity !== filterEntity) return false;
     return true;
   }).sort((a, b) => {
@@ -179,36 +181,36 @@ function App() {
 
   // Calculate Dashboard Stats (dependent on filters)
   
-  const dashInflow = engineData.classData.inflow;
-  const dashOutflow = engineData.classData.outflow;
-  const dashNetBalance = engineData.classData.net;
-  const dashEfficiencyRatio = dashInflow > 0 ? (dashNetBalance / dashInflow) * 100 : 0;
+  const dashInflow = engineData.total_income;
+  const dashOutflow = engineData.total_expenses;
+  const dashNetBalance = engineData.net_cash_balance;
+  const dashEfficiencyRatio = engineData.savings_efficiency;
   
-  const subclassInflow = engineData.subclassData.inflow;
-  const subclassOutflow = engineData.subclassData.outflow;
-  const subclassNet = engineData.subclassData.net;
+  const subclassInflow = engineData.total_receipts;
+  const subclassOutflow = engineData.total_payments;
+  const subclassNet = engineData.total_receipts - engineData.total_payments;
   const subclassEfficiencyRatio = subclassInflow > 0 ? (subclassNet / subclassInflow) * 100 : 0;
-const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx['Transaction Category']).filter(Boolean)));
+const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.transaction_category).filter(Boolean)));
   
   const timePoints = [...dashboardFilteredTransactions].reverse().reduce((acc, tx) => {
     const existing = acc.find(p => p.label === tx.month);
     if (existing) {
-      if (tx['Transaction Class'] === 'Income') existing.income += Number(tx.amount);
-      if (tx['Transaction Class'] !== 'Income') existing.expense += Number(tx.amount);
+      if ((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')) existing.income += Number(tx.amount);
+      if ((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')) existing.expense += Number(tx.amount);
     } else {
       acc.push({
         label: tx.month,
-        income: tx['Transaction Class'] === 'Income' ? Number(tx.amount) : 0,
-        expense: tx['Transaction Class'] !== 'Income' ? Number(tx.amount) : 0,
+        income: (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : 0,
+        expense: (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow') ? Number(tx.amount) : 0,
       });
     }
     return acc;
   }, []);
 
   const dashCategoryData = uniqueCategories.map((cat) => {
-    const catTxs = dashboardFilteredTransactions.filter((tx) => tx['Transaction Category'] === cat);
-    const income = catTxs.filter((tx) => tx['Transaction Class'] === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = catTxs.filter((tx) => tx['Transaction Class'] !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const catTxs = dashboardFilteredTransactions.filter((tx) => tx.transaction_category === cat);
+    const income = catTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expense = catTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { "Transaction Category": cat, income, expense, total: income + expense };
   }).filter((c) => c.total > 0);
 
@@ -222,8 +224,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     const [yearStr, monthStr] = label.split(' ');
     const matchedTxs = dashboardFilteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
 
-    const income = matchedTxs.filter((tx) => tx['Transaction Class'] === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = matchedTxs.filter((tx) => tx['Transaction Class'] !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const income = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expense = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { label, income, expense, total: income + expense };
   }).filter((t) => t.total > 0);
 
@@ -249,7 +251,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const uniqueFroms = Array.from(new Set(transactions.map(tx => tx.from).filter(Boolean)));
   const fromAllocation = uniqueFroms.map(fromName => {
     const amount = dashboardFilteredTransactions
-      .filter(tx => tx.from === fromName && tx['Transaction Class'] === 'Income')
+      .filter(tx => tx.from === fromName && (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow'))
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: fromName, amount };
   }).filter(f => f.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -260,24 +262,24 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const percentUsed = dashInflow > 0 ? ((entityVolumes.reduce((s, e) => s + e.totalClass, 0) / dashInflow) * 100) : 0;
 
   // Suggested Extra 3 - Entity Categories
-  const uniqueEntityCats = Array.from(new Set(transactions.map(tx => tx['Transaction Category']).filter(Boolean)));
+  const uniqueEntityCats = Array.from(new Set(transactions.map(tx => tx.transaction_category).filter(Boolean)));
   const entityCatExpenses = uniqueEntityCats.map(catName => {
     const amount = transactions
-      .filter(tx => tx['Transaction Category'] === catName && tx['Transaction Class'] !== 'Income')
+      .filter(tx => tx.transaction_category === catName && (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow'))
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: catName, amount };
   }).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
   const maxEntityCatExp = Math.max(...entityCatExpenses.map(c => c.amount), 1);
 
   // Payables & Receivables variables
-  const pendingIncomeList = transactions.filter(tx => tx['Transaction Class'] === 'Income' && tx.status === 'Pending');
-  const pendingExpenseList = transactions.filter(tx => tx['Transaction Class'] !== 'Income' && (tx.status === 'Pending' || tx.status === 'Overdue'));
+  const pendingIncomeList = transactions.filter(tx => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') && tx.payment_status === 'Pending');
+  const pendingExpenseList = transactions.filter(tx => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow') && (tx.payment_status === 'Pending' || tx.payment_status === 'Overdue'));
 
   const totalReceivables = pendingIncomeList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   const totalPayables = pendingExpenseList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
   const totalPendingExpensesCount = pendingExpenseList.length;
-  const totalOverdueExpensesCount = pendingExpenseList.filter(tx => tx.status === 'Overdue').length;
+  const totalOverdueExpensesCount = pendingExpenseList.filter(tx => tx.payment_status === 'Overdue').length;
   const overdueRate = totalPendingExpensesCount > 0 ? (totalOverdueExpensesCount / totalPendingExpensesCount) * 100 : 0;
 
 
@@ -548,15 +550,18 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     }
 
     const amountNum = Number(txAmount);
+
     const res = await registerTransaction(GUEST_PROFILE_ID, {
-      "Transaction Class": txClass,
+      transaction_type: txClass,
       amount: amountNum,
       from: txFrom,
       date: txDate,
-      status: txStatus,
-      subClass: txSubClass,
+      payment_status: txStatus,
+      transaction_subtype: txSubClass,
       entity: txEntity,
-      "Transaction Category": txCategory,
+      transaction_category: txCategory,
+      transaction_nature: txNature,
+      transaction_flow: txFlow,
       subCategory: txSubCategory,
       description: txDescription || `${txClass} log`
     });
@@ -874,6 +879,36 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
               </div>
 
+              {/* Row 3: Nature & Flow */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Nature
+                  </label>
+                  <select
+                    value={txNature}
+                    onChange={(e) => setTxNature(e.target.value)}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="accrual">Accrual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Flow
+                  </label>
+                  <select
+                    value={txFlow}
+                    onChange={(e) => setTxFlow(e.target.value)}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="inflow">Inflow</option>
+                    <option value="outflow">Outflow</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Submit Button */}
               <button
                 type="submit"
@@ -916,30 +951,30 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                             <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                tx.status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                tx.status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
-                                tx.status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                                tx.status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
                                 'bg-stone-100 text-stone-800 border border-stone-200'
                               }`}>
-                                {tx.status || 'Completed'}
+                                {tx.payment_status || 'Completed'}
                               </span>
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                tx['Transaction Class'] === 'Income' 
+                                (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
                                   : 'bg-rose-100 text-rose-800 border border-rose-250'
                               }`}>
-                                {tx['Transaction Class']}
+                                {tx.transaction_type}
                               </span>
                             </td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx['Transaction Subclass'] || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                             <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                              tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'
+                              (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
                             }`}>
-                              {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
+                              {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                           </tr>
@@ -957,28 +992,28 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           <div className="flex justify-between items-start">
                             <div>
                               <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                {tx.entity || tx['Transaction Class']}
+                                {tx.entity || tx.transaction_type}
                               </span>
                               <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                {tx.from} • {tx['Transaction Subclass'] || '-'}
+                                {tx.from} • {tx.transaction_subtype || '-'}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className={`font-mono font-black text-xs ${tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                              <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                               </div>
                               <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
-                                tx.status === 'Completed' 
+                                tx.payment_status === 'Completed' 
                                   ? 'bg-green-100 text-green-800 border border-green-200' 
                                   : 'bg-amber-100 text-amber-800 border border-amber-200'
                               }`}>
-                                {tx.status || 'Completed'}
+                                {tx.payment_status || 'Completed'}
                               </span>
                             </div>
                           </div>
                           <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
                             <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx['Transaction Category'] || '-'}</span>
+                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.transaction_category || '-'}</span>
                           </div>
                         </div>
                       ))}
@@ -1355,24 +1390,24 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       {/* Class Summary Row */}
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Income</span>
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total income</span>
                           <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">+{dashInflow.toLocaleString()}g</span>
                           <div className="absolute right-3 bottom-3 text-2xl opacity-15">📈</div>
                         </div>
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Expense</span>
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total expenses</span>
                           <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">-{dashOutflow.toLocaleString()}g</span>
                           <div className="absolute right-3 bottom-3 text-2xl opacity-15">📉</div>
                         </div>
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Net Balance</span>
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Net cash balance</span>
                           <span className={`title-font text-xl font-black mt-1 font-mono ${dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
                             {dashNetBalance >= 0 ? '+' : ''}{dashNetBalance.toLocaleString()}g
                           </span>
                           <div className="absolute right-3 bottom-3 text-2xl opacity-15">💰</div>
                         </div>
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Efficiency</span>
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Savings efficiency</span>
                           <span className={`title-font text-xl font-black mt-1 font-mono ${dashEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                             {dashEfficiencyRatio.toFixed(1)}%
                           </span>
@@ -1600,11 +1635,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                 <div key={tx.id} className="bg-[#faf4e5]/70 border border-[#8b4513]/10 rounded-lg p-2.5 flex justify-between items-center text-xs">
                                   <div className="space-y-0.5">
                                     <div className="font-bold text-[#4b2c20]">{tx.from} &rarr; {tx.entity}</div>
-                                    <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx['Transaction Class']}</div>
+                                    <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.transaction_type}</div>
                                   </div>
                                   <div className="text-right">
                                     <div className="font-mono font-black text-emerald-700">+{Number(tx.amount).toLocaleString()}g</div>
-                                    <span className="text-[8px] px-1 bg-amber-100 border border-amber-200 rounded text-amber-800 font-bold">{tx.status}</span>
+                                    <span className="text-[8px] px-1 bg-amber-100 border border-amber-200 rounded text-amber-800 font-bold">{tx.payment_status}</span>
                                   </div>
                                 </div>
                               ))}
@@ -1627,14 +1662,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           {pendingExpenseList.length > 0 ? (
                             <div className="space-y-2">
                               {pendingExpenseList.map((tx) => {
-                                const isOverdue = tx.status === 'Overdue';
+                                const isOverdue = tx.payment_status === 'Overdue';
                                 return (
                                   <div key={tx.id} className={`bg-[#faf4e5]/70 border rounded-lg p-2.5 flex justify-between items-center text-xs ${
                                     isOverdue ? 'border-red-300 bg-red-50/20' : 'border-[#8b4513]/10'
                                   }`}>
                                     <div className="space-y-0.5">
                                       <div className="font-bold text-[#4b2c20]">{tx.entity}</div>
-                                      <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx['Transaction Class']}</div>
+                                      <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.transaction_type}</div>
                                     </div>
                                     <div className="text-right">
                                       <div className="font-mono font-black text-rose-700">-{Number(tx.amount).toLocaleString()}g</div>
@@ -1642,7 +1677,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                         isOverdue 
                                           ? 'bg-red-100 border border-red-200 text-red-800 animate-pulse' 
                                           : 'bg-amber-100 border border-amber-200 text-amber-800'
-                                      }`}>{tx.status}</span>
+                                      }`}>{tx.payment_status}</span>
                                     </div>
                                   </div>
                                 );
@@ -1904,6 +1939,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Nature/Flow</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_class')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
@@ -1916,30 +1952,34 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                               <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
                               <td className="py-2 px-3 whitespace-nowrap">
                                 <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                  tx.status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                  tx.status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
-                                  tx.status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                                  tx.status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                  tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                  tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                  tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                  tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
                                   'bg-stone-100 text-stone-800 border border-stone-200'
                                 }`}>
-                                  {tx.status || 'Completed'}
+                                  {tx.payment_status || 'Completed'}
                                 </span>
                               </td>
                               <td className="py-2 px-3 whitespace-nowrap">
                                 <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                  tx['Transaction Class'] === 'Income' 
+                                  (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
                                     : 'bg-rose-100 text-rose-800 border border-rose-200'
                                 }`}>
-                                  {tx['Transaction Class']}
+                                  {tx.transaction_type}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx['Transaction Subclass'] || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase mr-1">{tx.transaction_nature || '-'}</span>
+                                <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase">{tx.transaction_flow || '-'}</span>
+                              </td>
+                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
                               <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                               <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                                tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'
+                                (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
                               }`}>
-                                {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                               </td>
                               <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                             </tr>
@@ -1957,28 +1997,32 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                             <div className="flex justify-between items-start">
                               <div>
                                 <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                  {tx.entity || tx['Transaction Class']}
+                                  {tx.entity || tx.transaction_type}
                                 </span>
                                 <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                  {tx.from} • {tx['Transaction Subclass'] || '-'}
+                                  {tx.from} • {tx.transaction_subtype || '-'}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className={`font-mono font-black text-xs ${tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                  {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                                 </div>
                                 <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
-                                  tx.status === 'Completed' 
+                                  tx.payment_status === 'Completed' 
                                     ? 'bg-green-100 text-green-800 border border-green-200' 
                                     : 'bg-amber-100 text-amber-800 border border-amber-200'
                                 }`}>
-                                  {tx.status || 'Completed'}
+                                  {tx.payment_status || 'Completed'}
                                 </span>
                               </div>
                             </div>
-                            <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
+                            <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between items-center text-[8.5px] text-stone-500 font-bold">
                               <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                              <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx['Transaction Category'] || '-'}</span>
+                              <div className="flex gap-1 flex-wrap justify-end">
+                                <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_nature || '-'}</span>
+                                <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_flow || '-'}</span>
+                                <span className="uppercase text-[8px] bg-amber-100 text-amber-800 px-1 rounded border border-amber-200">{tx.transaction_category || '-'}</span>
+                              </div>
                             </div>
                           </div>
                         ))}

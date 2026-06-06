@@ -36,8 +36,8 @@ VALUES
 DELETE FROM public.transactions WHERE profile_id = '00000000-0000-0000-0000-000000000000';
 
 -- 5. Insert mock transactions matching the new schema
-INSERT INTO public.transactions (profile_id, "Transaction Class", amount, "from", date, status, "Transaction Subclass", entity, "Transaction Category", description)
+INSERT INTO public.transactions (profile_id, transaction_type, amount, "from", date, payment_status, transaction_subtype, entity, transaction_category, transaction_nature, transaction_flow, description)
 VALUES
-    ('00000000-0000-0000-0000-000000000000', 'Income',  1000, 'Pedro', '2026-05-15', 'Completed', 'Cash receipt', 'Salary', 'Payroll', 'Ordenado de Maio'),
-    ('00000000-0000-0000-0000-000000000000', 'Income',  500,  'Consolidated',    '2026-05-20', 'Completed', 'Cash receipt', 'Bonus', 'Payroll', 'Bónus de performance'),
-    ('00000000-0000-0000-0000-000000000000', 'Expense', 200,  'Reni',    '2026-05-22', 'Completed', 'Cash payment', 'Hypermarket', 'Markets', 'Compras para o mês');
+    ('00000000-0000-0000-0000-000000000000', 'Income',  1000, 'Pedro', '2026-05-15', 'Completed', 'Cash receipt', 'Salary', 'Payroll', 'cash', 'inflow', 'Ordenado de Maio'),
+    ('00000000-0000-0000-0000-000000000000', 'Income',  500,  'Consolidated',    '2026-05-20', 'Completed', 'Cash receipt', 'Bonus', 'Payroll', 'cash', 'inflow', 'Bónus de performance'),
+    ('00000000-0000-0000-0000-000000000000', 'Expense', 200,  'Reni',    '2026-05-22', 'Completed', 'Cash payment', 'Hypermarket', 'Markets', 'cash', 'outflow', 'Compras para o mês');

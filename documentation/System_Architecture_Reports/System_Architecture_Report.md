@@ -106,21 +106,20 @@ The layout is structured using a mobile-first responsive framework that guarante
 
 Persistence and trigger logic is strictly bound to the 4-tier literal string architecture.
 
-```
    +------------------------------------+          +------------------------------------+
    |              profiles              |          |            transactions            |
    +------------------------------------+          +------------------------------------+
    | id          UUID (PK)              |<----+    | id                   UUID (PK)     |
    | email       TEXT                   |     |    | profile_id           UUID (FK)     |
-   | gold        BIGINT                 |     +---o| "Transaction Class"  TEXT          |
-   | level       INTEGER                |          | amount               NUMERIC       |
-   | xp          INTEGER                |          | "Transaction Subclass" TEXT        |
-   | updated_at  TIMESTAMPTZ            |          | entity               TEXT          |
-   +------------------------------------+          | "Transaction Category" TEXT        |
-                                                   | status               TEXT          |
+   | gold        BIGINT                 |     +---o| amount               NUMERIC       |
+   | level       INTEGER                |          | transaction_type     TEXT          |
+   | xp          INTEGER                |          | transaction_subtype  TEXT          |
+   | updated_at  TIMESTAMPTZ            |          | transaction_category TEXT          |
+   +------------------------------------+          | transaction_nature   TEXT (CHECK)  |
+                                                   | transaction_flow     TEXT (CHECK)  |
+                                                   | payment_status       TEXT          |
                                                    | created_at           TIMESTAMPTZ   |
                                                    +------------------------------------+
-```
 
 ### Table Definitions
 
@@ -130,32 +129,38 @@ Represents the lord's metadata and statistics.
 - `gold` (`BIGINT`) - Real-time wallet balance.
 
 #### 2. Table: `transactions`
-Contains the detailed financial ledger records natively utilizing literal space-separated column names.
-- `"Transaction Class"` (`TEXT` - e.g. `'Income'`, `'Expense'`)
-- `"Transaction Subclass"` (`TEXT` - e.g. `'Cash receipt'`, `'Cash payment'`)
-- `"Transaction Category"` (`TEXT` - High-level grouping, e.g. `'Payroll'`, `'Housing'`)
+Contains the detailed financial ledger records natively utilizing a modern `snake_case` schema with strict double-entry checks.
+- `transaction_type` (`TEXT` - e.g. `'Income'`, `'Expense'`)
+- `transaction_subtype` (`TEXT` - e.g. `'Cash receipt'`, `'Cash payment'`)
+- `transaction_category` (`TEXT` - High-level grouping, e.g. `'Payroll'`, `'Housing'`)
+- `transaction_nature` (`TEXT` - Matrix axis: `'cash'` or `'accrual'`)
+- `transaction_flow` (`TEXT` - Matrix axis: `'inflow'` or `'outflow'`)
 - `entity` (`TEXT` - Specific destination/origin)
 
 ### Automated Database Triggers
 
 When a new row is written into `transactions`:
-- If `NEW."Transaction Class" = 'Income'`: Adds the transaction amount to the user's `gold` balance, and increments `xp`.
-- If `NEW."Transaction Class" != 'Income'`: Subtracts the transaction amount from the user's `gold` balance.
+- If `NEW.transaction_type = 'Income'`: Adds the transaction amount to the user's `gold` balance, and increments `xp`.
+- If `NEW.transaction_type != 'Income'`: Subtracts the transaction amount from the user's `gold` balance.
 
 ---
 
 ## 6. Centralized 4-Tier Data Engine & Dashboard Architecture
 
-The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js` React Context Hook. Instead of running redundant `filter()` and `reduce()` loops inside every component, the engine parses raw transactions into pristine, pre-calculated 4-tier volumes exactly once per render.
+The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js` React Context Hook. Instead of running redundant `filter()` and `reduce()` loops inside every component, the engine parses raw transactions into pristine, pre-calculated 2x2 matrix volumes exactly once per render.
 
 ### A. Dual-Row KPI Summary
 The top-level dashboard displays two distinct statistical rows simultaneously without relying on global abstract modes:
-1. **Class Summary Row:** Total Class Income | Total Class Expense | Net Class Balance | Efficiency
-2. **Subclass Summary Row:** Total Subclass Receipts | Total Subclass Payments | Net Subclass Balance | Efficiency
+1. **Accrual Summary Row:** Total income | Total expenses | Savings efficiency
+2. **Cash Summary Row:** Total receipts | Total payments | Net cash balance
+
+These are strictly derived by the engine using the double-entry accounting constraints:
+- **Total income / Total expenses**: Uses `transaction_nature = 'accrual'` coupled with `'inflow'` or `'outflow'`.
+- **Total receipts / Total payments**: Uses `transaction_nature = 'cash'` coupled with `'inflow'` or `'outflow'`.
 
 ### B. Component-Level Pivoting (Autonomous Charts)
 The visualization components possess independent interactive logic to pivot their perspectives:
 
-*   **FlowByCategoryChart.jsx:** A local `[ Class | Subclass ]` toggle seamlessly swaps the bar chart metrics between mapping `Transaction Class` attributes (Income/Expense) and `Transaction Subclass` attributes (Receipts/Payments).
-*   **TimeEvolutionChart.jsx:** A unified SVG spline rendering system with an interactive **4-checkbox legend**, enabling overlay comparisons of `Class Income` vs `Sub Receipt` curves over the same temporal progression map.
-*   **TopEntitiesChart.jsx:** The donut chart automatically recalculates segment boundaries and tabular volumes based on a local `[ Class | Subclass ]` toggle, tapping directly into the `engineData.entityData` payload.
+*   **FlowByCategoryChart.jsx:** A local `[ Accrual | Cash ]` toggle seamlessly swaps the bar chart metrics between mapping `Total income`/`Total expenses` and `Total receipts`/`Total payments`.
+*   **TimeEvolutionChart.jsx:** A unified SVG spline rendering system with an interactive **4-checkbox legend**, enabling overlay comparisons of `Total income` vs `Total receipts` curves over the same temporal progression map.
+*   **TopEntitiesChart.jsx:** The donut chart automatically recalculates segment boundaries and tabular volumes based on a local toggle, tapping directly into the matrix data payload.

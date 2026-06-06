@@ -177,11 +177,11 @@ export default function TimeEvolutionChart({ timePoints, t }) {
       <div className="flex flex-wrap gap-2 mb-3 justify-center">
         <label className="flex items-center gap-1 cursor-pointer">
           <input type="checkbox" checked={activeLines.classIncome} onChange={() => toggleLine('classIncome')} className="accent-emerald-700 w-3 h-3" />
-          <span className="text-[9px] font-black text-emerald-800 uppercase">Class Income</span>
+          <span className="text-[9px] font-black text-emerald-800 uppercase">Total income</span>
         </label>
         <label className="flex items-center gap-1 cursor-pointer">
           <input type="checkbox" checked={activeLines.classExpense} onChange={() => toggleLine('classExpense')} className="accent-rose-700 w-3 h-3" />
-          <span className="text-[9px] font-black text-rose-800 uppercase">Class Expense</span>
+          <span className="text-[9px] font-black text-rose-800 uppercase">Total expenses</span>
         </label>
         <label className="flex items-center gap-1 cursor-pointer">
           <input type="checkbox" checked={activeLines.subReceipt} onChange={() => toggleLine('subReceipt')} className="accent-emerald-500 w-3 h-3" />
