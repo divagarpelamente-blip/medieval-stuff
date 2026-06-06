@@ -8,6 +8,9 @@ import bgMap from './assets/Medieval_Town_Backround.png';
 import { useKingdomStore } from './store/useKingdomStore';
 import { Toaster, toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import FlowByCategoryChart from './components/charts/FlowByCategoryChart';
+import TimeEvolutionChart from './components/charts/TimeEvolutionChart';
+import TopEntitiesChart from './components/charts/TopEntitiesChart';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -31,11 +34,11 @@ function App() {
   const [dashSubTab, setDashSubTab] = useState('overview'); // overview, income_expense, payables_receivables
   const [dashGranularity, setDashGranularity] = useState('quarter'); // month, quarter, year
 
-  // Interactive Diverging Bar Chart local controls
-  const [chartTimeHorizon, setChartTimeHorizon] = useState('all'); // all, moon, cycles
-  const [chartGranularity, setChartGranularity] = useState('all'); // all, Income, Expense, Savings
-  const [chartScaleMode, setChartScaleMode] = useState('absolute'); // absolute, percentage
-  const [chartTooltip, setChartTooltip] = useState(null); // { name, type, amount, percentage, x, y }
+  // Unified Sidebar Filter state
+  const [selectedYears, setSelectedYears] = useState([]);
+  const [selectedQuarters, setSelectedQuarters] = useState([]);
+  const [selectedMonths, setSelectedMonths] = useState([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar toggle
 
   // Settings manage states
   const [selectedSettingType, setSelectedSettingType] = useState('from');
@@ -90,6 +93,14 @@ function App() {
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
 
+  // Default to last 3 years on load
+  useEffect(() => {
+    if (transactions.length > 0 && selectedYears.length === 0) {
+      const allYears = Array.from(new Set(transactions.map((tx) => tx.year).filter(Boolean))).sort((a, b) => b - a);
+      setSelectedYears(allYears.slice(0, 3).map(String));
+    }
+  }, [transactions, selectedYears]);
+
   const profile = { email, gold, level, xp };
 
   const { t: originalT } = useTranslation();
@@ -126,12 +137,44 @@ function App() {
     return dateB - dateA;
   });
 
+  // Cascading Filtering Engine
+  const isFallbackState = selectedYears.length === 0 || (selectedYears.length > 0 && selectedQuarters.length === 0 && selectedMonths.length === 0);
+  
+  const quarterToMonths = {
+    'Q1': ['January', 'February', 'March'],
+    'Q2': ['April', 'May', 'June'],
+    'Q3': ['July', 'August', 'September'],
+    'Q4': ['October', 'November', 'December']
+  };
+
+  const dashboardFilteredTransactions = transactions.filter((tx) => {
+    if (isFallbackState) return false;
+    if (!selectedYears.includes(String(tx.year))) return false;
+
+    if (selectedQuarters.length > 0 && selectedMonths.length === 0) {
+      const allowedMonths = selectedQuarters.flatMap(q => quarterToMonths[q]);
+      return allowedMonths.includes(tx.month);
+    }
+
+    if (selectedMonths.length > 0 && selectedQuarters.length === 0) {
+      return selectedMonths.includes(tx.month);
+    }
+
+    if (selectedQuarters.length > 0 && selectedMonths.length > 0) {
+      const allowedFromQuarters = selectedQuarters.flatMap(q => quarterToMonths[q]);
+      const unionMonths = Array.from(new Set([...allowedFromQuarters, ...selectedMonths]));
+      return unionMonths.includes(tx.month);
+    }
+
+    return false;
+  }).sort((a, b) => new Date(a.date || a.created_at) - new Date(b.date || b.created_at));
+
   // Calculate Dashboard Stats (dependent on filters)
-  const dashInflow = transactions
+  const dashInflow = dashboardFilteredTransactions
     .filter((tx) => tx.type === 'income')
     .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
-  const dashOutflow = transactions
+  const dashOutflow = dashboardFilteredTransactions
     .filter((tx) => tx.type === 'expense')
     .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
@@ -141,8 +184,24 @@ function App() {
 
   // Group by category (based on dashboard filtered transactions)
   const categoriesList = ['Income', 'Expense', 'Savings', 'Debt'];
+  
+  const timePoints = [...dashboardFilteredTransactions].reverse().reduce((acc, tx) => {
+    const existing = acc.find(p => p.label === tx.month);
+    if (existing) {
+      if (tx.type === 'income') existing.income += Number(tx.amount);
+      if (tx.type === 'expense') existing.expense += Number(tx.amount);
+    } else {
+      acc.push({
+        label: tx.month,
+        income: tx.type === 'income' ? Number(tx.amount) : 0,
+        expense: tx.type === 'expense' ? Number(tx.amount) : 0,
+      });
+    }
+    return acc;
+  }, []);
+
   const dashCategoryData = categoriesList.map((cat) => {
-    const catTxs = transactions.filter((tx) => tx.category === cat);
+    const catTxs = dashboardFilteredTransactions.filter((tx) => tx.category === cat);
     const income = catTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     const expense = catTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { category: cat, income, expense, total: income + expense };
@@ -150,99 +209,13 @@ function App() {
 
   const maxDashCategoryVal = Math.max(...dashCategoryData.map(c => Math.max(c.income, c.expense)), 1);
 
-  // Group by category and subcategory for Diverging Bar Chart
-  const chartFilteredTransactions = transactions.filter((tx) => {
-    if (!tx.date) return chartTimeHorizon === 'all';
-    const txDate = new Date(tx.date);
-    const now = new Date();
-    if (chartTimeHorizon === 'moon') {
-      return txDate.getFullYear() === now.getFullYear() && txDate.getMonth() === now.getMonth();
-    }
-    if (chartTimeHorizon === 'cycles') {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(now.getDate() - 30);
-      return txDate >= thirtyDaysAgo && txDate <= now;
-    }
-    return true; // all
-  });
-
-  let chartGroupedData = [];
-  if (chartGranularity === 'all') {
-    // Group by category
-    const categories = ['Income', 'Expense', 'Savings', 'Debt'];
-    chartGroupedData = categories.map((cat) => {
-      const catTxs = chartFilteredTransactions.filter((tx) => tx.category === cat);
-      const income = catTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const expense = catTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      return { name: cat, income, expense, net: income - expense, total: income + expense };
-    });
-  } else {
-    // Group by subcategory under specific category
-    const catTxs = chartFilteredTransactions.filter((tx) => tx.category === chartGranularity);
-    const subcategories = Array.from(new Set(catTxs.map(tx => tx.subcategory).filter(Boolean)));
-    chartGroupedData = subcategories.map((subcat) => {
-      const subcatTxs = catTxs.filter((tx) => tx.subcategory === subcat);
-      const income = subcatTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const expense = subcatTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      return { name: subcat, income, expense, net: income - expense, total: income + expense };
-    });
-  }
-
-  // Filter out items with 0 total volume
-  chartGroupedData = chartGroupedData.filter((item) => item.total > 0);
-
-  // Sort descending by absolute value from the center line: Math.max(income, expense)
-  chartGroupedData.sort((a, b) => Math.max(b.income, b.expense) - Math.max(a.income, a.expense));
-
-  // Totals for tooltips / segment percentages
-  const totalInflowSegment = chartGroupedData.reduce((sum, item) => sum + item.income, 0) || 1;
-  const totalOutflowSegment = chartGroupedData.reduce((sum, item) => sum + item.expense, 0) || 1;
-  const totalChartVolume = chartGroupedData.reduce((sum, item) => sum + item.total, 0) || 1;
-
-  // Max value of any bar in the current grouping (to compute width percentage relative to max bar length)
-  const maxChartBarVal = Math.max(...chartGroupedData.map(item => Math.max(item.income, item.expense)), 1);
-
-  const handleChartMouseMove = (e, item, type) => {
-    const rect = e.currentTarget.closest('.diverging-chart-container').getBoundingClientRect();
-    const x = e.clientX - rect.left + 15;
-    const y = e.clientY - rect.top + 15;
-    
-    let percentage = 0;
-    let amount = 0;
-    if (type === 'income') {
-      amount = item.income;
-      percentage = (item.income / totalInflowSegment) * 100;
-    } else {
-      amount = item.expense;
-      percentage = (item.expense / totalOutflowSegment) * 100;
-    }
-
-    setChartTooltip({
-      name: item.name,
-      type,
-      amount,
-      percentage,
-      x,
-      y
-    });
-  };
-
   // Group by selected granularity
-  const uniqueYearsList = Array.from(new Set(transactions.map(tx => tx.year).filter(Boolean))).sort((a, b) => a - b);
-  const timeLabels = 
-    dashGranularity === 'month'
-      ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-      : dashGranularity === 'quarter'
-        ? ['Q1', 'Q2', 'Q3', 'Q4']
-        : uniqueYearsList.map(String);
-
+  const currentYear = new Date().getFullYear();
+  const uniqueYearsList = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
+  const timeLabels = Array.from(new Set(dashboardFilteredTransactions.map(tx => `${tx.year} ${tx.month}`)));
   const dashTimeData = timeLabels.map((label) => {
-    const matchedTxs = transactions.filter((tx) => {
-      if (dashGranularity === 'month') return tx.month === label;
-      if (dashGranularity === 'quarter') return tx.quarter === label;
-      if (dashGranularity === 'year') return String(tx.year) === label;
-      return false;
-    });
+    const [yearStr, monthStr] = label.split(' ');
+    const matchedTxs = dashboardFilteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
 
     const income = matchedTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     const expense = matchedTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
@@ -270,7 +243,7 @@ function App() {
   // Suggested Extra 1 - From Allocation (Fontes de Ouro)
   const uniqueFroms = Array.from(new Set(transactions.map(tx => tx.from).filter(Boolean)));
   const fromAllocation = uniqueFroms.map(fromName => {
-    const amount = transactions
+    const amount = dashboardFilteredTransactions
       .filter(tx => tx.from === fromName && tx.type === 'income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: fromName, amount };
@@ -278,12 +251,12 @@ function App() {
   const maxFromAmount = Math.max(...fromAllocation.map(f => f.amount), 1);
 
   // Suggested Extra 2 - Top Entities (Maiores Comércios)
-  const uniqueEntities = Array.from(new Set(transactions.map(tx => tx.entity).filter(Boolean)));
+  const uniqueEntities = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.entity).filter(Boolean)));
   const entityVolumes = uniqueEntities.map(entName => {
-    const inflow = transactions
+    const inflow = dashboardFilteredTransactions
       .filter(tx => tx.entity === entName && tx.type === 'income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const outflow = transactions
+    const outflow = dashboardFilteredTransactions
       .filter(tx => tx.entity === entName && tx.type === 'expense')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: entName, inflow, outflow, total: inflow + outflow };
@@ -592,15 +565,22 @@ function App() {
       });
     }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Add BOM for Excel UTF-8 compatibility
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `tesouro_real_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
+    link.href = url;
+    link.download = `tesouro_real_${new Date().toISOString().split('T')[0]}.csv`;
+    link.style.display = 'none';
     document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    // Use a small timeout to ensure the click registers before cleanup
+    setTimeout(() => {
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+    
     toast.success(
       transactions && transactions.length > 0
         ? t.success_export
@@ -1512,33 +1492,112 @@ function App() {
                   })}
                 </div>
 
-                {/* Right Buttons: Time Views */}
-                <div className="flex gap-1.5 items-center">
-                  {[
-                    { id: 'month', label: t.gran_month, icon: '📅' },
-                    { id: 'quarter', label: t.gran_quarter, icon: '⏳' },
-                    { id: 'year', label: t.gran_year, icon: '👑' }
-                  ].map((gran) => {
-                    const isSel = dashGranularity === gran.id;
-                    return (
-                      <button
-                        key={gran.id}
-                        type="button"
-                        onClick={() => setDashGranularity(gran.id)}
-                        className={`px-3 py-3 md:py-1.5 rounded-lg border font-black text-[9px] uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 min-h-[44px] md:min-h-0 ${
-                          isSel
-                            ? 'bg-[#8b4513] border-[#8b4513] text-[#ffd700] shadow-md'
-                            : 'bg-[#faf4e5]/80 border-[#8b4513]/20 text-[#5d4037]/80 hover:bg-[#8b4513]/10 hover:text-[#4b2c20]'
-                        }`}
-                      >
-                        <span>{gran.icon}</span>
-                        {gran.label}
-                      </button>
-                    );
-                  })}
+                {/* Right Buttons: Sidebar Toggle */}
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className="md:hidden px-3 py-3 rounded-lg border border-[#8b4513]/20 bg-[#faf4e5]/80 text-[#5d4037] font-black text-[9px] uppercase tracking-wider hover:bg-[#8b4513]/10"
+                  >
+                    {isSidebarOpen ? 'Close Filters' : 'Filters'}
+                  </button>
                 </div>
               </div>
-              <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar flex-grow relative z-10 text-[#2d1b0d] space-y-6">
+
+              {/* Layout Container: Sidebar + Main Content */}
+              <div className="flex flex-1 overflow-hidden relative z-10 text-[#2d1b0d]">
+                
+                {/* SIDEBAR FILTER PANEL */}
+                <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block w-full md:w-56 lg:w-64 flex-shrink-0 bg-[#faf4e5]/90 border-r border-[#8b4513]/25 overflow-y-auto custom-scrollbar-subtle flex flex-col`}>
+                  <div className="p-4 space-y-6">
+                    {/* Years */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4b2c20]">Years</h4>
+                        <div className="flex gap-2 text-[8px] font-bold text-[#8b4513] uppercase">
+                          <button onClick={() => setSelectedYears(uniqueYearsList.map(String))} className="hover:underline">All</button>
+                          <button onClick={() => setSelectedYears([])} className="hover:underline">None</button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 max-h-32 overflow-y-auto custom-scrollbar-subtle pr-1">
+                        {uniqueYearsList.map(y => {
+                          const yStr = String(y);
+                          const isSel = selectedYears.includes(yStr);
+                          return (
+                            <label key={yStr} onClick={() => setSelectedYears(prev => prev.includes(yStr) ? prev.filter(x => x !== yStr) : [...prev, yStr])} className="flex items-center gap-2 cursor-pointer group">
+                              <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${isSel ? 'bg-[#8b4513] border-[#8b4513]' : 'border-[#8b4513]/40 group-hover:border-[#8b4513]'}`}>
+                                {isSel && <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />}
+                              </div>
+                              <span className="text-[11px] font-bold text-[#5d4037] group-hover:text-[#4b2c20]">{yStr}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Quarters */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4b2c20]">Quarters</h4>
+                        <div className="flex gap-2 text-[8px] font-bold text-[#8b4513] uppercase">
+                          <button onClick={() => setSelectedQuarters(['Q1', 'Q2', 'Q3', 'Q4'])} className="hover:underline">All</button>
+                          <button onClick={() => setSelectedQuarters([])} className="hover:underline">None</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {['Q1', 'Q2', 'Q3', 'Q4'].map(q => {
+                          const isSel = selectedQuarters.includes(q);
+                          return (
+                            <button
+                              key={q}
+                              onClick={() => setSelectedQuarters(prev => prev.includes(q) ? prev.filter(x => x !== q) : [...prev, q])}
+                              className={`py-1 rounded border text-[9px] font-bold transition-all ${isSel ? 'bg-[#8b4513] border-[#8b4513] text-[#ffd700]' : 'bg-transparent border-[#8b4513]/20 text-[#5d4037] hover:bg-[#8b4513]/10'}`}
+                            >
+                              {q}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Months */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4b2c20]">Months</h4>
+                        <div className="flex gap-2 text-[8px] font-bold text-[#8b4513] uppercase">
+                          <button onClick={() => setSelectedMonths(monthOptions)} className="hover:underline">All</button>
+                          <button onClick={() => setSelectedMonths([])} className="hover:underline">None</button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 max-h-40 overflow-y-auto custom-scrollbar-subtle pr-1">
+                        {monthOptions.map(m => {
+                          const isSel = selectedMonths.includes(m);
+                          return (
+                            <label key={m} onClick={() => setSelectedMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])} className="flex items-center gap-2 cursor-pointer group">
+                              <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${isSel ? 'bg-[#8b4513] border-[#8b4513]' : 'border-[#8b4513]/40 group-hover:border-[#8b4513]'}`}>
+                                {isSel && <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />}
+                              </div>
+                              <span className="text-[10px] font-bold text-[#5d4037] group-hover:text-[#4b2c20]">{m}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* MAIN DASHBOARD CONTENT */}
+                <div className="flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-6">
+                  {isFallbackState ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
+                      <div className="text-6xl">📜</div>
+                      <div className="space-y-1">
+                        <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Select a Time Period</h3>
+                        <p className="text-xs font-serif italic text-[#5d4037]">Consult the archives by selecting at least one Year in the filter panel.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                 
                 {/* SUBTAB: OVERVIEW */}
                 {dashSubTab === 'overview' && (
@@ -1598,289 +1657,21 @@ function App() {
                     {/* 2. Charts Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Category Breakdown (Diverging Bar Chart) */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px] diverging-chart-container relative select-none">
-                        {/* Selector Controls Header */}
-                        <div className="flex flex-col gap-2 border-b border-[#8b4513]/10 pb-2 flex-shrink-0">
-                          <div className="flex justify-between items-center">
-                            <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider">
-                              {t('dashboard.charts.flow_by_category')}
-                            </h4>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[8px] font-sans font-medium text-stone-500 uppercase">{t('dashboard.charts.scale_mode')}:</span>
-                              <button
-                                type="button"
-                                onClick={() => setChartScaleMode(chartScaleMode === 'absolute' ? 'percentage' : 'absolute')}
-                                className="px-2 py-0.5 rounded bg-[#8b4513]/10 border border-[#8b4513]/20 hover:bg-[#8b4513]/20 text-[8px] font-bold text-[#4b2c20] transition-all cursor-pointer"
-                              >
-                                {chartScaleMode === 'absolute' ? t('dashboard.charts.scale_absolute') : t('dashboard.charts.scale_percentage')}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-between items-center gap-2">
-                            <div className="flex gap-1">
-                              {[
-                                { id: 'all', label: t('dashboard.charts.horizon_all') },
-                                { id: 'moon', label: t('dashboard.charts.horizon_moon') },
-                                { id: 'cycles', label: t('dashboard.charts.horizon_cycles') }
-                              ].map((hor) => {
-                                const isSel = chartTimeHorizon === hor.id;
-                                return (
-                                  <button
-                                    key={hor.id}
-                                    type="button"
-                                    onClick={() => setChartTimeHorizon(hor.id)}
-                                    className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                                      isSel
-                                        ? 'bg-[#8b4513] text-[#ffd700]'
-                                        : 'bg-[#faf4e5]/80 border border-[#8b4513]/15 text-[#5d4037]/70 hover:bg-[#8b4513]/10'
-                                    }`}
-                                  >
-                                    {hor.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <span className="text-[8px] font-sans font-medium text-stone-500 uppercase">{t('category_label')}:</span>
-                              <select
-                                value={chartGranularity}
-                                onChange={(e) => setChartGranularity(e.target.value)}
-                                className="bg-[#faf4e5] border border-[#8b4513]/30 rounded px-1.5 py-0.5 text-[8.5px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513] cursor-pointer"
-                              >
-                                <option value="all">{t('all_categories')}</option>
-                                <option value="Income">🟢 {t('income')}</option>
-                                <option value="Expense">🔴 {t('expense')}</option>
-                                <option value="Savings">🛡️ {t('savings')}</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Chart Area */}
-                        <div className="space-y-3.5 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                          {chartGroupedData.length > 0 ? (
-                            chartGroupedData.map((c) => {
-                              const incWidth = (c.income / maxChartBarVal) * 100;
-                              const expWidth = (c.expense / maxChartBarVal) * 100;
-                              
-                              const displayIncome = chartScaleMode === 'absolute'
-                                ? `+${c.income.toLocaleString()}g`
-                                : `+${((c.income / totalChartVolume) * 100).toFixed(1)}%`;
-
-                              const displayExpense = chartScaleMode === 'absolute'
-                                ? `-${c.expense.toLocaleString()}g`
-                                : `-${((c.expense / totalChartVolume) * 100).toFixed(1)}%`;
-
-                              return (
-                                <div key={c.name} className="space-y-1">
-                                  {/* Row Info */}
-                                  <div className="flex justify-between font-bold text-[#4b2c20] text-[9.5px]">
-                                    <span>{c.name}</span>
-                                    <span className={`font-mono font-bold text-[9px] ${c.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                      {t('balance')}: {c.net >= 0 ? '+' : ''}{c.net.toLocaleString()}g
-                                    </span>
-                                  </div>
-
-                                  {/* Diverging Bar Row */}
-                                  <div className="relative grid grid-cols-[1fr_2px_1fr] items-center h-5 bg-[#faf4e5]/40 rounded border border-[#8b4513]/10 overflow-hidden">
-                                    {/* Left (Expense) */}
-                                    <div 
-                                      className="flex justify-end h-full items-center pr-0.5 cursor-crosshair"
-                                      onMouseEnter={(e) => handleChartMouseMove(e, c, 'expense')}
-                                      onMouseMove={(e) => handleChartMouseMove(e, c, 'expense')}
-                                      onMouseLeave={() => setChartTooltip(null)}
-                                    >
-                                      {c.expense > 0 && (
-                                        <div 
-                                          className="h-[14px] bg-rose-700 rounded-l transition-all duration-500 ease-out origin-right flex items-center justify-end pr-1.5 text-[7.5px] font-bold text-white font-mono select-none"
-                                          style={{ width: `${expWidth}%` }}
-                                        >
-                                          {displayExpense}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Zero Center baseline */}
-                                    <div className="h-full w-[2px] bg-[#8b4513]/30 z-10" />
-
-                                    {/* Right (Income) */}
-                                    <div 
-                                      className="flex justify-start h-full items-center pl-0.5 cursor-crosshair"
-                                      onMouseEnter={(e) => handleChartMouseMove(e, c, 'income')}
-                                      onMouseMove={(e) => handleChartMouseMove(e, c, 'income')}
-                                      onMouseLeave={() => setChartTooltip(null)}
-                                    >
-                                      {c.income > 0 && (
-                                        <div 
-                                          className="h-[14px] bg-emerald-700 rounded-r transition-all duration-500 ease-out origin-left flex items-center justify-start pl-1.5 text-[7.5px] font-bold text-white font-mono select-none"
-                                          style={{ width: `${incWidth}%` }}
-                                        >
-                                          {displayIncome}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t('no_options_registered')}</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Localized Floating Precision Tooltip Card */}
-                        {chartTooltip && (
-                          <div 
-                            className="absolute bg-[#f4e4bc] border-2 border-[#8b4513] text-[#4b2c20] text-[9.5px] p-2.5 rounded-lg shadow-2xl pointer-events-none z-[120] font-sans w-48 space-y-1 animate-in fade-in duration-100"
-                            style={{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }}
-                          >
-                            <div 
-                              className="absolute inset-0 pointer-events-none opacity-20 mix-blend-multiply rounded-md"
-                              style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')" }}
-                            />
-                            <div className="relative font-black text-center border-b border-[#8b4513]/20 pb-1 uppercase tracking-wider title-font text-[#4b2c20]">
-                              {chartTooltip.name}
-                            </div>
-                            <div className="relative flex justify-between gap-2">
-                              <span className="text-stone-500 font-bold uppercase text-[8px]">{t('type_label')}:</span>
-                              <span className={`font-black uppercase text-[8.5px] ${chartTooltip.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                {chartTooltip.type === 'income' ? `🟢 ${t('income')}` : `🔴 ${t('expense')}`}
-                              </span>
-                            </div>
-                            <div className="relative flex justify-between gap-2">
-                              <span className="text-stone-500 font-bold uppercase text-[8px]">{t('value')}:</span>
-                              <span className="font-mono font-black">{chartTooltip.amount.toLocaleString()}g</span>
-                            </div>
-                            <div className="relative flex justify-between gap-2">
-                              <span className="text-stone-500 font-bold uppercase text-[8px]">{t('dashboard.charts.segment_percentage')}:</span>
-                              <span className="font-mono font-black">{chartTooltip.percentage.toFixed(1)}%</span>
-                            </div>
-                          </div>
-                        )}
+                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px] relative select-none">
+                        <FlowByCategoryChart dashCategoryData={dashCategoryData} t={t} />
                       </div>
 
-                      {/* Dynamic Time Evolution */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px]">
-                        <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>{t.time_evolution}</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t('active_grouping', { gran: dashGranularity === 'month' ? t('gran_month') : dashGranularity === 'quarter' ? t('gran_quarter') : t('gran_year') })}</span>
-                        </h4>
-                        <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                          {dashTimeData.length > 0 ? (
-                            dashTimeData.map((tItem) => {
-                              const incWidth = (tItem.income / maxDashTimeVal) * 100;
-                              const expWidth = (tItem.expense / maxDashTimeVal) * 100;
-                              const net = tItem.income - tItem.expense;
-                              return (
-                                <div key={tItem.label} className="space-y-1 text-xs">
-                                  <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                    <span>{tItem.label}</span>
-                                    <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                      {t.balance}: {net >= 0 ? '+' : ''}{net.toLocaleString()}g
-                                    </span>
-                                  </div>
-                                  <div className="space-y-1 bg-[#faf4e5]/60 border border-[#8b4513]/10 rounded p-1.5">
-                                    {tItem.income > 0 && (
-                                      <div className="flex items-center gap-2">
-                                        <span className="w-8 text-[8px] text-emerald-800 font-bold uppercase">{t.income}</span>
-                                        <div className="flex-1 bg-[#faf4e5]/80 h-1.5 rounded-full overflow-hidden border border-[#8b4513]/5">
-                                          <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
-                                        </div>
-                                        <span className="w-10 text-right text-[8px] font-mono font-bold text-stone-600">+{tItem.income.toLocaleString()}g</span>
-                                      </div>
-                                    )}
-                                    {tItem.expense > 0 && (
-                                      <div className="flex items-center gap-2">
-                                        <span className="w-8 text-[8px] text-rose-800 font-bold uppercase">{t.expense}</span>
-                                        <div className="flex-1 bg-[#faf4e5]/80 h-1.5 rounded-full overflow-hidden border border-[#8b4513]/5">
-                                          <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
-                                        </div>
-                                        <span className="w-10 text-right text-[8px] font-mono font-bold text-stone-600">-{tItem.expense.toLocaleString()}g</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_records_active_period}</p>
-                            </div>
-                          )}
-                        </div>
+                      {/* Spline Time Evolution */}
+                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
+                        <TimeEvolutionChart timePoints={dashTimeData} t={t} />
                       </div>
-                    </div>
 
-                    {/* Extra Overview Metrics */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* From Allocation */}
+                      {/* Top Entities Donut */}
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[240px]">
-                        <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>{t.gold_origin}</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.paying_sources}</span>
-                        </h4>
-                        <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                          {fromAllocation.length > 0 ? (
-                            fromAllocation.map((item) => {
-                              const pctWidth = (item.amount / maxFromAmount) * 100;
-                              return (
-                                <div key={item.name} className="space-y-1">
-                                  <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                    <span>👤 {item.name}</span>
-                                    <span className="font-mono text-emerald-700">+{item.amount.toLocaleString()}g</span>
-                                  </div>
-                                  <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                    <div className="h-full bg-amber-500 rounded-full" style={{ width: `${pctWidth}%` }} />
-                                  </div>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_income_registered}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Top Entities */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[240px]">
-                        <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>{t.top_entities}</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.by_gold_volume}</span>
-                        </h4>
-                        <div className="overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                          {entityVolumes.length > 0 ? (
-                            <table className="w-full text-left border-collapse text-[10px] font-sans">
-                              <thead>
-                                <tr className="border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider">
-                                  <th className="py-1">{t.entidade_header}</th>
-                                  <th className="py-1 text-right">{t.income}</th>
-                                  <th className="py-1 text-right">{t.expense}</th>
-                                  <th className="py-1 text-right">{t.total_header}</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                                {entityVolumes.map((ent) => (
-                                  <tr key={ent.name} className="hover:bg-[#8b4513]/5">
-                                    <td className="py-1.5 font-bold text-[#4b2c20]">{ent.name}</td>
-                                    <td className="py-1.5 text-right text-emerald-600 font-mono">+{ent.inflow.toLocaleString()}g</td>
-                                    <td className="py-1.5 text-right text-rose-600 font-mono">-{ent.outflow.toLocaleString()}g</td>
-                                    <td className="py-1.5 text-right font-mono font-black text-[#b8860b]">{ent.total.toLocaleString()}g</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          ) : (
-                            <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_commercial_record}</p>
-                            </div>
-                          )}
-                        </div>
+                        {(() => {
+                           const percentUsed = dashInflow > 0 ? ((entityVolumes.reduce((s, e) => s + e.outflow, 0) / dashInflow) * 100) : 0;
+                           return <TopEntitiesChart entityVolumes={entityVolumes} percentUsed={percentUsed} t={t} />;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -2100,8 +1891,9 @@ function App() {
                     </div>
                   </div>
                 )}
-
-
+                    </>
+                  )}
+              </div>
               </div>
             </div>
           </div>

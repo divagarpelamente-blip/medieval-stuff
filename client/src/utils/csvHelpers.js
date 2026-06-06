@@ -36,15 +36,22 @@ export const handleExportCSV = (transactions, t) => {
     });
   }
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  // Add BOM for Excel UTF-8 compatibility
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', `tesouro_real_${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = 'hidden';
+  link.href = url;
+  link.download = `tesouro_real_${new Date().toISOString().split('T')[0]}.csv`;
+  link.style.display = 'none';
   document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  
+  // Use a small timeout to ensure the click registers before cleanup
+  setTimeout(() => {
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
+
   toast.success(
     transactions && transactions.length > 0
       ? t('success_export')
