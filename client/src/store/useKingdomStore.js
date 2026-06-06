@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
+import i18n from '../i18n';
 
 const loadLocal = (key, defaultVal) => {
   try {
@@ -26,6 +27,7 @@ export const useKingdomStore = create((set, get) => ({
   email: 'lord.eldoria@kingdom.gov',
   transactions: [],
   isLoading: false,
+  language: loadLocal('language', 'en'),
 
   // Dropdown manage lists
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
@@ -219,6 +221,12 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
+  setLanguage: (lang) => {
+    set({ language: lang });
+    saveLocal('language', lang);
+    i18n.changeLanguage(lang);
+  },
+
   resetStore: () => set({
     gold: 1000,
     gems: 100,
@@ -226,7 +234,8 @@ export const useKingdomStore = create((set, get) => ({
     level: 1,
     email: 'lord.eldoria@kingdom.gov',
     transactions: [],
-    isLoading: false
+    isLoading: false,
+    language: 'en'
   })
 }));
 

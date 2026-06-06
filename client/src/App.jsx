@@ -7,6 +7,7 @@ import Modal from './components/Modal';
 import bgMap from './assets/Medieval_Town_Backround.png';
 import { useKingdomStore } from './store/useKingdomStore';
 import { Toaster, toast } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -29,6 +30,12 @@ function App() {
   // Dashboard Page Sub-Tabs and Granularity state
   const [dashSubTab, setDashSubTab] = useState('overview'); // overview, income_expense, payables_receivables
   const [dashGranularity, setDashGranularity] = useState('quarter'); // month, quarter, year
+
+  // Interactive Diverging Bar Chart local controls
+  const [chartTimeHorizon, setChartTimeHorizon] = useState('all'); // all, moon, cycles
+  const [chartGranularity, setChartGranularity] = useState('all'); // all, Income, Expense, Savings
+  const [chartScaleMode, setChartScaleMode] = useState('absolute'); // absolute, percentage
+  const [chartTooltip, setChartTooltip] = useState(null); // { name, type, amount, percentage, x, y }
 
   // Settings manage states
   const [selectedSettingType, setSelectedSettingType] = useState('from');
@@ -85,6 +92,19 @@ function App() {
 
   const profile = { email, gold, level, xp };
 
+  const { t: originalT } = useTranslation();
+  const t = new Proxy(originalT, {
+    get(target, prop) {
+      if (prop in target) {
+        return target[prop];
+      }
+      if (typeof prop === 'string') {
+        return target(prop);
+      }
+      return undefined;
+    }
+  });
+
   // Get unique years for the Year filter selector
   const uniqueYears = Array.from(
     new Set(transactions.map((tx) => tx.year).filter(Boolean))
@@ -130,6 +150,83 @@ function App() {
 
   const maxDashCategoryVal = Math.max(...dashCategoryData.map(c => Math.max(c.income, c.expense)), 1);
 
+  // Group by category and subcategory for Diverging Bar Chart
+  const chartFilteredTransactions = transactions.filter((tx) => {
+    if (!tx.date) return chartTimeHorizon === 'all';
+    const txDate = new Date(tx.date);
+    const now = new Date();
+    if (chartTimeHorizon === 'moon') {
+      return txDate.getFullYear() === now.getFullYear() && txDate.getMonth() === now.getMonth();
+    }
+    if (chartTimeHorizon === 'cycles') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(now.getDate() - 30);
+      return txDate >= thirtyDaysAgo && txDate <= now;
+    }
+    return true; // all
+  });
+
+  let chartGroupedData = [];
+  if (chartGranularity === 'all') {
+    // Group by category
+    const categories = ['Income', 'Expense', 'Savings', 'Debt'];
+    chartGroupedData = categories.map((cat) => {
+      const catTxs = chartFilteredTransactions.filter((tx) => tx.category === cat);
+      const income = catTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const expense = catTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      return { name: cat, income, expense, net: income - expense, total: income + expense };
+    });
+  } else {
+    // Group by subcategory under specific category
+    const catTxs = chartFilteredTransactions.filter((tx) => tx.category === chartGranularity);
+    const subcategories = Array.from(new Set(catTxs.map(tx => tx.subcategory).filter(Boolean)));
+    chartGroupedData = subcategories.map((subcat) => {
+      const subcatTxs = catTxs.filter((tx) => tx.subcategory === subcat);
+      const income = subcatTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const expense = subcatTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      return { name: subcat, income, expense, net: income - expense, total: income + expense };
+    });
+  }
+
+  // Filter out items with 0 total volume
+  chartGroupedData = chartGroupedData.filter((item) => item.total > 0);
+
+  // Sort descending by absolute value from the center line: Math.max(income, expense)
+  chartGroupedData.sort((a, b) => Math.max(b.income, b.expense) - Math.max(a.income, a.expense));
+
+  // Totals for tooltips / segment percentages
+  const totalInflowSegment = chartGroupedData.reduce((sum, item) => sum + item.income, 0) || 1;
+  const totalOutflowSegment = chartGroupedData.reduce((sum, item) => sum + item.expense, 0) || 1;
+  const totalChartVolume = chartGroupedData.reduce((sum, item) => sum + item.total, 0) || 1;
+
+  // Max value of any bar in the current grouping (to compute width percentage relative to max bar length)
+  const maxChartBarVal = Math.max(...chartGroupedData.map(item => Math.max(item.income, item.expense)), 1);
+
+  const handleChartMouseMove = (e, item, type) => {
+    const rect = e.currentTarget.closest('.diverging-chart-container').getBoundingClientRect();
+    const x = e.clientX - rect.left + 15;
+    const y = e.clientY - rect.top + 15;
+    
+    let percentage = 0;
+    let amount = 0;
+    if (type === 'income') {
+      amount = item.income;
+      percentage = (item.income / totalInflowSegment) * 100;
+    } else {
+      amount = item.expense;
+      percentage = (item.expense / totalOutflowSegment) * 100;
+    }
+
+    setChartTooltip({
+      name: item.name,
+      type,
+      amount,
+      percentage,
+      x,
+      y
+    });
+  };
+
   // Group by selected granularity
   const uniqueYearsList = Array.from(new Set(transactions.map(tx => tx.year).filter(Boolean))).sort((a, b) => a - b);
   const timeLabels = 
@@ -156,13 +253,18 @@ function App() {
 
   let dashTreasurerAdvice;
   if (transactions.length === 0) {
-    dashTreasurerAdvice = '"Nenhum movimento registado nos livros oficiais da coroa, meu Lorde. O reino aguarda atividade financeira."';
+    dashTreasurerAdvice = t('advice_empty');
   } else if (dashNetBalance > 0) {
-    dashTreasurerAdvice = `"Os cofres do reino estão prósperos, meu Lorde! Registamos um saldo positivo de +${dashNetBalance.toLocaleString()}g moedas de ouro. A eficiência de poupança está em ${dashEfficiencyRatio.toFixed(1)}%."`;
+    dashTreasurerAdvice = t('advice_positive', {
+      balance: dashNetBalance.toLocaleString(),
+      ratio: dashEfficiencyRatio.toFixed(1)
+    });
   } else if (dashNetBalance < 0) {
-    dashTreasurerAdvice = `"Alerta, meu Lorde! A Tesouraria Real está em défice comercial de ${dashNetBalance.toLocaleString()}g moedas. As nossas despesas superam os rendimentos. Devemos conter os gastos!"`;
+    dashTreasurerAdvice = t('advice_negative', {
+      balance: Math.abs(dashNetBalance).toLocaleString()
+    });
   } else {
-    dashTreasurerAdvice = '"O balanço da Tesouraria Real está perfeitamente equilibrado, meu Lorde."';
+    dashTreasurerAdvice = t('advice_neutral');
   }
 
   // Suggested Extra 1 - From Allocation (Fontes de Ouro)
@@ -214,6 +316,23 @@ function App() {
     fetchKingdomData(GUEST_PROFILE_ID);
   }, [fetchKingdomData]);
 
+  // Global key listener to return to previous screen on Escape
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (isNewTxModalOpen) {
+          setIsNewTxModalOpen(false);
+        } else if (isMineModalOpen) {
+          setIsMineModalOpen(false);
+        } else if (activeTab !== 'quests') {
+          setActiveTab('quests');
+        }
+      }
+    };
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [activeTab, isMineModalOpen, isNewTxModalOpen]);
+
   // Sincronizar estados locais do formulário quando as opções mudarem no store
   useEffect(() => {
     if (fromOptions && !fromOptions.includes(txFrom)) {
@@ -260,32 +379,32 @@ function App() {
 
     switch (selectedSettingType) {
       case 'from':
-        title = 'Gerir Origens (From)';
+        title = t.manage_from;
         currentList = fromOptions;
         break;
       case 'status':
-        title = 'Gerir Status (Estados)';
+        title = t.manage_status;
         currentList = statusOptions;
         break;
       case 'category':
-        title = 'Gerir Categorias';
+        title = t.manage_category;
         currentList = categoryOptions;
         break;
       case 'subcategory':
-        title = 'Gerir Subcategorias';
+        title = t.manage_subcategory;
         currentList = subcategoryOptions;
         break;
       case 'entity':
-        title = 'Gerir Entidades (Entities)';
+        title = t.manage_entity;
         currentList = entityOptions;
         showEntityCategorySelector = true;
         break;
       case 'entityCategory':
-        title = 'Gerir Categoria das Entidades';
+        title = t.manage_entityCategory;
         currentList = entityCategoryOptions;
         break;
       case 'month':
-        title = 'Gerir Meses';
+        title = t.manage_month;
         currentList = monthOptions;
         break;
       default:
@@ -295,24 +414,24 @@ function App() {
     const handleAddOptionSubmit = (e) => {
       e.preventDefault();
       if (!newOptionVal.trim()) {
-        toast.error('Por favor, digite um valor!');
+        toast.error(t.err_enter_value);
         return;
       }
       const val = newOptionVal.trim();
       if (currentList.includes(val)) {
-        toast.error('Este valor já existe na lista!');
+        toast.error(t.err_value_exists);
         return;
       }
 
       const extraData = selectedSettingType === 'entity' ? { entityCategory: newEntityCatVal } : undefined;
       addOption(selectedSettingType, val, extraData);
       setNewOptionVal('');
-      toast.success(`Adicionado "${val}" com sucesso!`);
+      toast.success(t('success_added_option', { val }));
     };
 
     const handleDeleteOption = (val) => {
       deleteOption(selectedSettingType, val);
-      toast.success(`Removido "${val}" com sucesso!`);
+      toast.success(t('success_deleted_option', { val }));
     };
 
     return (
@@ -320,7 +439,7 @@ function App() {
         {/* Title */}
         <div className="border-b border-[#8b4513]/20 pb-2 mb-4">
           <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">{title}</h3>
-          <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">Editor do Livro Oficial</p>
+          <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t.official_ledger_editor}</p>
         </div>
 
         {/* Add option form */}
@@ -328,27 +447,27 @@ function App() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
             <div>
               <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                Novo Valor
+                {t.new_value}
               </label>
               <input
                 type="text"
                 value={newOptionVal}
                 onChange={(e) => setNewOptionVal(e.target.value)}
-                placeholder="Ex: Novo Item"
+                placeholder={t('placeholder.item')}
                 required
-                className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
               />
             </div>
 
             {showEntityCategorySelector && (
               <div>
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                  Categoria Padrão
+                  {t.default_category}
                 </label>
                 <select
                   value={newEntityCatVal}
                   onChange={(e) => setNewEntityCatVal(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                 >
                   {entityCategoryOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -360,9 +479,9 @@ function App() {
             <div className={`${!showEntityCategorySelector ? 'sm:col-span-2' : ''} flex justify-end`}>
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer"
+                className="px-4 py-3 md:py-2 min-h-[44px] md:min-h-0 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
               >
-                ➕ Adicionar
+                ➕ {t.add}
               </button>
             </div>
           </div>
@@ -374,9 +493,9 @@ function App() {
             <table className="w-full text-left border-collapse text-[10px] font-sans">
               <thead>
                 <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                  <th className="py-2 px-3">Valor</th>
-                  {selectedSettingType === 'entity' && <th className="py-2 px-3">Categoria Padrão</th>}
-                  <th className="py-2 px-3 text-right">Ações</th>
+                  <th className="py-2 px-3">{t.value}</th>
+                  {selectedSettingType === 'entity' && <th className="py-2 px-3">{t.default_category}</th>}
+                  <th className="py-2 px-3 text-right">{t.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
@@ -391,9 +510,9 @@ function App() {
                         type="button"
                         onClick={() => handleDeleteOption(val)}
                         className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
-                        title="Eliminar Opção"
+                        title={t.eliminate}
                       >
-                        ❌ Eliminar
+                        ❌ {t.eliminate}
                       </button>
                     </td>
                   </tr>
@@ -402,7 +521,7 @@ function App() {
             </table>
           ) : (
             <p className="text-center py-8 text-xs text-[#5d4037]/60 italic font-serif">
-              Nenhuma opção registada nesta lista.
+              {t.no_options_registered}
             </p>
           )}
         </div>
@@ -484,8 +603,8 @@ function App() {
     document.body.removeChild(link);
     toast.success(
       transactions && transactions.length > 0
-        ? 'Ledger exportado com sucesso!'
-        : 'Template CSV exportado (sem dados)!'
+        ? t.success_export
+        : t.success_export_empty
     );
   };
 
@@ -533,7 +652,7 @@ function App() {
         const text = event.target.result;
         const parsed = parseCSV(text);
         if (parsed.length === 0 || (parsed.length === 1 && parsed[0][0] === '')) {
-          toast.success('Importação concluída: 0 transações carregadas.');
+          toast.success(t.success_import_zero);
           return;
         }
 
@@ -541,7 +660,7 @@ function App() {
         const rows = parsed.slice(1);
 
         if (rows.length === 0 || (rows.length === 1 && rows[0].length === 1 && rows[0][0] === '')) {
-          toast.success('Importação concluída: 0 transações carregadas.');
+          toast.success(t.success_import_zero);
           return;
         }
 
@@ -585,19 +704,19 @@ function App() {
         }
 
         if (listToInsert.length === 0) {
-          toast.success('Importação concluída: 0 transações carregadas.');
+          toast.success(t.success_import_zero);
           return;
         }
 
         const res = await registerTransactions(GUEST_PROFILE_ID, listToInsert);
         if (res.success) {
-          toast.success(`Importado com sucesso ${listToInsert.length} transações!`);
+          toast.success(t('success_import', { count: listToInsert.length }));
         } else {
-          toast.error(`Falha na importação: ${res.error}`);
+          toast.error(t('err_import_db', { error: res.error }));
         }
       } catch (err) {
         console.error(err);
-        toast.error('Erro ao processar o arquivo CSV!');
+        toast.error(t.err_import);
       } finally {
         // Clear value to allow importing the same file again
         e.target.value = '';
@@ -609,11 +728,11 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!txAmount || isNaN(txAmount) || Number(txAmount) <= 0) {
-      toast.error('Please enter a valid amount of Gold Coins!');
+      toast.error(t.err_invalid_amount);
       return;
     }
     if (!txFrom) {
-      toast.error('Please specify the "From" (origin/payer) field!');
+      toast.error(t.err_invalid_from);
       return;
     }
 
@@ -634,8 +753,8 @@ function App() {
     if (res.success) {
       toast.success(
         txType === 'income'
-          ? `Added ${amountNum} Gold! Level and XP updated.`
-          : `Spent ${amountNum} Gold!`
+          ? t('success_added_gold', { amount: amountNum })
+          : t('success_spent_gold', { amount: amountNum })
       );
       setTxAmount('');
       setTxDescription('');
@@ -649,12 +768,12 @@ function App() {
       setIsMineModalOpen(false);
       setIsNewTxModalOpen(false);
     } else {
-      toast.error(`Transaction failed: ${res.error}`);
+      toast.error(t('err_transaction_failed', { error: res.error }));
     }
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
+    <div className="w-screen h-screen overflow-hidden select-none bg-black flex items-center justify-center">
       <Toaster 
         position="top-center" 
         toastOptions={{
@@ -674,7 +793,9 @@ function App() {
       />
       <div className="game-viewport">
         {/* HUD Superior */}
-        <HUD profile={profile} diamonds={gems} />
+        {activeTab === 'quests' && !isMineModalOpen && !isNewTxModalOpen && (
+          <HUD profile={profile} diamonds={gems} />
+        )}
 
         {/* Mapa Isométrico */}
         <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all ${activeTab === 'settings' ? 'blur-sm pointer-events-none' : ''}`}>
@@ -689,7 +810,14 @@ function App() {
 
         {/* Settings View */}
         {activeTab === 'settings' && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setActiveTab('quests');
+              }
+            }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          >
             <div className="bg-[#f4e4bc] w-full max-w-4xl max-h-[80%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
@@ -708,7 +836,7 @@ function App() {
               <button 
                 onClick={() => setActiveTab('quests')}
                 className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
-                title="Voltar ao Mapa"
+                title={t.back_to_map}
               >
                 <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
                 <span className="text-[#ffd700] text-lg font-black font-sans">✕</span>
@@ -718,7 +846,7 @@ function App() {
               <div className="relative h-16 flex items-center justify-center z-10 pt-2">
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[110%] h-10 bg-gradient-to-r from-[#8b4513] via-[#5d4037] to-[#8b4513] shadow-lg transform -rotate-1 skew-x-12 z-0 border-y-2 border-[#d4af37]" />
                 <h2 className="title-font text-lg sm:text-xl text-[#ffd700] font-bold uppercase tracking-[0.2em] relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                  Painel de Configuração
+                  {t.configuration_panel}
                 </h2>
               </div>
 
@@ -727,15 +855,15 @@ function App() {
                 
                 {/* Left Navigation Menu (Wood buttons) */}
                 <div className="w-1/3 min-w-[150px] border-r border-[#8b4513]/25 pr-3 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar-subtle">
-                  <h4 className="text-[10px] font-black uppercase text-[#8b4513]/70 tracking-widest mb-1.5 pl-1 title-font">Listas do Reino</h4>
+                  <h4 className="text-[10px] font-black uppercase text-[#8b4513]/70 tracking-widest mb-1.5 pl-1 title-font">{t.kingdom_lists}</h4>
                   {[
-                    { id: 'from', label: 'From (Origem)', icon: '👤' },
-                    { id: 'status', label: 'Status (Estado)', icon: '📊' },
-                    { id: 'category', label: 'Category (Categoria)', icon: '📁' },
-                    { id: 'subcategory', label: 'Subcategory (Subcat)', icon: '📂' },
-                    { id: 'entity', label: 'Entity (Entidade)', icon: '🏢' },
-                    { id: 'entityCategory', label: 'Entity Category', icon: '🏷️' },
-                    { id: 'month', label: 'Month (Mês)', icon: '📅' }
+                    { id: 'from', label: t.manage_from, icon: '👤' },
+                    { id: 'status', label: t.manage_status, icon: '📊' },
+                    { id: 'category', label: t.manage_category, icon: '📁' },
+                    { id: 'subcategory', label: t.manage_subcategory, icon: '📂' },
+                    { id: 'entity', label: t.manage_entity, icon: '🏢' },
+                    { id: 'entityCategory', label: t.manage_entityCategory, icon: '🏷️' },
+                    { id: 'month', label: t.manage_month, icon: '📅' }
                   ].map((btn) => {
                     const isSel = selectedSettingType === btn.id;
                     return (
@@ -746,7 +874,7 @@ function App() {
                           setSelectedSettingType(btn.id);
                           setNewOptionVal('');
                         }}
-                        className={`text-left px-3 py-2 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all border cursor-pointer ${
+                        className={`text-left px-3 py-3 md:py-2 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all border cursor-pointer min-h-[44px] md:min-h-0 flex items-center ${
                           isSel
                             ? 'bg-[#8b4513]/20 border-[#8b4513] text-[#4b2c20] shadow-inner font-black scale-[1.02]'
                             : 'bg-[#faf4e5]/80 border-[#8b4513]/10 text-[#5d4037]/80 hover:bg-[#8b4513]/5 hover:text-[#4b2c20]'
@@ -777,7 +905,7 @@ function App() {
         <Modal
           isOpen={isMineModalOpen}
           onClose={() => setIsMineModalOpen(false)}
-          title="Livro de Transações"
+          title={t.ledger_transactions}
           size="max-w-6xl"
         >
           <div className="space-y-6">
@@ -787,8 +915,8 @@ function App() {
                 📜
               </div>
               <div>
-                <h3 className="title-font text-lg font-black text-[#4b2c20] uppercase">Registar Movimento</h3>
-                <p className="text-[10px] text-[#5d4037]/75 font-bold uppercase tracking-wider">Mina de Ouro & Comércio</p>
+                <h3 className="title-font text-lg font-black text-[#4b2c20] uppercase">{t.register_movement}</h3>
+                <p className="text-[10px] text-[#5d4037]/75 font-bold uppercase tracking-wider">{t.gold_mine_commerce}</p>
               </div>
             </div>
 
@@ -799,9 +927,9 @@ function App() {
                 {/* Type Selection */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Tipo
+                    {t.type}
                   </label>
-                  <div className="grid grid-cols-2 gap-1.5 h-[38px]">
+                  <div className="grid grid-cols-2 gap-1.5 h-11 md:h-[38px]">
                     <button
                       type="button"
                       onClick={() => setTxType('income')}
@@ -811,7 +939,7 @@ function App() {
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50'
                       }`}
                     >
-                      🟢 Receita
+                      🟢 {t.income}
                     </button>
                     <button
                       type="button"
@@ -822,7 +950,7 @@ function App() {
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50'
                       }`}
                     >
-                      🔴 Despesa
+                      🔴 {t.expense}
                     </button>
                   </div>
                 </div>
@@ -830,28 +958,28 @@ function App() {
                 {/* Amount */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Ouro (Coins)
+                    {t.amount_gold}
                   </label>
                   <input
                     type="number"
                     value={txAmount}
                     onChange={(e) => setTxAmount(e.target.value)}
-                    placeholder="Ex: 500"
+                    placeholder={t('placeholder.amount')}
                     required
                     min="1"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
 
                 {/* From */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    From (Origem)
+                    {t.origin_from}
                   </label>
                   <select
                     value={txFrom}
                     onChange={(e) => setTxFrom(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {fromOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -862,14 +990,14 @@ function App() {
                 {/* Date */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Data
+                    {t.date}
                   </label>
                   <input
                     type="date"
                     value={txDate}
                     onChange={(e) => setTxDate(e.target.value)}
                     required
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
               </div>
@@ -879,12 +1007,12 @@ function App() {
                 {/* Status */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Status
+                    {t.status}
                   </label>
                   <select
                     value={txStatus}
                     onChange={(e) => setTxStatus(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {statusOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -895,12 +1023,12 @@ function App() {
                 {/* Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Categoria
+                    {t.category}
                   </label>
                   <select
                     value={txCategory}
                     onChange={(e) => setTxCategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {categoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -911,12 +1039,12 @@ function App() {
                 {/* Subcategory */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Subcategoria
+                    {t.subcategory}
                   </label>
                   <select
                     value={txSubcategory}
                     onChange={(e) => setTxSubcategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {subcategoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -927,12 +1055,12 @@ function App() {
                 {/* Entity */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Entity (Entidade)
+                    {t.entity}
                   </label>
                   <select
                     value={txEntity}
                     onChange={(e) => handleEntityChange(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {entityOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -946,12 +1074,12 @@ function App() {
                 {/* Entity Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Entity Category
+                    {t.entity_category}
                   </label>
                   <select
                     value={txEntityCategory}
                     onChange={(e) => setTxEntityCategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {entityCategoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -962,14 +1090,14 @@ function App() {
                 {/* Description / Notes */}
                 <div className="sm:col-span-2">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Descrição (Notes)
+                    {t.description}
                   </label>
                   <input
                     type="text"
                     value={txDescription}
                     onChange={(e) => setTxDescription(e.target.value)}
-                    placeholder="Ex: Venda de excedente de minério"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    placeholder={t('placeholder.notes')}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
               </div>
@@ -980,81 +1108,121 @@ function App() {
                 disabled={isLoading}
                 className="w-full py-3 bg-[#8b4513] text-white font-black text-xs uppercase tracking-widest rounded-xl hover:scale-[1.01] active:scale-99 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md border-2 border-[#d4af37]/30"
               >
-                {isLoading ? 'Registando Movimento...' : 'Registar no Livro'}
+                {isLoading ? `${t.register_movement}...` : t.save_transaction}
               </button>
             </form>
 
             {/* Transactions History Table Section */}
             <div className="border-t border-[#8b4513]/20 pt-4 space-y-3">
               <h4 className="title-font text-sm font-black text-[#4b2c20] uppercase flex justify-between items-center">
-                <span>Histórico de Transações</span>
+                <span>{t.ledger_transactions}</span>
                 <span className="text-[9px] font-sans font-bold text-[#5d4037]/60 tracking-normal normal-case">
-                  Livro de Contas Consolidado
+                  {t.treasury_books}
                 </span>
               </h4>
 
               {/* Responsive Table with horizontal scroll */}
-              <div className="max-h-64 overflow-y-auto overflow-x-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar">
+              <div className="max-h-64 overflow-y-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar">
                 {transactions && transactions.length > 0 ? (
-                  <table className="w-full text-left border-collapse text-[10px] font-sans">
-                    <thead>
-                      <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                        <th className="py-2.5 px-3 whitespace-nowrap">From</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Date</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Month</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Year</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Quarter</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Type</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Status</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Category</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Subcategory</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Entity</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Entity Category</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                      {transactions.map((tx) => (
-                        <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
-                          <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.date || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap font-serif italic text-stone-600">{tx.month || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.year || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                              tx.type === 'income' 
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
-                                : 'bg-rose-100 text-rose-800 border border-rose-250'
-                            }`}>
-                              {tx.type}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 whitespace-nowrap">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${
-                              tx.status === 'Completed' 
-                                ? 'bg-green-100 text-green-800 border border-green-200' 
-                                : 'bg-amber-100 text-amber-800 border border-amber-200'
-                            }`}>
-                              {tx.status || 'Completed'}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.category}</td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.subcategory || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-medium">{tx.entity_category || '-'}</td>
-                          <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                            tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
-                          }`}>
-                            {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
-                          </td>
+                  <>
+                    {/* Desktop table view */}
+                    <table className="hidden md:table w-full text-left border-collapse text-[10px] font-sans">
+                      <thead>
+                        <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.date')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.month')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.year')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.quarter')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.type')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.subcategory')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity_category')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+                        {transactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
+                            <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.date || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap font-serif italic text-stone-600">{tx.month || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.year || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                tx.type === 'income' 
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
+                                  : 'bg-rose-100 text-rose-800 border border-rose-250'
+                              }`}>
+                                {tx.type}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${
+                                tx.status === 'Completed' 
+                                  ? 'bg-green-100 text-green-800 border border-green-200' 
+                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              }`}>
+                                {tx.status || 'Completed'}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.category}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.subcategory || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-medium">{tx.entity_category || '-'}</td>
+                            <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
+                              tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
+                            }`}>
+                              {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Mobile cards view */}
+                    <div className="grid grid-cols-1 gap-2.5 p-3 md:hidden">
+                      {transactions.map((tx) => (
+                        <div 
+                          key={tx.id} 
+                          className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-xl p-3 shadow-sm flex flex-col gap-2 relative overflow-hidden"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
+                                {tx.entity || tx.category}
+                              </span>
+                              <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
+                                {tx.from} • {tx.subcategory || '-'}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className={`font-mono font-black text-xs ${tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                              </div>
+                              <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
+                                tx.status === 'Completed' 
+                                  ? 'bg-green-100 text-green-800 border border-green-200' 
+                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              }`}>
+                                {tx.status || 'Completed'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
+                            <span>📅 {tx.date} ({tx.month} {tx.year})</span>
+                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.entity_category || '-'}</span>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </>
                 ) : (
                   <p className="text-center py-8 text-xs text-[#5d4037]/60 italic font-serif">
-                    Nenhum registo no livro de transações.
+                    {t.no_options_registered}
                   </p>
                 )}
               </div>
@@ -1066,7 +1234,7 @@ function App() {
         <Modal
           isOpen={isNewTxModalOpen}
           onClose={() => setIsNewTxModalOpen(false)}
-          title="Nova Transação Real"
+          title={t.register_movement}
           size="max-w-4xl"
         >
           <div className="space-y-6">
@@ -1075,8 +1243,8 @@ function App() {
                 ➕
               </div>
               <div>
-                <h3 className="title-font text-lg font-black text-[#4b2c20] uppercase">Adicionar ao Livro</h3>
-                <p className="text-[10px] text-[#5d4037]/75 font-bold uppercase tracking-wider">Novo Registro de Ouro</p>
+                <h3 className="title-font text-lg font-black text-[#4b2c20] uppercase">{t.register_movement}</h3>
+                <p className="text-[10px] text-[#5d4037]/75 font-bold uppercase tracking-wider">{t.gold_mine_commerce}</p>
               </div>
             </div>
 
@@ -1086,9 +1254,9 @@ function App() {
                 {/* Type Selection */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Tipo
+                    {t.type}
                   </label>
-                  <div className="grid grid-cols-2 gap-1.5 h-[38px]">
+                  <div className="grid grid-cols-2 gap-1.5 h-11 md:h-[38px]">
                     <button
                       type="button"
                       onClick={() => setTxType('income')}
@@ -1098,7 +1266,7 @@ function App() {
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50 cursor-pointer'
                       }`}
                     >
-                      🟢 Receita
+                      🟢 {t.income}
                     </button>
                     <button
                       type="button"
@@ -1109,7 +1277,7 @@ function App() {
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50 cursor-pointer'
                       }`}
                     >
-                      🔴 Despesa
+                      🔴 {t.expense}
                     </button>
                   </div>
                 </div>
@@ -1117,28 +1285,28 @@ function App() {
                 {/* Amount */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Ouro (Coins)
+                    {t.amount_gold}
                   </label>
                   <input
                     type="number"
                     value={txAmount}
                     onChange={(e) => setTxAmount(e.target.value)}
-                    placeholder="Ex: 500"
+                    placeholder={t('placeholder.amount')}
                     required
                     min="1"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
 
                 {/* From */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    From (Origem)
+                    {t.origin_from}
                   </label>
                   <select
                     value={txFrom}
                     onChange={(e) => setTxFrom(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {fromOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -1149,14 +1317,14 @@ function App() {
                 {/* Date */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Data
+                    {t.date}
                   </label>
                   <input
                     type="date"
                     value={txDate}
                     onChange={(e) => setTxDate(e.target.value)}
                     required
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
               </div>
@@ -1166,12 +1334,12 @@ function App() {
                 {/* Status */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Status
+                    {t.status}
                   </label>
                   <select
                     value={txStatus}
                     onChange={(e) => setTxStatus(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {statusOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -1182,12 +1350,12 @@ function App() {
                 {/* Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Categoria
+                    {t.category}
                   </label>
                   <select
                     value={txCategory}
                     onChange={(e) => setTxCategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {categoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -1198,12 +1366,12 @@ function App() {
                 {/* Subcategory */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Subcategoria
+                    {t.subcategory}
                   </label>
                   <select
                     value={txSubcategory}
                     onChange={(e) => setTxSubcategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {subcategoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -1214,12 +1382,12 @@ function App() {
                 {/* Entity */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Entity (Entidade)
+                    {t.entity}
                   </label>
                   <select
                     value={txEntity}
                     onChange={(e) => handleEntityChange(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {entityOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -1233,12 +1401,12 @@ function App() {
                 {/* Entity Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Entity Category
+                    {t.entity_category}
                   </label>
                   <select
                     value={txEntityCategory}
                     onChange={(e) => setTxEntityCategory(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {entityCategoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -1249,14 +1417,14 @@ function App() {
                 {/* Description / Notes */}
                 <div className="sm:col-span-2">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Descrição (Notes)
+                    {t.description}
                   </label>
                   <input
                     type="text"
                     value={txDescription}
                     onChange={(e) => setTxDescription(e.target.value)}
-                    placeholder="Ex: Venda de excedente de minério"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    placeholder={t('placeholder.notes')}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
               </div>
@@ -1267,7 +1435,7 @@ function App() {
                 disabled={isLoading}
                 className="w-full py-3 bg-[#8b4513] text-white font-black text-xs uppercase tracking-widest rounded-xl hover:scale-[1.01] active:scale-99 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md border-2 border-[#d4af37]/30 cursor-pointer"
               >
-                {isLoading ? 'Registando Movimento...' : 'Registar no Livro'}
+                {isLoading ? `${t.register_movement}...` : t.save_transaction}
               </button>
             </form>
           </div>
@@ -1275,7 +1443,14 @@ function App() {
 
         {/* Dashboard View (Royal Treasury Summary) */}
         {activeTab === 'dashboard' && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setActiveTab('quests');
+              }
+            }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          >
             <div className="bg-[#f4e4bc] w-full max-w-6xl h-[88%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
@@ -1295,7 +1470,7 @@ function App() {
                 type="button"
                 onClick={() => setActiveTab('quests')}
                 className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
-                title="Voltar ao Mapa"
+                title={t.back_to_map}
               >
                 <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
                 <span className="text-[#ffd700] text-lg font-black font-sans">✕</span>
@@ -1305,7 +1480,7 @@ function App() {
               <div className="relative h-16 flex items-center justify-center z-10 pt-2">
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[110%] h-10 bg-gradient-to-r from-[#8b4513] via-[#5d4037] to-[#8b4513] shadow-lg transform -rotate-1 skew-x-12 z-0 border-y-2 border-[#d4af37]" />
                 <h2 className="title-font text-lg sm:text-xl text-[#ffd700] font-bold uppercase tracking-[0.2em] relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                  Your Realm Treasury
+                  {t.financial_report}
                 </h2>
               </div>
 
@@ -1314,9 +1489,9 @@ function App() {
                 {/* Left Buttons: Analysis Sub-tabs */}
                 <div className="flex flex-wrap gap-1.5 items-center justify-center">
                   {[
-                    { id: 'overview', label: 'Overview', icon: '📊' },
-                    { id: 'income_expense', label: 'Income & Expenses', icon: '💸' },
-                    { id: 'payables_receivables', label: 'Payables & Receivables', icon: '📜' }
+                    { id: 'overview', label: t.subtab_overview, icon: '📊' },
+                    { id: 'income_expense', label: t.subtab_income_expense, icon: '💸' },
+                    { id: 'payables_receivables', label: t.subtab_payables_receivables, icon: '📜' }
                   ].map((tab) => {
                     const isSel = dashSubTab === tab.id;
                     return (
@@ -1324,7 +1499,7 @@ function App() {
                         key={tab.id}
                         type="button"
                         onClick={() => setDashSubTab(tab.id)}
-                        className={`px-3 py-1.5 rounded-lg border font-black text-[9px] uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 ${
+                        className={`px-3 py-3 md:py-1.5 rounded-lg border font-black text-[9px] uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 min-h-[44px] md:min-h-0 ${
                           isSel
                             ? 'bg-[#8b4513] border-[#8b4513] text-[#ffd700] shadow-md'
                             : 'bg-[#faf4e5]/80 border-[#8b4513]/20 text-[#5d4037]/80 hover:bg-[#8b4513]/10 hover:text-[#4b2c20]'
@@ -1340,9 +1515,9 @@ function App() {
                 {/* Right Buttons: Time Views */}
                 <div className="flex gap-1.5 items-center">
                   {[
-                    { id: 'month', label: 'Monthly view', icon: '📅' },
-                    { id: 'quarter', label: 'Quarterly view', icon: '⏳' },
-                    { id: 'year', label: 'Year view', icon: '👑' }
+                    { id: 'month', label: t.gran_month, icon: '📅' },
+                    { id: 'quarter', label: t.gran_quarter, icon: '⏳' },
+                    { id: 'year', label: t.gran_year, icon: '👑' }
                   ].map((gran) => {
                     const isSel = dashGranularity === gran.id;
                     return (
@@ -1350,7 +1525,7 @@ function App() {
                         key={gran.id}
                         type="button"
                         onClick={() => setDashGranularity(gran.id)}
-                        className={`px-3 py-1.5 rounded-lg border font-black text-[9px] uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 ${
+                        className={`px-3 py-3 md:py-1.5 rounded-lg border font-black text-[9px] uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 min-h-[44px] md:min-h-0 ${
                           isSel
                             ? 'bg-[#8b4513] border-[#8b4513] text-[#ffd700] shadow-md'
                             : 'bg-[#faf4e5]/80 border-[#8b4513]/20 text-[#5d4037]/80 hover:bg-[#8b4513]/10 hover:text-[#4b2c20]'
@@ -1371,7 +1546,7 @@ function App() {
                     {/* 1. KPIs */}
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total de Receitas (Inflow)</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.total_income_inflow}</span>
                         <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">
                           +{dashInflow.toLocaleString()}g
                         </span>
@@ -1379,7 +1554,7 @@ function App() {
                       </div>
 
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total de Despesas (Outflow)</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.total_expenses_outflow}</span>
                         <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">
                           -{dashOutflow.toLocaleString()}g
                         </span>
@@ -1387,7 +1562,7 @@ function App() {
                       </div>
 
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Saldo Líquido</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.net_balance}</span>
                         <span className={`title-font text-xl font-black mt-1 font-mono ${
                           dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'
                         }`}>
@@ -1397,7 +1572,7 @@ function App() {
                       </div>
 
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Eficiência de Poupança</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.savings_efficiency}</span>
                         <span className={`title-font text-xl font-black mt-1 font-mono ${
                           dashEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'
                         }`}>
@@ -1412,7 +1587,7 @@ function App() {
                       <div className="relative flex gap-3 items-center">
                         <div className="text-3xl">🧙‍♂️</div>
                         <div className="space-y-0.5">
-                          <h5 className="text-[9px] font-black uppercase text-[#8b4513]/85 tracking-widest font-sans">Conselho do Tesoureiro Real</h5>
+                          <h5 className="text-[9px] font-black uppercase text-[#8b4513]/85 tracking-widest font-sans">{t.treasurer_advice_banner}</h5>
                           <p className="text-xs italic text-[#4b2c20] font-serif leading-relaxed">
                             {dashTreasurerAdvice}
                           </p>
@@ -1422,93 +1597,209 @@ function App() {
 
                     {/* 2. Charts Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Category Breakdown */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[240px]">
-                        <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>Fluxo por Categoria</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">Consolidado Geral</span>
-                        </h4>
-                        <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                          {dashCategoryData.length > 0 ? (
-                            dashCategoryData.map((c) => {
-                              const incWidth = (c.income / maxDashCategoryVal) * 100;
-                              const expWidth = (c.expense / maxDashCategoryVal) * 100;
+                      {/* Category Breakdown (Diverging Bar Chart) */}
+                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px] diverging-chart-container relative select-none">
+                        {/* Selector Controls Header */}
+                        <div className="flex flex-col gap-2 border-b border-[#8b4513]/10 pb-2 flex-shrink-0">
+                          <div className="flex justify-between items-center">
+                            <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider">
+                              {t('dashboard.charts.flow_by_category')}
+                            </h4>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[8px] font-sans font-medium text-stone-500 uppercase">{t('dashboard.charts.scale_mode')}:</span>
+                              <button
+                                type="button"
+                                onClick={() => setChartScaleMode(chartScaleMode === 'absolute' ? 'percentage' : 'absolute')}
+                                className="px-2 py-0.5 rounded bg-[#8b4513]/10 border border-[#8b4513]/20 hover:bg-[#8b4513]/20 text-[8px] font-bold text-[#4b2c20] transition-all cursor-pointer"
+                              >
+                                {chartScaleMode === 'absolute' ? t('dashboard.charts.scale_absolute') : t('dashboard.charts.scale_percentage')}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center gap-2">
+                            <div className="flex gap-1">
+                              {[
+                                { id: 'all', label: t('dashboard.charts.horizon_all') },
+                                { id: 'moon', label: t('dashboard.charts.horizon_moon') },
+                                { id: 'cycles', label: t('dashboard.charts.horizon_cycles') }
+                              ].map((hor) => {
+                                const isSel = chartTimeHorizon === hor.id;
+                                return (
+                                  <button
+                                    key={hor.id}
+                                    type="button"
+                                    onClick={() => setChartTimeHorizon(hor.id)}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                      isSel
+                                        ? 'bg-[#8b4513] text-[#ffd700]'
+                                        : 'bg-[#faf4e5]/80 border border-[#8b4513]/15 text-[#5d4037]/70 hover:bg-[#8b4513]/10'
+                                    }`}
+                                  >
+                                    {hor.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <span className="text-[8px] font-sans font-medium text-stone-500 uppercase">{t('category_label')}:</span>
+                              <select
+                                value={chartGranularity}
+                                onChange={(e) => setChartGranularity(e.target.value)}
+                                className="bg-[#faf4e5] border border-[#8b4513]/30 rounded px-1.5 py-0.5 text-[8.5px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513] cursor-pointer"
+                              >
+                                <option value="all">{t('all_categories')}</option>
+                                <option value="Income">🟢 {t('income')}</option>
+                                <option value="Expense">🔴 {t('expense')}</option>
+                                <option value="Savings">🛡️ {t('savings')}</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Chart Area */}
+                        <div className="space-y-3.5 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
+                          {chartGroupedData.length > 0 ? (
+                            chartGroupedData.map((c) => {
+                              const incWidth = (c.income / maxChartBarVal) * 100;
+                              const expWidth = (c.expense / maxChartBarVal) * 100;
+                              
+                              const displayIncome = chartScaleMode === 'absolute'
+                                ? `+${c.income.toLocaleString()}g`
+                                : `+${((c.income / totalChartVolume) * 100).toFixed(1)}%`;
+
+                              const displayExpense = chartScaleMode === 'absolute'
+                                ? `-${c.expense.toLocaleString()}g`
+                                : `-${((c.expense / totalChartVolume) * 100).toFixed(1)}%`;
+
                               return (
-                                <div key={c.category} className="space-y-1 text-xs">
-                                  <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                    <span>{c.category}</span>
-                                    <span className="font-mono text-stone-600">Volume: {c.total.toLocaleString()}g</span>
+                                <div key={c.name} className="space-y-1">
+                                  {/* Row Info */}
+                                  <div className="flex justify-between font-bold text-[#4b2c20] text-[9.5px]">
+                                    <span>{c.name}</span>
+                                    <span className={`font-mono font-bold text-[9px] ${c.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                      {t('balance')}: {c.net >= 0 ? '+' : ''}{c.net.toLocaleString()}g
+                                    </span>
                                   </div>
-                                  {c.income > 0 && (
-                                    <div className="space-y-0.5">
-                                      <div className="flex justify-between text-[8px] text-emerald-800 font-bold font-mono">
-                                        <span>Receita</span>
-                                        <span>+{c.income.toLocaleString()}g</span>
-                                      </div>
-                                      <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                        <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
-                                      </div>
+
+                                  {/* Diverging Bar Row */}
+                                  <div className="relative grid grid-cols-[1fr_2px_1fr] items-center h-5 bg-[#faf4e5]/40 rounded border border-[#8b4513]/10 overflow-hidden">
+                                    {/* Left (Expense) */}
+                                    <div 
+                                      className="flex justify-end h-full items-center pr-0.5 cursor-crosshair"
+                                      onMouseEnter={(e) => handleChartMouseMove(e, c, 'expense')}
+                                      onMouseMove={(e) => handleChartMouseMove(e, c, 'expense')}
+                                      onMouseLeave={() => setChartTooltip(null)}
+                                    >
+                                      {c.expense > 0 && (
+                                        <div 
+                                          className="h-[14px] bg-rose-700 rounded-l transition-all duration-500 ease-out origin-right flex items-center justify-end pr-1.5 text-[7.5px] font-bold text-white font-mono select-none"
+                                          style={{ width: `${expWidth}%` }}
+                                        >
+                                          {displayExpense}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                  {c.expense > 0 && (
-                                    <div className="space-y-0.5">
-                                      <div className="flex justify-between text-[8px] text-rose-800 font-bold font-mono">
-                                        <span>Despesa</span>
-                                        <span>-{c.expense.toLocaleString()}g</span>
-                                      </div>
-                                      <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                        <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
-                                      </div>
+
+                                    {/* Zero Center baseline */}
+                                    <div className="h-full w-[2px] bg-[#8b4513]/30 z-10" />
+
+                                    {/* Right (Income) */}
+                                    <div 
+                                      className="flex justify-start h-full items-center pl-0.5 cursor-crosshair"
+                                      onMouseEnter={(e) => handleChartMouseMove(e, c, 'income')}
+                                      onMouseMove={(e) => handleChartMouseMove(e, c, 'income')}
+                                      onMouseLeave={() => setChartTooltip(null)}
+                                    >
+                                      {c.income > 0 && (
+                                        <div 
+                                          className="h-[14px] bg-emerald-700 rounded-r transition-all duration-500 ease-out origin-left flex items-center justify-start pl-1.5 text-[7.5px] font-bold text-white font-mono select-none"
+                                          style={{ width: `${incWidth}%` }}
+                                        >
+                                          {displayIncome}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
                               );
                             })
                           ) : (
                             <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Nenhuma atividade financeira.</p>
+                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t('no_options_registered')}</p>
                             </div>
                           )}
                         </div>
+
+                        {/* Localized Floating Precision Tooltip Card */}
+                        {chartTooltip && (
+                          <div 
+                            className="absolute bg-[#f4e4bc] border-2 border-[#8b4513] text-[#4b2c20] text-[9.5px] p-2.5 rounded-lg shadow-2xl pointer-events-none z-[120] font-sans w-48 space-y-1 animate-in fade-in duration-100"
+                            style={{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }}
+                          >
+                            <div 
+                              className="absolute inset-0 pointer-events-none opacity-20 mix-blend-multiply rounded-md"
+                              style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')" }}
+                            />
+                            <div className="relative font-black text-center border-b border-[#8b4513]/20 pb-1 uppercase tracking-wider title-font text-[#4b2c20]">
+                              {chartTooltip.name}
+                            </div>
+                            <div className="relative flex justify-between gap-2">
+                              <span className="text-stone-500 font-bold uppercase text-[8px]">{t('type_label')}:</span>
+                              <span className={`font-black uppercase text-[8.5px] ${chartTooltip.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {chartTooltip.type === 'income' ? `🟢 ${t('income')}` : `🔴 ${t('expense')}`}
+                              </span>
+                            </div>
+                            <div className="relative flex justify-between gap-2">
+                              <span className="text-stone-500 font-bold uppercase text-[8px]">{t('value')}:</span>
+                              <span className="font-mono font-black">{chartTooltip.amount.toLocaleString()}g</span>
+                            </div>
+                            <div className="relative flex justify-between gap-2">
+                              <span className="text-stone-500 font-bold uppercase text-[8px]">{t('dashboard.charts.segment_percentage')}:</span>
+                              <span className="font-mono font-black">{chartTooltip.percentage.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Dynamic Time Evolution */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[240px]">
+                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px]">
                         <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>Evolução Temporal</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">Agrupamento Ativo ({dashGranularity})</span>
+                          <span>{t.time_evolution}</span>
+                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t('active_grouping', { gran: dashGranularity === 'month' ? t('gran_month') : dashGranularity === 'quarter' ? t('gran_quarter') : t('gran_year') })}</span>
                         </h4>
                         <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                           {dashTimeData.length > 0 ? (
-                            dashTimeData.map((t) => {
-                              const incWidth = (t.income / maxDashTimeVal) * 100;
-                              const expWidth = (t.expense / maxDashTimeVal) * 100;
-                              const net = t.income - t.expense;
+                            dashTimeData.map((tItem) => {
+                              const incWidth = (tItem.income / maxDashTimeVal) * 100;
+                              const expWidth = (tItem.expense / maxDashTimeVal) * 100;
+                              const net = tItem.income - tItem.expense;
                               return (
-                                <div key={t.label} className="space-y-1 text-xs">
+                                <div key={tItem.label} className="space-y-1 text-xs">
                                   <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                    <span>{t.label}</span>
+                                    <span>{tItem.label}</span>
                                     <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                      Balanço: {net >= 0 ? '+' : ''}{net.toLocaleString()}g
+                                      {t.balance}: {net >= 0 ? '+' : ''}{net.toLocaleString()}g
                                     </span>
                                   </div>
                                   <div className="space-y-1 bg-[#faf4e5]/60 border border-[#8b4513]/10 rounded p-1.5">
-                                    {t.income > 0 && (
+                                    {tItem.income > 0 && (
                                       <div className="flex items-center gap-2">
-                                        <span className="w-8 text-[8px] text-emerald-800 font-bold uppercase">Receita</span>
+                                        <span className="w-8 text-[8px] text-emerald-800 font-bold uppercase">{t.income}</span>
                                         <div className="flex-1 bg-[#faf4e5]/80 h-1.5 rounded-full overflow-hidden border border-[#8b4513]/5">
                                           <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
                                         </div>
-                                        <span className="w-10 text-right text-[8px] font-mono font-bold text-stone-600">+{t.income.toLocaleString()}g</span>
+                                        <span className="w-10 text-right text-[8px] font-mono font-bold text-stone-600">+{tItem.income.toLocaleString()}g</span>
                                       </div>
                                     )}
-                                    {t.expense > 0 && (
+                                    {tItem.expense > 0 && (
                                       <div className="flex items-center gap-2">
-                                        <span className="w-8 text-[8px] text-rose-800 font-bold uppercase">Despesa</span>
+                                        <span className="w-8 text-[8px] text-rose-800 font-bold uppercase">{t.expense}</span>
                                         <div className="flex-1 bg-[#faf4e5]/80 h-1.5 rounded-full overflow-hidden border border-[#8b4513]/5">
                                           <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
                                         </div>
-                                        <span className="w-10 text-right text-[8px] font-mono font-bold text-stone-600">-{t.expense.toLocaleString()}g</span>
+                                        <span className="w-10 text-right text-[8px] font-mono font-bold text-stone-600">-{tItem.expense.toLocaleString()}g</span>
                                       </div>
                                     )}
                                   </div>
@@ -1517,7 +1808,7 @@ function App() {
                             })
                           ) : (
                             <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Nenhuma atividade registada neste período.</p>
+                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_records_active_period}</p>
                             </div>
                           )}
                         </div>
@@ -1529,8 +1820,8 @@ function App() {
                       {/* From Allocation */}
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[240px]">
                         <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>Origem do Ouro (From Allocation)</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">Fontes Pagadoras</span>
+                          <span>{t.gold_origin}</span>
+                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.paying_sources}</span>
                         </h4>
                         <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                           {fromAllocation.length > 0 ? (
@@ -1550,7 +1841,7 @@ function App() {
                             })
                           ) : (
                             <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Nenhum rendimento registado.</p>
+                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_income_registered}</p>
                             </div>
                           )}
                         </div>
@@ -1559,18 +1850,18 @@ function App() {
                       {/* Top Entities */}
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[240px]">
                         <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>Maiores Comércios (Top Entities)</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">Por Volume de Ouro</span>
+                          <span>{t.top_entities}</span>
+                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.by_gold_volume}</span>
                         </h4>
                         <div className="overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                           {entityVolumes.length > 0 ? (
                             <table className="w-full text-left border-collapse text-[10px] font-sans">
                               <thead>
                                 <tr className="border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider">
-                                  <th className="py-1">Entidade</th>
-                                  <th className="py-1 text-right">Inflow</th>
-                                  <th className="py-1 text-right">Outflow</th>
-                                  <th className="py-1 text-right">Total</th>
+                                  <th className="py-1">{t.entidade_header}</th>
+                                  <th className="py-1 text-right">{t.income}</th>
+                                  <th className="py-1 text-right">{t.expense}</th>
+                                  <th className="py-1 text-right">{t.total_header}</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
@@ -1586,7 +1877,7 @@ function App() {
                             </table>
                           ) : (
                             <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Sem registo comercial.</p>
+                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_commercial_record}</p>
                             </div>
                           )}
                         </div>
@@ -1601,7 +1892,7 @@ function App() {
                     {/* KPI & Savings Rate Banner */}
                     <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 shadow-sm">
                       <div className="flex flex-col justify-between">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Taxa de Poupança Real</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.savings_rate_real}</span>
                         <span className={`title-font text-2xl font-black mt-1 font-mono ${
                           dashEfficiencyRatio >= 20 ? 'text-emerald-700' : dashEfficiencyRatio >= 0 ? 'text-[#b8860b]' : 'text-rose-700'
                         }`}>
@@ -1610,11 +1901,11 @@ function App() {
                       </div>
                       <div className="sm:col-span-2 text-xs italic text-[#5d4037] flex items-center border-l border-[#8b4513]/15 pl-4">
                         {dashEfficiencyRatio >= 30 ? (
-                          <span>"A vossa gestão é digna de lenda, meu Lorde! Guardais uma grande fatia do vosso ouro para futuras conquistas."</span>
+                          <span>{t.advice_efficiency_good}</span>
                         ) : dashEfficiencyRatio >= 0 ? (
-                          <span>"Mantendes as contas sob controlo, mas podíamos poupar mais ouro se reduzíssemos as despesas menores."</span>
+                          <span>{t.advice_efficiency_ok}</span>
                         ) : (
-                          <span>"Perigo! O reino está a esgotar as suas reservas. Precisamos cortar despesas imediatamente!"</span>
+                          <span>{t.advice_efficiency_bad}</span>
                         )}
                       </div>
                     </div>
@@ -1622,29 +1913,29 @@ function App() {
                     {/* Side-by-side evolution */}
                     <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
                       <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                        <span>Comparação de Fluxos ({dashGranularity})</span>
-                        <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">Receita vs Despesa</span>
+                        <span>{t.flow_comparison} ({dashGranularity === 'month' ? t.gran_month : dashGranularity === 'quarter' ? t.gran_quarter : t.gran_year})</span>
+                        <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.revenue_vs_expense}</span>
                       </h4>
                       <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                         {dashTimeData.length > 0 ? (
-                          dashTimeData.map((t) => {
-                            const incWidth = (t.income / maxDashTimeVal) * 100;
-                            const expWidth = (t.expense / maxDashTimeVal) * 100;
-                            const net = t.income - t.expense;
+                          dashTimeData.map((tItem) => {
+                            const incWidth = (tItem.income / maxDashTimeVal) * 100;
+                            const expWidth = (tItem.expense / maxDashTimeVal) * 100;
+                            const net = tItem.income - tItem.expense;
                             return (
-                              <div key={t.label} className="space-y-2 border-b border-[#8b4513]/5 pb-2">
+                              <div key={tItem.label} className="space-y-2 border-b border-[#8b4513]/5 pb-2">
                                 <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                  <span>{t.label}</span>
+                                  <span>{tItem.label}</span>
                                   <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                    Balanço: {net >= 0 ? '+' : ''}{net.toLocaleString()}g
+                                    {t.balance}: {net >= 0 ? '+' : ''}{net.toLocaleString()}g
                                   </span>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   {/* Income bar */}
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-[8px] text-emerald-800 font-bold font-mono">
-                                      <span>Receita</span>
-                                      <span>+{t.income.toLocaleString()}g</span>
+                                      <span>{t.income}</span>
+                                      <span>+{tItem.income.toLocaleString()}g</span>
                                     </div>
                                     <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
                                       <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
@@ -1653,8 +1944,8 @@ function App() {
                                   {/* Expense bar */}
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-[8px] text-rose-800 font-bold font-mono">
-                                      <span>Despesa</span>
-                                      <span>-{t.expense.toLocaleString()}g</span>
+                                      <span>{t.expense}</span>
+                                      <span>-{tItem.expense.toLocaleString()}g</span>
                                     </div>
                                     <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
                                       <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
@@ -1666,7 +1957,7 @@ function App() {
                           })
                         ) : (
                           <div className="h-full flex items-center justify-center">
-                            <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Sem registos comerciais no período activo.</p>
+                            <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_records_active_period}</p>
                           </div>
                         )}
                       </div>
@@ -1675,8 +1966,8 @@ function App() {
                     {/* Cost breakdown by Entity Category */}
                     <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
                       <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                        <span>Despesas por Categoria de Entidade</span>
-                        <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">Distribuição do Gasto</span>
+                        <span>{t.expenses_by_entity_category}</span>
+                        <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.spending_distribution}</span>
                       </h4>
                       <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                         {entityCatExpenses.length > 0 ? (
@@ -1696,7 +1987,7 @@ function App() {
                           })
                         ) : (
                           <div className="h-full flex items-center justify-center">
-                            <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Nenhuma despesa registada.</p>
+                            <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_expenses_registered}</p>
                           </div>
                         )}
                       </div>
@@ -1710,7 +2001,7 @@ function App() {
                     {/* KPIs Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Moedas a Receber (Receivables)</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.receivables}</span>
                         <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">
                           +{totalReceivables.toLocaleString()}g
                         </span>
@@ -1718,7 +2009,7 @@ function App() {
                       </div>
 
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Moedas a Pagar (Payables)</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.payables}</span>
                         <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">
                           -{totalPayables.toLocaleString()}g
                         </span>
@@ -1726,7 +2017,7 @@ function App() {
                       </div>
 
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Taxa de Atraso (Overdue Rate)</span>
+                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.overdue_rate}</span>
                         <span className={`title-font text-xl font-black mt-1 font-mono ${
                           overdueRate > 50 ? 'text-red-700' : overdueRate > 0 ? 'text-amber-600' : 'text-emerald-700'
                         }`}>
@@ -1741,8 +2032,8 @@ function App() {
                       {/* Receivables List */}
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[320px]">
                         <h4 className="title-font text-[11px] font-black text-emerald-800 uppercase tracking-wider border-b border-emerald-600/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>Receitas Pendentes</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{pendingIncomeList.length} items</span>
+                          <span>{t.pending_revenues}</span>
+                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{pendingIncomeList.length} {pendingIncomeList.length === 1 ? 'item' : 'items'}</span>
                         </h4>
                         <div className="overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                           {pendingIncomeList.length > 0 ? (
@@ -1762,7 +2053,7 @@ function App() {
                             </div>
                           ) : (
                             <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Nenhuma receita pendente. Todos os pagamentos foram cobrados!</p>
+                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_pending_revenues}</p>
                             </div>
                           )}
                         </div>
@@ -1771,8 +2062,8 @@ function App() {
                       {/* Payables List */}
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[320px]">
                         <h4 className="title-font text-[11px] font-black text-rose-800 uppercase tracking-wider border-b border-rose-600/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>Despesas Pendentes / Atrasadas</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{pendingExpenseList.length} items</span>
+                          <span>{t.pending_expenses}</span>
+                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{pendingExpenseList.length} {pendingExpenseList.length === 1 ? 'item' : 'items'}</span>
                         </h4>
                         <div className="overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                           {pendingExpenseList.length > 0 ? (
@@ -1801,7 +2092,7 @@ function App() {
                             </div>
                           ) : (
                             <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">Nenhuma despesa pendente. O reino está livre de dívidas correntes!</p>
+                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_pending_expenses}</p>
                             </div>
                           )}
                         </div>
@@ -1818,7 +2109,14 @@ function App() {
 
         {/* Transactions View (Financial Ledger) */}
         {activeTab === 'transactions' && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setActiveTab('quests');
+              }
+            }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          >
             <div className="bg-[#f4e4bc] w-full max-w-5xl max-h-[82%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
@@ -1838,7 +2136,7 @@ function App() {
                 type="button"
                 onClick={() => setActiveTab('quests')}
                 className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
-                title="Voltar ao Mapa"
+                title={t.back_to_map}
               >
                 <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
                 <span className="text-[#ffd700] text-lg font-black font-sans">✕</span>
@@ -1848,7 +2146,7 @@ function App() {
               <div className="relative h-16 flex items-center justify-center z-10 pt-2">
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[110%] h-10 bg-gradient-to-r from-[#8b4513] via-[#5d4037] to-[#8b4513] shadow-lg transform -rotate-1 skew-x-12 z-0 border-y-2 border-[#d4af37]" />
                 <h2 className="title-font text-lg sm:text-xl text-[#ffd700] font-bold uppercase tracking-[0.2em] relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                  Financial Ledger
+                  {t.ledger_transactions}
                 </h2>
               </div>
 
@@ -1858,24 +2156,24 @@ function App() {
                 {/* Title and Action Buttons */}
                 <div className="flex justify-between items-center">
                   <h4 className="title-font text-sm font-black text-[#4b2c20] uppercase">
-                    Livro Geral de Contas
+                    {t.ledger_transactions}
                   </h4>
                   <div className="flex gap-2 flex-wrap items-center">
                     <button
                       type="button"
                       onClick={handleExportCSV}
                       className="px-3 py-1.5 bg-[#faf4e5]/90 border-2 border-[#8b4513]/30 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                      title="Exportar todas as transações para CSV"
+                      title={t.export_csv}
                     >
-                      <span>📤</span> Exportar CSV
+                      <span>📤</span> {t.export_csv}
                     </button>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current.click()}
                       className="px-3 py-1.5 bg-[#faf4e5]/90 border-2 border-[#8b4513]/30 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                      title="Importar transações a partir de um arquivo CSV"
+                      title={t.import_csv}
                     >
-                      <span>📥</span> Importar CSV
+                      <span>📥</span> {t.import_csv}
                     </button>
                     <input
                       type="file"
@@ -1889,14 +2187,14 @@ function App() {
                       onClick={handleNewTxClick}
                       className="px-3 py-1.5 bg-[#8b4513] border-2 border-[#d4af37]/30 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                     >
-                      <span>➕</span> Nova Transação
+                      <span>➕</span> {t.register_movement}
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
                       className="px-3 py-1.5 bg-[#faf4e5]/90 border-2 border-[#8b4513]/30 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                     >
-                      <span>🔍</span> {isFiltersExpanded ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+                      <span>🔍</span> {isFiltersExpanded ? t.hide_filters : t.show_filters}
                     </button>
                   </div>
                 </div>
@@ -1905,7 +2203,7 @@ function App() {
                 {isFiltersExpanded && (
                   <div className="bg-[#faf4e5]/50 border border-[#8b4513]/20 rounded-xl p-4 animate-in slide-in-from-top-2 duration-200">
                     <div className="flex justify-between items-center border-b border-[#8b4513]/15 pb-2 mb-3">
-                      <span className="text-[9px] font-black uppercase text-[#5d4037]/80 tracking-wider">Filtros Ativos</span>
+                      <span className="text-[9px] font-black uppercase text-[#5d4037]/80 tracking-wider">{t.active_filters}</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -1916,50 +2214,50 @@ function App() {
                           setFilterType('All');
                           setFilterDate('');
                           setFilterCategory('All');
-                          toast.success('Filtros limpos!');
+                          toast.success(t.filters_cleared);
                         }}
                         className="text-[9px] font-black text-rose-800 hover:text-rose-955 uppercase transition-colors cursor-pointer"
                       >
-                        Limpar Todos
+                        {t.clear_all}
                       </button>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
                       {/* Year */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">Ano (Year)</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.year_label}</label>
                         <select
                           value={filterYear}
                           onChange={(e) => setFilterYear(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">All Years</option>
+                          <option value="All">{t.all_years}</option>
                           {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                       </div>
 
                       {/* Month */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">Mês (Month)</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.month_label}</label>
                         <select
                           value={filterMonth}
                           onChange={(e) => setFilterMonth(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">All Months</option>
+                          <option value="All">{t.all_months}</option>
                           {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
                       </div>
 
                       {/* Quarter */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">Trimestre (Quarter)</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.quarter_label}</label>
                         <select
                           value={filterQuarter}
                           onChange={(e) => setFilterQuarter(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">All Quarters</option>
+                          <option value="All">{t.all_quarters}</option>
                           <option value="Q1">Q1</option>
                           <option value="Q2">Q2</option>
                           <option value="Q3">Q3</option>
@@ -1969,34 +2267,34 @@ function App() {
 
                       {/* From */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">From</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.origin_from}</label>
                         <select
                           value={filterFrom}
                           onChange={(e) => setFilterFrom(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">All From</option>
+                          <option value="All">{t.all_from}</option>
                           {fromOptions.map(f => <option key={f} value={f}>{f}</option>)}
                         </select>
                       </div>
 
                       {/* Type */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">Tipo (Type)</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.type_label}</label>
                         <select
                           value={filterType}
                           onChange={(e) => setFilterType(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">All Types</option>
-                          <option value="income">income (Receita)</option>
-                          <option value="expense">expense (Despesa)</option>
+                          <option value="All">{t.all_types}</option>
+                          <option value="income">{t.income}</option>
+                          <option value="expense">{t.expense}</option>
                         </select>
                       </div>
 
                       {/* Date */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">Data (Date)</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.date_label}</label>
                         <input
                           type="date"
                           value={filterDate}
@@ -2007,13 +2305,13 @@ function App() {
 
                       {/* Category */}
                       <div>
-                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">Categoria (Cat)</label>
+                        <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.category_label}</label>
                         <select
                           value={filterCategory}
                           onChange={(e) => setFilterCategory(e.target.value)}
                           className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                         >
-                          <option value="All">All Categories</option>
+                          <option value="All">{t.all_categories}</option>
                           {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </div>
@@ -2022,51 +2320,91 @@ function App() {
                 )}
 
                 {/* Ledger Data Table */}
-                <div className="max-h-[380px] overflow-y-auto overflow-x-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar shadow-inner">
+                <div className="max-h-[380px] overflow-y-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar shadow-inner">
                   {filteredTransactions.length > 0 ? (
-                    <table className="w-full text-left border-collapse text-[10px] font-sans">
-                      <thead>
-                        <tr className="bg-[#8b4513] border-b border-[#8b4513]/20 text-[#ffd700] font-black uppercase tracking-wider title-font sticky top-0 z-20">
-                          <th className="py-2.5 px-3 whitespace-nowrap">From</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">Type</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">Date</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">Month</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">Year</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">Quarter</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">Category</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap text-right">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                        {filteredTransactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
-                            <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                tx.type === 'income' 
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                  : 'bg-rose-100 text-rose-800 border border-rose-200'
-                              }`}>
-                                {tx.type}
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.date || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-serif italic text-stone-600">{tx.month || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.year || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.category}</td>
-                            <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                              tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
-                            }`}>
-                              {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
-                            </td>
+                    <>
+                      {/* Desktop Table View */}
+                      <table className="hidden md:table w-full text-left border-collapse text-[10px] font-sans">
+                        <thead>
+                          <tr className="bg-[#8b4513] border-b border-[#8b4513]/20 text-[#ffd700] font-black uppercase tracking-wider title-font sticky top-0 z-20">
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.type')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.date')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.month')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.year')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.quarter')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+                          {filteredTransactions.map((tx) => (
+                            <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
+                              <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                  tx.type === 'income' 
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                }`}>
+                                  {tx.type}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.date || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap font-serif italic text-stone-600">{tx.month || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.year || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.category}</td>
+                              <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
+                                tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
+                              }`}>
+                                {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {/* Mobile Cards View */}
+                      <div className="grid grid-cols-1 gap-2.5 p-3 md:hidden">
+                        {filteredTransactions.map((tx) => (
+                          <div 
+                            key={tx.id} 
+                            className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-xl p-3 shadow-sm flex flex-col gap-2 relative overflow-hidden"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
+                                  {tx.entity || tx.category}
+                                </span>
+                                <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
+                                  {tx.from} • {tx.subcategory || '-'}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`font-mono font-black text-xs ${tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                </div>
+                                <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
+                                  tx.status === 'Completed' 
+                                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                                    : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                }`}>
+                                  {tx.status || 'Completed'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
+                              <span>📅 {tx.date} ({tx.month} {tx.year})</span>
+                              <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.entity_category || '-'}</span>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    </>
                   ) : (
                     <p className="text-center py-12 text-xs text-[#5d4037]/60 italic font-serif">
-                      Nenhum registo de transação encontrado para os filtros ativos.
+                      {t.no_options_registered}
                     </p>
                   )}
                 </div>

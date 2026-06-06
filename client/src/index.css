@@ -29,8 +29,15 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   @apply bg-[#0a0a0a];
   overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 .medieval-font { font-family: 'MedievalSharp', cursive; }
@@ -44,6 +51,7 @@ h1, h2, h3, h4, h5, h6 {
 .game-viewport {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   position: relative;
   /* Sky to Grass Background mimicking the reference image */
   background: linear-gradient(to bottom, 

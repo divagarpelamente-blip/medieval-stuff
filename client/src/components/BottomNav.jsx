@@ -1,12 +1,15 @@
 import { Compass, Trophy, BookOpen, LayoutDashboard, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
+  const { t } = useTranslation();
+
   const items = [
-    { id: 'quests', label: 'Quests', icon: Compass },
-    { id: 'achievements', label: 'Achievements', icon: Trophy },
-    { id: 'transactions', label: 'Transactions', icon: BookOpen },
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'quests', label: t('quests'), icon: Compass },
+    { id: 'achievements', label: t('achievements'), icon: Trophy },
+    { id: 'transactions', label: t('transactions'), icon: BookOpen },
+    { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { id: 'settings', label: t('settings'), icon: Settings },
   ];
 
   return (

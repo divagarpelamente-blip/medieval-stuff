@@ -1,0 +1,167 @@
+# System Architecture Report: Eldoria (Medieval Stuff)
+
+This document provides a comprehensive technical audit and specification of the system architecture of the **Eldoria** game application. It details the state management layer, dynamic database synchronization, localization engine, and interactive layout structure.
+
+---
+
+## 1. High-Level Architecture & System Flow
+
+Eldoria operates on a modern **BaaS (Backend-as-a-Service)** architecture, pairing a reactive React + Vite frontend with a Supabase PostgreSQL database for persistent data storage, real-time trigger updates, and user session statistics.
+
+```mermaid
+graph TD
+    subgraph Client [React + Vite Frontend]
+        App[App.jsx Components]
+        Store[Zustand Store / useKingdomStore]
+        i18n[i18next Localization Engine]
+        LStore[Local Web Browser Storage]
+    end
+
+    subgraph Backend [Supabase PostgreSQL DB]
+        T_Trans[transactions table]
+        T_Prof[profiles table]
+        P_Trig[PostgreSQL Trigger / Level-XP-Gold Update]
+    end
+
+    %% Client Internal Flow
+    App -->|Reads State & Updates| Store
+    Store -->|Saves Configuration Lists| LStore
+    Store -->|Syncs Active Language| i18n
+    i18n -->|Reads Initial Preference| LStore
+
+    %% Client to Backend DB Sync
+    Store -->|Fetches Profile & Ledger| T_Prof
+    Store -->|Inserts Ledger Movement| T_Trans
+    T_Trans -->|Triggers Update| P_Trig
+    P_Trig -->|Adjusts Stats & Gold| T_Prof
+    T_Prof -.->|Refreshed by Store| Store
+```
+
+### Core Data Flow
+1. **User Action**: The user records a transaction (ledger movement) in the Mine Modal or History Modal.
+2. **Zustand Action Dispatch**: The application dispatches `registerTransaction` to insert the row into Supabase's `transactions` table.
+3. **Database-Level Calculations**: PostgreSQL triggers automatically calculate the profile's accumulated XP, Level, and Gold balance in response to the insertion.
+4. **State Refresh**: The store refetches data from `profiles` and `transactions` to synchronize the frontend with the database-level calculations.
+
+---
+
+## 2. State Management & Data Persistence
+
+Eldoria separates state into two primary scopes: **global runtime states (Zustand)** and **persistent client-side lists (LocalStorage)**.
+
+### A. Zustand Global Store (`useKingdomStore.js`)
+Located in [useKingdomStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useKingdomStore.js), the Zustand store handles:
+- **Stat State**: `gold`, `gems`, `xp`, `level`, `email`, and loading spinners (`isLoading`).
+- **Ledger Records**: `transactions` array.
+- **Database Operations**: Async dispatches to Supabase for single or batch transaction entries.
+- **Synchronizations**: Triggers dynamic language switches inside the `i18next` engine during store action executions.
+
+### B. LocalStorage Configurations
+To ensure a personalized, modular experience without querying DB configurations continuously, options list settings are saved directly under the `eldoria_` prefix:
+- `eldoria_fromOptions`: List of payers/origins (e.g. `'Pedro'`, `'Reni'`, `'Consolidated'`).
+- `eldoria_statusOptions`: Ledger status constraints (e.g. `'Pending'`, `'Overdue'`, `'Paid on Time'`).
+- `eldoria_categoryOptions`: Core categories (e.g. `'Income'`, `'Expense'`, `'Savings'`).
+- `eldoria_subcategoryOptions`: Subcategories (e.g. `'Cash receipt'`, `'Credit payment'`).
+- `eldoria_entityOptions`: Commercial entities (e.g. `'Salary'`, `'Rent'`, `'Gasoline'`).
+- `eldoria_entityMappings`: Key-value map linking entities to their parent categories.
+- `eldoria_language`: Active locale key (e.g. `'en'`, `'pt-BR'`).
+
+---
+
+## 3. Localization Architecture (i18next & English-First Structure)
+
+Eldoria integrates **i18next** with a custom localization engine setup. To optimize token overhead during frontend iterations, the codebase operates on an **"English-First" development base** where secondary locales are frozen at the configuration level.
+
+```
+client/src/utils/locales/
+├── en.js     (English - Definitive source of truth, active)
+├── pt-BR.js  (Portuguese - Brazil, frozen/inactive)
+├── fr.js     (French, frozen/inactive)
+├── es.js     (Spanish, frozen/inactive)
+└── de.js     (German, frozen/inactive)
+```
+
+### Key Technical Implementations & English-First Lockdown
+1. **Explicit Locale Freeze**: Inside [i18n.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/i18n.js), secondary imports are commented out and the configuration strictly registers only the English namespace resource. The active runtime language (`lng`) and fallback (`fallbackLng`) are hardlocked to `'en'`.
+2. **Semantic Keys & Nested Tokenization**: All display text is systematically mapped to key calls. Hardcoded layout table headers inside [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx) (e.g. in the ledger and transaction history views) are refactored to use nested translation lookups:
+   - `t('ledger.headers.from')`, `t('ledger.headers.type')`, `t('ledger.headers.amount')`, etc.
+   - These keys are centralized under the `ledger.headers` namespace inside the definitive [en.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/utils/locales/en.js) dictionary.
+3. **Custom Interpolation Delimiters**: Configured with `{` and `}` delimiters inside [i18n.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/i18n.js) to match the existing variables template structure (e.g. `t('success_added_gold', { amount: 100 })` maps to `Added {amount} Gold!`).
+4. **Dynamic Property Proxy Wrapper**: In [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx), the `t` translator hook runs behind a **JavaScript Proxy**. This intercepts property access (like `t.quests` or `t.manage_from`) and seamlessly maps it to target the active English dictionary keys, maintaining backwards compatibility with legacy layout styles.
+
+---
+
+## 4. UI/UX Stacking & Responsive Gestures
+
+The layout is structured using a mobile-first responsive framework that guarantees stability across both touch interfaces and desktop pointers, employing stacking context separation and gesture controls.
+
+### A. Viewport Lock & Touch Bounds
+- **Elastic Scroll Prevention**: Custom stylesheet definitions in [index.css](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/index.css) set the main viewport wrapper to dynamic height (`100dvh`), `position: fixed`, and `touch-action: manipulation`. This completely blocks iOS and Android pull-to-refresh elastic scroll anomalies.
+- **Select Prevention**: Global `select-none` controls prevent browser text highlights when dragging or tapping visual components.
+
+### B. Adaptive Top HUD & Overlay Stacking
+- **Vertical Grid Stacking**: The profile status bar and resources wrap gracefully from a wide row design on desktop (`md:flex-row md:h-24`) to a compact vertical stack (`flex-col h-auto py-2.5 gap-2`) on mobile.
+- **Conditional Visibility**: The HUD renders conditionally (`activeTab === 'quests' && !isMineModalOpen && !isNewTxModalOpen`) to maintain visual clarity and block z-axis overlay collisions.
+
+### C. Touch Target Guidelines (Minimum 44x44px)
+- **Interactive Colliders**: Hitzones in [IsometricMap.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/IsometricMap.jsx) enforce a minimum tap container limit (`min-w-[44px] min-h-[44px]`).
+- **Padded Menus & Controls**: Sidebar selections (`py-3 md:py-2`), form inputs (`h-11 md:h-[38px]`), close seals (`w-12 h-12`), and language selectors are rescaled to prevent accidental taps on small mobile screens.
+
+### D. Tabular Data Responsive Cards
+- **Responsive Card Fallbacks**: To optimize layout width on screens below the `md` breakpoint, standard multi-column tables are hidden (`hidden md:table`) and replaced by stackable parchment card lists (`grid grid-cols-1 md:hidden`). This applies to both the **Mine Modal History list** and **main Ledger Data table** in [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx).
+
+### E. Stacking Layer Contexts
+Z-index values are categorized as follows to guarantee correct component sorting and block mouse clicks leakage:
+- **Game Map (Background)**: Static background map.
+- **Map Interactives (HitZones)**: `z-50` (colliders representing buildings).
+- **Tab Overlays (Treasury, Ledger, Settings)**: `z-50` absolute overlays covering the viewport.
+- **Main HUD**: `z-[70]` (Globe selector dropdown at `z-[100]`).
+- **Modals**: `z-[100]` overlay backdrops.
+
+### F. Gesture Dismissals
+- **Backdrop Click-Outside**: Clicking or pressing on the semi-transparent dark backdrop wrapper of any modal or fullscreen tab overlay automatically triggers closure and returns the view to the main map screen.
+- **Escape Key Listener**: Registered global `useEffect` listeners monitor the keydown sequence. Pressing `Escape` closes active modals or returns the user from secondary tabs back to the Kingdom map.
+
+---
+
+## 5. Database Schema & Triggers (Supabase PostgreSQL)
+
+Persistence and trigger logic is handled in the relational schema defined in **[db_reset_migration.sql](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/SQL%20all/db_reset_migration.sql)**.
+
+```
+   +------------------------------------+          +------------------------------------+
+   |              profiles              |          |            transactions            |
+   +------------------------------------+          +------------------------------------+
+   | id          UUID (PK)              |<----+    | id              UUID (PK)          |
+   | email       TEXT                   |     |    | profile_id      UUID (FK)          |
+   | gold        BIGINT                 |     +---o| type            TEXT               |
+   | level       INTEGER                |          | amount          BIGINT             |
+   | xp          INTEGER                |          | category        TEXT               |
+   | updated_at  TIMESTAMPTZ            |          | status          TEXT               |
+   +------------------------------------+          | created_at      TIMESTAMPTZ        |
+                                                   +------------------------------------+
+```
+
+### Table Definitions
+
+#### 1. Table: `profiles`
+Represents the lord's metadata and statistics.
+- `id` (`UUID`, PK) - Connected to Supabase Auth.
+- `gold` (`BIGINT`) - Real-time wallet balance (updates automatically via transaction inserts).
+- `level` (`INTEGER`) - Calculated from XP (updates automatically).
+- `xp` (`INTEGER`) - Experience points earned (updates automatically).
+
+#### 2. Table: `transactions`
+Contains the detailed financial ledger records.
+- `id` (`UUID`, PK, default: `gen_random_uuid()`)
+- `profile_id` (`UUID`, FK referencing `profiles.id`)
+- `type` (`TEXT` - constraint: `'income'` or `'expense'`)
+- `amount` (`BIGINT`) - Amount in gold coins.
+- `category` / `subcategory` / `entity` / `entity_category` (`TEXT`)
+- `status` (`TEXT` - e.g. `'Pending'`, `'Paid on Time'`).
+
+### Automated Database Triggers
+When a new row is written into `transactions`:
+- If `type = 'income'`: Adds the transaction amount to the user's `gold` balance, and increments `xp` by `amount * 0.1` points.
+- If `type = 'expense'`: Subtracts the transaction amount from the user's `gold` balance.
+- **Level Up Calculation**: If the accumulated XP exceeds the level boundary (`100 * Math.pow(1.5, level - 1)`), the trigger updates the `level` column and fires a database state change.
