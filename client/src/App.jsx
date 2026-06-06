@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import FlowByCategoryChart from './components/charts/FlowByCategoryChart';
 import TimeEvolutionChart from './components/charts/TimeEvolutionChart';
 import TopEntitiesChart from './components/charts/TopEntitiesChart';
+import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -524,181 +525,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     setActiveTab('dashboard');
   };
 
-  const handleExportCSV = () => {
-    const headers = [
-      'type',
-      'amount',
-      'from',
-      'date',
-      'status',
-      'category',
-      'subcategory',
-      'entity',
-      'entity_category',
-      'description'
-    ];
-
-    let csvContent = headers.join(',') + '\n';
-
-    if (transactions && transactions.length > 0) {
-      transactions.forEach((tx) => {
-        const row = headers.map((header) => {
-          let val = tx[header];
-          if (header === 'entity_category' && tx['Transaction Category'] !== undefined) {
-            val = tx['Transaction Category'];
-          }
-          if (val === null || val === undefined) {
-            return '';
-          }
-          let stringVal = String(val);
-          if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n')) {
-            stringVal = '"' + stringVal.replace(/"/g, '""') + '"';
-          }
-          return stringVal;
-        });
-        csvContent += row.join(',') + '\n';
-      });
-    }
-
-    // Add BOM for Excel UTF-8 compatibility
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `tesouro_real_${new Date().toISOString().split('T')[0]}.csv`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    
-    // Use a small timeout to ensure the click registers before cleanup
-    setTimeout(() => {
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 100);
-    
-    toast.success(
-      transactions && transactions.length > 0
-        ? t.success_export
-        : t.success_export_empty
-    );
-  };
-
-  const parseCSV = (text) => {
-    const lines = [];
-    let row = [""];
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const c = text[i];
-      const next = text[i + 1];
-
-      if (c === '"') {
-        if (inQuotes && next === '"') {
-          row[row.length - 1] += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (c === ',' && !inQuotes) {
-        row.push("");
-      } else if ((c === '\r' || c === '\n') && !inQuotes) {
-        if (c === '\r' && next === '\n') {
-          i++;
-        }
-        lines.push(row);
-        row = [""];
-      } else {
-        row[row.length - 1] += c;
-      }
-    }
-    if (row.length > 1 || row[0] !== "") {
-      lines.push(row);
-    }
-    return lines;
-  };
-
-  const handleImportCSV = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target.result;
-        const parsed = parseCSV(text);
-        if (parsed.length === 0 || (parsed.length === 1 && parsed[0][0] === '')) {
-          toast.success(t.success_import_zero);
-          return;
-        }
-
-        const headers = parsed[0].map(h => h.trim().toLowerCase());
-        const rows = parsed.slice(1);
-
-        if (rows.length === 0 || (rows.length === 1 && rows[0].length === 1 && rows[0][0] === '')) {
-          toast.success(t.success_import_zero);
-          return;
-        }
-
-        const listToInsert = [];
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
-          if (row.length === 1 && row[0] === '') continue; // skip empty lines
-
-          const tx = {};
-          headers.forEach((header, idx) => {
-            let val = row[idx] ? row[idx].trim() : '';
-            // normalize header keys
-            if (header === 'entity category' || header === 'entity_category') {
-              tx.entityCategory = val;
-            } else if (header === 'from (origem)' || header === 'from') {
-              tx.from = val;
-            } else if (header === 'tipo' || header === 'type') {
-              tx['Transaction Class'] = val.toLowerCase();
-            } else if (header === 'ouro' || header === 'coins' || header === 'amount') {
-              tx.amount = Number(val);
-            } else {
-              tx[header] = val;
-            }
-          });
-
-          // Validation
-          if (!tx['Transaction Class'] || !['income', 'expense'].includes(tx['Transaction Class'])) {
-            tx['Transaction Class'] = 'expense'; // default fallback
-          }
-          if (!tx.amount || isNaN(tx.amount)) {
-            tx.amount = 0; // default fallback
-          }
-          if (!tx['Transaction Class']) {
-            tx['Transaction Class'] = tx['Transaction Class'] === 'Income' ? 'Income' : 'Expense';
-          }
-          if (!tx.from) {
-            tx.from = fromOptions[0] || 'Pedro';
-          }
-
-          listToInsert.push(tx);
-        }
-
-        if (listToInsert.length === 0) {
-          toast.success(t.success_import_zero);
-          return;
-        }
-
-        const res = await registerTransactions(GUEST_PROFILE_ID, listToInsert);
-        if (res.success) {
-          toast.success(t('success_import', { count: listToInsert.length }));
-        } else {
-          toast.error(t('err_import_db', { error: res.error }));
-        }
-      } catch (err) {
-        console.error(err);
-        toast.error(t.err_import);
-      } finally {
-        // Clear value to allow importing the same file again
-        e.target.value = '';
-      }
-    };
-    reader.readAsText(file);
-  };
+  const exportCSV = () => handleExportCSV(transactions, t);
+  const importCSV = (e) => handleImportCSV(e, { t, fromOptions, registerTransactions, GUEST_PROFILE_ID });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1884,7 +1712,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   <div className="flex gap-2 flex-wrap items-center">
                     <button
                       type="button"
-                      onClick={handleExportCSV}
+                      onClick={exportCSV}
                       className="px-3 py-1.5 bg-[#faf4e5]/90 border-2 border-[#8b4513]/30 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                       title={t.export_csv}
                     >
@@ -1901,7 +1729,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     <input
                       type="file"
                       ref={fileInputRef}
-                      onChange={handleImportCSV}
+                      onChange={importCSV}
                       accept=".csv"
                       className="hidden"
                     />
