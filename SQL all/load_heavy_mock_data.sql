@@ -6,13 +6,13 @@
 DO $$
 DECLARE
     i INT;
-    v_type TEXT;
-    v_category TEXT;
+    v_class TEXT;
+    v_sub_class TEXT;
     v_entity TEXT;
-    v_entity_category TEXT;
+    v_category TEXT;
     v_from TEXT;
     v_status TEXT;
-    v_subcategory TEXT;
+    v_sub_category TEXT := '';
     v_amount NUMERIC;
     v_date DATE;
     v_desc TEXT;
@@ -57,41 +57,35 @@ BEGIN
         -- Map entity category, type, category, subcategory and amount realistically
         CASE v_entity
             WHEN 'Salary', 'Bonus' THEN 
-                v_entity_category := 'Payroll';
-                v_type := 'income';
-                v_category := 'Income';
-                v_subcategory := 'Cash receipt';
+                v_category := 'Payroll';
+                v_class := 'Income';
+                v_sub_class := 'Cash receipt';
                 v_amount := 800 + floor(random() * 1800); -- Higher amounts for salaries/bonuses
             WHEN 'CGD', 'Universo', 'ActiveBank', 'WizInk', 'Inter(Brasil)', 'Cofidis', 'Jota', 'Mae' THEN 
-                v_entity_category := 'Bank (Credit Card)';
+                v_category := 'Bank (Credit Card)';
                 IF random() < 0.85 THEN
-                    v_type := 'expense';
-                    v_category := 'Expense';
-                    v_subcategory := 'Credit payment';
+                    v_class := 'Expense';
+                    v_sub_class := 'Credit payment';
                     v_amount := 30 + floor(random() * 450);
                 ELSE
-                    v_type := 'income';
-                    v_category := 'Income';
-                    v_subcategory := 'Credit receipt';
+                    v_class := 'Income';
+                    v_sub_class := 'Credit receipt';
                     v_amount := 10 + floor(random() * 150);
                 END IF;
             WHEN 'Rent' THEN 
-                v_entity_category := 'Rent';
-                v_type := 'expense';
-                v_category := 'Expense';
-                v_subcategory := 'Cash payment';
+                v_category := 'Rent';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
                 v_amount := 350 + floor(random() * 250);
             WHEN 'Endesa', 'Digal', 'Simas', 'NOS' THEN 
-                v_entity_category := 'Utilities';
-                v_type := 'expense';
-                v_category := 'Expense';
-                v_subcategory := 'Cash payment';
+                v_category := 'Utilities';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
                 v_amount := 20 + floor(random() * 110);
             ELSE -- 'Gasoline', 'Repairs', 'Fees', 'Via Verde'
-                v_entity_category := 'Transports';
-                v_type := 'expense';
-                v_category := 'Expense';
-                v_subcategory := 'Cash payment';
+                v_category := 'Transports';
+                v_class := 'Expense';
+                v_sub_class := 'Cash payment';
                 v_amount := 10 + floor(random() * 120);
         END CASE;
 
@@ -99,13 +93,13 @@ BEGIN
         v_from := froms[1 + floor(random() * array_length(froms, 1))::INT];
         
         -- Select random status
-        IF v_type = 'expense' AND random() < 0.15 THEN
+        IF v_class = 'Expense' AND random() < 0.15 THEN
             IF random() < 0.5 THEN
                 v_status := 'Overdue';
             ELSE
                 v_status := 'Pending';
             END IF;
-        ELSIF v_type = 'income' AND random() < 0.05 THEN
+        ELSIF v_class = 'Income' AND random() < 0.05 THEN
             v_status := 'Pending';
         ELSE
             IF random() < 0.7 THEN
@@ -116,16 +110,16 @@ BEGIN
         END IF;
 
         -- Randomly distribute a few expenses to Savings or Debt categories for variety
-        IF v_category = 'Expense' AND random() < 0.08 THEN
-            v_category := 'Debt';
-        ELSIF v_category = 'Expense' AND random() < 0.05 THEN
-            v_category := 'Savings';
+        IF v_class = 'Expense' AND random() < 0.08 THEN
+            v_class := 'Debt';
+        ELSIF v_class = 'Expense' AND random() < 0.05 THEN
+            v_class := 'Savings';
         END IF;
 
         v_desc := 'Mockup ' || v_entity || ' transaction';
 
         -- Insert transaction (database trigger auto-calculates month, year, quarter, and profile Gold/XP)
-        INSERT INTO public.transactions (profile_id, type, amount, "from", date, status, category, subcategory, entity, entity_category, description)
-        VALUES ('00000000-0000-0000-0000-000000000000', v_type, v_amount, v_from, v_date, v_status, v_category, v_subcategory, v_entity, v_entity_category, v_desc);
+        INSERT INTO public.transactions (profile_id, class, amount, "from", date, status, sub_class, entity, category, sub_category, description)
+        VALUES ('00000000-0000-0000-0000-000000000000', v_class, v_amount, v_from, v_date, v_status, v_sub_class, v_entity, v_category, v_sub_category, v_desc);
     END LOOP;
 END $$;

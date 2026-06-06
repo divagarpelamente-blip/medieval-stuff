@@ -154,15 +154,15 @@ export const useKingdomStore = create((set, get) => ({
         .insert([
           {
             profile_id: profileId,
-            type: transactionData.type,
+            class: transactionData.class,
             amount: Number(transactionData.amount),
             from: transactionData.from,
             date: transactionData.date || null,
             status: transactionData.status || 'Completed',
-            category: transactionData.category,
-            subcategory: transactionData.subcategory,
+            sub_class: transactionData.subClass,
             entity: transactionData.entity,
-            entity_category: transactionData.entityCategory,
+            category: transactionData.category,
+            sub_category: transactionData.subCategory || '',
             description: transactionData.description
           }
         ])
@@ -207,15 +207,15 @@ export const useKingdomStore = create((set, get) => ({
     try {
       const formatted = transactionsList.map((tx) => ({
         profile_id: profileId,
-        type: tx.type,
+        class: tx.class,
         amount: Number(tx.amount),
         from: tx.from,
         date: tx.date || null,
         status: tx.status || 'Completed',
-        category: tx.category,
-        subcategory: tx.subcategory,
+        sub_class: tx.subClass,
         entity: tx.entity,
-        entity_category: tx.entityCategory || tx.entity_category,
+        category: tx.category,
+        sub_category: tx.subCategory || '',
         description: tx.description
       }));
 

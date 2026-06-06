@@ -59,15 +59,15 @@ function App() {
   const deleteOption = useKingdomStore((state) => state.deleteOption);
 
   // Form states
-  const [txType, setTxType] = useState('income');
-  const [txCategory, setTxCategory] = useState('Income');
+  const [txClass, setTxClass] = useState('Income');
   const [txAmount, setTxAmount] = useState('');
   const [txFrom, setTxFrom] = useState('Pedro');
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
   const [txStatus, setTxStatus] = useState('Pending');
-  const [txSubcategory, setTxSubcategory] = useState('Cash receipt');
+  const [txSubClass, setTxSubClass] = useState('Cash receipt');
   const [txEntity, setTxEntity] = useState('Salary');
-  const [txEntityCategory, setTxEntityCategory] = useState('Payroll');
+  const [txCategory, setTxCategory] = useState('Payroll');
+  const [txSubCategory, setTxSubCategory] = useState('');
   const [txDescription, setTxDescription] = useState('');
 
   // Auto-fill Entity Category when Entity changes
@@ -75,7 +75,7 @@ function App() {
     setTxEntity(entityVal);
     const mapped = entityMappings[entityVal];
     if (mapped) {
-      setTxEntityCategory(mapped);
+      setTxCategory(mapped);
     }
   };
 
@@ -93,11 +93,11 @@ function App() {
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
 
-  // Default to last 3 years on load
+  // Default to last 2 years on load
   useEffect(() => {
     if (transactions.length > 0 && selectedYears.length === 0) {
       const allYears = Array.from(new Set(transactions.map((tx) => tx.year).filter(Boolean))).sort((a, b) => b - a);
-      setSelectedYears(allYears.slice(0, 3).map(String));
+      setSelectedYears(allYears.slice(0, 2).map(String));
     }
   }, [transactions, selectedYears]);
 
@@ -127,9 +127,9 @@ function App() {
     if (filterMonth !== 'All' && tx.month !== filterMonth) return false;
     if (filterQuarter !== 'All' && tx.quarter !== filterQuarter) return false;
     if (filterFrom !== 'All' && tx.from !== filterFrom) return false;
-    if (filterType !== 'All' && tx.type !== filterType) return false;
+    if (filterType !== 'All' && tx.class !== filterType) return false;
     if (filterDate && tx.date !== filterDate) return false;
-    if (filterCategory !== 'All' && tx.category !== filterCategory) return false;
+    if (filterCategory !== 'All' && tx.class !== filterCategory) return false;
     return true;
   }).sort((a, b) => {
     const dateA = new Date(a.date || a.created_at);
@@ -171,11 +171,11 @@ function App() {
 
   // Calculate Dashboard Stats (dependent on filters)
   const dashInflow = dashboardFilteredTransactions
-    .filter((tx) => tx.type === 'income')
+    .filter((tx) => tx.class === 'Income')
     .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
   const dashOutflow = dashboardFilteredTransactions
-    .filter((tx) => tx.type === 'expense')
+    .filter((tx) => tx.class !== 'Income')
     .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
   const dashNetBalance = dashInflow - dashOutflow;
@@ -188,22 +188,22 @@ function App() {
   const timePoints = [...dashboardFilteredTransactions].reverse().reduce((acc, tx) => {
     const existing = acc.find(p => p.label === tx.month);
     if (existing) {
-      if (tx.type === 'income') existing.income += Number(tx.amount);
-      if (tx.type === 'expense') existing.expense += Number(tx.amount);
+      if (tx.class === 'Income') existing.income += Number(tx.amount);
+      if (tx.class !== 'Income') existing.expense += Number(tx.amount);
     } else {
       acc.push({
         label: tx.month,
-        income: tx.type === 'income' ? Number(tx.amount) : 0,
-        expense: tx.type === 'expense' ? Number(tx.amount) : 0,
+        income: tx.class === 'Income' ? Number(tx.amount) : 0,
+        expense: tx.class !== 'Income' ? Number(tx.amount) : 0,
       });
     }
     return acc;
   }, []);
 
   const dashCategoryData = categoriesList.map((cat) => {
-    const catTxs = dashboardFilteredTransactions.filter((tx) => tx.category === cat);
-    const income = catTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = catTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const catTxs = dashboardFilteredTransactions.filter((tx) => tx.class === cat);
+    const income = catTxs.filter((tx) => tx.class === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expense = catTxs.filter((tx) => tx.class !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { category: cat, income, expense, total: income + expense };
   }).filter((c) => c.total > 0);
 
@@ -217,8 +217,8 @@ function App() {
     const [yearStr, monthStr] = label.split(' ');
     const matchedTxs = dashboardFilteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
 
-    const income = matchedTxs.filter((tx) => tx.type === 'income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = matchedTxs.filter((tx) => tx.type === 'expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const income = matchedTxs.filter((tx) => tx.class === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expense = matchedTxs.filter((tx) => tx.class !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { label, income, expense, total: income + expense };
   }).filter((t) => t.total > 0);
 
@@ -244,7 +244,7 @@ function App() {
   const uniqueFroms = Array.from(new Set(transactions.map(tx => tx.from).filter(Boolean)));
   const fromAllocation = uniqueFroms.map(fromName => {
     const amount = dashboardFilteredTransactions
-      .filter(tx => tx.from === fromName && tx.type === 'income')
+      .filter(tx => tx.from === fromName && tx.class === 'Income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: fromName, amount };
   }).filter(f => f.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -254,27 +254,27 @@ function App() {
   const uniqueEntities = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.entity).filter(Boolean)));
   const entityVolumes = uniqueEntities.map(entName => {
     const inflow = dashboardFilteredTransactions
-      .filter(tx => tx.entity === entName && tx.type === 'income')
+      .filter(tx => tx.entity === entName && tx.class === 'Income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     const outflow = dashboardFilteredTransactions
-      .filter(tx => tx.entity === entName && tx.type === 'expense')
+      .filter(tx => tx.entity === entName && tx.class !== 'Income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: entName, inflow, outflow, total: inflow + outflow };
   }).filter(e => e.total > 0).sort((a, b) => b.total - a.total).slice(0, 5);
 
   // Suggested Extra 3 - Entity Categories cost breakdown (Income & Expenses tab)
-  const uniqueEntityCats = Array.from(new Set(transactions.map(tx => tx.entity_category).filter(Boolean)));
+  const uniqueEntityCats = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)));
   const entityCatExpenses = uniqueEntityCats.map(catName => {
     const amount = transactions
-      .filter(tx => tx.entity_category === catName && tx.type === 'expense')
+      .filter(tx => tx.category === catName && tx.class !== 'Income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: catName, amount };
   }).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
   const maxEntityCatExp = Math.max(...entityCatExpenses.map(c => c.amount), 1);
 
   // Payables & Receivables variables
-  const pendingIncomeList = transactions.filter(tx => tx.type === 'income' && tx.status === 'Pending');
-  const pendingExpenseList = transactions.filter(tx => tx.type === 'expense' && (tx.status === 'Pending' || tx.status === 'Overdue'));
+  const pendingIncomeList = transactions.filter(tx => tx.class === 'Income' && tx.status === 'Pending');
+  const pendingExpenseList = transactions.filter(tx => tx.class !== 'Income' && (tx.status === 'Pending' || tx.status === 'Overdue'));
 
   const totalReceivables = pendingIncomeList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   const totalPayables = pendingExpenseList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
@@ -320,30 +320,30 @@ function App() {
   }, [statusOptions, txStatus]);
 
   useEffect(() => {
-    if (categoryOptions && !categoryOptions.includes(txCategory)) {
-      setTxCategory(categoryOptions[0] || '');
+    if (categoryOptions && !categoryOptions.includes(txClass)) {
+      setTxClass(categoryOptions[0] || '');
     }
-  }, [categoryOptions, txCategory]);
+  }, [categoryOptions, txClass]);
 
   useEffect(() => {
-    if (subcategoryOptions && !subcategoryOptions.includes(txSubcategory)) {
-      setTxSubcategory(subcategoryOptions[0] || '');
+    if (subcategoryOptions && !subcategoryOptions.includes(txSubClass)) {
+      setTxSubClass(subcategoryOptions[0] || '');
     }
-  }, [subcategoryOptions, txSubcategory]);
+  }, [subcategoryOptions, txSubClass]);
 
   useEffect(() => {
     if (entityOptions && !entityOptions.includes(txEntity)) {
       const firstEntity = entityOptions[0] || '';
       setTxEntity(firstEntity);
-      setTxEntityCategory(entityMappings[firstEntity] || entityCategoryOptions[0] || '');
+      setTxCategory(entityMappings[firstEntity] || entityCategoryOptions[0] || '');
     }
   }, [entityOptions, entityMappings, txEntity, entityCategoryOptions]);
 
   useEffect(() => {
-    if (entityCategoryOptions && !entityCategoryOptions.includes(txEntityCategory)) {
-      setTxEntityCategory(entityCategoryOptions[0] || '');
+    if (entityCategoryOptions && !entityCategoryOptions.includes(txCategory)) {
+      setTxCategory(entityCategoryOptions[0] || '');
     }
-  }, [entityCategoryOptions, txEntityCategory]);
+  }, [entityCategoryOptions, txCategory]);
 
   const renderSettingsPanel = () => {
     let title = '';
@@ -503,15 +503,15 @@ function App() {
   };
 
   const resetFormState = () => {
-    setTxType('income');
+    setTxClass('income');
     setTxAmount('');
     setTxFrom(fromOptions[0] || 'Pedro');
     setTxDate(new Date().toISOString().split('T')[0]);
     setTxStatus(statusOptions[0] || 'Pending');
-    setTxCategory(categoryOptions[0] || 'Income');
-    setTxSubcategory(subcategoryOptions[0] || 'Cash receipt');
+    setTxClass(categoryOptions[0] || 'Income');
+    setTxSubClass(subcategoryOptions[0] || 'Cash receipt');
     setTxEntity(entityOptions[0] || 'Salary');
-    setTxEntityCategory(entityMappings[entityOptions[0]] || 'Payroll');
+    setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
     setTxDescription('');
   };
 
@@ -549,8 +549,8 @@ function App() {
       transactions.forEach((tx) => {
         const row = headers.map((header) => {
           let val = tx[header];
-          if (header === 'entity_category' && tx.entity_category !== undefined) {
-            val = tx.entity_category;
+          if (header === 'entity_category' && tx.category !== undefined) {
+            val = tx.category;
           }
           if (val === null || val === undefined) {
             return '';
@@ -658,7 +658,7 @@ function App() {
             } else if (header === 'from (origem)' || header === 'from') {
               tx.from = val;
             } else if (header === 'tipo' || header === 'type') {
-              tx.type = val.toLowerCase();
+              tx.class = val.toLowerCase();
             } else if (header === 'ouro' || header === 'coins' || header === 'amount') {
               tx.amount = Number(val);
             } else {
@@ -667,14 +667,14 @@ function App() {
           });
 
           // Validation
-          if (!tx.type || !['income', 'expense'].includes(tx.type)) {
-            tx.type = 'expense'; // default fallback
+          if (!tx.class || !['income', 'expense'].includes(tx.class)) {
+            tx.class = 'expense'; // default fallback
           }
           if (!tx.amount || isNaN(tx.amount)) {
             tx.amount = 0; // default fallback
           }
-          if (!tx.category) {
-            tx.category = tx.type === 'income' ? 'Income' : 'Expense';
+          if (!tx.class) {
+            tx.class = tx.class === 'Income' ? 'Income' : 'Expense';
           }
           if (!tx.from) {
             tx.from = fromOptions[0] || 'Pedro';
@@ -718,33 +718,33 @@ function App() {
 
     const amountNum = Number(txAmount);
     const res = await registerTransaction(GUEST_PROFILE_ID, {
-      type: txType,
+      class: txClass,
       amount: amountNum,
       from: txFrom,
       date: txDate,
       status: txStatus,
-      category: txCategory,
-      subcategory: txSubcategory,
+      subClass: txSubClass,
       entity: txEntity,
-      entityCategory: txEntityCategory,
-      description: txDescription || `${txCategory} log`
+      category: txCategory,
+      subCategory: txSubCategory,
+      description: txDescription || `${txClass} log`
     });
 
     if (res.success) {
       toast.success(
-        txType === 'income'
+        txClass === 'Income'
           ? t('success_added_gold', { amount: amountNum })
           : t('success_spent_gold', { amount: amountNum })
       );
       setTxAmount('');
       setTxDescription('');
       setTxFrom(fromOptions[0] || 'Pedro');
-      setTxSubcategory(subcategoryOptions[0] || 'Cash receipt');
+      setTxSubClass(subcategoryOptions[0] || 'Cash receipt');
       setTxEntity(entityOptions[0] || 'Salary');
-      setTxEntityCategory(entityMappings[entityOptions[0]] || 'Payroll');
+      setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
       setTxDate(new Date().toISOString().split('T')[0]);
       setTxStatus(statusOptions[0] || 'Pending');
-      setTxCategory(categoryOptions[0] || 'Income');
+      setTxClass(categoryOptions[0] || 'Income');
       setIsMineModalOpen(false);
       setIsNewTxModalOpen(false);
     } else {
@@ -907,14 +907,14 @@ function App() {
                 {/* Type Selection */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.type}
+                    {t.class}
                   </label>
                   <div className="grid grid-cols-2 gap-1.5 h-11 md:h-[38px]">
                     <button
                       type="button"
-                      onClick={() => setTxType('income')}
+                      onClick={() => setTxClass('income')}
                       className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txType === 'income'
+                        txClass === 'income'
                           ? 'bg-emerald-800/20 border-emerald-600 text-emerald-800 shadow-sm'
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50'
                       }`}
@@ -923,9 +923,9 @@ function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setTxType('expense')}
+                      onClick={() => setTxClass('expense')}
                       className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txType === 'expense'
+                        txClass === 'expense'
                           ? 'bg-rose-800/20 border-rose-600 text-rose-800 shadow-sm'
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50'
                       }`}
@@ -1003,11 +1003,11 @@ function App() {
                 {/* Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.category}
+                    {t.class}
                   </label>
                   <select
-                    value={txCategory}
-                    onChange={(e) => setTxCategory(e.target.value)}
+                    value={txClass}
+                    onChange={(e) => setTxClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {categoryOptions.map((opt) => (
@@ -1019,11 +1019,11 @@ function App() {
                 {/* Subcategory */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.subcategory}
+                    {t.sub_class}
                   </label>
                   <select
-                    value={txSubcategory}
-                    onChange={(e) => setTxSubcategory(e.target.value)}
+                    value={txSubClass}
+                    onChange={(e) => setTxSubClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {subcategoryOptions.map((opt) => (
@@ -1054,11 +1054,11 @@ function App() {
                 {/* Entity Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.entity_category}
+                    {t.category}
                   </label>
                   <select
-                    value={txEntityCategory}
-                    onChange={(e) => setTxEntityCategory(e.target.value)}
+                    value={txCategory}
+                    onChange={(e) => setTxCategory(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {entityCategoryOptions.map((opt) => (
@@ -1114,12 +1114,12 @@ function App() {
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.month')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.year')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.quarter')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.type')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.subcategory')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_class')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
-                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity_category')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_category')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
                         </tr>
                       </thead>
@@ -1133,30 +1133,32 @@ function App() {
                             <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                tx.type === 'income' 
+                                tx.class === 'Income' 
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
                                   : 'bg-rose-100 text-rose-800 border border-rose-250'
                               }`}>
-                                {tx.type}
+                                {tx.class}
                               </span>
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${
-                                tx.status === 'Completed' 
-                                  ? 'bg-green-100 text-green-800 border border-green-200' 
-                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                tx.status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                tx.status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                tx.status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                tx.status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                'bg-stone-100 text-stone-800 border border-stone-200'
                               }`}>
-                                {tx.status || 'Completed'}
+                                {tx.status}
                               </span>
                             </td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.category}</td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.subcategory || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.sub_class || '-'}</td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-medium">{tx.entity_category || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-medium">{tx.category || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-medium">{tx.sub_category || '-'}</td>
                             <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                              tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
+                              tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'
                             }`}>
-                              {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
+                              {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
                             </td>
                           </tr>
                         ))}
@@ -1173,15 +1175,15 @@ function App() {
                           <div className="flex justify-between items-start">
                             <div>
                               <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                {tx.entity || tx.category}
+                                {tx.entity || tx.class}
                               </span>
                               <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                {tx.from} • {tx.subcategory || '-'}
+                                {tx.from} • {tx.sub_class || '-'}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className={`font-mono font-black text-xs ${tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                              <div className={`font-mono font-black text-xs ${tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                               </div>
                               <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
                                 tx.status === 'Completed' 
@@ -1194,7 +1196,7 @@ function App() {
                           </div>
                           <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
                             <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.entity_category || '-'}</span>
+                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.category || '-'}</span>
                           </div>
                         </div>
                       ))}
@@ -1234,14 +1236,14 @@ function App() {
                 {/* Type Selection */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.type}
+                    {t.class}
                   </label>
                   <div className="grid grid-cols-2 gap-1.5 h-11 md:h-[38px]">
                     <button
                       type="button"
-                      onClick={() => setTxType('income')}
+                      onClick={() => setTxClass('income')}
                       className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txType === 'income'
+                        txClass === 'income'
                           ? 'bg-emerald-800/20 border-emerald-600 text-emerald-800 shadow-sm cursor-pointer'
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50 cursor-pointer'
                       }`}
@@ -1250,9 +1252,9 @@ function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setTxType('expense')}
+                      onClick={() => setTxClass('expense')}
                       className={`rounded-lg border font-black text-[10px] uppercase tracking-wider transition-all ${
-                        txType === 'expense'
+                        txClass === 'expense'
                           ? 'bg-rose-800/20 border-rose-600 text-rose-800 shadow-sm cursor-pointer'
                           : 'bg-stone-100/50 border-stone-300 text-stone-600 hover:bg-stone-200/50 cursor-pointer'
                       }`}
@@ -1330,11 +1332,11 @@ function App() {
                 {/* Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.category}
+                    {t.class}
                   </label>
                   <select
-                    value={txCategory}
-                    onChange={(e) => setTxCategory(e.target.value)}
+                    value={txClass}
+                    onChange={(e) => setTxClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {categoryOptions.map((opt) => (
@@ -1346,11 +1348,11 @@ function App() {
                 {/* Subcategory */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.subcategory}
+                    {t.sub_class}
                   </label>
                   <select
-                    value={txSubcategory}
-                    onChange={(e) => setTxSubcategory(e.target.value)}
+                    value={txSubClass}
+                    onChange={(e) => setTxSubClass(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {subcategoryOptions.map((opt) => (
@@ -1381,11 +1383,11 @@ function App() {
                 {/* Entity Category */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.entity_category}
+                    {t.category}
                   </label>
                   <select
-                    value={txEntityCategory}
-                    onChange={(e) => setTxEntityCategory(e.target.value)}
+                    value={txCategory}
+                    onChange={(e) => setTxCategory(e.target.value)}
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {entityCategoryOptions.map((opt) => (
@@ -1467,11 +1469,13 @@ function App() {
               {/* Row 2: Navigation (Left) & Time Filters (Right) */}
               <div className="px-4 py-2.5 border-b border-[#8b4513]/25 flex flex-col md:flex-row justify-between items-center gap-3 bg-[#faf4e5]/40 z-10">
                 {/* Left Buttons: Analysis Sub-tabs */}
-                <div className="flex flex-wrap gap-1.5 items-center justify-center">
+                <div className="flex flex-wrap gap-1.5 items-center justify-start md:justify-end w-full">
                   {[
                     { id: 'overview', label: t.subtab_overview, icon: '📊' },
                     { id: 'income_expense', label: t.subtab_income_expense, icon: '💸' },
-                    { id: 'payables_receivables', label: t.subtab_payables_receivables, icon: '📜' }
+                    { id: 'payables_receivables', label: t.subtab_payables_receivables, icon: '📜' },
+                    { id: 'liabilities', label: 'Liabilities', icon: '🏦' },
+                    { id: 'ratios', label: 'Ratios', icon: '⚖️' }
                   ].map((tab) => {
                     const isSel = dashSubTab === tab.id;
                     return (
@@ -1508,23 +1512,23 @@ function App() {
               <div className="flex flex-1 overflow-hidden relative z-10 text-[#2d1b0d]">
                 
                 {/* SIDEBAR FILTER PANEL */}
-                <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block w-full md:w-56 lg:w-64 flex-shrink-0 bg-[#faf4e5]/90 border-r border-[#8b4513]/25 overflow-y-auto custom-scrollbar-subtle flex flex-col`}>
+                <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block w-full md:w-36 lg:w-40 px-2 flex-shrink-0 bg-[#faf4e5]/90 border-r border-[#8b4513]/25 overflow-y-auto custom-scrollbar-subtle flex flex-col`}>
                   <div className="p-4 space-y-6">
                     {/* Years */}
                     <div className="space-y-2">
                       <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1">
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4b2c20]">Years</h4>
-                        <div className="flex gap-2 text-[8px] font-bold text-[#8b4513] uppercase">
+                        <div className="flex flex-wrap gap-1 text-[8px] font-bold text-[#8b4513] uppercase">
                           <button onClick={() => setSelectedYears(uniqueYearsList.map(String))} className="hover:underline">All</button>
                           <button onClick={() => setSelectedYears([])} className="hover:underline">None</button>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1 max-h-32 overflow-y-auto custom-scrollbar-subtle pr-1">
+                      <div className="flex flex-col gap-1 max-h-12 overflow-y-auto custom-scrollbar-subtle pr-1">
                         {uniqueYearsList.map(y => {
                           const yStr = String(y);
                           const isSel = selectedYears.includes(yStr);
                           return (
-                            <label key={yStr} onClick={() => setSelectedYears(prev => prev.includes(yStr) ? prev.filter(x => x !== yStr) : [...prev, yStr])} className="flex items-center gap-2 cursor-pointer group">
+                            <label key={yStr} onClick={() => setSelectedYears(prev => prev.includes(yStr) ? prev.filter(x => x !== yStr) : [...prev, yStr])} className="flex flex-wrap items-center gap-1 cursor-pointer group">
                               <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${isSel ? 'bg-[#8b4513] border-[#8b4513]' : 'border-[#8b4513]/40 group-hover:border-[#8b4513]'}`}>
                                 {isSel && <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />}
                               </div>
@@ -1569,7 +1573,7 @@ function App() {
                           <button onClick={() => setSelectedMonths([])} className="hover:underline">None</button>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1 max-h-40 overflow-y-auto custom-scrollbar-subtle pr-1">
+                      <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto custom-scrollbar-subtle pr-1">
                         {monthOptions.map(m => {
                           const isSel = selectedMonths.includes(m);
                           return (
@@ -1833,7 +1837,7 @@ function App() {
                                 <div key={tx.id} className="bg-[#faf4e5]/70 border border-[#8b4513]/10 rounded-lg p-2.5 flex justify-between items-center text-xs">
                                   <div className="space-y-0.5">
                                     <div className="font-bold text-[#4b2c20]">{tx.from} &rarr; {tx.entity}</div>
-                                    <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.category}</div>
+                                    <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.class}</div>
                                   </div>
                                   <div className="text-right">
                                     <div className="font-mono font-black text-emerald-700">+{Number(tx.amount).toLocaleString()}g</div>
@@ -1867,7 +1871,7 @@ function App() {
                                   }`}>
                                     <div className="space-y-0.5">
                                       <div className="font-bold text-[#4b2c20]">{tx.entity}</div>
-                                      <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.category}</div>
+                                      <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.class}</div>
                                     </div>
                                     <div className="text-right">
                                       <div className="font-mono font-black text-rose-700">-{Number(tx.amount).toLocaleString()}g</div>
@@ -2120,12 +2124,12 @@ function App() {
                         <thead>
                           <tr className="bg-[#8b4513] border-b border-[#8b4513]/20 text-[#ffd700] font-black uppercase tracking-wider title-font sticky top-0 z-20">
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.type')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.date')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.month')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.year')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.quarter')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_class')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_category')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
                           </tr>
                         </thead>
@@ -2135,22 +2139,22 @@ function App() {
                               <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
                               <td className="py-2 px-3 whitespace-nowrap">
                                 <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                  tx.type === 'income' 
+                                  tx.class === 'Income' 
                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
                                     : 'bg-rose-100 text-rose-800 border border-rose-200'
                                 }`}>
-                                  {tx.type}
+                                  {tx.class}
                                 </span>
                               </td>
                               <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.date || '-'}</td>
                               <td className="py-2 px-3 whitespace-nowrap font-serif italic text-stone-600">{tx.month || '-'}</td>
                               <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.year || '-'}</td>
                               <td className="py-2 px-3 whitespace-nowrap font-mono">{tx.quarter || '-'}</td>
-                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.category}</td>
+                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.class}</td>
                               <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                                tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
+                                tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'
                               }`}>
-                                {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                               </td>
                             </tr>
                           ))}
@@ -2167,15 +2171,15 @@ function App() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                  {tx.entity || tx.category}
+                                  {tx.entity || tx.class}
                                 </span>
                                 <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                  {tx.from} • {tx.subcategory || '-'}
+                                  {tx.from} • {tx.sub_class || '-'}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className={`font-mono font-black text-xs ${tx.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                  {tx.type === 'income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                <div className={`font-mono font-black text-xs ${tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                                 </div>
                                 <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
                                   tx.status === 'Completed' 
@@ -2188,7 +2192,7 @@ function App() {
                             </div>
                             <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
                               <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                              <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.entity_category || '-'}</span>
+                              <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.category || '-'}</span>
                             </div>
                           </div>
                         ))}

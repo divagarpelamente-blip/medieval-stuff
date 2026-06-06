@@ -148,11 +148,15 @@ Persistence and trigger logic is handled in the relational schema defined in **[
    +------------------------------------+          +------------------------------------+
    | id          UUID (PK)              |<----+    | id              UUID (PK)          |
    | email       TEXT                   |     |    | profile_id      UUID (FK)          |
-   | gold        BIGINT                 |     +---o| type            TEXT               |
+   | gold        BIGINT                 |     +---o| class           TEXT               |
    | level       INTEGER                |          | amount          BIGINT             |
-   | xp          INTEGER                |          | category        TEXT               |
-   | updated_at  TIMESTAMPTZ            |          | status          TEXT               |
-   +------------------------------------+          | created_at      TIMESTAMPTZ        |
+   | xp          INTEGER                |          | sub_class       TEXT               |
+   | updated_at  TIMESTAMPTZ            |          | entity          TEXT               |
+   +------------------------------------+          | category        TEXT               |
+                                                   | sub_category    TEXT               |
+                                                   | status          TEXT               |
+                                                   | created_at      TIMESTAMPTZ        |
+                                                   +------------------------------------+
                                                    +------------------------------------+
 ```
 
@@ -173,17 +177,17 @@ Contains the detailed financial ledger records.
 
 - `id` (`UUID`, PK, default: `gen_random_uuid()`)
 - `profile_id` (`UUID`, FK referencing `profiles.id`)
-- `type` (`TEXT` - constraint: `'income'` or `'expense'`)
+- `class` (`TEXT` - unrestricted, supports `'Income'`, `'Expense'`, `'Savings'`, `'Debt'`)
 - `amount` (`BIGINT`) - Amount in gold coins.
-- `category` / `subcategory` / `entity` / `entity_category` (`TEXT`)
+- `sub_class` / `entity` / `category` / `sub_category` (`TEXT`)
 - `status` (`TEXT` - e.g. `'Pending'`, `'Paid on Time'`).
 
 ### Automated Database Triggers
 
 When a new row is written into `transactions`:
 
-- If `type = 'income'`: Adds the transaction amount to the user's `gold` balance, and increments `xp` by `amount * 0.1` points.
-- If `type = 'expense'`: Subtracts the transaction amount from the user's `gold` balance.
+- If `class = 'Income'`: Adds the transaction amount to the user's `gold` balance, and increments `xp` by `amount * 0.1` points.
+- If `class != 'Income'` (Expense, Savings, Debt): Subtracts the transaction amount from the user's `gold` balance.
 - **Level Up Calculation**: If the accumulated XP exceeds the level boundary (`100 * Math.pow(1.5, level - 1)`), the trigger updates the `level` column and fires a database state change.
 
 ---
@@ -203,13 +207,14 @@ The dashboard applies a cascading logical sequence to resolve selected Years, Qu
 
 All key indicators (Inflows, Outflows, Net Balance, Efficiency Rate, Receivables, Payables, and Entity Volumes) recalculate dynamically relative to `dashboardFilteredTransactions`.
 
-### B. Responsive Sidebar UI
+### B. Responsive Sidebar & Navigation UI
 
-- **Sticky Column Layout**: Displays a sticky column filter panel on desktop and a top stacked container on tablets/mobile screens.
+- **Dimensional Compression**: The sidebar utilizes a strict, slim footprint (`w-36` to `w-40` on desktop) to maximize the main dashboard content area, with nested controls wrapping dynamically to prevent clipping.
+- **Navigation Tabs**: Primary dashboard sub-views (Overview, Income & Expenses, Receivables & Payables, Liabilities, Ratios) are explicitly right-aligned horizontally along the header block to draw attention to the main content.
 - **Section Controls**:
-  - **Years**: Displays a scrollable checkbox list of up to 5 years (current year plus 4 preceding years). Defaults to selecting the 3 most recent years.
-  - **Quarters**: Exactly 4 items (Q1–Q4) with visual toggle buttons.
-  - **Months**: Scrollable list of the 12 calendar months.
+  - **Years**: Displays a scrollable checkbox list. The viewport is strictly bounded (`max-h-12`) to visually present only 2 rows before scrolling, and the logic defaults to activating the **2 most recent years**.
+  - **Quarters**: Exactly 4 items (Q1–Q4) with subtle visual toggle buttons.
+  - **Months**: Expanded scrollable list containing the 12 calendar months, sized robustly (`max-h-[300px]`) to ensure maximum visibility of all options at once without clipping.
   - **All/None Actions**: Helper links in each section enable instant bulk selections.
 
 ### C. Refactored SVG Visualizations

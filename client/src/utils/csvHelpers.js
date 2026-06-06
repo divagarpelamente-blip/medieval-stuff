@@ -2,15 +2,15 @@ import { toast } from 'react-hot-toast';
 
 export const handleExportCSV = (transactions, t) => {
   const headers = [
-    'type',
     'amount',
     'from',
     'date',
     'status',
-    'category',
-    'subcategory',
+    'class',
+    'sub_class',
     'entity',
-    'entity_category',
+    'class',
+    'sub_class',
     'description'
   ];
 
@@ -20,8 +20,8 @@ export const handleExportCSV = (transactions, t) => {
     transactions.forEach((tx) => {
       const row = headers.map((header) => {
         let val = tx[header];
-        if (header === 'entity_category' && tx.entity_category !== undefined) {
-          val = tx.entity_category;
+        if (header === 'class' && tx.class !== undefined) {
+          val = tx.class;
         }
         if (val === null || val === undefined) {
           return '';
@@ -124,12 +124,16 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
         headers.forEach((header, idx) => {
           let val = row[idx] ? row[idx].trim() : '';
           // normalize header keys
-          if (header === 'entity category' || header === 'entity_category') {
-            tx.entityCategory = val;
+          if (header === 'entity class' || header === 'class') {
+            tx.class = val;
           } else if (header === 'from (origem)' || header === 'from') {
             tx.from = val;
-          } else if (header === 'tipo' || header === 'type') {
-            tx.type = val.toLowerCase();
+          } else if (header === 'classe' || header === 'class') {
+            tx.class = val;
+          } else if (header === 'sub classe' || header === 'sub_class') {
+            tx.subClass = val;
+          } else if (header === 'sub class' || header === 'sub_class') {
+            tx.subCategory = val;
           } else if (header === 'ouro' || header === 'coins' || header === 'amount') {
             tx.amount = Number(val);
           } else {
@@ -138,14 +142,17 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
         });
 
         // Validation
-        if (!tx.type || !['income', 'expense'].includes(tx.type)) {
-          tx.type = 'expense'; // default fallback
+        if (!tx.class || !['Income', 'Expense', 'Savings', 'Debt'].includes(tx.class)) {
+          tx.class = 'Expense'; // default fallback
         }
         if (!tx.amount || isNaN(tx.amount)) {
           tx.amount = 0; // default fallback
         }
-        if (!tx.category) {
-          tx.category = tx.type === 'income' ? 'Income' : 'Expense';
+        if (!tx.class) {
+          tx.class = 'Internal';
+        }
+        if (!tx.subCategory) {
+          tx.subCategory = '';
         }
         if (!tx.from) {
           tx.from = fromOptions[0] || 'Pedro';

@@ -3,7 +3,6 @@ DROP TABLE IF EXISTS public.transactions CASCADE;
 CREATE TABLE IF NOT EXISTS public.transactions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
     amount NUMERIC NOT NULL,
     "from" TEXT,
     date DATE DEFAULT CURRENT_DATE,
@@ -11,10 +10,11 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     year INTEGER,
     quarter TEXT,
     status TEXT DEFAULT 'Completed',
-    category TEXT NOT NULL,
-    subcategory TEXT,
+    class TEXT NOT NULL,
+    sub_class TEXT,
     entity TEXT,
-    entity_category TEXT,
+    category TEXT,
+    sub_category TEXT,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -69,7 +69,7 @@ DECLARE
     max_xp NUMERIC;
 BEGIN
     -- 4.1 Update gold balance
-    IF NEW.type = 'income' THEN
+    IF NEW.class = 'Income' THEN
         UPDATE public.profiles
         SET gold = gold + CAST(NEW.amount AS BIGINT)
         WHERE id = NEW.profile_id;
