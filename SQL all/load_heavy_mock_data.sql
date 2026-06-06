@@ -143,7 +143,7 @@ BEGIN
 
         -- Insert transaction (database trigger auto-calculates month, year, quarter, and profile Gold/XP)
         INSERT INTO public.transactions (
-            profile_id, class, sub_class, entity, category, 
+            profile_id, "Transaction Class", "Transaction Subclass", entity, "Transaction Category", 
             amount, "from", date, month, year, quarter, status, description
         ) VALUES (
             '00000000-0000-0000-0000-000000000000', v_class, v_sub_class, v_entity, v_category,

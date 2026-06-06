@@ -10,10 +10,10 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     year INTEGER,
     quarter TEXT,
     status TEXT DEFAULT 'Completed',
-    class TEXT NOT NULL,
-    sub_class TEXT,
+    "Transaction Class" TEXT NOT NULL,
+    "Transaction Subclass" TEXT,
     entity TEXT,
-    category TEXT,
+    "Transaction Category" TEXT,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -68,7 +68,7 @@ DECLARE
     max_xp NUMERIC;
 BEGIN
     -- 4.1 Update gold balance
-    IF NEW.class = 'Income' THEN
+    IF NEW."Transaction Class" = 'Income' THEN
         UPDATE public.profiles
         SET gold = gold + CAST(NEW.amount AS BIGINT)
         WHERE id = NEW.profile_id;

@@ -8,3 +8,13 @@ client/dist
 server/dist
 .DS_Store
 *.log
+
+# Temp AI & script generation artifacts
+step_*.json
+*_dump.txt
+*.jsonl
+refactor*.js
+app_jsx_history.json
+all_user_diffs.txt
+orig_app.jsx
+git_app.jsx

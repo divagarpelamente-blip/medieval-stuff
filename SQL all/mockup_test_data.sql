@@ -36,7 +36,7 @@ VALUES
 DELETE FROM public.transactions WHERE profile_id = '00000000-0000-0000-0000-000000000000';
 
 -- 5. Insert mock transactions matching the new schema
-INSERT INTO public.transactions (profile_id, class, amount, "from", date, status, sub_class, entity, category, description)
+INSERT INTO public.transactions (profile_id, "Transaction Class", amount, "from", date, status, "Transaction Subclass", entity, "Transaction Category", description)
 VALUES
     ('00000000-0000-0000-0000-000000000000', 'Income',  1000, 'Pedro', '2026-05-15', 'Completed', 'Cash receipt', 'Salary', 'Payroll', 'Ordenado de Maio'),
     ('00000000-0000-0000-0000-000000000000', 'Income',  500,  'Consolidated',    '2026-05-20', 'Completed', 'Cash receipt', 'Bonus', 'Payroll', 'Bónus de performance'),

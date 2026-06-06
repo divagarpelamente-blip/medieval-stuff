@@ -1,6 +1,7 @@
 import React from 'react';
 
 export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
+  const [viewMode, setViewMode] = React.useState('class');
   const renderChart = () => {
     if (entityVolumes.length === 0) {
       return (
@@ -10,7 +11,7 @@ export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
       );
     }
 
-    const topEntitiesTotalVolume = entityVolumes.reduce((sum, ent) => sum + ent.total, 0);
+    const topEntitiesTotalVolume = entityVolumes.reduce((sum, ent) => sum + (viewMode === 'class' ? ent.totalClass : ent.totalSubclass), 0);
     const R = 45;
     const Circumference = 2 * Math.PI * R;
     const colors = ['#8b4513', '#d4af37', '#cd7f32', '#568f63', '#a0522d'];
@@ -18,7 +19,22 @@ export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
     let accumulatedPercent = 0;
 
     return (
-      <div className="w-full h-full flex flex-col sm:flex-row items-center justify-center gap-6">
+      <>
+      <div className="flex bg-[#faf4e5] border border-[#8b4513]/20 rounded p-0.5 absolute top-2 right-2 z-10">
+              <button 
+                onClick={() => setViewMode('class')}
+                className={`px-2 py-0.5 text-[8px] font-black uppercase rounded transition-all ${viewMode === 'class' ? 'bg-[#8b4513] text-[#ffd700]' : 'text-[#8b4513]/70 hover:bg-[#8b4513]/10'}`}
+              >
+                Class
+              </button>
+              <button 
+                onClick={() => setViewMode('subclass')}
+                className={`px-2 py-0.5 text-[8px] font-black uppercase rounded transition-all ${viewMode === 'subclass' ? 'bg-[#8b4513] text-[#ffd700]' : 'text-[#8b4513]/70 hover:bg-[#8b4513]/10'}`}
+              >
+                Subclass
+              </button>
+            </div>
+            <div className="w-full h-full flex flex-col sm:flex-row items-center justify-center gap-6 relative">
         <div className="relative w-28 h-28 flex-shrink-0">
           <svg viewBox="0 0 110 110" className="w-full h-full transform -rotate-90">
             <circle
@@ -30,7 +46,7 @@ export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
               strokeWidth="10"
             />
             {entityVolumes.map((ent, idx) => {
-              const percent = (ent.total / topEntitiesTotalVolume) * 100;
+              const percent = ((viewMode === 'class' ? ent.totalClass : ent.totalSubclass) / topEntitiesTotalVolume) * 100;
               const strokeDashoffset = Circumference - (percent / 100) * Circumference;
               const strokeDasharray = `${Circumference} ${Circumference}`;
               const rotation = (accumulatedPercent / 100) * 360;
@@ -78,14 +94,15 @@ export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
             </thead>
             <tbody className="divide-y divide-[#8b4513]/5 text-stone-700 font-bold">
               {entityVolumes.map((ent, idx) => {
-                const percent = (ent.total / topEntitiesTotalVolume) * 100;
+                const totalVal = viewMode === 'class' ? ent.totalClass : ent.totalSubclass;
+                const percent = totalVal > 0 ? (totalVal / topEntitiesTotalVolume) * 100 : 0;
                 return (
                   <tr key={ent.name} className="hover:bg-[#8b4513]/5">
                     <td className="py-1 flex items-center gap-1 font-bold text-[#4b2c20] truncate max-w-[80px]">
                       <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: colors[idx % colors.length] }} />
                       {ent.name}
                     </td>
-                    <td className="py-1 text-right font-mono font-black">{ent.total.toLocaleString()}g</td>
+                    <td className="py-1 text-right font-mono font-black">{totalVal.toLocaleString()}g</td>
                     <td className="py-1 text-right font-mono text-[#5d4037]/60">{percent.toFixed(1)}%</td>
                   </tr>
                 );
@@ -94,6 +111,7 @@ export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
           </table>
         </div>
       </div>
+      </>
     );
   };
 

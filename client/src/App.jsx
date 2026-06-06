@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef } from 'react';
+import { useDashboardEngine } from './lib/useDashboardEngine';
 import HUD from './components/HUD';
 import BottomNav from './components/BottomNav';
 import IsometricMap from './components/IsometricMap';
@@ -33,7 +34,7 @@ function App() {
 
   // Dashboard Page Sub-Tabs and Granularity state
   const [dashSubTab, setDashSubTab] = useState('overview'); // overview, income_expense, payables_receivables
-  const [dashGranularity, setDashGranularity] = useState('quarter'); // month, quarter, year
+  const [dashGranularity] = useState('month'); // month, quarter, year
 
   // Unified Sidebar Filter state
   const [selectedYears, setSelectedYears] = useState([]);
@@ -68,7 +69,7 @@ function App() {
   const [txSubClass, setTxSubClass] = useState('Cash receipt');
   const [txEntity, setTxEntity] = useState('Salary');
   const [txCategory, setTxCategory] = useState('Payroll');
-  const [txSubCategory, setTxSubCategory] = useState('');
+  const [txSubCategory] = useState('');
   const [txDescription, setTxDescription] = useState('');
 
   // Auto-fill Entity Category when Entity changes
@@ -129,8 +130,8 @@ function App() {
     if (filterQuarter !== 'All' && tx.quarter !== filterQuarter) return false;
     if (filterFrom !== 'All' && tx.from !== filterFrom) return false;
     if (filterStatus !== 'All' && tx.status !== filterStatus) return false;
-    if (filterClass !== 'All' && tx.class !== filterClass) return false;
-    if (filterSubClass !== 'All' && tx.sub_class !== filterSubClass) return false;
+    if (filterClass !== 'All' && tx['Transaction Class'] !== filterClass) return false;
+    if (filterSubClass !== 'All' && tx['Transaction Subclass'] !== filterSubClass) return false;
     if (filterEntity !== 'All' && tx.entity !== filterEntity) return false;
     return true;
   }).sort((a, b) => {
@@ -171,42 +172,42 @@ function App() {
     return false;
   }).sort((a, b) => new Date(a.date || a.created_at) - new Date(b.date || b.created_at));
 
+  const engineData = useDashboardEngine(dashboardFilteredTransactions);
+
+
   // Calculate Dashboard Stats (dependent on filters)
-  const dashInflow = dashboardFilteredTransactions
-    .filter((tx) => tx.class === 'Income')
-    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-  const dashOutflow = dashboardFilteredTransactions
-    .filter((tx) => tx.class !== 'Income')
-    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-  const dashNetBalance = dashInflow - dashOutflow;
-
+  
+  const dashInflow = engineData.classData.inflow;
+  const dashOutflow = engineData.classData.outflow;
+  const dashNetBalance = engineData.classData.net;
   const dashEfficiencyRatio = dashInflow > 0 ? (dashNetBalance / dashInflow) * 100 : 0;
-
-  // Group by category (based on dashboard filtered transactions)
-  const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.category).filter(Boolean)));
+  
+  const subclassInflow = engineData.subclassData.inflow;
+  const subclassOutflow = engineData.subclassData.outflow;
+  const subclassNet = engineData.subclassData.net;
+  const subclassEfficiencyRatio = subclassInflow > 0 ? (subclassNet / subclassInflow) * 100 : 0;
+const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx['Transaction Category']).filter(Boolean)));
   
   const timePoints = [...dashboardFilteredTransactions].reverse().reduce((acc, tx) => {
     const existing = acc.find(p => p.label === tx.month);
     if (existing) {
-      if (tx.class === 'Income') existing.income += Number(tx.amount);
-      if (tx.class !== 'Income') existing.expense += Number(tx.amount);
+      if (tx['Transaction Class'] === 'Income') existing.income += Number(tx.amount);
+      if (tx['Transaction Class'] !== 'Income') existing.expense += Number(tx.amount);
     } else {
       acc.push({
         label: tx.month,
-        income: tx.class === 'Income' ? Number(tx.amount) : 0,
-        expense: tx.class !== 'Income' ? Number(tx.amount) : 0,
+        income: tx['Transaction Class'] === 'Income' ? Number(tx.amount) : 0,
+        expense: tx['Transaction Class'] !== 'Income' ? Number(tx.amount) : 0,
       });
     }
     return acc;
   }, []);
 
   const dashCategoryData = uniqueCategories.map((cat) => {
-    const catTxs = dashboardFilteredTransactions.filter((tx) => tx.category === cat);
-    const income = catTxs.filter((tx) => tx.class === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = catTxs.filter((tx) => tx.class !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    return { category: cat, income, expense, total: income + expense };
+    const catTxs = dashboardFilteredTransactions.filter((tx) => tx['Transaction Category'] === cat);
+    const income = catTxs.filter((tx) => tx['Transaction Class'] === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expense = catTxs.filter((tx) => tx['Transaction Class'] !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    return { "Transaction Category": cat, income, expense, total: income + expense };
   }).filter((c) => c.total > 0);
 
   const maxDashCategoryVal = Math.max(...dashCategoryData.map(c => Math.max(c.income, c.expense)), 1);
@@ -219,8 +220,8 @@ function App() {
     const [yearStr, monthStr] = label.split(' ');
     const matchedTxs = dashboardFilteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
 
-    const income = matchedTxs.filter((tx) => tx.class === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = matchedTxs.filter((tx) => tx.class !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const income = matchedTxs.filter((tx) => tx['Transaction Class'] === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expense = matchedTxs.filter((tx) => tx['Transaction Class'] !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { label, income, expense, total: income + expense };
   }).filter((t) => t.total > 0);
 
@@ -246,37 +247,29 @@ function App() {
   const uniqueFroms = Array.from(new Set(transactions.map(tx => tx.from).filter(Boolean)));
   const fromAllocation = uniqueFroms.map(fromName => {
     const amount = dashboardFilteredTransactions
-      .filter(tx => tx.from === fromName && tx.class === 'Income')
+      .filter(tx => tx.from === fromName && tx['Transaction Class'] === 'Income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: fromName, amount };
   }).filter(f => f.amount > 0).sort((a, b) => b.amount - a.amount);
   const maxFromAmount = Math.max(...fromAllocation.map(f => f.amount), 1);
 
   // Suggested Extra 2 - Top Entities (Maiores Comércios)
-  const uniqueEntities = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.entity).filter(Boolean)));
-  const entityVolumes = uniqueEntities.map(entName => {
-    const inflow = dashboardFilteredTransactions
-      .filter(tx => tx.entity === entName && tx.class === 'Income')
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const outflow = dashboardFilteredTransactions
-      .filter(tx => tx.entity === entName && tx.class !== 'Income')
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    return { name: entName, inflow, outflow, total: inflow + outflow };
-  }).filter(e => e.total > 0).sort((a, b) => b.total - a.total).slice(0, 5);
+  const entityVolumes = engineData.entityData.slice(0, 5);
+  const percentUsed = dashInflow > 0 ? ((entityVolumes.reduce((s, e) => s + e.totalClass, 0) / dashInflow) * 100) : 0;
 
-  // Suggested Extra 3 - Entity Categories cost breakdown (Income & Expenses tab)
-  const uniqueEntityCats = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)));
+  // Suggested Extra 3 - Entity Categories
+  const uniqueEntityCats = Array.from(new Set(transactions.map(tx => tx['Transaction Category']).filter(Boolean)));
   const entityCatExpenses = uniqueEntityCats.map(catName => {
     const amount = transactions
-      .filter(tx => tx.category === catName && tx.class !== 'Income')
+      .filter(tx => tx['Transaction Category'] === catName && tx['Transaction Class'] !== 'Income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: catName, amount };
   }).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
   const maxEntityCatExp = Math.max(...entityCatExpenses.map(c => c.amount), 1);
 
   // Payables & Receivables variables
-  const pendingIncomeList = transactions.filter(tx => tx.class === 'Income' && tx.status === 'Pending');
-  const pendingExpenseList = transactions.filter(tx => tx.class !== 'Income' && (tx.status === 'Pending' || tx.status === 'Overdue'));
+  const pendingIncomeList = transactions.filter(tx => tx['Transaction Class'] === 'Income' && tx.status === 'Pending');
+  const pendingExpenseList = transactions.filter(tx => tx['Transaction Class'] !== 'Income' && (tx.status === 'Pending' || tx.status === 'Overdue'));
 
   const totalReceivables = pendingIncomeList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   const totalPayables = pendingExpenseList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
@@ -551,8 +544,8 @@ function App() {
       transactions.forEach((tx) => {
         const row = headers.map((header) => {
           let val = tx[header];
-          if (header === 'entity_category' && tx.category !== undefined) {
-            val = tx.category;
+          if (header === 'entity_category' && tx['Transaction Category'] !== undefined) {
+            val = tx['Transaction Category'];
           }
           if (val === null || val === undefined) {
             return '';
@@ -660,7 +653,7 @@ function App() {
             } else if (header === 'from (origem)' || header === 'from') {
               tx.from = val;
             } else if (header === 'tipo' || header === 'type') {
-              tx.class = val.toLowerCase();
+              tx['Transaction Class'] = val.toLowerCase();
             } else if (header === 'ouro' || header === 'coins' || header === 'amount') {
               tx.amount = Number(val);
             } else {
@@ -669,14 +662,14 @@ function App() {
           });
 
           // Validation
-          if (!tx.class || !['income', 'expense'].includes(tx.class)) {
-            tx.class = 'expense'; // default fallback
+          if (!tx['Transaction Class'] || !['income', 'expense'].includes(tx['Transaction Class'])) {
+            tx['Transaction Class'] = 'expense'; // default fallback
           }
           if (!tx.amount || isNaN(tx.amount)) {
             tx.amount = 0; // default fallback
           }
-          if (!tx.class) {
-            tx.class = tx.class === 'Income' ? 'Income' : 'Expense';
+          if (!tx['Transaction Class']) {
+            tx['Transaction Class'] = tx['Transaction Class'] === 'Income' ? 'Income' : 'Expense';
           }
           if (!tx.from) {
             tx.from = fromOptions[0] || 'Pedro';
@@ -720,14 +713,14 @@ function App() {
 
     const amountNum = Number(txAmount);
     const res = await registerTransaction(GUEST_PROFILE_ID, {
-      class: txClass,
+      "Transaction Class": txClass,
       amount: amountNum,
       from: txFrom,
       date: txDate,
       status: txStatus,
       subClass: txSubClass,
       entity: txEntity,
-      category: txCategory,
+      "Transaction Category": txCategory,
       subCategory: txSubCategory,
       description: txDescription || `${txClass} log`
     });
@@ -1098,19 +1091,19 @@ function App() {
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                tx.class === 'Income' 
+                                tx['Transaction Class'] === 'Income' 
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
                                   : 'bg-rose-100 text-rose-800 border border-rose-250'
                               }`}>
-                                {tx.class}
+                                {tx['Transaction Class']}
                               </span>
                             </td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.sub_class || '-'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx['Transaction Subclass'] || '-'}</td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                             <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                              tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'
+                              tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'
                             }`}>
-                              {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
+                              {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                           </tr>
@@ -1128,15 +1121,15 @@ function App() {
                           <div className="flex justify-between items-start">
                             <div>
                               <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                {tx.entity || tx.class}
+                                {tx.entity || tx['Transaction Class']}
                               </span>
                               <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                {tx.from} • {tx.sub_class || '-'}
+                                {tx.from} • {tx['Transaction Subclass'] || '-'}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className={`font-mono font-black text-xs ${tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                              <div className={`font-mono font-black text-xs ${tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                               </div>
                               <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
                                 tx.status === 'Completed' 
@@ -1149,7 +1142,7 @@ function App() {
                           </div>
                           <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
                             <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.category || '-'}</span>
+                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx['Transaction Category'] || '-'}</span>
                           </div>
                         </div>
                       ))}
@@ -1521,44 +1514,64 @@ function App() {
                 {dashSubTab === 'overview' && (
                   <div className="space-y-6 animate-in fade-in duration-200">
                     {/* 1. KPIs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.total_income_inflow}</span>
-                        <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">
-                          +{dashInflow.toLocaleString()}g
-                        </span>
-                        <div className="absolute right-3 bottom-3 text-2xl opacity-15">📈</div>
+                    
+                    <div className="space-y-4">
+                      {/* Class Summary Row */}
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Income</span>
+                          <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">+{dashInflow.toLocaleString()}g</span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📈</div>
+                        </div>
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Expense</span>
+                          <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">-{dashOutflow.toLocaleString()}g</span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📉</div>
+                        </div>
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Net Balance</span>
+                          <span className={`title-font text-xl font-black mt-1 font-mono ${dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
+                            {dashNetBalance >= 0 ? '+' : ''}{dashNetBalance.toLocaleString()}g
+                          </span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">💰</div>
+                        </div>
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Class Efficiency</span>
+                          <span className={`title-font text-xl font-black mt-1 font-mono ${dashEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {dashEfficiencyRatio.toFixed(1)}%
+                          </span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">🛡️</div>
+                        </div>
                       </div>
 
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.total_expenses_outflow}</span>
-                        <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">
-                          -{dashOutflow.toLocaleString()}g
-                        </span>
-                        <div className="absolute right-3 bottom-3 text-2xl opacity-15">📉</div>
-                      </div>
-
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.net_balance}</span>
-                        <span className={`title-font text-xl font-black mt-1 font-mono ${
-                          dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'
-                        }`}>
-                          {dashNetBalance >= 0 ? '+' : ''}{dashNetBalance.toLocaleString()}g
-                        </span>
-                        <div className="absolute right-3 bottom-3 text-2xl opacity-15">💰</div>
-                      </div>
-
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.savings_efficiency}</span>
-                        <span className={`title-font text-xl font-black mt-1 font-mono ${
-                          dashEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                        }`}>
-                          {dashEfficiencyRatio.toFixed(1)}%
-                        </span>
-                        <div className="absolute right-3 bottom-3 text-2xl opacity-15">🛡️</div>
+                      {/* Subclass Summary Row */}
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Receipts</span>
+                          <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">+{subclassInflow.toLocaleString()}g</span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📥</div>
+                        </div>
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Payments</span>
+                          <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">-{subclassOutflow.toLocaleString()}g</span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📤</div>
+                        </div>
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Net Balance</span>
+                          <span className={`title-font text-xl font-black mt-1 font-mono ${subclassNet >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
+                            {subclassNet >= 0 ? '+' : ''}{subclassNet.toLocaleString()}g
+                          </span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">💎</div>
+                        </div>
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Efficiency</span>
+                          <span className={`title-font text-xl font-black mt-1 font-mono ${subclassEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {subclassEfficiencyRatio.toFixed(1)}%
+                          </span>
+                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">✨</div>
+                        </div>
                       </div>
                     </div>
-
                     {/* Advice Banner */}
                     <div className="bg-[#f4e4bc] border-2 border-double border-[#8b4513]/40 rounded-xl p-4 shadow-inner relative">
                       <div className="relative flex gap-3 items-center">
@@ -1576,12 +1589,12 @@ function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Category Breakdown (Diverging Bar Chart) */}
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px] relative select-none">
-                        <FlowByCategoryChart dashCategoryData={dashCategoryData} t={t} />
+                        <FlowByCategoryChart dashCategoryData={engineData.categoryData} t={t} />
                       </div>
 
                       {/* Spline Time Evolution */}
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
-                        <TimeEvolutionChart timePoints={dashTimeData} t={t} />
+                        <TimeEvolutionChart timePoints={engineData.timeData} t={t} />
                       </div>
 
                       {/* Top Entities Donut */}
@@ -1751,7 +1764,7 @@ function App() {
                                 <div key={tx.id} className="bg-[#faf4e5]/70 border border-[#8b4513]/10 rounded-lg p-2.5 flex justify-between items-center text-xs">
                                   <div className="space-y-0.5">
                                     <div className="font-bold text-[#4b2c20]">{tx.from} &rarr; {tx.entity}</div>
-                                    <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.class}</div>
+                                    <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx['Transaction Class']}</div>
                                   </div>
                                   <div className="text-right">
                                     <div className="font-mono font-black text-emerald-700">+{Number(tx.amount).toLocaleString()}g</div>
@@ -1785,7 +1798,7 @@ function App() {
                                   }`}>
                                     <div className="space-y-0.5">
                                       <div className="font-bold text-[#4b2c20]">{tx.entity}</div>
-                                      <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.class}</div>
+                                      <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx['Transaction Class']}</div>
                                     </div>
                                     <div className="text-right">
                                       <div className="font-mono font-black text-rose-700">-{Number(tx.amount).toLocaleString()}g</div>
@@ -2078,19 +2091,19 @@ function App() {
                               </td>
                               <td className="py-2 px-3 whitespace-nowrap">
                                 <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                  tx.class === 'Income' 
+                                  tx['Transaction Class'] === 'Income' 
                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
                                     : 'bg-rose-100 text-rose-800 border border-rose-200'
                                 }`}>
-                                  {tx.class}
+                                  {tx['Transaction Class']}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.sub_class || '-'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx['Transaction Subclass'] || '-'}</td>
                               <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                               <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                                tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'
+                                tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'
                               }`}>
-                                {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                               </td>
                               <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                             </tr>
@@ -2108,15 +2121,15 @@ function App() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                  {tx.entity || tx.class}
+                                  {tx.entity || tx['Transaction Class']}
                                 </span>
                                 <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                  {tx.from} • {tx.sub_class || '-'}
+                                  {tx.from} • {tx['Transaction Subclass'] || '-'}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className={`font-mono font-black text-xs ${tx.class === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                  {tx.class === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                <div className={`font-mono font-black text-xs ${tx['Transaction Class'] === 'Income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {tx['Transaction Class'] === 'Income' ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
                                 </div>
                                 <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
                                   tx.status === 'Completed' 
@@ -2129,7 +2142,7 @@ function App() {
                             </div>
                             <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
                               <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                              <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.category || '-'}</span>
+                              <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx['Transaction Category'] || '-'}</span>
                             </div>
                           </div>
                         ))}

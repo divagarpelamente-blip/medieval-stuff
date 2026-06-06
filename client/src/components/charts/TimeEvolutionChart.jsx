@@ -2,6 +2,18 @@ import React, { useState } from 'react';
 
 export default function TimeEvolutionChart({ timePoints, t }) {
   const [evolutionTooltip, setEvolutionTooltip] = useState(null);
+  
+  // Interactive 4-line legend state
+  const [activeLines, setActiveLines] = useState({
+    classIncome: true,
+    classExpense: true,
+    subReceipt: false,
+    subPayment: false
+  });
+
+  const toggleLine = (line) => {
+    setActiveLines(prev => ({ ...prev, [line]: !prev[line] }));
+  };
 
   const renderChart = () => {
     if (timePoints.length === 0) {
@@ -13,7 +25,7 @@ export default function TimeEvolutionChart({ timePoints, t }) {
     }
 
     const chartWidth = 400;
-    const chartHeight = 200;
+    const chartHeight = 180;
     const paddingLeft = 45;
     const paddingRight = 15;
     const paddingTop = 15;
@@ -21,7 +33,14 @@ export default function TimeEvolutionChart({ timePoints, t }) {
     const plotWidth = chartWidth - paddingLeft - paddingRight;
     const plotHeight = chartHeight - paddingTop - paddingBottom;
 
-    const maxVal = Math.max(...timePoints.map(p => Math.max(p.income, p.expense)), 1);
+    const maxVal = Math.max(...timePoints.map(p => 
+      Math.max(
+        activeLines.classIncome ? p.classIncome : 0,
+        activeLines.classExpense ? p.classExpense : 0,
+        activeLines.subReceipt ? p.subReceipt : 0,
+        activeLines.subPayment ? p.subPayment : 0
+      )
+    ), 1);
     const scale = (plotHeight - 10) / maxVal;
 
     const mappedPoints = timePoints.map((p, idx) => {
@@ -29,16 +48,17 @@ export default function TimeEvolutionChart({ timePoints, t }) {
         ? paddingLeft + plotWidth / 2 
         : paddingLeft + (idx / (timePoints.length - 1)) * plotWidth;
       
-      const yIncome = (paddingTop + plotHeight) - p.income * scale;
-      const yExpense = (paddingTop + plotHeight) - p.expense * scale;
-
       return {
         label: p.label,
-        income: p.income,
-        expense: p.expense,
+        classIncome: p.classIncome,
+        classExpense: p.classExpense,
+        subReceipt: p.subReceipt,
+        subPayment: p.subPayment,
         x,
-        yIncome,
-        yExpense
+        yClassIncome: (paddingTop + plotHeight) - p.classIncome * scale,
+        yClassExpense: (paddingTop + plotHeight) - p.classExpense * scale,
+        ySubReceipt: (paddingTop + plotHeight) - p.subReceipt * scale,
+        ySubPayment: (paddingTop + plotHeight) - p.subPayment * scale,
       };
     });
 
@@ -58,157 +78,86 @@ export default function TimeEvolutionChart({ timePoints, t }) {
       return d;
     };
 
-    const getAreaPath = (pts, key) => {
-      if (pts.length === 0) return '';
-      const linePath = getBezierPath(pts, key);
-      const firstX = pts[0].x;
-      const lastX = pts[pts.length - 1].x;
-      const bottomY = paddingTop + plotHeight;
-      return `${linePath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
-    };
-
-    const incomePath = getBezierPath(mappedPoints, 'yIncome');
-    const incomeAreaPath = getAreaPath(mappedPoints, 'yIncome');
-
-    const expensePath = getBezierPath(mappedPoints, 'yExpense');
-    const expenseAreaPath = getAreaPath(mappedPoints, 'yExpense');
-
-    const ticks = [
-      (paddingTop + plotHeight) - maxVal * scale,
-      (paddingTop + plotHeight) - (maxVal / 2) * scale,
-      (paddingTop + plotHeight)
-    ];
-    const tickVals = [maxVal, maxVal / 2, 0];
-
-    const handleMouseMove = (e, p) => {
-      const rect = e.currentTarget.closest('.evolution-chart-container').getBoundingClientRect();
+    const handleChartMouseMove = (e, p) => {
+      const rect = e.currentTarget.closest('.diverging-chart-container').getBoundingClientRect();
       const x = e.clientX - rect.left + 15;
       const y = e.clientY - rect.top + 15;
+      
       setEvolutionTooltip({
         label: p.label,
-        income: p.income,
-        expense: p.expense,
+        classIncome: p.classIncome,
+        classExpense: p.classExpense,
+        subReceipt: p.subReceipt,
+        subPayment: p.subPayment,
         x,
         y
       });
     };
 
     return (
-      <div className="w-full h-full flex flex-col justify-between select-none relative evolution-chart-container">
-        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full">
-          <defs>
-            <linearGradient id="inc-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-            </linearGradient>
-            <linearGradient id="exp-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
+      <div className="w-full h-full flex flex-col justify-between select-none relative diverging-chart-container">
+        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible">
+          {/* Background Grid */}
+          <line x1={paddingLeft} y1={paddingTop} x2={chartWidth - paddingRight} y2={paddingTop} stroke="#8b4513" strokeWidth="0.5" opacity="0.1" strokeDasharray="2 2" />
+          <line x1={paddingLeft} y1={paddingTop + plotHeight/2} x2={chartWidth - paddingRight} y2={paddingTop + plotHeight/2} stroke="#8b4513" strokeWidth="0.5" opacity="0.1" strokeDasharray="2 2" />
+          <line x1={paddingLeft} y1={paddingTop + plotHeight} x2={chartWidth - paddingRight} y2={paddingTop + plotHeight} stroke="#8b4513" strokeWidth="1" opacity="0.2" />
 
-          {ticks.map((yVal, i) => (
-            <g key={i}>
-              <line 
-                x1={paddingLeft} 
-                y1={yVal} 
-                x2={chartWidth - paddingRight} 
-                y2={yVal} 
-                stroke="#8b4513" 
-                strokeOpacity={i === 2 ? '0.2' : '0.08'} 
-                strokeWidth={i === 2 ? '1.5' : '1'} 
-                strokeDasharray={i === 2 ? '' : '3 3'} 
-              />
-              <text 
-                x={paddingLeft - 8} 
-                y={yVal + 3} 
-                textAnchor="end" 
-                className="text-[8px] font-mono font-bold fill-[#5d4037]/75"
-              >
-                {Math.round(tickVals[i]).toLocaleString()}g
-              </text>
+          {/* Y Axis Labels */}
+          <text x={paddingLeft - 5} y={paddingTop + 4} fontSize="8" fill="#5d4037" textAnchor="end" opacity="0.6" className="font-bold">
+            {maxVal.toLocaleString()}
+          </text>
+          <text x={paddingLeft - 5} y={paddingTop + plotHeight/2 + 3} fontSize="8" fill="#5d4037" textAnchor="end" opacity="0.6" className="font-bold">
+            {(maxVal/2).toLocaleString()}
+          </text>
+          <text x={paddingLeft - 5} y={paddingTop + plotHeight} fontSize="8" fill="#5d4037" textAnchor="end" opacity="0.6" className="font-bold">
+            0
+          </text>
+
+          {/* Paths */}
+          {activeLines.classIncome && <path d={getBezierPath(mappedPoints, 'yClassIncome')} fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-sm transition-all duration-300" />}
+          {activeLines.classExpense && <path d={getBezierPath(mappedPoints, 'yClassExpense')} fill="none" stroke="#e11d48" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-sm transition-all duration-300" />}
+          {activeLines.subReceipt && <path d={getBezierPath(mappedPoints, 'ySubReceipt')} fill="none" stroke="#10b981" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-sm transition-all duration-300" />}
+          {activeLines.subPayment && <path d={getBezierPath(mappedPoints, 'ySubPayment')} fill="none" stroke="#f43f5e" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-sm transition-all duration-300" />}
+
+          {/* Interaction Points */}
+          {mappedPoints.map((p, idx) => (
+            <g 
+              key={idx} 
+              onMouseEnter={(e) => handleChartMouseMove(e, p)}
+              onMouseMove={(e) => handleChartMouseMove(e, p)}
+              onMouseLeave={() => setEvolutionTooltip(null)}
+              className="cursor-crosshair"
+            >
+              <rect x={p.x - 10} y={paddingTop} width="20" height={plotHeight} fill="transparent" />
+              {activeLines.classIncome && <circle cx={p.x} cy={p.yClassIncome} r="3" fill="#059669" stroke="#faf4e5" strokeWidth="1.5" className="transition-all hover:r-4 drop-shadow-sm" />}
+              {activeLines.classExpense && <circle cx={p.x} cy={p.yClassExpense} r="3" fill="#e11d48" stroke="#faf4e5" strokeWidth="1.5" className="transition-all hover:r-4 drop-shadow-sm" />}
+              {activeLines.subReceipt && <circle cx={p.x} cy={p.ySubReceipt} r="2.5" fill="#10b981" stroke="#faf4e5" strokeWidth="1" className="transition-all hover:r-4 drop-shadow-sm" />}
+              {activeLines.subPayment && <circle cx={p.x} cy={p.ySubPayment} r="2.5" fill="#f43f5e" stroke="#faf4e5" strokeWidth="1" className="transition-all hover:r-4 drop-shadow-sm" />}
+              
+              {/* X Axis Labels (every other point if many) */}
+              {(timePoints.length <= 6 || idx % 2 === 0) && (
+                <text x={p.x} y={paddingTop + plotHeight + 12} fontSize="8" fill="#5d4037" textAnchor="middle" opacity="0.8" className="font-bold">
+                  {p.label}
+                </text>
+              )}
             </g>
           ))}
-
-          {mappedPoints.length > 0 && (
-            <>
-              <path d={incomeAreaPath} fill="url(#inc-grad)" />
-              <path d={expenseAreaPath} fill="url(#exp-grad)" />
-            </>
-          )}
-
-          {mappedPoints.length > 0 && (
-            <>
-              <path d={incomePath} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
-              <path d={expensePath} fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
-            </>
-          )}
-
-          {mappedPoints.map((p, i) => (
-            <g key={i}>
-              <circle
-                cx={p.x}
-                cy={p.yIncome}
-                r={4}
-                fill="#f4e4bc"
-                stroke="#10b981"
-                strokeWidth={2}
-                className="cursor-crosshair hover:r-6 hover:fill-[#10b981] transition-all"
-                onMouseEnter={(e) => handleMouseMove(e, p)}
-                onMouseMove={(e) => handleMouseMove(e, p)}
-                onMouseLeave={() => setEvolutionTooltip(null)}
-              />
-              <circle
-                cx={p.x}
-                cy={p.yExpense}
-                r={4}
-                fill="#f4e4bc"
-                stroke="#ef4444"
-                strokeWidth={2}
-                className="cursor-crosshair hover:r-6 hover:fill-[#ef4444] transition-all"
-                onMouseEnter={(e) => handleMouseMove(e, p)}
-                onMouseMove={(e) => handleMouseMove(e, p)}
-                onMouseLeave={() => setEvolutionTooltip(null)}
-              />
-            </g>
-          ))}
-
-          {mappedPoints.map((p, i) => {
-            const interval = Math.ceil(mappedPoints.length / 6);
-            if (i % interval !== 0 && i !== mappedPoints.length - 1) return null;
-            return (
-              <text
-                key={i}
-                x={p.x}
-                y={chartHeight - 4}
-                textAnchor="middle"
-                className="text-[8px] font-sans font-bold fill-[#5d4037]/75"
-              >
-                {p.label}
-              </text>
-            );
-          })}
         </svg>
 
+        {/* Tooltip */}
         {evolutionTooltip && (
           <div 
-            className="absolute bg-[#f4e4bc] border-2 border-[#8b4513] text-[#4b2c20] text-[9px] p-2 rounded shadow-2xl pointer-events-none z-[120] font-sans w-36 space-y-1 animate-in fade-in duration-100"
-            style={{ left: `${evolutionTooltip.x}px`, top: `${evolutionTooltip.y}px` }}
+            className="absolute pointer-events-none z-50 bg-[#faf4e5] border border-[#8b4513]/30 rounded-lg p-2 shadow-lg w-max"
+            style={{ left: Math.min(evolutionTooltip.x, chartWidth - 140), top: Math.max(0, evolutionTooltip.y - 80) }}
           >
-            <div 
-              className="absolute inset-0 pointer-events-none opacity-20 mix-blend-multiply rounded"
-              style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')" }}
-            />
-            <div className="relative font-black text-center border-b border-[#8b4513]/20 pb-0.5 uppercase tracking-wider text-[#4b2c20]">
+            <div className="text-[10px] font-black uppercase text-[#8b4513] border-b border-[#8b4513]/20 pb-1 mb-1">
               {evolutionTooltip.label}
             </div>
-            <div className="relative flex justify-between">
-              <span className="text-emerald-700 font-bold uppercase text-[7.5px]">{t('income', 'Income')}:</span>
-              <span className="font-mono font-black">+{evolutionTooltip.income.toLocaleString()}g</span>
-            </div>
-            <div className="relative flex justify-between">
-              <span className="text-rose-700 font-bold uppercase text-[7.5px]">{t('expense', 'Expense')}:</span>
-              <span className="font-mono font-black">-{evolutionTooltip.expense.toLocaleString()}g</span>
+            <div className="space-y-0.5">
+              {activeLines.classIncome && <div className="text-[9px] font-bold text-emerald-800 flex justify-between gap-3"><span>Class: Income</span> <span>+{evolutionTooltip.classIncome.toLocaleString()}g</span></div>}
+              {activeLines.classExpense && <div className="text-[9px] font-bold text-rose-800 flex justify-between gap-3"><span>Class: Expense</span> <span>-{evolutionTooltip.classExpense.toLocaleString()}g</span></div>}
+              {activeLines.subReceipt && <div className="text-[9px] font-bold text-emerald-600 flex justify-between gap-3"><span>Subclass: Receipt</span> <span>+{evolutionTooltip.subReceipt.toLocaleString()}g</span></div>}
+              {activeLines.subPayment && <div className="text-[9px] font-bold text-rose-600 flex justify-between gap-3"><span>Subclass: Payment</span> <span>-{evolutionTooltip.subPayment.toLocaleString()}g</span></div>}
             </div>
           </div>
         )}
@@ -217,12 +166,34 @@ export default function TimeEvolutionChart({ timePoints, t }) {
   };
 
   return (
-    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px]">
-      <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-        <span>{t('time_evolution', 'Time Evolution')}</span>
-        <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t('evolution_spline_label', 'Income vs Expenses Spline')}</span>
-      </h4>
-      <div className="flex-grow flex items-center justify-center mt-4 w-full">
+    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col">
+      <div className="flex justify-between items-center border-b border-[#8b4513]/20 pb-2 mb-4">
+        <div>
+          <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">{t('time_evolution')}</h3>
+          <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t('temporal_progression')}</p>
+        </div>
+      </div>
+      
+      <div className="flex flex-wrap gap-2 mb-3 justify-center">
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" checked={activeLines.classIncome} onChange={() => toggleLine('classIncome')} className="accent-emerald-700 w-3 h-3" />
+          <span className="text-[9px] font-black text-emerald-800 uppercase">Class Income</span>
+        </label>
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" checked={activeLines.classExpense} onChange={() => toggleLine('classExpense')} className="accent-rose-700 w-3 h-3" />
+          <span className="text-[9px] font-black text-rose-800 uppercase">Class Expense</span>
+        </label>
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" checked={activeLines.subReceipt} onChange={() => toggleLine('subReceipt')} className="accent-emerald-500 w-3 h-3" />
+          <span className="text-[9px] font-black text-emerald-600 uppercase">Sub Receipt</span>
+        </label>
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" checked={activeLines.subPayment} onChange={() => toggleLine('subPayment')} className="accent-rose-500 w-3 h-3" />
+          <span className="text-[9px] font-black text-rose-600 uppercase">Sub Payment</span>
+        </label>
+      </div>
+
+      <div className="flex-grow flex items-center justify-center min-h-[180px]">
         {renderChart()}
       </div>
     </div>
