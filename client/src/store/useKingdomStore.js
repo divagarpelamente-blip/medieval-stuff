@@ -172,8 +172,26 @@ export const useKingdomStore = create((set, get) => ({
         throw error;
       }
 
-      // Refresh local store from DB to stay in sync with the trigger updates
-      await get().fetchKingdomData(profileId);
+      // Append locally to avoid fetching all historical transactions
+      if (data && data.length > 0) {
+        set((state) => ({ transactions: [data[0], ...state.transactions] }));
+      }
+
+      // Fetch only the profile stats to get the new trigger-calculated Gold, XP, and Level
+      const profileRes = await supabase
+        .from('profiles')
+        .select('gold, xp, level')
+        .eq('id', profileId)
+        .single();
+      
+      if (profileRes.data) {
+        set({
+          gold: profileRes.data.gold ? Number(profileRes.data.gold) : get().gold,
+          level: profileRes.data.level || get().level,
+          xp: profileRes.data.xp || get().xp,
+        });
+      }
+
       return { success: true, data };
     } catch (err) {
       console.error('Error registering transaction:', err);
@@ -210,8 +228,26 @@ export const useKingdomStore = create((set, get) => ({
         throw error;
       }
 
-      // Refresh local store from DB once
-      await get().fetchKingdomData(profileId);
+      // Append locally
+      if (data && data.length > 0) {
+        set((state) => ({ transactions: [...data, ...state.transactions] }));
+      }
+
+      // Fetch only the profile stats
+      const profileRes = await supabase
+        .from('profiles')
+        .select('gold, xp, level')
+        .eq('id', profileId)
+        .single();
+
+      if (profileRes.data) {
+        set({
+          gold: profileRes.data.gold ? Number(profileRes.data.gold) : get().gold,
+          level: profileRes.data.level || get().level,
+          xp: profileRes.data.xp || get().xp,
+        });
+      }
+
       return { success: true, data };
     } catch (err) {
       console.error('Error batch registering transactions:', err);

@@ -38,6 +38,7 @@ graph TD
 ```
 
 ### Core Data Flow
+
 1. **User Action**: The user records a transaction (ledger movement) in the Mine Modal or History Modal.
 2. **Zustand Action Dispatch**: The application dispatches `registerTransaction` to insert the row into Supabase's `transactions` table.
 3. **Database-Level Calculations**: PostgreSQL triggers automatically calculate the profile's accumulated XP, Level, and Gold balance in response to the insertion.
@@ -50,14 +51,18 @@ graph TD
 Eldoria separates state into two primary scopes: **global runtime states (Zustand)** and **persistent client-side lists (LocalStorage)**.
 
 ### A. Zustand Global Store (`useKingdomStore.js`)
+
 Located in [useKingdomStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useKingdomStore.js), the Zustand store handles:
+
 - **Stat State**: `gold`, `gems`, `xp`, `level`, `email`, and loading spinners (`isLoading`).
 - **Ledger Records**: `transactions` array.
 - **Database Operations**: Async dispatches to Supabase for single or batch transaction entries.
 - **Synchronizations**: Triggers dynamic language switches inside the `i18next` engine during store action executions.
 
 ### B. LocalStorage Configurations
+
 To ensure a personalized, modular experience without querying DB configurations continuously, options list settings are saved directly under the `eldoria_` prefix:
+
 - `eldoria_fromOptions`: List of payers/origins (e.g. `'Pedro'`, `'Reni'`, `'Consolidated'`).
 - `eldoria_statusOptions`: Ledger status constraints (e.g. `'Pending'`, `'Overdue'`, `'Paid on Time'`).
 - `eldoria_categoryOptions`: Core categories (e.g. `'Income'`, `'Expense'`, `'Savings'`).
@@ -82,6 +87,7 @@ client/src/utils/locales/
 ```
 
 ### Key Technical Implementations & English-First Lockdown
+
 1. **Explicit Locale Freeze**: Inside [i18n.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/i18n.js), secondary imports are commented out and the configuration strictly registers only the English namespace resource. The active runtime language (`lng`) and fallback (`fallbackLng`) are hardlocked to `'en'`.
 2. **Semantic Keys & Nested Tokenization**: All display text is systematically mapped to key calls. Hardcoded layout table headers inside [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx) (e.g. in the ledger and transaction history views) are refactored to use nested translation lookups:
    - `t('ledger.headers.from')`, `t('ledger.headers.type')`, `t('ledger.headers.amount')`, etc.
@@ -96,22 +102,28 @@ client/src/utils/locales/
 The layout is structured using a mobile-first responsive framework that guarantees stability across both touch interfaces and desktop pointers, employing stacking context separation and gesture controls.
 
 ### A. Viewport Lock & Touch Bounds
+
 - **Elastic Scroll Prevention**: Custom stylesheet definitions in [index.css](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/index.css) set the main viewport wrapper to dynamic height (`100dvh`), `position: fixed`, and `touch-action: manipulation`. This completely blocks iOS and Android pull-to-refresh elastic scroll anomalies.
 - **Select Prevention**: Global `select-none` controls prevent browser text highlights when dragging or tapping visual components.
 
 ### B. Adaptive Top HUD & Overlay Stacking
+
 - **Vertical Grid Stacking**: The profile status bar and resources wrap gracefully from a wide row design on desktop (`md:flex-row md:h-24`) to a compact vertical stack (`flex-col h-auto py-2.5 gap-2`) on mobile.
 - **Conditional Visibility**: The HUD renders conditionally (`activeTab === 'quests' && !isMineModalOpen && !isNewTxModalOpen`) to maintain visual clarity and block z-axis overlay collisions.
 
 ### C. Touch Target Guidelines (Minimum 44x44px)
+
 - **Interactive Colliders**: Hitzones in [IsometricMap.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/IsometricMap.jsx) enforce a minimum tap container limit (`min-w-[44px] min-h-[44px]`).
 - **Padded Menus & Controls**: Sidebar selections (`py-3 md:py-2`), form inputs (`h-11 md:h-[38px]`), close seals (`w-12 h-12`), and language selectors are rescaled to prevent accidental taps on small mobile screens.
 
 ### D. Tabular Data Responsive Cards
+
 - **Responsive Card Fallbacks**: To optimize layout width on screens below the `md` breakpoint, standard multi-column tables are hidden (`hidden md:table`) and replaced by stackable parchment card lists (`grid grid-cols-1 md:hidden`). This applies to both the **Mine Modal History list** and **main Ledger Data table** in [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx).
 
 ### E. Stacking Layer Contexts
+
 Z-index values are categorized as follows to guarantee correct component sorting and block mouse clicks leakage:
+
 - **Game Map (Background)**: Static background map.
 - **Map Interactives (HitZones)**: `z-50` (colliders representing buildings).
 - **Tab Overlays (Treasury, Ledger, Settings)**: `z-50` absolute overlays covering the viewport.
@@ -119,6 +131,7 @@ Z-index values are categorized as follows to guarantee correct component sorting
 - **Modals**: `z-[100]` overlay backdrops.
 
 ### F. Gesture Dismissals
+
 - **Backdrop Click-Outside**: Clicking or pressing on the semi-transparent dark backdrop wrapper of any modal or fullscreen tab overlay automatically triggers closure and returns the view to the main map screen.
 - **Escape Key Listener**: Registered global `useEffect` listeners monitor the keydown sequence. Pressing `Escape` closes active modals or returns the user from secondary tabs back to the Kingdom map.
 
@@ -145,14 +158,18 @@ Persistence and trigger logic is handled in the relational schema defined in **[
 ### Table Definitions
 
 #### 1. Table: `profiles`
+
 Represents the lord's metadata and statistics.
+
 - `id` (`UUID`, PK) - Connected to Supabase Auth.
 - `gold` (`BIGINT`) - Real-time wallet balance (updates automatically via transaction inserts).
 - `level` (`INTEGER`) - Calculated from XP (updates automatically).
 - `xp` (`INTEGER`) - Experience points earned (updates automatically).
 
 #### 2. Table: `transactions`
+
 Contains the detailed financial ledger records.
+
 - `id` (`UUID`, PK, default: `gen_random_uuid()`)
 - `profile_id` (`UUID`, FK referencing `profiles.id`)
 - `type` (`TEXT` - constraint: `'income'` or `'expense'`)
@@ -161,7 +178,54 @@ Contains the detailed financial ledger records.
 - `status` (`TEXT` - e.g. `'Pending'`, `'Paid on Time'`).
 
 ### Automated Database Triggers
+
 When a new row is written into `transactions`:
+
 - If `type = 'income'`: Adds the transaction amount to the user's `gold` balance, and increments `xp` by `amount * 0.1` points.
 - If `type = 'expense'`: Subtracts the transaction amount from the user's `gold` balance.
 - **Level Up Calculation**: If the accumulated XP exceeds the level boundary (`100 * Math.pow(1.5, level - 1)`), the trigger updates the `level` column and fires a database state change.
+
+---
+
+## 6. Treasury Dashboard Refactoring (Sidebar Filters & SVG Charts)
+
+The Treasury Dashboard has been refactored to replace individual time-horizon views (Monthly, Quarterly, Yearly) with a unified, sticky Sidebar multi-select filter panel and advanced interactive SVG visualizations.
+
+### A. Cascading Filtering Engine
+The dashboard applies a cascading logical sequence to resolve selected Years, Quarters, and Months into a flat array of active months:
+1. **Empty / Fallback State**: If no years are checked, or if years are checked but both quarters and months lists are empty, `isFallbackState` is flagged as `true`. The main panel renders a centered notice instructing the user to make a selection.
+2. **Quarter-Only Isolation**: If years are checked and at least one quarter is checked (with zero months checked), quarters are mapped directly to their three constituent months.
+3. **Month-Only Isolation**: If years are checked and at least one month is checked (with zero quarters checked), the query strictly matches checked months.
+4. **Mixed Selection (Union Logic)**: If years, quarters, and months are simultaneously checked, a unique flat union is constructed containing the checked months plus the months mapped from the checked quarters.
+
+All key indicators (Inflows, Outflows, Net Balance, Efficiency Rate, Receivables, Payables, and Entity Volumes) recalculate dynamically relative to `dashboardFilteredTransactions`.
+
+### B. Responsive Sidebar UI
+- **Sticky Column Layout**: Displays a sticky column filter panel on desktop and a top stacked container on tablets/mobile screens.
+- **Section Controls**:
+  - **Years**: Displays a scrollable checkbox list of up to 5 years (current year plus 4 preceding years). Defaults to selecting the 3 most recent years.
+  - **Quarters**: Exactly 4 items (Q1–Q4) with visual toggle buttons.
+  - **Months**: Scrollable list of the 12 calendar months.
+  - **All/None Actions**: Helper links in each section enable instant bulk selections.
+
+### C. Refactored SVG Visualizations
+- **Vertical Column Bar Chart (Flow by Category)**: Category labels sit on the horizontal X-axis. Positive incomes project upwards (emerald) and negative expenses project downwards (rose) from a zero baseline in the middle of the Y-axis. Vertical Y-axis gridlines scale dynamically based on the max volume.
+- **Spline Area Chart (Time Evolution)**: Connects chronological points across selected periods using horizontal cubic Bezier curves (`getBezierPath`). Renders separate splines for Income and Expense, filling the area beneath them with gradient masks at `0.35` opacity. Incorporates mouse hotspot nodes for triggering interactive tooltips.
+- **Hollow Center Donut Chart (Top Entities)**: Replaces the top entities list with a 5-slice SVG donut chart mapping total gold volumes. The hollow center embeds a wrapped text node displaying `[Calculated %] of Total Income Used`.
+
+---
+
+## 7. UI Component Deconstruction & Modularization
+
+To address the growing complexity of the main orchestrator (`App.jsx`), heavy visualizers and parsing logic have been extracted into isolated modules. This reduces the primary file size and prevents global re-renders on localized interactions (such as hover tooltips).
+
+### A. CSV Data Parsing
+- Extracted into **`client/src/utils/csvHelpers.js`**. 
+- Includes pure utility functions for `handleExportCSV`, `parseCSV`, and `handleImportCSV`. These functions receive `transactions`, localized translation methods (`t`), and the `registerTransactions` dispatch as arguments to operate independently of the main React component state.
+
+### B. Isolated SVG Charts
+- Dashboard visualizers were moved to **`client/src/components/charts/`**.
+- **`FlowByCategoryChart.jsx`**: Manages the diverging bar chart and localizes its own tooltip hover state (`chartTooltip`) to avoid re-rendering the parent container.
+- **`TimeEvolutionChart.jsx`**: Handles cubic Bezier curves and maintains an isolated `evolutionTooltip` state for mouse interactions.
+- **`TopEntitiesChart.jsx`**: Wraps the SVG donut calculation logic alongside its corresponding side-table display.
+
