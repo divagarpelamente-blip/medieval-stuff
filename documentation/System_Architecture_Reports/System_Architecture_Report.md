@@ -58,22 +58,23 @@ Located in `client/src/store/useKingdomStore.js`, the Zustand store handles:
 
 - **Stat State**: `gold`, `gems`, `xp`, `level`, `email`, and loading spinners (`isLoading`).
 - **Ledger Records**: `transactions` array.
-- **Database Operations**: Async dispatches to Supabase for single or batch transaction entries.
+- **Database Operations**: Async dispatches to Supabase for single or batch transaction entries. 
+  - **Action Isolation:** Heavy multi-row transaction datasets are strictly isolated to `fetchDashboardTransactions` (only called when visiting the Dashboard or Ledger), keeping `fetchKingdomData` as a lightning-fast single-row profile poller for the core HUD.
 - **Atomic Optimizations**: The `registerTransaction` logic avoids massive full-table synchronization payloads by leveraging local array unshifting (`[newTx, ...transactions]`) while only polling Supabase for the calculated profile scalar values (`gold`, `xp`, `level`).
 - **Synchronizations**: Triggers dynamic language switches inside the `i18next` engine during store action executions.
 
 ### B. LocalStorage Configurations
 
-To ensure a personalized, modular experience without querying DB configurations continuously, options list settings are saved directly under the `eldoria_` prefix:
+To ensure a personalized, modular experience without querying DB configurations continuously, customizable user inputs are saved directly under the `eldoria_` prefix:
 
 - `eldoria_fromOptions`: List of payers/origins.
-- `eldoria_statusOptions`: Ledger status constraints.
-- `eldoria_classOptions`: Core transaction classes.
-- `eldoria_subClassOptions`: Subclasses.
 - `eldoria_categoryOptions`: High-level category groupings.
 - `eldoria_entityOptions`: Specific commercial entities/destinations.
 - `eldoria_entityMappings`: Key-value map linking entities accurately to their parent categories.
 - `eldoria_language`: Active locale key.
+
+> [!NOTE]
+> Fixed database taxonomy constraints (e.g., `classOptions`, `subClassOptions`, `statusOptions`, `monthOptions`) have been explicitly purged from LocalStorage initialization loops and exist purely as static state configurations to guarantee Engine stability.
 
 ---
 
