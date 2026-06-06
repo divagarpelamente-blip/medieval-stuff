@@ -66,10 +66,11 @@ To ensure a personalized, modular experience without querying DB configurations 
 
 - `eldoria_fromOptions`: List of payers/origins (e.g. `'Pedro'`, `'Reni'`, `'Consolidated'`).
 - `eldoria_statusOptions`: Ledger status constraints (e.g. `'Pending'`, `'Overdue'`, `'Paid on Time'`).
-- `eldoria_categoryOptions`: Core categories (e.g. `'Income'`, `'Expense'`, `'Savings'`).
-- `eldoria_subcategoryOptions`: Subcategories (e.g. `'Cash receipt'`, `'Credit payment'`).
-- `eldoria_entityOptions`: Commercial entities (e.g. `'Salary'`, `'Rent'`, `'Gasoline'`).
-- `eldoria_entityMappings`: Key-value map linking entities to their parent categories.
+- `eldoria_classOptions`: Core transaction classes (e.g. `'Income'`, `'Expense'`, `'Savings'`).
+- `eldoria_subClassOptions`: Subclasses (e.g. `'Cash receipt'`, `'Credit payment'`).
+- `eldoria_categoryOptions`: High-level category groupings (e.g. `'Payroll'`, `'Housing'`, `'Markets'`).
+- `eldoria_entityOptions`: Specific commercial entities/destinations (e.g. `'Salary'`, `'Rent'`, `'Hypermarket'`).
+- `eldoria_entityMappings`: Key-value map linking entities accurately to their parent categories.
 - `eldoria_language`: Active locale key (e.g. `'en'`, `'pt-BR'`).
 
 ---

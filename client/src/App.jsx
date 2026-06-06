@@ -185,7 +185,7 @@ function App() {
   const dashEfficiencyRatio = dashInflow > 0 ? (dashNetBalance / dashInflow) * 100 : 0;
 
   // Group by category (based on dashboard filtered transactions)
-  const categoriesList = ['Income', 'Expense', 'Savings', 'Debt'];
+  const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.category).filter(Boolean)));
   
   const timePoints = [...dashboardFilteredTransactions].reverse().reduce((acc, tx) => {
     const existing = acc.find(p => p.label === tx.month);
@@ -202,8 +202,8 @@ function App() {
     return acc;
   }, []);
 
-  const dashCategoryData = categoriesList.map((cat) => {
-    const catTxs = dashboardFilteredTransactions.filter((tx) => tx.class === cat);
+  const dashCategoryData = uniqueCategories.map((cat) => {
+    const catTxs = dashboardFilteredTransactions.filter((tx) => tx.category === cat);
     const income = catTxs.filter((tx) => tx.class === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     const expense = catTxs.filter((tx) => tx.class !== 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { category: cat, income, expense, total: income + expense };
