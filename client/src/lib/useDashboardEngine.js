@@ -1,91 +1,92 @@
 import { useMemo } from 'react';
+import { useKingdomStore } from '../store/useKingdomStore';
 
 /**
  * useDashboardEngine
- * Processes an array of raw transactions into pristine, pre-calculated 4-tier volumes.
+ * Pure adapter layer mapping Zero-Calculation PostgreSQL View payloads
+ * directly into the legacy UI structure without ANY client-side math arrays.
  */
-export function useDashboardEngine(transactions = []) {
+export function useDashboardEngine() {
+  const kpiSummary = useKingdomStore(state => state.kpiSummary);
+  const flowByCategory = useKingdomStore(state => state.flowByCategory);
+  const timeEvolution = useKingdomStore(state => state.timeEvolution);
+  const topEntities = useKingdomStore(state => state.topEntities);
+
   return useMemo(() => {
-    const engine = {
-      total_income: 0,
-      total_expenses: 0,
-      total_receipts: 0,
-      total_payments: 0,
-      categoryVolumes: {},
-      entityVolumes: {},
-      timeVolumes: {} // for the time series
-    };
+    // 1. Dual-Row KPI Summary Metrics
+    const total_income = kpiSummary?.total_income || 0;
+    const total_expenses = kpiSummary?.total_expenses || 0;
+    const total_receipts = kpiSummary?.total_receipts || 0;
+    const total_payments = kpiSummary?.total_payments || 0;
+    const net_cash_balance = kpiSummary?.net_cash_balance || 0;
+    const total_debt = kpiSummary?.total_debt || 0;
+    const savings_efficiency = kpiSummary?.savings_efficiency || 0;
 
-    transactions.forEach((tx) => {
-      const amount = Number(tx.amount) || 0;
+    // 2. Pivot Category Arrays
+    const catMap = {};
+    flowByCategory.forEach(row => {
+      const name = row.transaction_category || 'Unknown';
+      if (!catMap[name]) catMap[name] = { name, income: 0, expense: 0, receipt: 0, payment: 0 };
       
-      const tType = tx.transaction_type || 'Unknown';
-      const tSubtype = tx.transaction_subtype || 'Unknown';
-      const tCategory = tx.transaction_category || 'Unknown';
-      const tEntity = tx.entity || 'Unknown';
-      const tMonth = tx.month || 'Unknown';
-      const tYear = tx.year || 'Unknown';
-      const tNature = tx.transaction_nature || 'accrual';
-      const tFlow = tx.transaction_flow || 'outflow';
-      const tTimeLabel = `${tYear} ${tMonth}`;
-
-      // Core Accounting Matrix
-      if (tNature === 'accrual' && tFlow === 'inflow') engine.total_income += amount;
-      if (tNature === 'accrual' && tFlow === 'outflow') engine.total_expenses += amount;
-      if (tNature === 'cash' && tFlow === 'inflow') engine.total_receipts += amount;
-      if (tNature === 'cash' && tFlow === 'outflow') engine.total_payments += amount;
-
-      // Aggregate Category Volumes
-      if (!engine.categoryVolumes[tCategory]) engine.categoryVolumes[tCategory] = { income: 0, expense: 0, receipt: 0, payment: 0 };
-      if (tNature === 'accrual' && tFlow === 'inflow') engine.categoryVolumes[tCategory].income += amount;
-      if (tNature === 'accrual' && tFlow === 'outflow') engine.categoryVolumes[tCategory].expense += amount;
-      if (tNature === 'cash' && tFlow === 'inflow') engine.categoryVolumes[tCategory].receipt += amount;
-      if (tNature === 'cash' && tFlow === 'outflow') engine.categoryVolumes[tCategory].payment += amount;
-
-      // Aggregate Entity Volumes
-      if (!engine.entityVolumes[tEntity]) engine.entityVolumes[tEntity] = { income: 0, expense: 0, receipt: 0, payment: 0 };
-      if (tNature === 'accrual' && tFlow === 'inflow') engine.entityVolumes[tEntity].income += amount;
-      if (tNature === 'accrual' && tFlow === 'outflow') engine.entityVolumes[tEntity].expense += amount;
-      if (tNature === 'cash' && tFlow === 'inflow') engine.entityVolumes[tEntity].receipt += amount;
-      if (tNature === 'cash' && tFlow === 'outflow') engine.entityVolumes[tEntity].payment += amount;
-
-      // Aggregate Time Volumes
-      if (!engine.timeVolumes[tTimeLabel]) engine.timeVolumes[tTimeLabel] = { label: tTimeLabel, classIncome: 0, classExpense: 0, subReceipt: 0, subPayment: 0 };
-      if (tNature === 'accrual' && tFlow === 'inflow') engine.timeVolumes[tTimeLabel].classIncome += amount;
-      if (tNature === 'accrual' && tFlow === 'outflow') engine.timeVolumes[tTimeLabel].classExpense += amount;
-      if (tNature === 'cash' && tFlow === 'inflow') engine.timeVolumes[tTimeLabel].subReceipt += amount;
-      if (tNature === 'cash' && tFlow === 'outflow') engine.timeVolumes[tTimeLabel].subPayment += amount;
+      if (row.transaction_nature === 'accrual') {
+        catMap[name].income += Number(row.total_inflow) || 0;
+        catMap[name].expense += Number(row.total_outflow) || 0;
+      } else if (row.transaction_nature === 'cash') {
+        catMap[name].receipt += Number(row.total_inflow) || 0;
+        catMap[name].payment += Number(row.total_outflow) || 0;
+      }
     });
-
-    const net_cash_balance = engine.total_receipts - engine.total_payments;
-    const savings_efficiency = engine.total_receipts > 0 ? (net_cash_balance / engine.total_receipts) * 100 : 0;
-
-    const categoryData = Object.entries(engine.categoryVolumes).map(([name, vals]) => ({ 
-      name, 
-      ...vals, 
+    
+    const categoryData = Object.values(catMap).map(vals => ({
+      ...vals,
       totalClass: vals.income + vals.expense,
       totalSubclass: vals.receipt + vals.payment
     }));
 
-    const entityData = Object.entries(engine.entityVolumes).map(([name, vals]) => ({ 
-      name, 
-      ...vals, 
+    // 3. Pivot Entity Arrays
+    const entMap = {};
+    topEntities.forEach(row => {
+      const name = row.entity || 'Unknown';
+      if (!entMap[name]) entMap[name] = { name, income: 0, expense: 0, receipt: 0, payment: 0 };
+      
+      if (row.transaction_nature === 'accrual') {
+        entMap[name].income = Number(row.total_volume) || 0;
+      } else if (row.transaction_nature === 'cash') {
+        entMap[name].receipt = Number(row.total_volume) || 0;
+      }
+    });
+    
+    const entityData = Object.values(entMap).map(vals => ({
+      ...vals,
       totalClass: vals.income + vals.expense,
       totalSubclass: vals.receipt + vals.payment
     })).sort((a, b) => b.totalClass - a.totalClass);
 
-    const timeData = Object.values(engine.timeVolumes);
+    // 4. Map Time Evolution Arrays
+    const timeData = timeEvolution.map(row => {
+      const d = new Date(row.dimension_date);
+      return {
+        label: `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`,
+        classIncome: Number(row.accrual_inflow) || 0,
+        classExpense: Number(row.accrual_outflow) || 0,
+        subReceipt: Number(row.cash_inflow) || 0,
+        subPayment: Number(row.cash_outflow) || 0,
+        debtAccrual: Number(row.debt_accrual) || 0,
+        debtPayment: Number(row.debt_payment) || 0
+      };
+    });
 
     return {
-      total_income: engine.total_income,
-      total_expenses: engine.total_expenses,
-      total_receipts: engine.total_receipts,
-      total_payments: engine.total_payments,
+      total_income,
+      total_expenses,
+      total_receipts,
+      total_payments,
       net_cash_balance,
+      total_debt,
       savings_efficiency,
       categoryData,
       entityData,
       timeData
     };
-  }, [transactions]);
+  }, [kpiSummary, flowByCategory, timeEvolution, topEntities]);
 }

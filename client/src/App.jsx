@@ -12,6 +12,9 @@ import { useTranslation } from 'react-i18next';
 import FlowByCategoryChart from './components/charts/FlowByCategoryChart';
 import TimeEvolutionChart from './components/charts/TimeEvolutionChart';
 import TopEntitiesChart from './components/charts/TopEntitiesChart';
+import ExpensesDonutChart from './components/charts/ExpensesDonutChart';
+import ExpensesDetailedChart from './components/charts/ExpensesDetailedChart';
+import DebtEvolutionChart from './components/charts/DebtEvolutionChart';
 import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
@@ -39,6 +42,7 @@ function App() {
 
   // Unified Sidebar Filter state
   const [selectedYears, setSelectedYears] = useState([]);
+  const [hasInitializedYears, setHasInitializedYears] = useState(false);
   const [selectedQuarters, setSelectedQuarters] = useState([]);
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar toggle
@@ -95,17 +99,18 @@ function App() {
   
   // Actions
   const fetchKingdomData = useKingdomStore((state) => state.fetchKingdomData);
-  const fetchDashboardTransactions = useKingdomStore((state) => state.fetchDashboardTransactions);
+  const fetchDashboardData = useKingdomStore((state) => state.fetchDashboardData);
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
 
-  // Default to last 2 years on load
+  // Default to last 1 year on load
   useEffect(() => {
-    if (transactions.length > 0 && selectedYears.length === 0) {
+    if (transactions.length > 0 && !hasInitializedYears) {
       const allYears = Array.from(new Set(transactions.map((tx) => tx.year).filter(Boolean))).sort((a, b) => b - a);
-      setSelectedYears(allYears.slice(0, 2).map(String));
+      setSelectedYears(allYears.slice(0, 1).map(String));
+      setHasInitializedYears(true);
     }
-  }, [transactions, selectedYears]);
+  }, [transactions, hasInitializedYears]);
 
   const profile = { email, gold, level, xp };
 
@@ -176,20 +181,37 @@ function App() {
     return false;
   }).sort((a, b) => new Date(a.date || a.created_at) - new Date(b.date || b.created_at));
 
-  const engineData = useDashboardEngine(dashboardFilteredTransactions);
+  const engineData = useDashboardEngine();
 
 
   // Calculate Dashboard Stats (dependent on filters)
+  const dashInflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const dashOutflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   
-  const dashInflow = engineData.total_income;
-  const dashOutflow = engineData.total_expenses;
-  const dashNetBalance = engineData.net_cash_balance;
-  const dashEfficiencyRatio = engineData.savings_efficiency;
+  const subclassInflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'cash' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const subclassOutflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   
-  const subclassInflow = engineData.total_receipts;
-  const subclassOutflow = engineData.total_payments;
-  const subclassNet = engineData.total_receipts - engineData.total_payments;
+  const dashNetBalance = subclassInflow - subclassOutflow;
+  
+  const debtAccrual = dashboardFilteredTransactions.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const debtPayment = dashboardFilteredTransactions.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const dashDebt = debtAccrual - debtPayment;
+
+  const dashEfficiencyRatio = dashInflow > 0 ? ((dashInflow - dashOutflow) / dashInflow) * 100 : 0;
+  
+  const subclassNet = subclassInflow - subclassOutflow;
   const subclassEfficiencyRatio = subclassInflow > 0 ? (subclassNet / subclassInflow) * 100 : 0;
+
+  const formatNumberCompact = (num) => {
+    if (!num) return '0';
+    const absNum = Math.abs(num);
+    if (absNum >= 1.0e12) return (num / 1.0e12).toFixed(1) + "T";
+    if (absNum >= 1.0e9) return (num / 1.0e9).toFixed(1) + "B";
+    if (absNum >= 1.0e6) return (num / 1.0e6).toFixed(1) + "M";
+    if (absNum >= 1.0e3) return (num / 1.0e3).toFixed(1) + "K";
+    return num.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  };
+
 const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.transaction_category).filter(Boolean)));
   
   const timePoints = [...dashboardFilteredTransactions].reverse().reduce((acc, tx) => {
@@ -224,9 +246,12 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     const [yearStr, monthStr] = label.split(' ');
     const matchedTxs = dashboardFilteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
 
-    const income = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    return { label, income, expense, total: income + expense };
+    const classIncome = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const classExpense = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const subReceipt = matchedTxs.filter((tx) => (tx.transaction_nature === 'cash' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const subPayment = matchedTxs.filter((tx) => (tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    
+    return { label, classIncome, classExpense, subReceipt, subPayment, total: classIncome + classExpense + subReceipt + subPayment };
   }).filter((t) => t.total > 0);
 
   const maxDashTimeVal = Math.max(...dashTimeData.map(t => Math.max(t.income, t.expense)), 1);
@@ -291,9 +316,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   // Fetch heavy transaction array only when visiting the dashboard
   useEffect(() => {
     if (activeTab === 'dashboard' && transactions.length === 0) {
-      fetchDashboardTransactions(GUEST_PROFILE_ID);
+      fetchDashboardData(GUEST_PROFILE_ID);
     }
-  }, [activeTab, fetchDashboardTransactions, transactions.length]);
+  }, [activeTab, fetchDashboardData, transactions.length]);
 
   // Global key listener to return to previous screen on Escape
   useEffect(() => {
@@ -1383,73 +1408,52 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 
                 {/* SUBTAB: OVERVIEW */}
                 {dashSubTab === 'overview' && (
-                  <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className="space-y-3 animate-in fade-in duration-200">
                     {/* 1. KPIs */}
                     
-                    <div className="space-y-4">
-                      {/* Class Summary Row */}
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                    <div className="space-y-1">
+                      {/* 5-Card Summary Row */}
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-1.5">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total income</span>
-                          <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">+{dashInflow.toLocaleString()}g</span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📈</div>
+                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-emerald-700 mt-0.5 font-mono truncate w-full">+{formatNumberCompact(dashInflow)}g</span>
+                          <div className="absolute right-1 bottom-1 text-lg opacity-15">📈</div>
                         </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total expenses</span>
-                          <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">-{dashOutflow.toLocaleString()}g</span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📉</div>
+                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-rose-700 mt-0.5 font-mono truncate w-full">-{formatNumberCompact(dashOutflow)}g</span>
+                          <div className="absolute right-1 bottom-1 text-lg opacity-15">📉</div>
                         </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Net cash balance</span>
-                          <span className={`title-font text-xl font-black mt-1 font-mono ${dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
-                            {dashNetBalance >= 0 ? '+' : ''}{dashNetBalance.toLocaleString()}g
+                          <span className={`title-font text-sm sm:text-base lg:text-lg font-black mt-0.5 font-mono truncate w-full ${dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
+                            {dashNetBalance >= 0 ? '+' : ''}{formatNumberCompact(dashNetBalance)}g
                           </span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">💰</div>
+                          <div className="absolute right-1 bottom-1 text-lg opacity-15">💰</div>
                         </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
+                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Current Debt</span>
+                          <span className={`title-font text-sm sm:text-base lg:text-lg font-black mt-0.5 font-mono text-rose-700 truncate w-full`}>
+                            {formatNumberCompact(dashDebt)}g
+                          </span>
+                          <div className="absolute right-1 bottom-1 text-lg opacity-15">🏦</div>
+                        </div>
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Savings efficiency</span>
-                          <span className={`title-font text-xl font-black mt-1 font-mono ${dashEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          <span className={`title-font text-sm md:text-base lg:text-lg font-black mt-0.5 font-mono truncate w-full ${dashEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                             {dashEfficiencyRatio.toFixed(1)}%
                           </span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">🛡️</div>
-                        </div>
-                      </div>
-
-                      {/* Subclass Summary Row */}
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Receipts</span>
-                          <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">+{subclassInflow.toLocaleString()}g</span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📥</div>
-                        </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Payments</span>
-                          <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">-{subclassOutflow.toLocaleString()}g</span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">📤</div>
-                        </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Net Balance</span>
-                          <span className={`title-font text-xl font-black mt-1 font-mono ${subclassNet >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
-                            {subclassNet >= 0 ? '+' : ''}{subclassNet.toLocaleString()}g
-                          </span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">💎</div>
-                        </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Subclass Efficiency</span>
-                          <span className={`title-font text-xl font-black mt-1 font-mono ${subclassEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {subclassEfficiencyRatio.toFixed(1)}%
-                          </span>
-                          <div className="absolute right-3 bottom-3 text-2xl opacity-15">✨</div>
+                          <div className="absolute right-1 bottom-1 text-lg opacity-15">🛡️</div>
                         </div>
                       </div>
                     </div>
                     {/* Advice Banner */}
-                    <div className="bg-[#f4e4bc] border-2 border-double border-[#8b4513]/40 rounded-xl p-4 shadow-inner relative">
-                      <div className="relative flex gap-3 items-center">
-                        <div className="text-3xl">🧙‍♂️</div>
-                        <div className="space-y-0.5">
-                          <h5 className="text-[9px] font-black uppercase text-[#8b4513]/85 tracking-widest font-sans">{t.treasurer_advice_banner}</h5>
-                          <p className="text-xs italic text-[#4b2c20] font-serif leading-relaxed">
+                    <div className="bg-[#f4e4bc] border-2 border-double border-[#8b4513]/40 rounded p-1 sm:p-1.5 shadow-inner relative mb-2">
+                      <div className="relative flex gap-2 items-center">
+                        <div className="text-xl sm:text-2xl leading-none">🧙‍♂️</div>
+                        <div>
+                          <h5 className="text-[8px] font-black uppercase text-[#8b4513]/85 tracking-widest font-sans leading-none mb-0.5">{t('treasurer_advice_banner', "Royal Treasurer's Counsel")}</h5>
+                          <p className="text-[9px] sm:text-[10px] italic text-[#4b2c20] font-serif leading-tight m-0">
                             {dashTreasurerAdvice}
                           </p>
                         </div>
@@ -1458,22 +1462,24 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
                     {/* 2. Charts Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Category Breakdown (Diverging Bar Chart) */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[340px] relative select-none">
-                        <FlowByCategoryChart dashCategoryData={engineData.categoryData} t={t} />
+                      {/* Row 1 Left: Financial Position (formerly Time Evolution) */}
+                      <div className="h-[280px]">
+                        <TimeEvolutionChart timePoints={dashTimeData} t={t} />
                       </div>
 
-                      {/* Spline Time Evolution */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
-                        <TimeEvolutionChart timePoints={engineData.timeData} t={t} />
+                      {/* Row 1 Right: Expenses Donut */}
+                      <div className="h-[280px]">
+                        <ExpensesDonutChart dashCategoryData={dashCategoryData} t={t} />
                       </div>
 
-                      {/* Top Entities Donut */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[240px]">
-                        {(() => {
-                           const percentUsed = dashInflow > 0 ? ((entityVolumes.reduce((s, e) => s + e.outflow, 0) / dashInflow) * 100) : 0;
-                           return <TopEntitiesChart entityVolumes={entityVolumes} percentUsed={percentUsed} t={t} />;
-                        })()}
+                      {/* Row 2 Left: Expenses Detailed */}
+                      <div className="h-[280px]">
+                        <ExpensesDetailedChart transactions={dashboardFilteredTransactions} t={t} />
+                      </div>
+
+                      {/* Row 2 Right: Debt Evolution */}
+                      <div className="h-[280px]">
+                        <DebtEvolutionChart timePoints={engineData.timeData} t={t} />
                       </div>
                     </div>
                   </div>

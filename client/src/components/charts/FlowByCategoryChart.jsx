@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 
 export default function FlowByCategoryChart({ dashCategoryData, t }) {
   const [chartScaleMode, setChartScaleMode] = useState('absolute');
-  const [viewMode, setViewMode] = useState('class');
+
   const [chartTooltip, setChartTooltip] = useState(null);
 
   const handleChartMouseMove = (e, c, type) => {
     const rect = e.currentTarget.closest('.diverging-chart-container').getBoundingClientRect();
     const x = e.clientX - rect.left + 15;
     const y = e.clientY - rect.top + 15;
-    const amount = viewMode === 'class' ? (type === 'income' ? c.income : c.expense) : (type === 'income' ? c.receipt : c.payment);
-    const total = dashCategoryData.reduce((acc, curr) => acc + (viewMode === 'class' ? curr.totalClass : curr.totalSubclass), 0);
+    const amount = type === 'income' ? c.income : c.expense;
+    const total = dashCategoryData.reduce((acc, curr) => acc + curr.totalClass, 0);
     const percentage = total > 0 ? (amount / total) * 100 : 0;
     
     setChartTooltip({
@@ -42,7 +42,7 @@ export default function FlowByCategoryChart({ dashCategoryData, t }) {
     const plotHeight = 190;
     const baselineY = paddingTop + plotHeight / 2;
 
-    let maxVal = Math.max(...dashCategoryData.map(c => viewMode === 'class' ? Math.max(c.income, c.expense) : Math.max(c.receipt, c.payment)), 1);
+    let maxVal = Math.max(...dashCategoryData.map(c => Math.max(c.income, c.expense)), 1);
     
     // Scale Logic if percentage mode was supported properly (for now, default behavior)
     if (chartScaleMode === 'percentage') {

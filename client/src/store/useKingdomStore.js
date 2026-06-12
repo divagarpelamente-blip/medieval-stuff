@@ -35,6 +35,10 @@ export const useKingdomStore = create((set, get) => ({
   level: 1,
   email: 'lord.eldoria@kingdom.gov',
   transactions: [],
+  kpiSummary: null,
+  flowByCategory: [],
+  timeEvolution: [],
+  topEntities: [],
   isLoading: false,
   language: loadLocal('language', 'en'),
 
@@ -143,24 +147,36 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Isolated multi-row syncing mechanism for the Dashboard Engine
-  fetchDashboardTransactions: async (profileId) => {
+  // Native zero-calculation syncing mechanism for the Dashboard Engine
+  fetchDashboardData: async (profileId) => {
     set({ isLoading: true });
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('profile_id', profileId)
-        .order('created_at', { ascending: false });
+      const [
+        transactionsRes,
+        kpiRes,
+        flowRes,
+        timeRes,
+        topRes
+      ] = await Promise.all([
+        supabase.from('transactions').select('*').eq('profile_id', profileId).order('created_at', { ascending: false }).limit(100),
+        supabase.from('view_dashboard_kpi_summary').select('*').eq('profile_id', profileId).maybeSingle(),
+        supabase.from('view_chart_flow_by_category').select('*').eq('profile_id', profileId),
+        supabase.from('view_chart_time_evolution').select('*').eq('profile_id', profileId).order('dimension_date', { ascending: true }),
+        supabase.from('view_chart_top_entities').select('*').eq('profile_id', profileId).order('total_volume', { ascending: false })
+      ]);
 
-      if (error) {
-        console.error('Error fetching transactions:', error);
-      }
-      if (data) {
-        set({ transactions: data });
-      }
+      if (transactionsRes.error) console.error('Error fetching transactions:', transactionsRes.error);
+      if (kpiRes.error) console.error('Error fetching KPI view:', kpiRes.error);
+
+      set({ 
+        transactions: transactionsRes.data || [],
+        kpiSummary: kpiRes.data || null,
+        flowByCategory: flowRes.data || [],
+        timeEvolution: timeRes.data || [],
+        topEntities: topRes.data || []
+      });
     } catch (err) {
-      console.error('Failed to fetch dashboard transactions:', err);
+      console.error('Failed to fetch dashboard data:', err);
     } finally {
       set({ isLoading: false });
     }
@@ -213,6 +229,8 @@ export const useKingdomStore = create((set, get) => ({
           xp: profileRes.data.xp || get().xp,
         });
       }
+
+      get().fetchDashboardData(profileId);
 
       return { success: true, data };
     } catch (err) {
@@ -270,6 +288,8 @@ export const useKingdomStore = create((set, get) => ({
           xp: profileRes.data.xp || get().xp,
         });
       }
+
+      get().fetchDashboardData(profileId);
 
       return { success: true, data };
     } catch (err) {
