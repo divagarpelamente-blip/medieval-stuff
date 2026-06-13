@@ -21,8 +21,8 @@ The dashboard interface uses a multi-layered viewport-locking layout (`100dvh` o
 *   **Tab Selector Bar**: A horizontal pill navigation container styled with `.bg-[#faf4e5]/40 border-b border-[#8b4513]/25`.
 *   **Selector Buttons**: Rounded pill selectors (`rounded-lg border font-black text-[9px] uppercase tracking-wider`). Selected tabs use the primary dark-brown theme `bg-[#8b4513] text-[#ffd700]`, while inactive ones use the parchment-overlay `bg-[#faf4e5]/80 text-[#5d4037]/80 hover:bg-[#8b4513]/10`.
 
-### C. The Top fixed 5-Card Summary KPI Row
-*   **Layout Grid**: A fixed horizontal grid (`grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-1.5 bg-[#f4e4bc] border-b border-[#8b4513]/10 pb-2 z-20`) located at the top of the main container.
+### C. The Top Fixed KPI Summary Row
+*   **Layout Grid**: A dynamic horizontal grid (`grid grid-cols-1 sm:grid-cols-${kpis.length} gap-1 sm:gap-1.5 bg-[#f4e4bc] border-b border-[#8b4513]/10 pb-2 z-20`) located at the top of the main container, adjusting column width based on the active tab's card count.
 *   **KPI Card Design**: Each card uses a rounded parchment overlay (`bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center text-center shadow-sm relative overflow-hidden`).
 *   **Icons**: Subtly rendered bottom-right absolute indicator emojis (`absolute right-1 bottom-1 text-lg opacity-15`).
 *   **Values**: Must utilize compact currency formatting (`+23.2K / g` or `(4.5K) / g`) to prevent layout breaks.

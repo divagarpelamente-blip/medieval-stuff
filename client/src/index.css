@@ -10,6 +10,8 @@
   --wood: #5d4037;
   --stone: #455a64;
   --red-badge: #ff4444;
+  --tudor-brown: #4b2c20;
+  --tudor-cream: #faf4e5;
 
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -148,7 +150,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .resource-pill {
   display: flex;
-  items: center;
+  align-items: center;
   gap: 0.5rem;
   background: rgba(255, 255, 255, 0.95);
   border: 2px solid var(--tudor-brown);
@@ -163,11 +165,13 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--tudor-brown);
 }
 .resource-pill.gold {
-  border-color: #fdd835;
+  border-color: #d4af37;
+  background: #faf4e5;
 }
 
 .resource-pill.diamond {
-  border-color: #00e5ff;
+  border-color: #00bcd4;
+  background: #e0f7fa;
 }
 
 @keyframes fire {

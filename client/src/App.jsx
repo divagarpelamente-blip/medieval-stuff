@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef } from 'react';
 import { useDashboardEngine } from './lib/useDashboardEngine';
+import { supabase } from './lib/supabaseClient';
 import HUD from './components/HUD';
 import BottomNav from './components/BottomNav';
 import IsometricMap from './components/IsometricMap';
@@ -15,7 +16,16 @@ import TopEntitiesChart from './components/charts/TopEntitiesChart';
 import ExpensesDonutChart from './components/charts/ExpensesDonutChart';
 import ExpensesDetailedChart from './components/charts/ExpensesDetailedChart';
 import DebtEvolutionChart from './components/charts/DebtEvolutionChart';
+import LiabilitiesEvolutionChart from './components/charts/LiabilitiesEvolutionChart';
+import DebtByEntityChart from './components/charts/DebtByEntityChart';
+import DebtCompositionChart from './components/charts/DebtCompositionChart';
 import RoyalTreasurerInsights from './components/RoyalTreasurerInsights';
+import BaseDashboardTab from './components/BaseDashboardTab';
+import PayablesReceivablesSplineChart from './components/charts/PayablesReceivablesSplineChart';
+import OpenPayablesByCategoryChart from './components/charts/OpenPayablesByCategoryChart';
+import OpenPayablesByEntityChart from './components/charts/OpenPayablesByEntityChart';
+import OpenPayablesByMonthChart from './components/charts/OpenPayablesByMonthChart';
+import PaymentMethodsChart from './components/charts/PaymentMethodsChart';
 import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
@@ -25,6 +35,11 @@ function App() {
   const [isMineModalOpen, setIsMineModalOpen] = useState(false);
   const [isNewTxModalOpen, setIsNewTxModalOpen] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Selection & inline editing state for Ledger Transactions
+  const [selectedTxIds, setSelectedTxIds] = useState([]);
+  const [editingTxs, setEditingTxs] = useState({});
+  const [isEditing, setIsEditing] = useState(false);
 
   // Transactions Page Filters state
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
@@ -195,7 +210,7 @@ function App() {
     return false;
   }).sort((a, b) => new Date(a.date || a.created_at) - new Date(b.date || b.created_at));
 
-  const engineData = useDashboardEngine();
+  const engineData = useDashboardEngine(dashboardFilteredTransactions);
 
 
   // Calculate Dashboard Stats (dependent on filters)
@@ -325,17 +340,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const overdueRate = totalPendingExpensesCount > 0 ? (totalOverdueExpensesCount / totalPendingExpensesCount) * 100 : 0;
 
 
-  // Fetch initial profile state on mount
+  // Fetch initial profile state and dashboard/transactions data on mount
   useEffect(() => {
     fetchKingdomData(GUEST_PROFILE_ID);
-  }, [fetchKingdomData]);
-
-  // Fetch heavy transaction array only when visiting the dashboard
-  useEffect(() => {
-    if (activeTab === 'dashboard' && transactions.length === 0) {
-      fetchDashboardData(GUEST_PROFILE_ID);
-    }
-  }, [activeTab, fetchDashboardData, transactions.length]);
+    fetchDashboardData(GUEST_PROFILE_ID);
+  }, [fetchKingdomData, fetchDashboardData]);
 
   // Global key listener to return to previous screen on Escape
   useEffect(() => {
@@ -579,6 +588,125 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
   const exportCSV = () => handleExportCSV(transactions, t);
   const importCSV = (e) => handleImportCSV(e, { t, fromOptions, registerTransactions, GUEST_PROFILE_ID });
+
+  const handleToggleSelectAll = () => {
+    if (selectedTxIds.length === transactions.length) {
+      setSelectedTxIds([]);
+      if (isEditing) {
+        setIsEditing(false);
+        setEditingTxs({});
+      }
+    } else {
+      setSelectedTxIds(transactions.map((tx) => tx.id));
+    }
+  };
+
+  const handleToggleSelect = (txId) => {
+    setSelectedTxIds((prev) => {
+      const isSelected = prev.includes(txId);
+      const nextSelected = isSelected
+        ? prev.filter((id) => id !== txId)
+        : [...prev, txId];
+      
+      if (isEditing) {
+        setEditingTxs((prevEdit) => {
+          const nextEdit = { ...prevEdit };
+          if (isSelected) {
+            delete nextEdit[txId];
+          } else {
+            const tx = transactions.find((t) => t.id === txId);
+            if (tx) {
+              nextEdit[txId] = { ...tx };
+            }
+          }
+          return nextEdit;
+        });
+      }
+      return nextSelected;
+    });
+  };
+
+  const handleStartEditing = () => {
+    if (selectedTxIds.length === 0) return;
+    const initial = {};
+    selectedTxIds.forEach((id) => {
+      const tx = transactions.find((t) => t.id === id);
+      if (tx) {
+        initial[id] = { ...tx };
+      }
+    });
+    setEditingTxs(initial);
+    setIsEditing(true);
+  };
+
+  const handleCancelEditing = () => {
+    setIsEditing(false);
+    setSelectedTxIds([]);
+    setEditingTxs({});
+  };
+
+  const handleFieldChange = (txId, field, value) => {
+    setEditingTxs(prev => {
+      const updatedTx = { ...prev[txId], [field]: value };
+      if (field === 'entity' && entityMappings[value]) {
+        updatedTx.transaction_category = entityMappings[value];
+      }
+      return {
+        ...prev,
+        [txId]: updatedTx
+      };
+    });
+  };
+
+  const handleSaveEdits = async () => {
+    const toastId = toast.loading(t('saving_ledger') || 'Saving ledger changes...');
+    try {
+      const upsertRows = Object.values(editingTxs).map(tx => {
+        const txDate = tx.date || new Date().toISOString().split('T')[0];
+        const dateObj = new Date(txDate);
+        const year = dateObj.getFullYear();
+        const month = tx.month || dateObj.toLocaleString('default', { month: 'long' });
+        const quarter = 'Q' + (Math.floor(dateObj.getMonth() / 3) + 1);
+
+        return {
+          id: tx.id,
+          profile_id: tx.profile_id,
+          from: tx.from,
+          payment_status: tx.payment_status,
+          transaction_type: tx.transaction_type,
+          transaction_nature: tx.transaction_nature,
+          transaction_flow: tx.transaction_flow,
+          transaction_subtype: tx.transaction_subtype,
+          entity: tx.entity,
+          amount: Number(tx.amount),
+          description: tx.description,
+          transaction_category: entityMappings[tx.entity] || tx.transaction_category || 'Other Banking',
+          date: txDate,
+          month,
+          year,
+          quarter
+        };
+      });
+
+      const { error } = await supabase
+        .from('transactions')
+        .upsert(upsertRows);
+
+      if (error) throw error;
+
+      toast.success(t('success_saved_changes') || 'Changes saved successfully!', { id: toastId });
+      setIsEditing(false);
+      setSelectedTxIds([]);
+      setEditingTxs({});
+
+      // Sync both store state and profile stats
+      await fetchKingdomData(GUEST_PROFILE_ID);
+      await fetchDashboardData(GUEST_PROFILE_ID);
+    } catch (err) {
+      console.error('Error saving edits:', err);
+      toast.error(`${t('err_save_failed') || 'Save failed'}: ${err.message || err}`, { id: toastId });
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -970,6 +1098,46 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </span>
               </h4>
 
+              {/* Action Bar for Batch Editing */}
+              {selectedTxIds.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 shadow-md animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center gap-2 pl-2">
+                    <span className="w-1.5 h-1.5 bg-[#8b4513] rounded-full animate-pulse" />
+                    <span className="text-[9px] font-black uppercase text-[#4b2c20] tracking-wider">
+                      {selectedTxIds.length} {selectedTxIds.length === 1 ? (t('item_selected') || 'item selected') : (t('items_selected') || 'items selected')}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 pr-2 py-1">
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleSaveEdits}
+                          className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          💾 {t('save') || 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditing}
+                          className="px-3 py-1.5 bg-[#8b0000] hover:bg-[#8b0000]/90 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          ❌ {t('cancel') || 'Cancel'}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleStartEditing}
+                        className="px-3 py-1.5 bg-[#8b4513] hover:bg-[#8b4513]/90 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        ✏️ {t('edit') || 'Edit'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Responsive Table with horizontal scroll */}
               <div className="max-h-64 overflow-y-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar">
                 {transactions && transactions.length > 0 ? (
@@ -978,6 +1146,21 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     <table className="hidden md:table w-full text-left border-collapse text-[10px] font-sans">
                       <thead>
                         <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                          <th className="py-2.5 px-3 w-8 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={handleToggleSelectAll}
+                              className={`w-3.5 h-3.5 rounded border flex items-center justify-center cursor-pointer mx-auto transition-all focus:outline-none ${
+                                selectedTxIds.length === transactions.length && transactions.length > 0
+                                  ? 'bg-[#8b4513] border-[#8b4513]'
+                                  : 'bg-[#faf4e5]/80 border-[#8b4513]/40 hover:bg-[#8b4513]/10'
+                              }`}
+                            >
+                              {selectedTxIds.length === transactions.length && transactions.length > 0 && (
+                                <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />
+                              )}
+                            </button>
+                          </th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
@@ -988,77 +1171,314 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                        {transactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
-                            <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
-                                tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                                tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
-                                'bg-stone-100 text-stone-800 border border-stone-200'
-                              }`}>
-                                {tx.payment_status || 'Completed'}
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
-                                  : 'bg-rose-100 text-rose-800 border border-rose-250'
-                              }`}>
-                                {tx.transaction_type}
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
-                            <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                              (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
-                            }`}>
-                              {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
-                          </tr>
-                        ))}
+                        {transactions.map((tx) => {
+                          const isSelected = selectedTxIds.includes(tx.id);
+                          const isRowEditing = isEditing && isSelected;
+                          return (
+                            <tr 
+                              key={tx.id} 
+                              className={`hover:bg-[#8b4513]/5 transition-all ${
+                                isEditing && !isSelected ? 'opacity-50' : ''
+                              }`}
+                            >
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSelect(tx.id)}
+                                  className={`w-3.5 h-3.5 rounded border flex items-center justify-center cursor-pointer mx-auto transition-all focus:outline-none ${
+                                    isSelected
+                                      ? 'bg-[#8b4513] border-[#8b4513]'
+                                      : 'bg-[#faf4e5]/80 border-[#8b4513]/40 hover:bg-[#8b4513]/10'
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />
+                                  )}
+                                </button>
+                              </td>
+                              
+                              {isRowEditing ? (
+                                <>
+                                  {/* from */}
+                                  <td className="py-1 px-1 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.from || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'from', e.target.value)}
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none"
+                                    >
+                                      {fromOptions.map((opt) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  {/* status */}
+                                  <td className="py-1 px-1 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.payment_status || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'payment_status', e.target.value)}
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none"
+                                    >
+                                      {statusOptions.map((opt) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  {/* class */}
+                                  <td className="py-1 px-1 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_type || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'transaction_type', e.target.value)}
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none"
+                                    >
+                                      {classOptions.map((opt) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  {/* subclass */}
+                                  <td className="py-1 px-1 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_subtype || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'transaction_subtype', e.target.value)}
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none"
+                                    >
+                                      {subClassOptions.map((opt) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  {/* entity */}
+                                  <td className="py-1 px-1 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.entity || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'entity', e.target.value)}
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none font-sans"
+                                    >
+                                      {Object.entries(
+                                        entityOptions.reduce((acc, opt) => {
+                                          const cat = entityMappings[opt] || 'Uncategorized';
+                                          if (!acc[cat]) acc[cat] = [];
+                                          acc[cat].push(opt);
+                                          return acc;
+                                        }, {})
+                                      ).map(([cat, opts]) => (
+                                        <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
+                                          {opts.map((opt) => (
+                                            <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
+                                          ))}
+                                        </optgroup>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  {/* amount */}
+                                  <td className="py-1 px-1 whitespace-nowrap">
+                                    <input
+                                      type="number"
+                                      value={editingTxs[tx.id]?.amount || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'amount', e.target.value)}
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none font-mono text-right"
+                                    />
+                                  </td>
+                                  {/* description */}
+                                  <td className="py-1 px-1 whitespace-nowrap">
+                                    <input
+                                      type="text"
+                                      value={editingTxs[tx.id]?.description || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'description', e.target.value)}
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none"
+                                    />
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                      tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                      tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                      tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                      tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                      'bg-stone-100 text-stone-800 border border-stone-200'
+                                    }`}>
+                                      {tx.payment_status || 'Completed'}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                      (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
+                                        : 'bg-rose-100 text-rose-800 border border-rose-250'
+                                    }`}>
+                                      {tx.transaction_type}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
+                                  <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
+                                  <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
+                                    (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
+                                  }`}>
+                                    {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
 
                     {/* Mobile cards view */}
                     <div className="grid grid-cols-1 gap-2.5 p-3 md:hidden">
-                      {transactions.map((tx) => (
-                        <div 
-                          key={tx.id} 
-                          className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-xl p-3 shadow-sm flex flex-col gap-2 relative overflow-hidden"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                {tx.entity || tx.transaction_type}
-                              </span>
-                              <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                {tx.from} • {tx.transaction_subtype || '-'}
+                      {transactions.map((tx) => {
+                        const isSelected = selectedTxIds.includes(tx.id);
+                        const isCardEditing = isEditing && isSelected;
+                        return (
+                          <div 
+                            key={tx.id} 
+                            className={`bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-xl p-3 shadow-sm flex flex-col gap-2 relative overflow-hidden transition-all ${
+                              isEditing && !isSelected ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSelect(tx.id)}
+                                  className={`w-3.5 h-3.5 rounded border flex items-center justify-center cursor-pointer transition-all focus:outline-none ${
+                                    isSelected
+                                      ? 'bg-[#8b4513] border-[#8b4513]'
+                                      : 'bg-[#faf4e5]/80 border-[#8b4513]/40 hover:bg-[#8b4513]/10'
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />
+                                  )}
+                                </button>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
+                                  {tx.entity || tx.transaction_type}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
+                                </div>
+                                <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
+                                  tx.payment_status === 'Completed' 
+                                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                                    : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                }`}>
+                                  {tx.payment_status || 'Completed'}
+                                </span>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
+                            
+                            {isCardEditing ? (
+                              <div className="grid grid-cols-2 gap-2 mt-1 border-t border-[#8b4513]/10 pt-2">
+                                <div>
+                                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/80 mb-0.5">From</label>
+                                  <select
+                                    value={editingTxs[tx.id]?.from || ''}
+                                    onChange={(e) => handleFieldChange(tx.id, 'from', e.target.value)}
+                                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                  >
+                                    {fromOptions.map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/80 mb-0.5">Status</label>
+                                  <select
+                                    value={editingTxs[tx.id]?.payment_status || ''}
+                                    onChange={(e) => handleFieldChange(tx.id, 'payment_status', e.target.value)}
+                                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                  >
+                                    {statusOptions.map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/80 mb-0.5">Class</label>
+                                  <select
+                                    value={editingTxs[tx.id]?.transaction_type || ''}
+                                    onChange={(e) => handleFieldChange(tx.id, 'transaction_type', e.target.value)}
+                                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                  >
+                                    {classOptions.map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/80 mb-0.5">Subclass</label>
+                                  <select
+                                    value={editingTxs[tx.id]?.transaction_subtype || ''}
+                                    onChange={(e) => handleFieldChange(tx.id, 'transaction_subtype', e.target.value)}
+                                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                  >
+                                    {subClassOptions.map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/80 mb-0.5">Entity</label>
+                                  <select
+                                    value={editingTxs[tx.id]?.entity || ''}
+                                    onChange={(e) => handleFieldChange(tx.id, 'entity', e.target.value)}
+                                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none font-sans"
+                                  >
+                                    {Object.entries(
+                                      entityOptions.reduce((acc, opt) => {
+                                        const cat = entityMappings[opt] || 'Uncategorized';
+                                        if (!acc[cat]) acc[cat] = [];
+                                        acc[cat].push(opt);
+                                        return acc;
+                                      }, {})
+                                    ).map(([cat, opts]) => (
+                                      <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
+                                        {opts.map((opt) => (
+                                          <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
+                                        ))}
+                                      </optgroup>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/80 mb-0.5">Amount</label>
+                                  <input
+                                    type="number"
+                                    value={editingTxs[tx.id]?.amount || ''}
+                                    onChange={(e) => handleFieldChange(tx.id, 'amount', e.target.value)}
+                                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none font-mono"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/80 mb-0.5">Description</label>
+                                  <input
+                                    type="text"
+                                    value={editingTxs[tx.id]?.description || ''}
+                                    onChange={(e) => handleFieldChange(tx.id, 'description', e.target.value)}
+                                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                  />
+                                </div>
                               </div>
-                              <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
-                                tx.payment_status === 'Completed' 
-                                  ? 'bg-green-100 text-green-800 border border-green-200' 
-                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
-                              }`}>
-                                {tx.payment_status || 'Completed'}
-                              </span>
-                            </div>
+                            ) : (
+                              <>
+                                <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
+                                  {tx.from} • {tx.transaction_subtype || '-'}
+                                </div>
+                                <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
+                                  <span>📅 {tx.date} ({tx.month} {tx.year})</span>
+                                  <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.transaction_category || '-'}</span>
+                                </div>
+                              </>
+                            )}
                           </div>
-                          <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
-                            <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                            <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.transaction_category || '-'}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 ) : (
@@ -1286,212 +1706,77 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </h2>
               </div>
 
-              {/* Row 2: Navigation (Left) & Time Filters (Right) */}
-              <div className="px-4 py-2.5 border-b border-[#8b4513]/25 flex flex-col md:flex-row justify-between items-center gap-3 bg-[#faf4e5]/40 z-10">
-                {/* Left Buttons: Analysis Sub-tabs */}
-                <div className="flex flex-wrap gap-1.5 items-center justify-start md:justify-end w-full">
-                  {[
-                    { id: 'overview', label: t.subtab_overview, icon: '📊' },
-                    { id: 'income_expense', label: t.subtab_income_expense, icon: '💸' },
-                    { id: 'payables_receivables', label: t.subtab_payables_receivables, icon: '📜' },
-                    { id: 'liabilities', label: 'Liabilities', icon: '🏦' },
-                    { id: 'ratios', label: 'Ratios', icon: '⚖️' }
-                  ].map((tab) => {
-                    const isSel = dashSubTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setDashSubTab(tab.id)}
-                        className={`px-3 py-3 md:py-1.5 rounded-lg border font-black text-[9px] uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 min-h-[44px] md:min-h-0 ${
-                          isSel
-                            ? 'bg-[#8b4513] border-[#8b4513] text-[#ffd700] shadow-md'
-                            : 'bg-[#faf4e5]/80 border-[#8b4513]/20 text-[#5d4037]/80 hover:bg-[#8b4513]/10 hover:text-[#4b2c20]'
-                        }`}
-                      >
-                        <span>{tab.icon}</span>
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Right Buttons: Sidebar Toggle */}
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                    className="md:hidden px-3 py-3 rounded-lg border border-[#8b4513]/20 bg-[#faf4e5]/80 text-[#5d4037] font-black text-[9px] uppercase tracking-wider hover:bg-[#8b4513]/10"
-                  >
-                    {isSidebarOpen ? 'Close Filters' : 'Filters'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Layout Container: Sidebar + Main Content */}
-              <div className="flex flex-1 overflow-hidden relative z-10 text-[#2d1b0d]">
-                
-                {/* SIDEBAR FILTER PANEL */}
-                <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block w-full md:w-36 lg:w-40 px-2 flex-shrink-0 bg-[#faf4e5]/90 border-r border-[#8b4513]/25 overflow-y-auto custom-scrollbar-subtle flex flex-col`}>
-                  <div className="p-4 space-y-6">
-                    {/* Years */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4b2c20]">Years</h4>
-                        <div className="flex flex-wrap gap-1 text-[8px] font-bold text-[#8b4513] uppercase">
-                          <button onClick={() => setSelectedYears(uniqueYearsList.map(String))} className="hover:underline">All</button>
-                          <button onClick={() => setSelectedYears([])} className="hover:underline">None</button>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1 max-h-12 overflow-y-auto custom-scrollbar-subtle pr-1">
-                        {uniqueYearsList.map(y => {
-                          const yStr = String(y);
-                          const isSel = selectedYears.includes(yStr);
-                          return (
-                            <label key={yStr} onClick={() => setSelectedYears(prev => prev.includes(yStr) ? prev.filter(x => x !== yStr) : [...prev, yStr])} className="flex flex-wrap items-center gap-1 cursor-pointer group">
-                              <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${isSel ? 'bg-[#8b4513] border-[#8b4513]' : 'border-[#8b4513]/40 group-hover:border-[#8b4513]'}`}>
-                                {isSel && <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />}
-                              </div>
-                              <span className="text-[11px] font-bold text-[#5d4037] group-hover:text-[#4b2c20]">{yStr}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Quarters */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4b2c20]">Quarters</h4>
-                        <div className="flex gap-2 text-[8px] font-bold text-[#8b4513] uppercase">
-                          <button onClick={() => setSelectedQuarters(['Q1', 'Q2', 'Q3', 'Q4'])} className="hover:underline">All</button>
-                          <button onClick={() => setSelectedQuarters([])} className="hover:underline">None</button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {['Q1', 'Q2', 'Q3', 'Q4'].map(q => {
-                          const isSel = selectedQuarters.includes(q);
-                          return (
-                            <button
-                              key={q}
-                              onClick={() => setSelectedQuarters(prev => prev.includes(q) ? prev.filter(x => x !== q) : [...prev, q])}
-                              className={`py-1 rounded border text-[9px] font-bold transition-all ${isSel ? 'bg-[#8b4513] border-[#8b4513] text-[#ffd700]' : 'bg-transparent border-[#8b4513]/20 text-[#5d4037] hover:bg-[#8b4513]/10'}`}
-                            >
-                              {q}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Months */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4b2c20]">Months</h4>
-                        <div className="flex gap-2 text-[8px] font-bold text-[#8b4513] uppercase">
-                          <button onClick={() => setSelectedMonths(monthOptions)} className="hover:underline">All</button>
-                          <button onClick={() => setSelectedMonths([])} className="hover:underline">None</button>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto custom-scrollbar-subtle pr-1">
-                        {monthOptions.map(m => {
-                          const isSel = selectedMonths.includes(m);
-                          return (
-                            <label key={m} onClick={() => setSelectedMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])} className="flex items-center gap-2 cursor-pointer group">
-                              <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${isSel ? 'bg-[#8b4513] border-[#8b4513]' : 'border-[#8b4513]/40 group-hover:border-[#8b4513]'}`}>
-                                {isSel && <div className="w-1.5 h-1.5 bg-[#ffd700] rounded-sm" />}
-                              </div>
-                              <span className="text-[10px] font-bold text-[#5d4037] group-hover:text-[#4b2c20]">{m}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* MAIN DASHBOARD CONTENT */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  {isFallbackState ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
-                      <div className="text-6xl">📜</div>
-                      <div className="space-y-1">
-                        <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Select a Time Period</h3>
-                        <p className="text-xs font-serif italic text-[#5d4037]">Consult the archives by selecting at least one Year in the filter panel.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    (() => {
-                      const financialPositionInsight = dashNetBalance >= 0 
-                        ? t('advice_financial_position_positive', { inflow: formatNumberCompact(dashInflow) }) 
-                        : t('advice_financial_position_negative', { balance: formatNumberCompact(dashNetBalance) });
-
-                      const maxCategory = dashCategoryData.length > 0 ? dashCategoryData.reduce((prev, current) => (prev.amount > current.amount) ? prev : current) : null;
-                      const expensesReportInsight = maxCategory 
-                        ? t('advice_expenses_report', { category: maxCategory.name, amount: formatNumberCompact(-maxCategory.amount) }) 
-                        : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
-
-                      const expenseTransactions = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow');
-                      const entityTotals = expenseTransactions.reduce((acc, tx) => {
-                        acc[tx.entity_name] = (acc[tx.entity_name] || 0) + Number(tx.amount);
-                        return acc;
-                      }, {});
-                      const maxEntity = Object.keys(entityTotals).reduce((a, b) => entityTotals[a] > entityTotals[b] ? a : b, null);
-                      const expensesDetailedInsight = maxEntity 
-                        ? t('advice_expenses_detailed', { entity: maxEntity, amount: formatNumberCompact(-entityTotals[maxEntity]) }) 
-                        : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
-
-                      const debtEvolutionInsight = dashDebt > 0 
-                        ? t('advice_debt_positive', { debt: formatNumberCompact(-dashDebt) }) 
-                        : t('advice_debt_free', '"My Liege, the realm is free of debt! A golden age of financial independence is upon us."');
-
-                      return (
-                        <>
-                
+              <BaseDashboardTab
+                t={t}
+                dashSubTab={dashSubTab}
+                setDashSubTab={setDashSubTab}
+                subTabs={[
+                  { id: 'overview', label: t.subtab_overview, icon: '📊' },
+                  { id: 'income_expense', label: t.subtab_income_expense, icon: '💸' },
+                  { id: 'equity_savings', label: t.subtab_equity_savings, icon: '🛡️' },
+                  { id: 'payables_receivables', label: t.subtab_payables_receivables, icon: '📜' },
+                  { id: 'liabilities', label: t.subtab_liabilities, icon: '🏦' },
+                  { id: 'ratios', label: t.subtab_ratios, icon: '⚖️' }
+                ]}
+                isSidebarOpen={isSidebarOpen}
+                setIsSidebarOpen={setIsSidebarOpen}
+                selectedYears={selectedYears}
+                setSelectedYears={setSelectedYears}
+                uniqueYearsList={uniqueYearsList}
+                selectedQuarters={selectedQuarters}
+                setSelectedQuarters={setSelectedQuarters}
+                selectedMonths={selectedMonths}
+                setSelectedMonths={setSelectedMonths}
+                monthOptions={monthOptions}
+                isFallbackState={isFallbackState}
+                kpis={
+                  dashSubTab === 'income_expense' ? [
+                    { label: 'Total income', value: formatNumberCompact(dashInflow), icon: '📈', colorClass: 'text-emerald-700' },
+                    { label: 'Total expenses', value: formatNumberCompact(-dashOutflow), icon: '📉', colorClass: 'text-rose-700' },
+                    { label: 'Net cash balance', value: formatNumberCompact(dashNetBalance), icon: '💰', colorClass: dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700' }
+                  ] : dashSubTab === 'equity_savings' ? [
+                    { label: t.savings_rate_real || 'Real Savings Rate', value: `${dashEfficiencyRatio.toFixed(1)}%`, icon: '🛡️', colorClass: dashEfficiencyRatio >= 20 ? 'text-emerald-700' : dashEfficiencyRatio >= 0 ? 'text-[#b8860b]' : 'text-rose-700' }
+                  ] : dashSubTab === 'payables_receivables' ? [
+                    { label: t.kpi_all_payables || 'All Payables', value: formatNumberCompact(engineData.payablesReceivablesKpis?.all_payables), icon: '💸', colorClass: 'text-rose-700' },
+                    { label: t.kpi_open_payables || 'Open Payables', value: formatNumberCompact(engineData.payablesReceivablesKpis?.open_payables), icon: '⏳', colorClass: 'text-rose-800' },
+                    { label: t.kpi_all_receivables || 'All Receivables', value: formatNumberCompact(engineData.payablesReceivablesKpis?.all_receivables), icon: '📈', colorClass: 'text-emerald-700' },
+                    { label: t.kpi_open_receivables || 'Open Receivables', value: formatNumberCompact(engineData.payablesReceivablesKpis?.open_receivables), icon: '📜', colorClass: 'text-emerald-600' },
+                    { label: t.kpi_overdue_rate || 'Overdue Rate', value: `${engineData.payablesReceivablesKpis?.overdue_rate || 0.0}%`, icon: '⚠️', colorClass: (engineData.payablesReceivablesKpis?.overdue_rate || 0) > 20 ? 'text-rose-700' : 'text-[#b8860b]' }
+                  ] : dashSubTab === 'liabilities' ? [
+                    { label: t.kpi_total_debt || 'Total Debt', value: formatNumberCompact(engineData.liabilitiesKpis?.total_debt), icon: '🏦', colorClass: 'text-rose-700' },
+                    { label: t.kpi_to_be_paid || 'To Be Paid', value: formatNumberCompact(engineData.liabilitiesKpis?.to_be_paid), icon: '⏳', colorClass: 'text-amber-700' },
+                    { label: t.kpi_new_liabilities || 'New Liabilities', value: formatNumberCompact(engineData.liabilitiesKpis?.new_liabilities), icon: '📈', colorClass: 'text-[#b8860b]' },
+                    { label: t.kpi_amortizations || 'Amortizations', value: formatNumberCompact(engineData.liabilitiesKpis?.amortizations), icon: '🛡️', colorClass: 'text-emerald-700' }
+                  ] : []
+                }
+              >
                 {/* SUBTAB: OVERVIEW */}
                 {dashSubTab === 'overview' && (
-                  <div className="h-full flex flex-col animate-in fade-in duration-200">
-                    {/* 1. KPIs (Fixed at top) */}
-                    <div className="p-5 sm:p-6 pb-2 space-y-1 flex-shrink-0 z-20 bg-[#f4e4bc] border-b border-[#8b4513]/10">
-                      {/* 5-Card Summary Row */}
-                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-1.5">
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total income</span>
-                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-emerald-700 mt-0.5 font-mono truncate w-full">{formatNumberCompact(dashInflow)}</span>
-                          <div className="absolute right-1 bottom-1 text-lg opacity-15">📈</div>
-                        </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total expenses</span>
-                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-rose-700 mt-0.5 font-mono truncate w-full">{formatNumberCompact(-dashOutflow)}</span>
-                          <div className="absolute right-1 bottom-1 text-lg opacity-15">📉</div>
-                        </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Net cash balance</span>
-                          <span className={`title-font text-sm sm:text-base lg:text-lg font-black mt-0.5 font-mono truncate w-full ${dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
-                            {formatNumberCompact(dashNetBalance)}
-                          </span>
-                          <div className="absolute right-1 bottom-1 text-lg opacity-15">💰</div>
-                        </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Current Debt</span>
-                          <span className={`title-font text-sm sm:text-base lg:text-lg font-black mt-0.5 font-mono text-rose-700 truncate w-full`}>
-                            {formatNumberCompact(-dashDebt)}
-                          </span>
-                          <div className="absolute right-1 bottom-1 text-lg opacity-15">🏦</div>
-                        </div>
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
-                          <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Savings efficiency</span>
-                          <span className={`title-font text-sm md:text-base lg:text-lg font-black mt-0.5 font-mono truncate w-full ${dashEfficiencyRatio >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {dashEfficiencyRatio.toFixed(1)}%
-                          </span>
-                          <div className="absolute right-1 bottom-1 text-lg opacity-15">🛡️</div>
-                        </div>
-                      </div>
-                    </div>
+                  (() => {
+                    const financialPositionInsight = dashNetBalance >= 0 
+                      ? t('advice_financial_position_positive', { inflow: formatNumberCompact(dashInflow) }) 
+                      : t('advice_financial_position_negative', { balance: formatNumberCompact(dashNetBalance) });
 
-                    {/* Scrollable Zone */}
-                    <div className="flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-8 mt-4">
-                      {/* 2. Charts Grid Vertical Layout */}
+                    const maxCategory = dashCategoryData.length > 0 ? dashCategoryData.reduce((prev, current) => (prev.amount > current.amount) ? prev : current) : null;
+                    const expensesReportInsight = maxCategory 
+                      ? t('advice_expenses_report', { category: maxCategory.name, amount: formatNumberCompact(-maxCategory.amount) }) 
+                      : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
+
+                    const expenseTransactions = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow');
+                    const entityTotals = expenseTransactions.reduce((acc, tx) => {
+                      acc[tx.entity_name] = (acc[tx.entity_name] || 0) + Number(tx.amount);
+                      return acc;
+                    }, {});
+                    const maxEntity = Object.keys(entityTotals).reduce((a, b) => entityTotals[a] > entityTotals[b] ? a : b, null);
+                    const expensesDetailedInsight = maxEntity 
+                      ? t('advice_expenses_detailed', { entity: maxEntity, amount: formatNumberCompact(-entityTotals[maxEntity]) }) 
+                      : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
+
+                    const debtEvolutionInsight = dashDebt > 0 
+                      ? t('advice_debt_positive', { debt: formatNumberCompact(-dashDebt) }) 
+                      : t('advice_debt_free', '"My Liege, the realm is free of debt! A golden age of financial independence is upon us."');
+
+                    return (
                       <div className="flex flex-col gap-8">
                         {/* Row 1: Financial Position */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1533,33 +1818,13 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()
                 )}
 
                 {/* SUBTAB: INCOME & EXPENSES */}
                 {dashSubTab === 'income_expense' && (
-                  <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-6 animate-in fade-in duration-200 h-full">
-                    {/* KPI & Savings Rate Banner */}
-                    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 shadow-sm">
-                      <div className="flex flex-col justify-between">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.savings_rate_real}</span>
-                        <span className={`title-font text-2xl font-black mt-1 font-mono ${
-                          dashEfficiencyRatio >= 20 ? 'text-emerald-700' : dashEfficiencyRatio >= 0 ? 'text-[#b8860b]' : 'text-rose-700'
-                        }`}>
-                          {dashEfficiencyRatio.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="sm:col-span-2 text-xs italic text-[#5d4037] flex items-center border-l border-[#8b4513]/15 pl-4">
-                        {dashEfficiencyRatio >= 30 ? (
-                          <span>{t.advice_efficiency_good}</span>
-                        ) : dashEfficiencyRatio >= 0 ? (
-                          <span>{t.advice_efficiency_ok}</span>
-                        ) : (
-                          <span>{t.advice_efficiency_bad}</span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="space-y-6">
 
                     {/* Side-by-side evolution */}
                     <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
@@ -1646,119 +1911,169 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </div>
                 )}
 
-                {/* SUBTAB: PAYABLES & RECEIVABLES */}
-                {dashSubTab === 'payables_receivables' && (
-                  <div className="space-y-6 animate-in fade-in duration-200">
-                    {/* KPIs Row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.receivables}</span>
-                        <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">
-                          {formatNumberCompact(totalReceivables)}
-                        </span>
-                        <div className="absolute right-3 bottom-3 text-2xl opacity-15">📜</div>
-                      </div>
-
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.payables}</span>
-                        <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">
-                          {formatNumberCompact(-totalPayables)}
-                        </span>
-                        <div className="absolute right-3 bottom-3 text-2xl opacity-15">💸</div>
-                      </div>
-
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.overdue_rate}</span>
-                        <span className={`title-font text-xl font-black mt-1 font-mono ${
-                          overdueRate > 50 ? 'text-red-700' : overdueRate > 0 ? 'text-amber-600' : 'text-emerald-700'
-                        }`}>
-                          {overdueRate.toFixed(1)}%
-                        </span>
-                        <div className="absolute right-3 bottom-3 text-2xl opacity-15">⚠️</div>
-                      </div>
+                {/* SUBTAB: EQUITY & SAVINGS */}
+                {dashSubTab === 'equity_savings' && (
+                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
+                    <div className="text-6xl">🛡️</div>
+                    <div className="space-y-1">
+                      <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Equity & Savings Vault</h3>
+                      <p className="text-xs font-serif italic text-[#5d4037]">Under construction by order of the Royal Treasurer.</p>
                     </div>
-
-                    {/* Dual pending lists */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Receivables List */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[320px]">
-                        <h4 className="title-font text-[11px] font-black text-emerald-800 uppercase tracking-wider border-b border-emerald-600/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>{t.pending_revenues}</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{pendingIncomeList.length} {pendingIncomeList.length === 1 ? 'item' : 'items'}</span>
-                        </h4>
-                        <div className="overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                          {pendingIncomeList.length > 0 ? (
-                            <div className="space-y-2">
-                              {pendingIncomeList.map((tx) => (
-                                <div key={tx.id} className="bg-[#faf4e5]/70 border border-[#8b4513]/10 rounded-lg p-2.5 flex justify-between items-center text-xs">
-                                  <div className="space-y-0.5">
-                                    <div className="font-bold text-[#4b2c20]">{tx.from} &rarr; {tx.entity}</div>
-                                    <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.transaction_type}</div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="font-mono font-black text-emerald-700">+{Number(tx.amount).toLocaleString()}g</div>
-                                    <span className="text-[8px] px-1 bg-amber-100 border border-amber-200 rounded text-amber-800 font-bold">{tx.payment_status}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_pending_revenues}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Payables List */}
-                      <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[320px]">
-                        <h4 className="title-font text-[11px] font-black text-rose-800 uppercase tracking-wider border-b border-rose-600/10 pb-1.5 flex justify-between flex-shrink-0">
-                          <span>{t.pending_expenses}</span>
-                          <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{pendingExpenseList.length} {pendingExpenseList.length === 1 ? 'item' : 'items'}</span>
-                        </h4>
-                        <div className="overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                          {pendingExpenseList.length > 0 ? (
-                            <div className="space-y-2">
-                              {pendingExpenseList.map((tx) => {
-                                const isOverdue = tx.payment_status === 'Overdue';
-                                return (
-                                  <div key={tx.id} className={`bg-[#faf4e5]/70 border rounded-lg p-2.5 flex justify-between items-center text-xs ${
-                                    isOverdue ? 'border-red-300 bg-red-50/20' : 'border-[#8b4513]/10'
-                                  }`}>
-                                    <div className="space-y-0.5">
-                                      <div className="font-bold text-[#4b2c20]">{tx.entity}</div>
-                                      <div className="text-[9px] text-stone-500 font-mono">{tx.date} • {tx.transaction_type}</div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="font-mono font-black text-rose-700">-{Number(tx.amount).toLocaleString()}g</div>
-                                      <span className={`text-[8px] px-1 rounded font-bold ${
-                                        isOverdue 
-                                          ? 'bg-red-100 border border-red-200 text-red-800 animate-pulse' 
-                                          : 'bg-amber-100 border border-amber-200 text-amber-800'
-                                      }`}>{tx.payment_status}</span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="h-full flex items-center justify-center">
-                              <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_pending_expenses}</p>
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  </div>
                   </div>
                 )}
-                    </>
-                  );
-                })()
-              )}
-            </div>
+
+                {/* SUBTAB: PAYABLES & RECEIVABLES */}
+                {dashSubTab === 'payables_receivables' && (
+                  (() => {
+                    const prKpi = engineData.payablesReceivablesKpis;
+                    
+                    const evolutionDiff = (prKpi?.all_receivables || 0) - (prKpi?.all_payables || 0);
+                    const evolutionAdvice = evolutionDiff >= 0
+                      ? t('advice_pr_evolution_positive', { diff: formatNumberCompact(evolutionDiff) })
+                      : t('advice_pr_evolution_negative', { diff: formatNumberCompact(Math.abs(evolutionDiff)) });
+
+                    const opCatData = engineData.openPayablesByCategory;
+                    const maxCatPayable = opCatData.length > 0 ? opCatData[0] : null;
+                    const categoryAdvice = maxCatPayable
+                      ? t('advice_pr_category_positive', { category: maxCatPayable.name, amount: formatNumberCompact(maxCatPayable.amount) })
+                      : t('advice_pr_category_none');
+
+                    const opEntData = engineData.openPayablesByEntity;
+                    const maxEntPayable = opEntData.length > 0 ? opEntData[0] : null;
+                    const entityAdvice = maxEntPayable
+                      ? t('advice_pr_entity_positive', { entity: maxEntPayable.name, amount: formatNumberCompact(maxEntPayable.amount) })
+                      : t('advice_pr_entity_none');
+
+                    const opMonthData = engineData.openPayablesByMonth;
+                    const totalOpMonths = opMonthData.reduce((sum, item) => sum + item.amount, 0);
+                    const monthAdvice = totalOpMonths > 0
+                      ? t('advice_pr_month_positive')
+                      : t('advice_pr_month_none');
+
+                    const pmData = engineData.paymentMethodsDistribution;
+                    const maxPM = pmData.length > 0 ? pmData[0] : null;
+                    const paymentMethodAdvice = maxPM
+                      ? t('advice_pr_payment_method_positive', { method: maxPM.name, amount: formatNumberCompact(maxPM.amount) })
+                      : t('advice_pr_payment_method_none');
+
+                    return (
+                      <div className="flex flex-col gap-8">
+                        {/* Spline Evolution Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <PayablesReceivablesSplineChart prTimePoints={engineData.prTimePoints} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={evolutionAdvice} t={t} />
+                          </div>
+                        </div>
+
+                        {/* Open Payables by Category Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <OpenPayablesByCategoryChart openPayablesByCategory={engineData.openPayablesByCategory} t={t} formatNumberCompact={formatNumberCompact} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={categoryAdvice} t={t} />
+                          </div>
+                        </div>
+
+                        {/* Open Payables by Entity Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <OpenPayablesByEntityChart openPayablesByEntity={engineData.openPayablesByEntity} t={t} formatNumberCompact={formatNumberCompact} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={entityAdvice} t={t} />
+                          </div>
+                        </div>
+
+                        {/* Open Payables by Month Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <OpenPayablesByMonthChart openPayablesByMonth={engineData.openPayablesByMonth} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={monthAdvice} t={t} />
+                          </div>
+                        </div>
+
+                        {/* Payment Methods Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <PaymentMethodsChart paymentMethodsDistribution={engineData.paymentMethodsDistribution} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={paymentMethodAdvice} t={t} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+
+                {/* SUBTAB: LIABILITIES */}
+                {dashSubTab === 'liabilities' && (
+                  (() => {
+                    const evolutionAdvice = t('advice_liabilities_evolution');
+                    
+                    const debtEnt = engineData.debtByEntity || [];
+                    const maxDebtEnt = debtEnt.length > 0 ? debtEnt[0] : null;
+                    const entityAdvice = maxDebtEnt
+                      ? t('advice_debt_by_entity', { entity: maxDebtEnt.name, amount: formatNumberCompact(maxDebtEnt.amount) })
+                      : t('advice_pr_entity_none');
+
+                    const debtTypeAdvice = t('advice_debt_composition', { amount: formatNumberCompact(engineData.liabilitiesKpis?.total_debt || 0) });
+
+                    return (
+                      <div className="flex flex-col gap-8">
+                        {/* Spline Evolution Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <LiabilitiesEvolutionChart liabilitiesTimePoints={engineData.liabilitiesTimePoints} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={evolutionAdvice} t={t} />
+                          </div>
+                        </div>
+
+                        {/* Debt by Entity Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <DebtByEntityChart debtByEntity={engineData.debtByEntity} t={t} formatNumberCompact={formatNumberCompact} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={entityAdvice} t={t} />
+                          </div>
+                        </div>
+
+                        {/* Debt Composition Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <DebtCompositionChart debtByType={engineData.debtByType} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={debtTypeAdvice} t={t} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+
+                {/* SUBTAB: RATIOS */}
+                {dashSubTab === 'ratios' && (
+                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
+                    <div className="text-6xl">⚖️</div>
+                    <div className="space-y-1">
+                      <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Financial Ratios</h3>
+                      <p className="text-xs font-serif italic text-[#5d4037]">Under construction by order of the Royal Treasurer.</p>
+                    </div>
+                  </div>
+                )}
+              </BaseDashboardTab>
             </div>
           </div>
-        </div>
         )}
 
         {/* Transactions View (Financial Ledger) */}
@@ -1813,6 +2128,49 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     {t.ledger_transactions}
                   </h4>
                   <div className="flex gap-2 flex-wrap items-center">
+                    {selectedTxIds.length > 0 && (
+                      <>
+                        {!isEditing ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditing(true);
+                              const initialEdits = {};
+                              selectedTxIds.forEach(id => {
+                                const tx = transactions.find(t => t.id === id);
+                                if (tx) {
+                                  initialEdits[id] = { ...tx };
+                                }
+                              });
+                              setEditingTxs(initialEdits);
+                            }}
+                            className="px-3 py-1.5 bg-[#b8860b] border-2 border-[#d4af37]/30 text-white font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer animate-in fade-in zoom-in duration-150"
+                          >
+                            <span>✏️</span> {t('edit') || 'Edit'}
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleSaveEdits}
+                              className="px-3 py-1.5 bg-emerald-700 border-2 border-emerald-500/30 text-white font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer animate-in fade-in zoom-in duration-150"
+                            >
+                              <span>💾</span> {t('save') || 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsEditing(false);
+                                setEditingTxs({});
+                              }}
+                              className="px-3 py-1.5 bg-rose-700 border-2 border-rose-500/30 text-white font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer animate-in fade-in zoom-in duration-150"
+                            >
+                              <span>✕</span> {t('cancel') || 'Cancel'}
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={exportCSV}
@@ -1996,6 +2354,20 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       <table className="hidden md:table w-full text-left border-collapse text-[10px] font-sans">
                         <thead>
                           <tr className="bg-[#8b4513] border-b border-[#8b4513]/20 text-[#ffd700] font-black uppercase tracking-wider title-font sticky top-0 z-20">
+                            <th className="py-2.5 px-3 w-8">
+                              <input
+                                type="checkbox"
+                                checked={filteredTransactions.length > 0 && selectedTxIds.length === filteredTransactions.length}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedTxIds(filteredTransactions.map(t => t.id));
+                                  } else {
+                                    setSelectedTxIds([]);
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#ffd700] cursor-pointer"
+                              />
+                            </th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
@@ -2007,85 +2379,342 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                          {filteredTransactions.map((tx) => (
-                            <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
-                              <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
-                              <td className="py-2 px-3 whitespace-nowrap">
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                  tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                  tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
-                                  tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                                  tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
-                                  'bg-stone-100 text-stone-800 border border-stone-200'
+                          {filteredTransactions.map((tx) => {
+                            const isTxEditing = isEditing && selectedTxIds.includes(tx.id);
+                            if (isTxEditing) {
+                              return (
+                                <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors bg-[#faf4e5]/80">
+                                  <td className="py-2 px-3 whitespace-nowrap w-8">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedTxIds.includes(tx.id)}
+                                      onChange={() => {
+                                        setSelectedTxIds(prev => 
+                                          prev.includes(tx.id) 
+                                            ? prev.filter(id => id !== tx.id) 
+                                            : [...prev, tx.id]
+                                        );
+                                      }}
+                                      className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <input
+                                      type="text"
+                                      value={editingTxs[tx.id]?.from || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'from', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.payment_status || 'Completed'}
+                                      onChange={e => handleFieldChange(tx.id, 'payment_status', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                    >
+                                      {['Completed', 'Pending', 'Overdue', 'Paid on Time', 'Paid Late', 'Open', 'Paid'].map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_type || 'Income'}
+                                      onChange={e => handleFieldChange(tx.id, 'transaction_type', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                    >
+                                      {classOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <div className="flex flex-col gap-1">
+                                      <select
+                                        value={editingTxs[tx.id]?.transaction_nature || 'cash'}
+                                        onChange={e => handleFieldChange(tx.id, 'transaction_nature', e.target.value)}
+                                        className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                      >
+                                        <option value="cash">cash</option>
+                                        <option value="accrual">accrual</option>
+                                      </select>
+                                      <select
+                                        value={editingTxs[tx.id]?.transaction_flow || 'inflow'}
+                                        onChange={e => handleFieldChange(tx.id, 'transaction_flow', e.target.value)}
+                                        className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                      >
+                                        <option value="inflow">inflow</option>
+                                        <option value="outflow">outflow</option>
+                                      </select>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_subtype || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'transaction_subtype', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                    >
+                                      <option value="">-</option>
+                                      {subClassOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <select
+                                      value={editingTxs[tx.id]?.entity || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'entity', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                    >
+                                      <option value="">-</option>
+                                      {entityOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <input
+                                      type="number"
+                                      value={editingTxs[tx.id]?.amount || 0}
+                                      onChange={e => handleFieldChange(tx.id, 'amount', e.target.value)}
+                                      className="w-20 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-mono text-right"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap font-sans font-bold text-stone-500">
+                                    <input
+                                      type="text"
+                                      value={editingTxs[tx.id]?.description || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'description', e.target.value)}
+                                      className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return (
+                              <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
+                                <td className="py-2 px-3 whitespace-nowrap w-8">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedTxIds.includes(tx.id)}
+                                    onChange={() => {
+                                      setSelectedTxIds(prev => 
+                                        prev.includes(tx.id) 
+                                          ? prev.filter(id => id !== tx.id) 
+                                          : [...prev, tx.id]
+                                      );
+                                    }}
+                                    disabled={isEditing && !selectedTxIds.includes(tx.id)}
+                                    className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
+                                  />
+                                </td>
+                                <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
+                                <td className="py-2 px-3 whitespace-nowrap">
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                    tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                    tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                    tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                    tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                    'bg-stone-100 text-stone-800 border border-stone-200'
+                                  }`}>
+                                    {tx.payment_status || 'Completed'}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 whitespace-nowrap">
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                    (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                                      : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  }`}>
+                                    {tx.transaction_type}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 whitespace-nowrap">
+                                  <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase mr-1">{tx.transaction_nature || '-'}</span>
+                                  <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase">{tx.transaction_flow || '-'}</span>
+                                </td>
+                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
+                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
+                                <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
+                                  (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
                                 }`}>
-                                  {tx.payment_status || 'Completed'}
-                                </span>
-                              </td>
-                              <td className="py-2 px-3 whitespace-nowrap">
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                  (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
-                                }`}>
-                                  {tx.transaction_type}
-                                </span>
-                              </td>
-                              <td className="py-2 px-3 whitespace-nowrap">
-                                <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase mr-1">{tx.transaction_nature || '-'}</span>
-                                <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase">{tx.transaction_flow || '-'}</span>
-                              </td>
-                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
-                              <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
-                              <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                                (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
-                              }`}>
-                                {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
-                              </td>
-                              <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
-                            </tr>
-                          ))}
+                                  {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                </td>
+                                <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
 
                       {/* Mobile Cards View */}
                       <div className="grid grid-cols-1 gap-2.5 p-3 md:hidden">
-                        {filteredTransactions.map((tx) => (
-                          <div 
-                            key={tx.id} 
-                            className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-xl p-3 shadow-sm flex flex-col gap-2 relative overflow-hidden"
-                          >
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
-                                  {tx.entity || tx.transaction_type}
+                        {filteredTransactions.map((tx) => {
+                          const isTxEditing = isEditing && selectedTxIds.includes(tx.id);
+                          return (
+                            <div 
+                              key={tx.id} 
+                              className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-xl p-3 shadow-sm flex flex-col gap-2 relative overflow-hidden"
+                            >
+                              <div className="flex gap-2 items-center border-b border-[#8b4513]/10 pb-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTxIds.includes(tx.id)}
+                                  onChange={() => {
+                                    setSelectedTxIds(prev => 
+                                      prev.includes(tx.id) 
+                                        ? prev.filter(id => id !== tx.id) 
+                                        : [...prev, tx.id]
+                                    );
+                                  }}
+                                  disabled={isEditing && !selectedTxIds.includes(tx.id)}
+                                  className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer flex-shrink-0"
+                                />
+                                <span className="text-[9px] font-black uppercase tracking-wider text-[#4b2c20]">
+                                  {isTxEditing ? 'Editing Transaction' : (tx.entity || tx.transaction_type)}
                                 </span>
-                                <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
-                                  {tx.from} • {tx.transaction_subtype || '-'}
+                              </div>
+                              
+                              {isTxEditing ? (
+                                <div className="grid grid-cols-2 gap-2 text-[9px] font-sans font-bold">
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">From</label>
+                                    <input
+                                      type="text"
+                                      value={editingTxs[tx.id]?.from || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'from', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">Status</label>
+                                    <select
+                                      value={editingTxs[tx.id]?.payment_status || 'Completed'}
+                                      onChange={e => handleFieldChange(tx.id, 'payment_status', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    >
+                                      {['Completed', 'Pending', 'Overdue', 'Paid on Time', 'Paid Late', 'Open', 'Paid'].map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">Class (Type)</label>
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_type || 'Income'}
+                                      onChange={e => handleFieldChange(tx.id, 'transaction_type', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    >
+                                      {classOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">Sub Class</label>
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_subtype || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'transaction_subtype', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    >
+                                      <option value="">-</option>
+                                      {subClassOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">Nature</label>
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_nature || 'cash'}
+                                      onChange={e => handleFieldChange(tx.id, 'transaction_nature', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    >
+                                      <option value="cash">cash</option>
+                                      <option value="accrual">accrual</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">Flow</label>
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_flow || 'inflow'}
+                                      onChange={e => handleFieldChange(tx.id, 'transaction_flow', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    >
+                                      <option value="inflow">inflow</option>
+                                      <option value="outflow">outflow</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">Entity</label>
+                                    <select
+                                      value={editingTxs[tx.id]?.entity || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'entity', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    >
+                                      <option value="">-</option>
+                                      {entityOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-stone-500 uppercase">Amount</label>
+                                    <input
+                                      type="number"
+                                      value={editingTxs[tx.id]?.amount || 0}
+                                      onChange={e => handleFieldChange(tx.id, 'amount', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <label className="block text-[8px] text-stone-500 uppercase">Description</label>
+                                    <input
+                                      type="text"
+                                      value={editingTxs[tx.id]?.description || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'description', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] px-1 py-0.5 focus:outline-none"
+                                    />
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="text-right">
-                                <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                  {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
-                                </div>
-                                <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
-                                  tx.payment_status === 'Completed' 
-                                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                                    : 'bg-amber-100 text-amber-800 border border-amber-200'
-                                }`}>
-                                  {tx.payment_status || 'Completed'}
-                                </span>
-                              </div>
+                              ) : (
+                                <>
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider bg-[#8b4513]/10 text-[#4b2c20]">
+                                        {tx.entity || tx.transaction_type}
+                                      </span>
+                                      <div className="text-[10px] font-bold text-[#5d4037]/80 mt-1">
+                                        {tx.from} • {tx.transaction_subtype || '-'}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                        {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                      </div>
+                                      <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
+                                        tx.payment_status === 'Completed' 
+                                          ? 'bg-green-100 text-green-800 border border-green-200' 
+                                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                      }`}>
+                                        {tx.payment_status || 'Completed'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between items-center text-[8.5px] text-stone-500 font-bold">
+                                    <span>📅 {tx.date} ({tx.month} {tx.year})</span>
+                                    <div className="flex gap-1 flex-wrap justify-end">
+                                      <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_nature || '-'}</span>
+                                      <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_flow || '-'}</span>
+                                      <span className="uppercase text-[8px] bg-amber-100 text-amber-800 px-1 rounded border border-amber-200">{tx.transaction_category || '-'}</span>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
                             </div>
-                            <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between items-center text-[8.5px] text-stone-500 font-bold">
-                              <span>📅 {tx.date} ({tx.month} {tx.year})</span>
-                              <div className="flex gap-1 flex-wrap justify-end">
-                                <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_nature || '-'}</span>
-                                <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_flow || '-'}</span>
-                                <span className="uppercase text-[8px] bg-amber-100 text-amber-800 px-1 rounded border border-amber-200">{tx.transaction_category || '-'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   ) : (

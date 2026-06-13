@@ -36,6 +36,8 @@ export const useKingdomStore = create((set, get) => ({
   email: 'lord.eldoria@kingdom.gov',
   transactions: [],
   kpiSummary: null,
+  payablesReceivablesKpis: null,
+  liabilitiesKpis: null,
   flowByCategory: [],
   timeEvolution: [],
   topEntities: [],
@@ -46,7 +48,7 @@ export const useKingdomStore = create((set, get) => ({
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
   statusOptions: ['Pending', 'Overdue', 'Paid on Time', 'Paid Late'],
   classOptions: ['Income', 'Expense', 'Savings', 'Debt'],
-  subClassOptions: ['Cash receipt', 'Cash payment', 'Credit receipt', 'Credit payment'],
+  subClassOptions: ['Cash receipt', 'Cash payment', 'Credit receipt', 'Credit payment', 'New Debt', 'Amortization', 'Interest'],
   entityOptions: loadLocal('entityOptions', [
     'Salary', 'Bonus', 'Shows', 'Cinema', 'Restaurant', 'Trips', 'Streaming',
     'Rent', 'Landlord', 'Energy', 'IMI', 'Repairs', 'Water', 'Gas', 'Internet',
@@ -156,24 +158,32 @@ export const useKingdomStore = create((set, get) => ({
         kpiRes,
         flowRes,
         timeRes,
-        topRes
+        topRes,
+        prKpiRes,
+        liabilitiesKpiRes
       ] = await Promise.all([
         supabase.from('transactions').select('*').eq('profile_id', profileId).order('created_at', { ascending: false }).limit(100),
         supabase.from('view_dashboard_kpi_summary').select('*').eq('profile_id', profileId).maybeSingle(),
         supabase.from('view_chart_flow_by_category').select('*').eq('profile_id', profileId),
         supabase.from('view_chart_time_evolution').select('*').eq('profile_id', profileId).order('dimension_date', { ascending: true }),
-        supabase.from('view_chart_top_entities').select('*').eq('profile_id', profileId).order('total_volume', { ascending: false })
+        supabase.from('view_chart_top_entities').select('*').eq('profile_id', profileId).order('total_volume', { ascending: false }),
+        supabase.from('view_payables_receivables_kpis').select('*').eq('profile_id', profileId).maybeSingle(),
+        supabase.from('view_liabilities_kpis').select('*').eq('profile_id', profileId).maybeSingle()
       ]);
 
       if (transactionsRes.error) console.error('Error fetching transactions:', transactionsRes.error);
       if (kpiRes.error) console.error('Error fetching KPI view:', kpiRes.error);
+      if (prKpiRes.error) console.error('Error fetching payables/receivables KPIs view:', prKpiRes.error);
+      if (liabilitiesKpiRes.error) console.error('Error fetching liabilities KPIs view:', liabilitiesKpiRes.error);
 
       set({ 
         transactions: transactionsRes.data || [],
         kpiSummary: kpiRes.data || null,
         flowByCategory: flowRes.data || [],
         timeEvolution: timeRes.data || [],
-        topEntities: topRes.data || []
+        topEntities: topRes.data || [],
+        payablesReceivablesKpis: prKpiRes.data || null,
+        liabilitiesKpis: liabilitiesKpiRes.data || null
       });
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
@@ -201,7 +211,9 @@ export const useKingdomStore = create((set, get) => ({
             transaction_category: transactionData.transaction_category,
             transaction_nature: transactionData.transaction_nature,
             transaction_flow: transactionData.transaction_flow,
-            description: transactionData.description
+            description: transactionData.description,
+            due_date: transactionData.due_date || null,
+            payment_method: transactionData.payment_method || null
           }
         ])
         .select();
@@ -257,7 +269,9 @@ export const useKingdomStore = create((set, get) => ({
         transaction_category: tx.transaction_category,
         transaction_nature: tx.transaction_nature,
         transaction_flow: tx.transaction_flow,
-        description: tx.description
+        description: tx.description,
+        due_date: tx.due_date || null,
+        payment_method: tx.payment_method || null
       }));
 
       const { data, error } = await supabase

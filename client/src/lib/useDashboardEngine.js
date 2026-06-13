@@ -6,11 +6,13 @@ import { useKingdomStore } from '../store/useKingdomStore';
  * Pure adapter layer mapping Zero-Calculation PostgreSQL View payloads
  * directly into the legacy UI structure without ANY client-side math arrays.
  */
-export function useDashboardEngine() {
+export function useDashboardEngine(filteredTransactions = []) {
   const kpiSummary = useKingdomStore(state => state.kpiSummary);
+  const dbPayablesReceivablesKpis = useKingdomStore(state => state.payablesReceivablesKpis);
   const flowByCategory = useKingdomStore(state => state.flowByCategory);
   const timeEvolution = useKingdomStore(state => state.timeEvolution);
   const topEntities = useKingdomStore(state => state.topEntities);
+  const allTxs = useKingdomStore(state => state.transactions);
 
   return useMemo(() => {
     // 1. Dual-Row KPI Summary Metrics
@@ -21,6 +23,25 @@ export function useDashboardEngine() {
     const net_cash_balance = kpiSummary?.net_cash_balance || 0;
     const total_debt = kpiSummary?.total_debt || 0;
     const savings_efficiency = kpiSummary?.savings_efficiency || 0;
+
+    // 1.5 Payables & Receivables reactive metrics
+    const payables = filteredTransactions.filter(tx => tx.transaction_type === 'Payable');
+    const receivables = filteredTransactions.filter(tx => tx.transaction_type === 'Receivable');
+    
+    const all_payables = payables.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const open_payables = payables.filter(tx => ['Open', 'Overdue'].includes(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const all_receivables = receivables.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const open_receivables = receivables.filter(tx => tx.payment_status === 'Open').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const overdue_payables = payables.filter(tx => tx.payment_status === 'Overdue').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const overdue_rate = open_payables === 0 ? 0.0 : Number(((overdue_payables / open_payables) * 100).toFixed(1));
+
+    const payablesReceivablesKpis = {
+      all_payables,
+      open_payables,
+      all_receivables,
+      open_receivables,
+      overdue_rate
+    };
 
     // 2. Pivot Category Arrays
     const catMap = {};
@@ -76,6 +97,168 @@ export function useDashboardEngine() {
       };
     });
 
+    // 5. Payables & Receivables Spline Chart datasets
+    const prTimeLabels = Array.from(new Set(filteredTransactions.map(tx => `${tx.year} ${tx.month}`)));
+    const prTimePoints = prTimeLabels.map(label => {
+      const [yearStr, monthStr] = label.split(' ');
+      const matchedTxs = filteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
+      const payablesVol = matchedTxs.filter(tx => tx.transaction_type === 'Payable').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const receivablesVol = matchedTxs.filter(tx => tx.transaction_type === 'Receivable').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      return { label, payables: payablesVol, receivables: receivablesVol };
+    }).filter(t => t.payables > 0 || t.receivables > 0);
+
+    // 6. Open Payables by Category dataset
+    const openPayablesList = filteredTransactions.filter(tx => tx.transaction_type === 'Payable' && ['Open', 'Overdue'].includes(tx.payment_status));
+    const opCategories = Array.from(new Set(openPayablesList.map(tx => tx.transaction_category).filter(Boolean)));
+    const openPayablesByCategory = opCategories.map(cat => {
+      const amount = openPayablesList.filter(tx => tx.transaction_category === cat).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      return { name: cat, amount };
+    }).sort((a, b) => b.amount - a.amount);
+
+    // 7. Open Payables by Entity dataset
+    const opEntities = Array.from(new Set(openPayablesList.map(tx => tx.entity).filter(Boolean)));
+    const openPayablesByEntity = opEntities.map(ent => {
+      const amount = openPayablesList.filter(tx => tx.entity === ent).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      return { name: ent, amount };
+    }).sort((a, b) => b.amount - a.amount);
+
+    // 8. Open Payables by Month dataset
+    const opMonths = Array.from(new Set(openPayablesList.map(tx => tx.month).filter(Boolean)));
+    const openPayablesByMonth = opMonths.map(m => {
+      const amount = openPayablesList.filter(tx => tx.month === m).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      return { name: m, amount };
+    });
+
+    // 9. Payment Methods Distribution dataset
+    const completedTxs = filteredTransactions.filter(tx => ['Completed', 'Paid'].includes(tx.payment_status) && tx.payment_method);
+    const methods = Array.from(new Set(completedTxs.map(tx => tx.payment_method).filter(Boolean)));
+    const paymentMethodsDistribution = methods.map(method => {
+      const amount = completedTxs.filter(tx => tx.payment_method === method).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      return { name: method, amount };
+    }).sort((a, b) => b.amount - a.amount);
+
+    // 10. Liabilities calculations (differentiating principal pay-downs from interest)
+    const monthIndexes = {
+      'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
+      'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
+    };
+
+    const legacyDebt = allTxs.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0) - allTxs.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const newDebtVal = allTxs.filter(tx => tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const liabilities_total_debt = newDebtVal > 0 ? (newDebtVal - allTxs.filter(tx => tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)) : legacyDebt;
+
+    const liabilities_to_be_paid = filteredTransactions.filter(tx => tx.transaction_subtype === 'Amortization' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const liabilities_new_liabilities = filteredTransactions.filter(tx => tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const liabilities_amortizations = filteredTransactions.filter(tx => tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+    const liabilitiesKpis = {
+      total_debt: liabilities_total_debt,
+      to_be_paid: liabilities_to_be_paid,
+      new_liabilities: liabilities_new_liabilities,
+      amortizations: liabilities_amortizations
+    };
+
+    // Spline chart temporal data
+    const liabilitiesTimeLabels = Array.from(new Set(filteredTransactions.map(tx => `${tx.year} ${tx.month}`)));
+    const sortedLiabilitiesTimeLabels = liabilitiesTimeLabels.sort((a, b) => {
+      const [yA, mA] = a.split(' ');
+      const [yB, mB] = b.split(' ');
+      if (yA !== yB) return Number(yA) - Number(yB);
+      return monthIndexes[mA] - monthIndexes[mB];
+    });
+
+    const liabilitiesTimePoints = sortedLiabilitiesTimeLabels.map(label => {
+      const [yearStr, monthStr] = label.split(' ');
+      const yearNum = Number(yearStr);
+      const monthTxs = filteredTransactions.filter(tx => tx.year === yearNum && tx.month === monthStr);
+      
+      const newDebt = monthTxs.filter(tx => tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const amortization = monthTxs.filter(tx => tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const toBePaid = monthTxs.filter(tx => tx.transaction_subtype === 'Amortization' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      
+      // Cumulative debt historically up to this month
+      const histNewDebt = allTxs.filter(tx => {
+        if (tx.year < yearNum) return tx.transaction_subtype === 'New Debt';
+        if (tx.year === yearNum) {
+          return tx.transaction_subtype === 'New Debt' && monthIndexes[tx.month] <= monthIndexes[monthStr];
+        }
+        return false;
+      }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      
+      const histAmortization = allTxs.filter(tx => {
+        if (tx.year < yearNum) return tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed';
+        if (tx.year === yearNum) {
+          return tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed' && monthIndexes[tx.month] <= monthIndexes[monthStr];
+        }
+        return false;
+      }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+      let totalDebt = histNewDebt - histAmortization;
+      if (histNewDebt === 0) {
+        const legAccrual = allTxs.filter(tx => {
+          if (!['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category)) return false;
+          if (tx.year < yearNum) return tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow';
+          if (tx.year === yearNum) {
+            return tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow' && monthIndexes[tx.month] <= monthIndexes[monthStr];
+          }
+          return false;
+        }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+        
+        const legPayment = allTxs.filter(tx => {
+          if (!['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category)) return false;
+          if (tx.year < yearNum) return tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow';
+          if (tx.year === yearNum) {
+            return tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow' && monthIndexes[tx.month] <= monthIndexes[monthStr];
+          }
+          return false;
+        }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+        
+        totalDebt = legAccrual - legPayment;
+      }
+
+      return {
+        label: `${monthStr.substring(0, 3)} ${yearStr}`,
+        totalDebt,
+        toBePaid,
+        newDebt,
+        amortization
+      };
+    });
+
+    // Debt by Entity
+    const debtEntities = Array.from(new Set(allTxs.map(tx => tx.entity).filter(Boolean)));
+    const debtByEntity = debtEntities.map(ent => {
+      const entNewDebt = allTxs.filter(tx => tx.entity === ent && tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const entAmortization = allTxs.filter(tx => tx.entity === ent && tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      
+      let amount = entNewDebt - entAmortization;
+      
+      if (entNewDebt === 0) {
+        const legAcc = allTxs.filter(tx => tx.entity === ent && ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+        const legPay = allTxs.filter(tx => tx.entity === ent && ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+        amount = legAcc - legPay;
+      }
+      
+      return { name: ent, amount };
+    }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+
+    // Debt by Type (Category)
+    const debtCategories = Array.from(new Set(allTxs.map(tx => tx.transaction_category).filter(Boolean)));
+    const debtByType = debtCategories.map(cat => {
+      const catNewDebt = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const catAmortization = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      
+      let amount = catNewDebt - catAmortization;
+      
+      if (catNewDebt === 0 && ['Banking', 'Other Banking', 'Burrowed'].includes(cat)) {
+        const legAcc = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+        const legPay = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+        amount = legAcc - legPay;
+      }
+      
+      return { name: cat, amount };
+    }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+
     return {
       total_income,
       total_expenses,
@@ -84,9 +267,19 @@ export function useDashboardEngine() {
       net_cash_balance,
       total_debt,
       savings_efficiency,
+      payablesReceivablesKpis,
       categoryData,
       entityData,
-      timeData
+      timeData,
+      prTimePoints,
+      openPayablesByCategory,
+      openPayablesByEntity,
+      openPayablesByMonth,
+      paymentMethodsDistribution,
+      liabilitiesKpis,
+      liabilitiesTimePoints,
+      debtByEntity,
+      debtByType
     };
-  }, [kpiSummary, flowByCategory, timeEvolution, topEntities]);
+  }, [kpiSummary, dbPayablesReceivablesKpis, flowByCategory, timeEvolution, topEntities, filteredTransactions, allTxs]);
 }

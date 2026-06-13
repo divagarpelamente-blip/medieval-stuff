@@ -178,15 +178,20 @@ Contains the detailed financial ledger records natively utilizing a modern `snak
 
 The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js` React Context Hook. Instead of running redundant `filter()` and `reduce()` loops inside every component, the engine parses raw transactions into pristine, pre-calculated 2x2 matrix volumes exactly once per render.
 
-### A. Summary KPI Headers (5-Card Row)
+### A. Summary KPI Headers (Tab-specific KPI Rows)
 
-The dashboard's Overview sub-tab features a unified **5-Card Summary Row** displaying key financial metrics simultaneously:
+The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the interface. Rather than showing a fixed 5-card row globally, the KPIs are filtered dynamically based on the active sub-tab:
 
-1. **Total Income:** Accrual-basis inflow (`transaction_nature = 'accrual'` and `transaction_flow = 'inflow'`).
-2. **Total Expenses:** Accrual-basis outflow (`transaction_nature = 'accrual'` and `transaction_flow = 'outflow'`).
-3. **Net Cash Balance:** Derived from cash-basis movements (receipts vs payments).
-4. **Current Debt:** Active outstanding liabilities balance.
-5. **Savings Efficiency:** Calculated as `(Net Accrual / Total Inflow) * 100`.
+1. **Revenues & Expenses (`income_expense`):**
+   - **Total Income:** Accrual-basis inflow (`transaction_nature = 'accrual'` and `transaction_flow = 'inflow'`).
+   - **Total Expenses:** Accrual-basis outflow (`transaction_nature = 'accrual'` and `transaction_flow = 'outflow'`).
+   - **Net Cash Balance:** Derived from cash-basis movements (receipts vs payments).
+2. **Equity & Savings (`equity_savings`):**
+   - **Real Savings Rate:** Calculated as `(Net Accrual / Total Inflow) * 100` dynamically, representing the percentage of accrued income saved.
+3. **Liabilities (`liabilities`):**
+   - **Current Debt:** Active outstanding liabilities balance.
+4. **Other Tabs (`overview`, `payables_receivables`, `ratios`):**
+   - The top KPI summary row is dynamically hidden when no KPIs are specified for the sub-tab.
 
 ### B. Component-Level Pivoting (Autonomous Charts)
 
