@@ -94,6 +94,13 @@ export const en = {
   advice_positive: '"The vaults of the realm are thriving, my Lord! We registered a positive balance of +{balance}g gold coins. Savings efficiency is at {ratio}%."',
   advice_negative: '"Alert, my Lord! The Royal Treasury is in a deficit of {balance}g gold coins. Our expenses exceed income. We must cut spending!"',
   advice_neutral: '"The balance of the Royal Treasury is perfectly balanced, my Lord."',
+  
+  advice_financial_position_positive: '"My Liege, our coffers grow! The realm prospers as our income of {inflow} outweighs our expenses. Truly a golden age!"',
+  advice_financial_position_negative: '"My Liege, caution! We are bleeding gold. Our expenses outpace our income, leaving us with a deficit of {balance}. We must act!"',
+  advice_expenses_report: '"My Liege, {category} demands the largest share of our treasury, claiming {amount}. A heavy toll indeed!"',
+  advice_expenses_detailed: '"My Liege, {entity} is our greatest drain, demanding {amount}. Perhaps a royal inquiry is in order?"',
+  advice_debt_positive: '"My Liege, our debts stand at {debt}. The iron bank\'s patience is not infinite, we must prioritize repayment."',
+  advice_debt_free: '"My Liege, the realm is free of debt! A golden age of financial independence is upon us."',
 
   // Dashboard Detail Translations (Audit Fixes)
   total_income_inflow: "Total Income (Inflow)",

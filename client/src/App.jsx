@@ -15,6 +15,7 @@ import TopEntitiesChart from './components/charts/TopEntitiesChart';
 import ExpensesDonutChart from './components/charts/ExpensesDonutChart';
 import ExpensesDetailedChart from './components/charts/ExpensesDetailedChart';
 import DebtEvolutionChart from './components/charts/DebtEvolutionChart';
+import RoyalTreasurerInsights from './components/RoyalTreasurerInsights';
 import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
@@ -103,11 +104,24 @@ function App() {
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
 
-  // Default to last 1 year on load
+  // Default to last 1 year, and current quarter/month on load
   useEffect(() => {
     if (transactions.length > 0 && !hasInitializedYears) {
       const allYears = Array.from(new Set(transactions.map((tx) => tx.year).filter(Boolean))).sort((a, b) => b - a);
       setSelectedYears(allYears.slice(0, 1).map(String));
+      
+      const currentMonthIndex = new Date().getMonth();
+      const currentQuarterIndex = Math.floor(currentMonthIndex / 3) + 1;
+      
+      const quartersToSelect = [];
+      for (let i = 1; i <= currentQuarterIndex; i++) {
+        quartersToSelect.push(`Q${i}`);
+      }
+      setSelectedQuarters(quartersToSelect);
+      
+      const allMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      setSelectedMonths(allMonths.slice(0, currentMonthIndex + 1));
+      
       setHasInitializedYears(true);
     }
   }, [transactions, hasInitializedYears]);
@@ -203,13 +217,16 @@ function App() {
   const subclassEfficiencyRatio = subclassInflow > 0 ? (subclassNet / subclassInflow) * 100 : 0;
 
   const formatNumberCompact = (num) => {
-    if (!num) return '0';
+    if (!num) return '0 / g';
     const absNum = Math.abs(num);
-    if (absNum >= 1.0e12) return (num / 1.0e12).toFixed(1) + "T";
-    if (absNum >= 1.0e9) return (num / 1.0e9).toFixed(1) + "B";
-    if (absNum >= 1.0e6) return (num / 1.0e6).toFixed(1) + "M";
-    if (absNum >= 1.0e3) return (num / 1.0e3).toFixed(1) + "K";
-    return num.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    let formattedNum = absNum.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    if (absNum >= 1.0e12) formattedNum = (absNum / 1.0e12).toFixed(1) + "T";
+    else if (absNum >= 1.0e9) formattedNum = (absNum / 1.0e9).toFixed(1) + "B";
+    else if (absNum >= 1.0e6) formattedNum = (absNum / 1.0e6).toFixed(1) + "M";
+    else if (absNum >= 1.0e3) formattedNum = (absNum / 1.0e3).toFixed(1) + "K";
+    
+    if (num > 0) return `+${formattedNum} / g`;
+    return `(${formattedNum}) / g`;
   };
 
 const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx => tx.transaction_category).filter(Boolean)));
@@ -999,7 +1016,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                             <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
                               (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
                             }`}>
-                              {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()} 💰
+                              {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                           </tr>
@@ -1025,7 +1042,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                             </div>
                             <div className="text-right">
                               <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
                               </div>
                               <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
                                 tx.payment_status === 'Completed' 
@@ -1394,7 +1411,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
 
                 {/* MAIN DASHBOARD CONTENT */}
-                <div className="flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-6">
+                <div className="flex-1 flex flex-col overflow-hidden">
                   {isFallbackState ? (
                     <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
                       <div className="text-6xl">📜</div>
@@ -1404,37 +1421,61 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       </div>
                     </div>
                   ) : (
-                    <>
+                    (() => {
+                      const financialPositionInsight = dashNetBalance >= 0 
+                        ? t('advice_financial_position_positive', { inflow: formatNumberCompact(dashInflow) }) 
+                        : t('advice_financial_position_negative', { balance: formatNumberCompact(dashNetBalance) });
+
+                      const maxCategory = dashCategoryData.length > 0 ? dashCategoryData.reduce((prev, current) => (prev.amount > current.amount) ? prev : current) : null;
+                      const expensesReportInsight = maxCategory 
+                        ? t('advice_expenses_report', { category: maxCategory.name, amount: formatNumberCompact(-maxCategory.amount) }) 
+                        : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
+
+                      const expenseTransactions = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow');
+                      const entityTotals = expenseTransactions.reduce((acc, tx) => {
+                        acc[tx.entity_name] = (acc[tx.entity_name] || 0) + Number(tx.amount);
+                        return acc;
+                      }, {});
+                      const maxEntity = Object.keys(entityTotals).reduce((a, b) => entityTotals[a] > entityTotals[b] ? a : b, null);
+                      const expensesDetailedInsight = maxEntity 
+                        ? t('advice_expenses_detailed', { entity: maxEntity, amount: formatNumberCompact(-entityTotals[maxEntity]) }) 
+                        : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
+
+                      const debtEvolutionInsight = dashDebt > 0 
+                        ? t('advice_debt_positive', { debt: formatNumberCompact(-dashDebt) }) 
+                        : t('advice_debt_free', '"My Liege, the realm is free of debt! A golden age of financial independence is upon us."');
+
+                      return (
+                        <>
                 
                 {/* SUBTAB: OVERVIEW */}
                 {dashSubTab === 'overview' && (
-                  <div className="space-y-3 animate-in fade-in duration-200">
-                    {/* 1. KPIs */}
-                    
-                    <div className="space-y-1">
+                  <div className="h-full flex flex-col animate-in fade-in duration-200">
+                    {/* 1. KPIs (Fixed at top) */}
+                    <div className="p-5 sm:p-6 pb-2 space-y-1 flex-shrink-0 z-20 bg-[#f4e4bc] border-b border-[#8b4513]/10">
                       {/* 5-Card Summary Row */}
                       <div className="grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-1.5">
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total income</span>
-                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-emerald-700 mt-0.5 font-mono truncate w-full">+{formatNumberCompact(dashInflow)}g</span>
+                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-emerald-700 mt-0.5 font-mono truncate w-full">{formatNumberCompact(dashInflow)}</span>
                           <div className="absolute right-1 bottom-1 text-lg opacity-15">📈</div>
                         </div>
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Total expenses</span>
-                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-rose-700 mt-0.5 font-mono truncate w-full">-{formatNumberCompact(dashOutflow)}g</span>
+                          <span className="title-font text-sm sm:text-base lg:text-lg font-black text-rose-700 mt-0.5 font-mono truncate w-full">{formatNumberCompact(-dashOutflow)}</span>
                           <div className="absolute right-1 bottom-1 text-lg opacity-15">📉</div>
                         </div>
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Net cash balance</span>
                           <span className={`title-font text-sm sm:text-base lg:text-lg font-black mt-0.5 font-mono truncate w-full ${dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700'}`}>
-                            {dashNetBalance >= 0 ? '+' : ''}{formatNumberCompact(dashNetBalance)}g
+                            {formatNumberCompact(dashNetBalance)}
                           </span>
                           <div className="absolute right-1 bottom-1 text-lg opacity-15">💰</div>
                         </div>
                         <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center">
                           <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">Current Debt</span>
                           <span className={`title-font text-sm sm:text-base lg:text-lg font-black mt-0.5 font-mono text-rose-700 truncate w-full`}>
-                            {formatNumberCompact(dashDebt)}g
+                            {formatNumberCompact(-dashDebt)}
                           </span>
                           <div className="absolute right-1 bottom-1 text-lg opacity-15">🏦</div>
                         </div>
@@ -1447,39 +1488,50 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         </div>
                       </div>
                     </div>
-                    {/* Advice Banner */}
-                    <div className="bg-[#f4e4bc] border-2 border-double border-[#8b4513]/40 rounded p-1 sm:p-1.5 shadow-inner relative mb-2">
-                      <div className="relative flex gap-2 items-center">
-                        <div className="text-xl sm:text-2xl leading-none">🧙‍♂️</div>
-                        <div>
-                          <h5 className="text-[8px] font-black uppercase text-[#8b4513]/85 tracking-widest font-sans leading-none mb-0.5">{t('treasurer_advice_banner', "Royal Treasurer's Counsel")}</h5>
-                          <p className="text-[9px] sm:text-[10px] italic text-[#4b2c20] font-serif leading-tight m-0">
-                            {dashTreasurerAdvice}
-                          </p>
+
+                    {/* Scrollable Zone */}
+                    <div className="flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-8 mt-4">
+                      {/* 2. Charts Grid Vertical Layout */}
+                      <div className="flex flex-col gap-8">
+                        {/* Row 1: Financial Position */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <TimeEvolutionChart timePoints={dashTimeData} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={financialPositionInsight} t={t} />
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* 2. Charts Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Row 1 Left: Financial Position (formerly Time Evolution) */}
-                      <div className="h-[280px]">
-                        <TimeEvolutionChart timePoints={dashTimeData} t={t} />
-                      </div>
+                        {/* Row 2: Expenses Donut */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <ExpensesDonutChart dashCategoryData={dashCategoryData} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={expensesReportInsight} t={t} />
+                          </div>
+                        </div>
 
-                      {/* Row 1 Right: Expenses Donut */}
-                      <div className="h-[280px]">
-                        <ExpensesDonutChart dashCategoryData={dashCategoryData} t={t} />
-                      </div>
+                        {/* Row 3: Expenses Detailed */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <ExpensesDetailedChart transactions={dashboardFilteredTransactions} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={expensesDetailedInsight} t={t} />
+                          </div>
+                        </div>
 
-                      {/* Row 2 Left: Expenses Detailed */}
-                      <div className="h-[280px]">
-                        <ExpensesDetailedChart transactions={dashboardFilteredTransactions} t={t} />
-                      </div>
-
-                      {/* Row 2 Right: Debt Evolution */}
-                      <div className="h-[280px]">
-                        <DebtEvolutionChart timePoints={engineData.timeData} t={t} />
+                        {/* Row 4: Debt Evolution */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="h-[280px]">
+                            <DebtEvolutionChart timePoints={engineData.timeData} t={t} />
+                          </div>
+                          <div className="h-[280px]">
+                            <RoyalTreasurerInsights adviceText={debtEvolutionInsight} t={t} />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1487,7 +1539,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
                 {/* SUBTAB: INCOME & EXPENSES */}
                 {dashSubTab === 'income_expense' && (
-                  <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-6 animate-in fade-in duration-200 h-full">
                     {/* KPI & Savings Rate Banner */}
                     <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 shadow-sm">
                       <div className="flex flex-col justify-between">
@@ -1526,7 +1578,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                 <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
                                   <span>{tItem.label}</span>
                                   <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                    {t.balance}: {net >= 0 ? '+' : ''}{net.toLocaleString()}g
+                                    {t.balance}: {formatNumberCompact(net)}
                                   </span>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1534,7 +1586,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-[8px] text-emerald-800 font-bold font-mono">
                                       <span>{t.income}</span>
-                                      <span>+{tItem.income.toLocaleString()}g</span>
+                                      <span>{formatNumberCompact(tItem.income)}</span>
                                     </div>
                                     <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
                                       <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
@@ -1544,7 +1596,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-[8px] text-rose-800 font-bold font-mono">
                                       <span>{t.expense}</span>
-                                      <span>-{tItem.expense.toLocaleString()}g</span>
+                                      <span>{formatNumberCompact(-tItem.expense)}</span>
                                     </div>
                                     <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
                                       <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
@@ -1576,7 +1628,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                               <div key={cat.name} className="space-y-1">
                                 <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
                                   <span>🏷️ {cat.name}</span>
-                                  <span className="font-mono text-rose-700">-{cat.amount.toLocaleString()}g</span>
+                                  <span className="font-mono text-rose-700">{formatNumberCompact(-cat.amount)}</span>
                                 </div>
                                 <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
                                   <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pctWidth}%` }} />
@@ -1602,7 +1654,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
                         <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.receivables}</span>
                         <span className="title-font text-xl font-black text-emerald-700 mt-1 font-mono">
-                          +{totalReceivables.toLocaleString()}g
+                          {formatNumberCompact(totalReceivables)}
                         </span>
                         <div className="absolute right-3 bottom-3 text-2xl opacity-15">📜</div>
                       </div>
@@ -1610,7 +1662,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
                         <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">{t.payables}</span>
                         <span className="title-font text-xl font-black text-rose-700 mt-1 font-mono">
-                          -{totalPayables.toLocaleString()}g
+                          {formatNumberCompact(-totalPayables)}
                         </span>
                         <div className="absolute right-3 bottom-3 text-2xl opacity-15">💸</div>
                       </div>
@@ -1694,17 +1746,19 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                               <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_pending_expenses}</p>
                             </div>
                           )}
-                        </div>
                       </div>
                     </div>
                   </div>
+                  </div>
                 )}
                     </>
-                  )}
-              </div>
-              </div>
+                  );
+                })()
+              )}
+            </div>
             </div>
           </div>
+        </div>
         )}
 
         {/* Transactions View (Financial Ledger) */}

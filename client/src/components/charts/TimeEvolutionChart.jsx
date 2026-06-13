@@ -197,7 +197,7 @@ export default function TimeEvolutionChart({ timePoints, t }) {
 
   return (
     <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col">
-      <div className="flex justify-between items-center border-b border-[#8b4513]/20 pb-2 mb-4">
+      <div className="flex justify-center items-center border-b border-[#8b4513]/20 pb-2 mb-4 text-center">
         <div>
           <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">Financial Position</h3>
         </div>

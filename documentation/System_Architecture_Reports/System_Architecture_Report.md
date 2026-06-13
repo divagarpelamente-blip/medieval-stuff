@@ -16,6 +16,7 @@ graph TD
         Engine[useDashboardEngine Context]
         i18n[i18next Localization Engine]
         LStore[Local Web Browser Storage]
+        Insights[RoyalTreasurerInsights Component]
     end
 
     subgraph Backend [Supabase PostgreSQL DB]
@@ -30,6 +31,7 @@ graph TD
     Store -->|Saves Configuration Lists| LStore
     Store -->|Syncs Active Language| i18n
     i18n -->|Reads Initial Preference| LStore
+    App -->|Generates Contextual Text| Insights
 
     %% Client to Backend DB Sync
     Store -->|Fetches Profile & Ledger| T_Prof
@@ -58,7 +60,7 @@ Located in `client/src/store/useKingdomStore.js`, the Zustand store handles:
 
 - **Stat State**: `gold`, `gems`, `xp`, `level`, `email`, and loading spinners (`isLoading`).
 - **Ledger Records**: `transactions` array.
-- **Database Operations**: Async dispatches to Supabase for single or batch transaction entries. 
+- **Database Operations**: Async dispatches to Supabase for single or batch transaction entries.
   - **Action Isolation:** Heavy multi-row transaction datasets are strictly isolated to `fetchDashboardTransactions` (only called when visiting the Dashboard or Ledger), keeping `fetchKingdomData` as a lightning-fast single-row profile poller for the core HUD.
 - **Atomic Optimizations**: The `registerTransaction` logic avoids massive full-table synchronization payloads by leveraging local array unshifting (`[newTx, ...transactions]`) while only polling Supabase for the calculated profile scalar values (`gold`, `xp`, `level`).
 - **Synchronizations**: Triggers dynamic language switches inside the `i18next` engine during store action executions.
@@ -87,6 +89,7 @@ Eldoria integrates **i18next** with a custom localization engine setup. To optim
 1. **Explicit Locale Freeze**: Inside `i18n.js`, secondary imports are commented out and the configuration strictly registers only the English namespace resource. The active runtime language (`lng`) and fallback (`fallbackLng`) are hardlocked to `'en'`.
 2. **Semantic Keys & Nested Tokenization**: All display text is systematically mapped to key calls. Hardcoded layout table headers are refactored to use nested translation lookups.
 3. **Dynamic Property Proxy Wrapper**: In `App.jsx`, the `t` translator hook runs behind a **JavaScript Proxy**. This intercepts property access and seamlessly maps it to target the active English dictionary keys.
+4. **Contextual Advisor Localization Keys**: Added specific locale properties (`advice_financial_position_positive`, `advice_financial_position_negative`, `advice_expenses_report`, `advice_expenses_detailed`, `advice_debt_positive`, `advice_debt_free`) to the English namespace dictionary to enable localized advisor counsel rendering through the dynamic proxy setup.
 
 ---
 
@@ -95,10 +98,18 @@ Eldoria integrates **i18next** with a custom localization engine setup. To optim
 The layout is structured using a mobile-first responsive framework that guarantees stability across both touch interfaces and desktop pointers, employing stacking context separation and gesture controls.
 
 ### A. Viewport Lock & Touch Bounds
+
 - **Elastic Scroll Prevention**: Dynamic height (`100dvh`), `position: fixed`, and `touch-action: manipulation` block iOS and Android pull-to-refresh elastic scroll anomalies.
 
 ### B. Adaptive Top HUD & Overlay Stacking
+
 - **Vertical Grid Stacking**: Wraps gracefully from a wide row design on desktop to a compact vertical stack on mobile.
+
+### C. Dashboard Layout Architecture & Scrolling Stacks
+
+- **Fixed Top KPIs & Scrollable Charts**: In the Overview dashboard sub-tab, the layout splits into a fixed top panel containing the 5-card KPI summary header, and a vertically scrollable container below (`overflow-y-auto custom-scrollbar`) hosting the charts and advisor insight blocks. This ensures that the primary financial indicators remain visible at all times during deep analysis.
+- **Centered Chart Alignment**: Headers for all chart visualization widgets are centered, providing a cleaner, more focused look aligned with the medieval ledger aesthetic.
+- **Filters Default State**: The filter panel defaults to the last year, and automatically initializes the month list up to the current month and quarter list up to the current quarter to avoid showing empty charts on initial load.
 
 ---
 
@@ -112,36 +123,54 @@ Persistence and trigger logic is strictly bound to the 4-tier literal string arc
    | id          UUID (PK)              |<----+    | id                   UUID (PK)     |
    | email       TEXT                   |     |    | profile_id           UUID (FK)     |
    | gold        BIGINT                 |     +---o| amount               NUMERIC       |
-   | level       INTEGER                |          | transaction_type     TEXT          |
-   | xp          INTEGER                |          | transaction_subtype  TEXT          |
-   | updated_at  TIMESTAMPTZ            |          | transaction_category TEXT          |
-   +------------------------------------+          | transaction_nature   TEXT (CHECK)  |
-                                                   | transaction_flow     TEXT (CHECK)  |
+   | level       INTEGER                |          | "from"               TEXT          |
+   | xp          INTEGER                |          | date                 DATE          |
+   | updated_at  TIMESTAMPTZ            |          | month                TEXT          |
+   +------------------------------------+          | year                 INTEGER       |
+                                                   | quarter              TEXT          |
                                                    | payment_status       TEXT          |
+                                                   | transaction_type     TEXT          |
+                                                   | transaction_subtype  TEXT          |
+                                                   | entity               TEXT          |
+                                                   | transaction_category TEXT          |
+                                                   | transaction_nature   TEXT (CHECK)  |
+                                                   | transaction_flow     TEXT (CHECK)  |
+                                                   | description          TEXT          |
                                                    | created_at           TIMESTAMPTZ   |
                                                    +------------------------------------+
 
 ### Table Definitions
 
 #### 1. Table: `profiles`
+
 Represents the lord's metadata and statistics.
+
 - `id` (`UUID`, PK) - Connected to Supabase Auth.
 - `gold` (`BIGINT`) - Real-time wallet balance.
 
 #### 2. Table: `transactions`
+
 Contains the detailed financial ledger records natively utilizing a modern `snake_case` schema with strict double-entry checks.
+
 - `transaction_type` (`TEXT` - e.g. `'Income'`, `'Expense'`)
 - `transaction_subtype` (`TEXT` - e.g. `'Cash receipt'`, `'Cash payment'`)
 - `transaction_category` (`TEXT` - High-level grouping, e.g. `'Payroll'`, `'Housing'`)
 - `transaction_nature` (`TEXT` - Matrix axis: `'cash'` or `'accrual'`)
 - `transaction_flow` (`TEXT` - Matrix axis: `'inflow'` or `'outflow'`)
 - `entity` (`TEXT` - Specific destination/origin)
+- `"from"` (`TEXT` - Payer/originator of funds)
+- `description` (`TEXT` - Optional notes)
+- `date`, `month`, `year`, `quarter` - Automatically derived calendar attributes for analytics.
 
 ### Automated Database Triggers
 
-When a new row is written into `transactions`:
-- If `NEW.transaction_type = 'Income'`: Adds the transaction amount to the user's `gold` balance, and increments `xp`.
-- If `NEW.transaction_type != 'Income'`: Subtracts the transaction amount from the user's `gold` balance.
+1. **Pre-Process Transaction (`tr_pre_transaction_inserted`)**:
+   - A `BEFORE INSERT` trigger that automatically extracts calendar attributes (`year`, `month`, `quarter`) from the inserted `date` (or `CURRENT_DATE`), and defaults empty `payment_status` to `'Completed'`.
+
+2. **Update Profile Stats (`tr_on_transaction_inserted`)**:
+   - An `AFTER INSERT` trigger that updates the user's `gold` balance, and increments `xp` and `level` accordingly based on income.
+   - If `NEW.transaction_type = 'Income'`: Adds the transaction amount to the user's `gold` balance, and calculates `xp`.
+   - If `NEW.transaction_type != 'Income'`: Subtracts the transaction amount from the user's `gold` balance.
 
 ---
 
@@ -149,18 +178,36 @@ When a new row is written into `transactions`:
 
 The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js` React Context Hook. Instead of running redundant `filter()` and `reduce()` loops inside every component, the engine parses raw transactions into pristine, pre-calculated 2x2 matrix volumes exactly once per render.
 
-### A. Dual-Row KPI Summary
-The top-level dashboard displays two distinct statistical rows simultaneously without relying on global abstract modes:
-1. **Accrual Summary Row:** Total income | Total expenses | Savings efficiency
-2. **Cash Summary Row:** Total receipts | Total payments | Net cash balance
+### A. Summary KPI Headers (5-Card Row)
 
-These are strictly derived by the engine using the double-entry accounting constraints:
-- **Total income / Total expenses**: Uses `transaction_nature = 'accrual'` coupled with `'inflow'` or `'outflow'`.
-- **Total receipts / Total payments**: Uses `transaction_nature = 'cash'` coupled with `'inflow'` or `'outflow'`.
+The dashboard's Overview sub-tab features a unified **5-Card Summary Row** displaying key financial metrics simultaneously:
+
+1. **Total Income:** Accrual-basis inflow (`transaction_nature = 'accrual'` and `transaction_flow = 'inflow'`).
+2. **Total Expenses:** Accrual-basis outflow (`transaction_nature = 'accrual'` and `transaction_flow = 'outflow'`).
+3. **Net Cash Balance:** Derived from cash-basis movements (receipts vs payments).
+4. **Current Debt:** Active outstanding liabilities balance.
+5. **Savings Efficiency:** Calculated as `(Net Accrual / Total Inflow) * 100`.
 
 ### B. Component-Level Pivoting (Autonomous Charts)
+
 The visualization components possess independent interactive logic to pivot their perspectives:
 
-*   **FlowByCategoryChart.jsx:** A local `[ Accrual | Cash ]` toggle seamlessly swaps the bar chart metrics between mapping `Total income`/`Total expenses` and `Total receipts`/`Total payments`.
-*   **TimeEvolutionChart.jsx:** A unified SVG spline rendering system with an interactive **4-checkbox legend**, enabling overlay comparisons of `Total income` vs `Total receipts` curves over the same temporal progression map.
-*   **TopEntitiesChart.jsx:** The donut chart automatically recalculates segment boundaries and tabular volumes based on a local toggle, tapping directly into the matrix data payload.
+- **FlowByCategoryChart.jsx:** A local `[ Accrual | Cash ]` toggle seamlessly swaps the bar chart metrics between mapping `Total income`/`Total expenses` and `Total receipts`/`Total payments`.
+- **TimeEvolutionChart.jsx:** A unified SVG spline rendering system with an interactive **4-checkbox legend**, enabling overlay comparisons of `Total income` vs `Total receipts` curves over the same temporal progression map.
+- **TopEntitiesChart.jsx:** The donut chart automatically recalculates segment boundaries and tabular volumes based on a local toggle, tapping directly into the matrix data payload.
+
+### C. Royal Treasurer's Counsel (Contextual Advisor Insights)
+
+To assist the Lord of the Realm with decision-making, the dashboard couples every visualization chart with a dedicated `RoyalTreasurerInsights` advisor widget. 
+- **Dynamic Render Architecture**: In the Overview sub-tab, charts are paired side-by-side with an instance of `RoyalTreasurerInsights` on large screens (collapsing to a single-column stack on mobile).
+- **Contextual Calculations**:
+  - **Financial Position Advice**: Evaluates if the net balance is positive (`advice_financial_position_positive`) or negative (`advice_financial_position_negative`), dynamically injecting the formatted inflow or deficit value.
+  - **Expenses Distribution Advice**: Identifies the single highest-spending category using the filtered dataset and injects the category name and amount into `advice_expenses_report`.
+  - **Detailed Expenses Advice**: Aggregates filtered expenses by individual entity name to pinpoint the heaviest cash drain, formatting the name and amount into `advice_expenses_detailed`.
+  - **Debt Advice**: Reads current liabilities; if debt exists, it displays `advice_debt_positive` with the formatted amount, otherwise it displays `advice_debt_free`.
+
+### D. Compact Currency Formatting Engine (`formatNumberCompact`)
+
+To prevent UI overflows and maintain clean layouts on small viewports, the frontend implements a specialized `formatNumberCompact` formatting function:
+- **Value Compaction**: Automatically converts large gold numbers to use standard shorthand suffixes (`K`, `M`, `B`, `T`).
+- **Medieval Accounting Notation**: Positive values are formatted as `+Value / g` and negative values are wrapped in parentheses as `(Value) / g` (e.g. `+1.2K / g` or `(450) / g`), matching historical double-entry record-keeping style.

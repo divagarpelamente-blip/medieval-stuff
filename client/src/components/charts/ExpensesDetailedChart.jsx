@@ -53,7 +53,7 @@ export default function ExpensesDetailedChart({ transactions, t }) {
 
   return (
     <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-full relative">
-      <div className="flex justify-between items-center border-b border-[#8b4513]/10 pb-1.5 mb-3 flex-shrink-0">
+      <div className="flex justify-center items-center border-b border-[#8b4513]/10 pb-1.5 mb-3 flex-shrink-0 text-center">
         <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider">
           {t('expenses_detailed', 'Expenses Detailed')} {selectedCategory ? `- ${selectedCategory}` : ''}
         </h4>
