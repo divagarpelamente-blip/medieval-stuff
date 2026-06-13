@@ -314,6 +314,89 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
+  borrowLoan: async (profileId, { amount, from, entity, description, date }) => {
+    const common = {
+      amount: Number(amount),
+      from,
+      entity,
+      description: description || 'New Loan Borrowed',
+      date: date || new Date().toISOString().split('T')[0]
+    };
+    return get().registerTransactions(profileId, [
+      {
+        ...common,
+        transaction_type: 'Debt',
+        transaction_subtype: 'New Debt',
+        transaction_nature: 'accrual',
+        transaction_flow: 'inflow',
+        payment_status: 'Open'
+      },
+      {
+        ...common,
+        transaction_type: 'Debt',
+        transaction_subtype: 'New Debt',
+        transaction_nature: 'cash',
+        transaction_flow: 'inflow',
+        payment_status: 'Completed'
+      }
+    ]);
+  },
+
+  settlePayable: async (profileId, payableTx, paymentMethod) => {
+    set({ isLoading: true });
+    try {
+      const { error: updateErr } = await supabase
+        .from('transactions')
+        .update({ payment_status: 'Completed' })
+        .eq('id', payableTx.id);
+
+      if (updateErr) throw updateErr;
+
+      const cashPayment = {
+        profile_id: profileId,
+        transaction_type: 'Expense',
+        amount: Number(payableTx.amount),
+        from: payableTx.from,
+        date: new Date().toISOString().split('T')[0],
+        payment_status: 'Completed',
+        transaction_subtype: 'Cash payment',
+        entity: payableTx.entity,
+        transaction_category: payableTx.transaction_category,
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        description: `Payment for invoice: ${payableTx.description || payableTx.id}`,
+        payment_method: paymentMethod || 'Vault Cash'
+      };
+
+      const { data: cashData, error: cashErr } = await supabase
+        .from('transactions')
+        .insert([cashPayment])
+        .select();
+
+      if (cashErr) throw cashErr;
+
+      set(state => {
+        const nextTxs = state.transactions.map(tx => 
+          tx.id === payableTx.id ? { ...tx, payment_status: 'Completed' } : tx
+        );
+        if (cashData && cashData.length > 0) {
+          nextTxs.unshift(cashData[0]);
+        }
+        return { transactions: nextTxs };
+      });
+
+      await get().fetchKingdomData(profileId);
+      await get().fetchDashboardData(profileId);
+
+      return { success: true };
+    } catch (err) {
+      console.error('Error settling payable:', err);
+      return { success: false, error: err.message || err };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   setLanguage: (lang) => {
     set({ language: lang });
     saveLocal('language', lang);

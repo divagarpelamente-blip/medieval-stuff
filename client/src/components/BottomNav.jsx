@@ -7,7 +7,6 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
   const items = [
     { id: 'quests', label: t('quests'), icon: Compass },
     { id: 'achievements', label: t('achievements'), icon: Trophy },
-    { id: 'transactions', label: t('transactions'), icon: BookOpen },
     { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
     { id: 'settings', label: t('settings'), icon: Settings },
   ];
@@ -16,8 +15,8 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[60%] max-w-[480px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-1 flex justify-around items-center z-[60] shadow-2xl">
       {items.map((item) => {
         const Icon = item.icon;
-        const isActive = activeTab === item.id;
-        const isSupported = item.id === 'quests' || item.id === 'settings' || item.id === 'transactions' || item.id === 'dashboard';
+        const isActive = activeTab === item.id || (item.id === 'dashboard' && (activeTab === 'financial_statement' || activeTab === 'transactions'));
+        const isSupported = item.id === 'quests' || item.id === 'settings' || item.id === 'dashboard';
 
         return (
           <button 

@@ -26,6 +26,9 @@ import OpenPayablesByCategoryChart from './components/charts/OpenPayablesByCateg
 import OpenPayablesByEntityChart from './components/charts/OpenPayablesByEntityChart';
 import OpenPayablesByMonthChart from './components/charts/OpenPayablesByMonthChart';
 import PaymentMethodsChart from './components/charts/PaymentMethodsChart';
+import RoyalIncomeStatement from './components/RoyalIncomeStatement';
+import TreasuryStatements from './components/TreasuryStatements';
+import ConsolidatedFinancialStatement from './components/ConsolidatedFinancialStatement';
 import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
@@ -54,6 +57,7 @@ function App() {
 
   // Dashboard Page Sub-Tabs and Granularity state
   const [dashSubTab, setDashSubTab] = useState('overview'); // overview, income_expense, payables_receivables
+  const [isTreasuryMenuOpen, setIsTreasuryMenuOpen] = useState(false);
   const [dashGranularity] = useState('month'); // month, quarter, year
 
   // Unified Sidebar Filter state
@@ -583,7 +587,15 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   };
 
   const handleTreasuryClick = () => {
-    setActiveTab('dashboard');
+    setIsTreasuryMenuOpen(true);
+  };
+
+  const handleTabChange = (tabId) => {
+    if (tabId === 'dashboard') {
+      setIsTreasuryMenuOpen(true);
+    } else {
+      setActiveTab(tabId);
+    }
   };
 
   const exportCSV = () => handleExportCSV(transactions, t);
@@ -885,7 +897,135 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         )}
 
         {/* Navegação Inferior (Estática) */}
-        <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+        <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+
+        {/* Modal do Menu da Tesouraria Real */}
+        <Modal
+          isOpen={isTreasuryMenuOpen}
+          onClose={() => setIsTreasuryMenuOpen(false)}
+          title={t('treasury_menu_title', 'Royal Treasury Menu')}
+          size="max-w-2xl"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Financial Statements (Primary Option) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('financial_statement');
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                📜
+              </div>
+              <div className="flex-grow min-w-0">
+                <div className="flex justify-between items-center gap-2 w-full">
+                  <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                    {t('menu_financial_statements', 'Financial Statements')}
+                  </h3>
+                  <span className="text-[8px] font-black uppercase tracking-wider text-rose-700 bg-rose-100 group-hover:text-[#ffd700] group-hover:bg-rose-900 border border-rose-200 group-hover:border-rose-800 px-1.5 py-0.5 rounded font-sans scale-90 origin-right flex-shrink-0">
+                    {t('menu_primary', 'Primary')}
+                  </span>
+                </div>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_financial_statements_desc', 'Consolidated financial reports including Balance Sheet, Profit & Loss, and Cash Flow.')}
+                </p>
+              </div>
+            </button>
+
+            {/* Economic Overview */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('dashboard');
+                setDashSubTab('overview');
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                📊
+              </div>
+              <div className="flex-grow min-w-0">
+                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                  {t('menu_economic_overview', 'Economic Overview')}
+                </h3>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_economic_overview_desc', 'General view of cash balances, time evolution, and category distribution.')}
+                </p>
+              </div>
+            </button>
+
+            {/* Commercial Accounts */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('dashboard');
+                setDashSubTab('payables_receivables');
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                💸
+              </div>
+              <div className="flex-grow min-w-0">
+                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                  {t('menu_commercial_accounts', 'Commercial Accounts')}
+                </h3>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_commercial_accounts_desc', 'Track outstanding payables, receivables, and payment methods.')}
+                </p>
+              </div>
+            </button>
+
+            {/* Liabilities & Debt */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('dashboard');
+                setDashSubTab('liabilities');
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                🏦
+              </div>
+              <div className="flex-grow min-w-0">
+                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                  {t('menu_liabilities_debt', 'Liabilities & Debt')}
+                </h3>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_liabilities_debt_desc', 'Monitor outstanding liabilities, debt principal, and amortizations.')}
+                </p>
+              </div>
+            </button>
+
+            {/* General Ledger (Spans 2 columns) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('transactions');
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer sm:col-span-2"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                📖
+              </div>
+              <div className="flex-grow min-w-0">
+                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                  {t('menu_general_ledger', 'General Ledger')}
+                </h3>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_general_ledger_desc', 'Register gold coins movements, manage status, category, entity, and view entire book history.')}
+                </p>
+              </div>
+            </button>
+          </div>
+        </Modal>
 
         {/* Modal da Mina de Ouro (Ledger de Transações - Widescreen Layout) */}
         <Modal
@@ -1713,7 +1853,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 subTabs={[
                   { id: 'overview', label: t.subtab_overview, icon: '📊' },
                   { id: 'income_expense', label: t.subtab_income_expense, icon: '💸' },
-                  { id: 'equity_savings', label: t.subtab_equity_savings, icon: '🛡️' },
                   { id: 'payables_receivables', label: t.subtab_payables_receivables, icon: '📜' },
                   { id: 'liabilities', label: t.subtab_liabilities, icon: '🏦' },
                   { id: 'ratios', label: t.subtab_ratios, icon: '⚖️' }
@@ -1734,8 +1873,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     { label: 'Total income', value: formatNumberCompact(dashInflow), icon: '📈', colorClass: 'text-emerald-700' },
                     { label: 'Total expenses', value: formatNumberCompact(-dashOutflow), icon: '📉', colorClass: 'text-rose-700' },
                     { label: 'Net cash balance', value: formatNumberCompact(dashNetBalance), icon: '💰', colorClass: dashNetBalance >= 0 ? 'text-[#b8860b]' : 'text-rose-700' }
-                  ] : dashSubTab === 'equity_savings' ? [
-                    { label: t.savings_rate_real || 'Real Savings Rate', value: `${dashEfficiencyRatio.toFixed(1)}%`, icon: '🛡️', colorClass: dashEfficiencyRatio >= 20 ? 'text-emerald-700' : dashEfficiencyRatio >= 0 ? 'text-[#b8860b]' : 'text-rose-700' }
                   ] : dashSubTab === 'payables_receivables' ? [
                     { label: t.kpi_all_payables || 'All Payables', value: formatNumberCompact(engineData.payablesReceivablesKpis?.all_payables), icon: '💸', colorClass: 'text-rose-700' },
                     { label: t.kpi_open_payables || 'Open Payables', value: formatNumberCompact(engineData.payablesReceivablesKpis?.open_payables), icon: '⏳', colorClass: 'text-rose-800' },
@@ -1908,19 +2045,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         )}
                       </div>
                     </div>
+                    {/* Royal Income Statement Ledger (P&L) */}
+                    <RoyalIncomeStatement incomeStatement={engineData.incomeStatement} t={t} formatNumberCompact={formatNumberCompact} />
                   </div>
                 )}
 
-                {/* SUBTAB: EQUITY & SAVINGS */}
-                {dashSubTab === 'equity_savings' && (
-                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
-                    <div className="text-6xl">🛡️</div>
-                    <div className="space-y-1">
-                      <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Equity & Savings Vault</h3>
-                      <p className="text-xs font-serif italic text-[#5d4037]">Under construction by order of the Royal Treasurer.</p>
-                    </div>
-                  </div>
-                )}
 
                 {/* SUBTAB: PAYABLES & RECEIVABLES */}
                 {dashSubTab === 'payables_receivables' && (
@@ -2071,6 +2200,79 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     </div>
                   </div>
                 )}
+              </BaseDashboardTab>
+            </div>
+          </div>
+        )}
+
+        {/* Isolated Financial Statements View */}
+        {activeTab === 'financial_statement' && (
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setActiveTab('quests');
+              }
+            }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          >
+            <div className="bg-[#f4e4bc] w-full max-w-6xl h-[88%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+              
+              {/* Parchment Texture */}
+              <div 
+                className="absolute inset-0 pointer-events-none opacity-25 mix-blend-multiply"
+                style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')" }}
+              />
+
+              {/* Ornate Corners */}
+              <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-[#8b4513]/30 rounded-tl-lg pointer-events-none" />
+              <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-[#8b4513]/30 rounded-tr-lg pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-[#8b4513]/30 rounded-bl-lg pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-[#8b4513]/30 rounded-br-lg pointer-events-none" />
+
+              {/* Close Button to return to quests */}
+              <button 
+                type="button"
+                onClick={() => setActiveTab('quests')}
+                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+                title={t.back_to_map}
+              >
+                <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
+                <span className="text-[#ffd700] text-lg font-black font-sans">✕</span>
+              </button>
+
+              {/* Header Ribbon */}
+              <div className="relative h-16 flex items-center justify-center z-10 pt-2">
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[110%] h-10 bg-gradient-to-r from-[#8b4513] via-[#5d4037] to-[#8b4513] shadow-lg transform -rotate-1 skew-x-12 z-0 border-y-2 border-[#d4af37]" />
+                <h2 className="title-font text-lg sm:text-xl text-[#ffd700] font-bold uppercase tracking-[0.2em] relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                  {t.subtab_financial_statement || 'Financial Statements'}
+                </h2>
+              </div>
+
+              <BaseDashboardTab
+                t={t}
+                dashSubTab="financial_statement"
+                setDashSubTab={() => {}}
+                subTabs={[]}
+                isSidebarOpen={isSidebarOpen}
+                setIsSidebarOpen={setIsSidebarOpen}
+                selectedYears={selectedYears}
+                setSelectedYears={setSelectedYears}
+                uniqueYearsList={uniqueYearsList}
+                selectedQuarters={selectedQuarters}
+                setSelectedQuarters={setSelectedQuarters}
+                selectedMonths={selectedMonths}
+                setSelectedMonths={setSelectedMonths}
+                monthOptions={monthOptions}
+                isFallbackState={isFallbackState}
+                kpis={[]}
+              >
+                <ConsolidatedFinancialStatement
+                  incomeStatement={engineData.incomeStatement}
+                  cashFlowStatement={engineData.cashFlowStatement}
+                  balanceSheet={engineData.balanceSheet}
+                  t={t}
+                  formatNumberCompact={formatNumberCompact}
+                />
               </BaseDashboardTab>
             </div>
           </div>

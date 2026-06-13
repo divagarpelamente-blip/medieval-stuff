@@ -1,6 +1,19 @@
 import { useMemo } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
 
+const formatNumberCompact = (num) => {
+  if (!num) return '0 / g';
+  const absNum = Math.abs(num);
+  let formattedNum = absNum.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  if (absNum >= 1.0e12) formattedNum = (absNum / 1.0e12).toFixed(1) + "T";
+  else if (absNum >= 1.0e9) formattedNum = (absNum / 1.0e9).toFixed(1) + "B";
+  else if (absNum >= 1.0e6) formattedNum = (absNum / 1.0e6).toFixed(1) + "M";
+  else if (absNum >= 1.0e3) formattedNum = (absNum / 1.0e3).toFixed(1) + "K";
+  
+  if (num > 0) return `+${formattedNum} / g`;
+  return `(${formattedNum}) / g`;
+};
+
 /**
  * useDashboardEngine
  * Pure adapter layer mapping Zero-Calculation PostgreSQL View payloads
@@ -259,6 +272,158 @@ export function useDashboardEngine(filteredTransactions = []) {
       return { name: cat, amount };
     }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
 
+    // ==============================================================
+    // FINANCIAL STATEMENT ENGINE (P&L, CASH FLOW, BALANCE SHEET)
+    // ==============================================================
+
+    const incomeStatement = {
+      revenues: {},
+      expenses: {},
+      totalRevenue: 0,
+      totalExpense: 0,
+      netAccruedIncome: 0,
+      formattedNet: '0 / g'
+    };
+
+    const cashFlowStatement = {
+      operating: {},
+      investing: {},
+      financing: {},
+      netOperating: 0,
+      netInvesting: 0,
+      netFinancing: 0,
+      netCashFlow: 0,
+      formattedNet: '0 / g'
+    };
+
+    // Balance Sheet Cutoff Calculation
+    const cutoffTime = filteredTransactions.length > 0
+      ? Math.max(...filteredTransactions.map(tx => new Date(tx.date || tx.created_at).getTime()))
+      : new Date().getTime();
+
+    // Accounts for Balance Sheet (Cumulative historically up to cutoff date)
+    let netVaultCash = 0;
+    let outstandingReceivables = 0;
+    let outstandingPayables = 0;
+    let outstandingDebt = 0;
+
+    const filteredTxIds = new Set(filteredTransactions.map(tx => tx.id));
+
+    allTxs.forEach((tx) => {
+      const txAmount = Number(tx.amount) || 0;
+      const txTime = new Date(tx.date || tx.created_at).getTime();
+
+      // 1. Cumulative Balance Sheet Accumulation
+      if (txTime <= cutoffTime) {
+        if (tx.transaction_nature === 'cash') {
+          if (tx.transaction_flow === 'inflow') {
+            netVaultCash += txAmount;
+          } else if (tx.transaction_flow === 'outflow') {
+            netVaultCash -= txAmount;
+          }
+        }
+
+        if (tx.transaction_type === 'Receivable' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)) {
+          outstandingReceivables += txAmount;
+        }
+
+        if (tx.transaction_type === 'Payable' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)) {
+          outstandingPayables += txAmount;
+        }
+
+        if (tx.transaction_type === 'Debt') {
+          if (tx.transaction_subtype === 'New Debt') {
+            outstandingDebt += txAmount;
+          } else if (tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed') {
+            outstandingDebt -= txAmount;
+          }
+        }
+      }
+
+      // 2. Periodic P&L and Cash Flow Statement Reduction
+      if (filteredTxIds.has(tx.id)) {
+        if (tx.transaction_nature === 'accrual') {
+          const category = tx.transaction_category || 'Other';
+          if (tx.transaction_type === 'Income') {
+            incomeStatement.revenues[category] = (incomeStatement.revenues[category] || 0) + txAmount;
+            incomeStatement.totalRevenue += txAmount;
+          } else if (tx.transaction_type === 'Expense') {
+            incomeStatement.expenses[category] = (incomeStatement.expenses[category] || 0) + txAmount;
+            incomeStatement.totalExpense += txAmount;
+          }
+        }
+
+        if (tx.transaction_nature === 'cash') {
+          const subtype = tx.transaction_subtype || 'Other';
+          const category = tx.transaction_category || 'Other';
+          
+          let segment = 'operating';
+          if (tx.transaction_type === 'Savings') {
+            segment = 'investing';
+          } else if (
+            tx.transaction_type === 'Debt' ||
+            ['Amortization', 'Interest', 'New Debt'].includes(subtype) ||
+            ['Banking', 'Other Banking', 'Burrowed'].includes(category)
+          ) {
+            segment = 'financing';
+          }
+
+          const flowVal = tx.transaction_flow === 'inflow' ? txAmount : -txAmount;
+          cashFlowStatement[segment][subtype] = (cashFlowStatement[segment][subtype] || 0) + flowVal;
+
+          if (segment === 'operating') cashFlowStatement.netOperating += flowVal;
+          if (segment === 'investing') cashFlowStatement.netInvesting += flowVal;
+          if (segment === 'financing') cashFlowStatement.netFinancing += flowVal;
+          cashFlowStatement.netCashFlow += flowVal;
+        }
+      }
+    });
+
+    incomeStatement.netAccruedIncome = incomeStatement.totalRevenue - incomeStatement.totalExpense;
+    incomeStatement.formattedNet = formatNumberCompact(incomeStatement.netAccruedIncome);
+
+    const mapToFormattedArray = (dict) => {
+      return Object.entries(dict).map(([name, amount]) => ({
+        name,
+        amount,
+        formatted: formatNumberCompact(amount)
+      })).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+    };
+
+    const formattedRevenues = mapToFormattedArray(incomeStatement.revenues);
+    const formattedExpenses = mapToFormattedArray(incomeStatement.expenses);
+
+    const formattedOperating = mapToFormattedArray(cashFlowStatement.operating);
+    const formattedInvesting = mapToFormattedArray(cashFlowStatement.investing);
+    const formattedFinancing = mapToFormattedArray(cashFlowStatement.financing);
+
+    const totalAssets = netVaultCash + outstandingReceivables;
+    const totalLiabilities = outstandingDebt + outstandingPayables;
+    const accumulatedWealth = totalAssets - totalLiabilities;
+
+    const balanceSheet = {
+      assets: {
+        vaultCash: netVaultCash,
+        outstandingReceivables,
+        totalAssets,
+        formattedTotal: formatNumberCompact(totalAssets),
+        formattedVaultCash: formatNumberCompact(netVaultCash),
+        formattedReceivables: formatNumberCompact(outstandingReceivables)
+      },
+      liabilities: {
+        outstandingDebt,
+        outstandingPayables,
+        totalLiabilities,
+        formattedTotal: formatNumberCompact(totalLiabilities),
+        formattedDebt: formatNumberCompact(outstandingDebt),
+        formattedPayables: formatNumberCompact(outstandingPayables)
+      },
+      equity: {
+        accumulatedWealth,
+        formattedTotal: formatNumberCompact(accumulatedWealth)
+      }
+    };
+
     return {
       total_income,
       total_expenses,
@@ -279,7 +444,30 @@ export function useDashboardEngine(filteredTransactions = []) {
       liabilitiesKpis,
       liabilitiesTimePoints,
       debtByEntity,
-      debtByType
+      debtByType,
+      incomeStatement: {
+        revenues: formattedRevenues,
+        expenses: formattedExpenses,
+        totalRevenue: incomeStatement.totalRevenue,
+        totalExpense: incomeStatement.totalExpense,
+        netAccruedIncome: incomeStatement.netAccruedIncome,
+        formattedNet: incomeStatement.formattedNet
+      },
+      cashFlowStatement: {
+        operating: formattedOperating,
+        investing: formattedInvesting,
+        financing: formattedFinancing,
+        netOperating: cashFlowStatement.netOperating,
+        netInvesting: cashFlowStatement.netInvesting,
+        netFinancing: cashFlowStatement.netFinancing,
+        netCashFlow: cashFlowStatement.netCashFlow,
+        formattedNet: formatNumberCompact(cashFlowStatement.netCashFlow),
+        formattedOperating: formatNumberCompact(cashFlowStatement.netOperating),
+        formattedInvesting: formatNumberCompact(cashFlowStatement.netInvesting),
+        formattedFinancing: formatNumberCompact(cashFlowStatement.netFinancing)
+      },
+      balanceSheet
     };
   }, [kpiSummary, dbPayablesReceivablesKpis, flowByCategory, timeEvolution, topEntities, filteredTransactions, allTxs]);
 }
+

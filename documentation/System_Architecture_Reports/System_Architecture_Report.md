@@ -78,6 +78,16 @@ To ensure a personalized, modular experience without querying DB configurations 
 > [!NOTE]
 > Fixed database taxonomy constraints (e.g., `classOptions`, `subClassOptions`, `statusOptions`, `monthOptions`) have been explicitly purged from LocalStorage initialization loops and exist purely as static state configurations to guarantee Engine stability.
 
+### C. Batch Ledger Selection & Editing Workspace
+
+To facilitate mass updates to the treasury books without page navigation or multiple single-query database requests, the Gold Mine ledger supports a multi-row selection and inline editing workspace:
+
+1. **Selection Set Tracking**: Selection states are managed at the page component level using the `selectedTxIds` array. A "Select All" control dynamically checks/unchecks the entire active transaction set. Checkbox styling adheres strictly to the `AGENTS.md` parameters (parchment overlay backdrops, wood borders, and inner gold indicator squares).
+2. **Local Sandbox Cache (`editingTxs`)**: When inline editing is initiated, the selected records are cloned from the read-only store into a localized mutable workspace object (`editingTxs`). This sandbox holds current modifications (e.g., changes to Amount, Payer, Class, Subclass, Creditor, or Status) before they are finalized.
+3. **Atomic Batch Database Sync**: Upon clicking "Save", the app initiates a single, atomic `upsert` query to the Supabase `transactions` table.
+4. **Trigger-Driven Balance Synchronizations**: Following a successful batch update, the client triggers `fetchKingdomData` and `fetchDashboardData` to pull the new trigger-recalculated Gold/XP balances and refresh the analytics engine.
+5. **Rollback & State Discard**: Cancel actions clear the selection array and discard the `editingTxs` sandbox object, leaving store state intact.
+
 ---
 
 ## 3. Localization Architecture (i18next & English-First Structure)
@@ -110,6 +120,7 @@ The layout is structured using a mobile-first responsive framework that guarante
 - **Fixed Top KPIs & Scrollable Charts**: In the Overview dashboard sub-tab, the layout splits into a fixed top panel containing the 5-card KPI summary header, and a vertically scrollable container below (`overflow-y-auto custom-scrollbar`) hosting the charts and advisor insight blocks. This ensures that the primary financial indicators remain visible at all times during deep analysis.
 - **Centered Chart Alignment**: Headers for all chart visualization widgets are centered, providing a cleaner, more focused look aligned with the medieval ledger aesthetic.
 - **Filters Default State**: The filter panel defaults to the last year, and automatically initializes the month list up to the current month and quarter list up to the current quarter to avoid showing empty charts on initial load.
+- **Interactive Dimming and Focus**: During ledger editing, unselected items (table rows on desktop and cards on mobile) are styled with `opacity-50` and transition easing. This visually isolates the editing set and keeps the UI clean and concentrated.
 
 ---
 
