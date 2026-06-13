@@ -204,7 +204,8 @@ export const useKingdomStore = create((set, get) => ({
             transaction_type: transactionData.transaction_type,
             amount: Number(transactionData.amount),
             from: transactionData.from,
-            date: transactionData.date || null,
+            value_date: transactionData.value_date || null,
+            posting_date: transactionData.posting_date || null,
             payment_status: transactionData.payment_status || 'Completed',
             transaction_subtype: transactionData.transaction_subtype,
             entity: transactionData.entity,
@@ -262,7 +263,8 @@ export const useKingdomStore = create((set, get) => ({
         transaction_type: tx.transaction_type,
         amount: Number(tx.amount),
         from: tx.from,
-        date: tx.date || null,
+        value_date: tx.value_date || null,
+        posting_date: tx.posting_date || null,
         payment_status: tx.payment_status || 'Completed',
         transaction_subtype: tx.transaction_subtype,
         entity: tx.entity,
@@ -320,7 +322,8 @@ export const useKingdomStore = create((set, get) => ({
       from,
       entity,
       description: description || 'New Loan Borrowed',
-      date: date || new Date().toISOString().split('T')[0]
+      value_date: date || new Date().toISOString().split('T')[0],
+      posting_date: date || new Date().toISOString().split('T')[0]
     };
     return get().registerTransactions(profileId, [
       {
@@ -357,7 +360,8 @@ export const useKingdomStore = create((set, get) => ({
         transaction_type: 'Expense',
         amount: Number(payableTx.amount),
         from: payableTx.from,
-        date: new Date().toISOString().split('T')[0],
+        value_date: new Date().toISOString().split('T')[0],
+        posting_date: new Date().toISOString().split('T')[0],
         payment_status: 'Completed',
         transaction_subtype: 'Cash payment',
         entity: payableTx.entity,

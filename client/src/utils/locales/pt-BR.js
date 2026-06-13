@@ -46,7 +46,8 @@ export const ptBR = {
   expense: "Despesa",
   amount_gold: "Quantidade (Ouro)",
   origin_from: "Origem (From)",
-  date: "Data",
+  value_date: "Data de Valor",
+  posting_date: "Data de Lançamento",
   status: "Status",
   category: "Categoria",
   subcategory: "Subcategoria",
@@ -95,6 +96,10 @@ export const ptBR = {
   menu_liabilities_debt_desc: "Monitore obrigações pendentes, principal da dívida e amortizações.",
   menu_general_ledger: "Livro Razão Geral",
   menu_general_ledger_desc: "Registre movimentos de moedas de ouro, gerencie status, categorias, entidades e veja o histórico completo do livro.",
+  menu_treasury_dashboard: "Painel da Tesouraria",
+  menu_treasury_dashboard_desc: "Visão geral dos saldos de caixa, distribuição de categorias, contas comerciais e obrigações.",
+  menu_register_transaction: "Registrar Movimento",
+  menu_register_transaction_desc: "Registre uma nova movimentação de moedas de ouro, receitas, despesas, ativos ou passivos.",
   gran_month: "Mensal",
   gran_quarter: "Trimestral",
   gran_year: "Anual",
@@ -182,6 +187,9 @@ export const ptBR = {
   register_ledger: "Registar no Livro",
   registering_ledger: "Registando...",
   history_transactions: "Histórico de Transações",
+  "placeholder.item": "Ex: Novo Item",
+  "placeholder.amount": "Ex: 500",
+  "placeholder.notes": "Ex: Observações",
   chart_horizon_all: "Todo o Tempo",
   chart_horizon_moon: "Lua Atual",
   chart_horizon_cycles: "Últimos 30 Ciclos",
@@ -201,6 +209,10 @@ export const ptBR = {
   chart_debt_composition: "Composição da Dívida por Tipo",
   advice_liabilities_evolution: '"Meu suserano, nossos gráficos de spline rastreiam nossos passivos ao longo do tempo. Reembolsos e amortizações representam reduções saudáveis em nosso principal total. Vamos equilibrar nossa taxa de empréstimo com a velocidade de reembolso."',
   advice_debt_by_entity: '"Este gráfico exibe a quem devemos ouro, meu suserano. {entity} é o nosso maior credor com {amount}. Priorizar pagamentos a ele preservará nossas relações comerciais."',
-  advice_debt_composition: '"Meu Senhor, esta rosca exibe a composição de nossa dívida ativa. Temos {amount} pendente, dividido entre várias categorias. Diversificar nossas linhas de crédito mantém a tesouraria estável."'
+  advice_debt_composition: '"Meu Senhor, esta rosca exibe a composição de nossa dívida ativa. Temos {amount} pendente, dividido entre várias categorias. Diversificar nossas linhas de crédito mantém a tesouraria estável."',
+  tpl_salary: "Salário",
+  tpl_blacksmith_payment: "Pagar Ferreiro",
+  tpl_tavern_feast: "Banquete na Taverna",
+  tpl_borrow_gold: "Pegar Ouro Emprestado"
 };
 

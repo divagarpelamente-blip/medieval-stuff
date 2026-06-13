@@ -128,27 +128,28 @@ The layout is structured using a mobile-first responsive framework that guarante
 
 Persistence and trigger logic is strictly bound to the 4-tier literal string architecture.
 
-   +------------------------------------+          +------------------------------------+
-   |              profiles              |          |            transactions            |
-   +------------------------------------+          +------------------------------------+
-   | id          UUID (PK)              |<----+    | id                   UUID (PK)     |
-   | email       TEXT                   |     |    | profile_id           UUID (FK)     |
-   | gold        BIGINT                 |     +---o| amount               NUMERIC       |
-   | level       INTEGER                |          | "from"               TEXT          |
-   | xp          INTEGER                |          | date                 DATE          |
-   | updated_at  TIMESTAMPTZ            |          | month                TEXT          |
-   +------------------------------------+          | year                 INTEGER       |
-                                                   | quarter              TEXT          |
-                                                   | payment_status       TEXT          |
-                                                   | transaction_type     TEXT          |
-                                                   | transaction_subtype  TEXT          |
-                                                   | entity               TEXT          |
-                                                   | transaction_category TEXT          |
-                                                   | transaction_nature   TEXT (CHECK)  |
-                                                   | transaction_flow     TEXT (CHECK)  |
-                                                   | description          TEXT          |
-                                                   | created_at           TIMESTAMPTZ   |
-                                                   +------------------------------------+
+    +------------------------------------+          +------------------------------------+
+    |              profiles              |          |            transactions            |
+    +------------------------------------+          +------------------------------------+
+    | id          UUID (PK)              |<----+    | id                   UUID (PK)     |
+    | email       TEXT                   |     |    | profile_id           UUID (FK)     |
+    | gold        BIGINT                 |     +---o| amount               NUMERIC       |
+    | level       INTEGER                |          | "from"               TEXT          |
+    | xp          INTEGER                |          | value_date           DATE          |
+    | updated_at  TIMESTAMPTZ            |          | posting_date         DATE          |
+    +------------------------------------+          | month                TEXT          |
+                                                    | year                 INTEGER       |
+                                                    | quarter              TEXT          |
+                                                    | payment_status       TEXT          |
+                                                    | transaction_type     TEXT          |
+                                                    | transaction_subtype  TEXT          |
+                                                    | entity               TEXT          |
+                                                    | transaction_category TEXT          |
+                                                    | transaction_nature   TEXT (CHECK)  |
+                                                    | transaction_flow     TEXT (CHECK)  |
+                                                    | description          TEXT          |
+                                                    | created_at           TIMESTAMPTZ   |
+                                                    +------------------------------------+
 
 ### Table Definitions
 
@@ -170,24 +171,33 @@ Contains the detailed financial ledger records natively utilizing a modern `snak
 - `transaction_flow` (`TEXT` - Matrix axis: `'inflow'` or `'outflow'`)
 - `entity` (`TEXT` - Specific destination/origin)
 - `"from"` (`TEXT` - Payer/originator of funds)
-- `description` (`TEXT` - Optional notes)
-- `date`, `month`, `year`, `quarter` - Automatically derived calendar attributes for analytics.
+- `value_date` (`DATE` - Expected transaction completion date)
+- `posting_date` (`DATE` - Ledger posting date, defaults to current date)
+- `month`, `year`, `quarter` - Automatically derived calendar attributes from `posting_date` for analytics.
 
-### Automated Database Triggers
+### Automated Database Triggers & Constraints
 
 1. **Pre-Process Transaction (`tr_pre_transaction_inserted`)**:
-   - A `BEFORE INSERT` trigger that automatically extracts calendar attributes (`year`, `month`, `quarter`) from the inserted `date` (or `CURRENT_DATE`), and defaults empty `payment_status` to `'Completed'`.
+   - A `BEFORE INSERT` trigger that automatically extracts calendar attributes (`year`, `month`, `quarter`) from the inserted `posting_date` (or `CURRENT_DATE`), defaults `value_date` to `posting_date` if empty, and defaults empty `payment_status` to `'Completed'`.
 
 2. **Update Profile Stats (`tr_on_transaction_inserted`)**:
-   - An `AFTER INSERT` trigger that updates the user's `gold` balance, and increments `xp` and `level` accordingly based on income.
-   - If `NEW.transaction_type = 'Income'`: Adds the transaction amount to the user's `gold` balance, and calculates `xp`.
-   - If `NEW.transaction_type != 'Income'`: Subtracts the transaction amount from the user's `gold` balance.
+   - An `AFTER INSERT` trigger (`update_profile_on_transaction`) that updates the user's `gold` balance, and increments `xp` and `level` accordingly based on income.
+   - **Cash vs. Accrual Separation**: Only transactions of nature `'cash'` (or cash-basis transactions of type `'Income'` or `'Expense'`) will alter the player's active profile `gold` balance or award XP.
+   - Accrual invoices and tracking records of types `'Payable'` and `'Receivable'` (which represent outstanding invoices) do NOT update the player's active profile `gold` or XP.
+   - If `NEW.transaction_type = 'Income'` and `NEW.transaction_nature = 'cash'`: Adds the transaction amount to the user's `gold` balance, and calculates `xp`.
+   - If `NEW.transaction_type = 'Expense'` and `NEW.transaction_nature = 'cash'`: Subtracts the transaction amount from the user's `gold` balance.
+
+3. **Double-Entry Subtype Constraints**:
+   - Accrual `'Receivable'` entries must have `transaction_flow = 'inflow'`.
+   - Accrual `'Payable'` entries must have `transaction_flow = 'outflow'`.
+   - Loan borrows (`'New Debt'` subtype) must have `transaction_flow = 'inflow'`.
+   - Loan payments (`'Amortization'` or `'Interest'` subtypes) must have `transaction_flow = 'outflow'` and `transaction_nature = 'cash'`.
 
 ---
 
 ## 6. Centralized 4-Tier Data Engine & Dashboard Architecture
 
-The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js` React Context Hook. Instead of running redundant `filter()` and `reduce()` loops inside every component, the engine parses raw transactions into pristine, pre-calculated 2x2 matrix volumes exactly once per render.
+The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js` React Context Hook. Instead of running redundant `filter()` and `reduce()` loops inside every component, the engine parses raw transactions into pristine, pre-calculated matrix volumes exactly once per render.
 
 ### A. Summary KPI Headers (Tab-specific KPI Rows)
 
@@ -197,14 +207,20 @@ The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the
    - **Total Income:** Accrual-basis inflow (`transaction_nature = 'accrual'` and `transaction_flow = 'inflow'`).
    - **Total Expenses:** Accrual-basis outflow (`transaction_nature = 'accrual'` and `transaction_flow = 'outflow'`).
    - **Net Cash Balance:** Derived from cash-basis movements (receipts vs payments).
-2. **Equity & Savings (`equity_savings`):**
-   - **Real Savings Rate:** Calculated as `(Net Accrual / Total Inflow) * 100` dynamically, representing the percentage of accrued income saved.
+2. **Payables & Receivables (`payables_receivables`):**
+   - **All Payables, Open Payables, All Receivables, Open Receivables, Overdue Rate**: Tracks outstanding assets, liabilities, and their age segments.
 3. **Liabilities (`liabilities`):**
-   - **Current Debt:** Active outstanding liabilities balance.
-4. **Other Tabs (`overview`, `payables_receivables`, `ratios`):**
-   - The top KPI summary row is dynamically hidden when no KPIs are specified for the sub-tab.
+   - **Total Debt, To Be Paid, New Liabilities, Amortizations**: Tracks debt principal, borrowing events, and payments.
 
-### B. Component-Level Pivoting (Autonomous Charts)
+### B. Consolidated Financial Statement Engine
+
+The dashboard engine runs an O(N) single-pass calculation loop to construct the reports:
+1. **Royal Income Statement (Profit & Loss)**: Segments accrued revenues vs accrued expenses to calculate Net Accrued Income.
+2. **Treasury Cash Flow Statement**: Classifies cash-nature movements into Operating, Investing, and Financing activities.
+3. **Balance Sheet**: Dynamically aggregates historical transactions up to the active date filter's cutoff to verify:
+   $$\text{Assets (Cash + Receivables)} = \text{Liabilities (Debt)} + \text{Equity (Net Wealth)}$$
+
+### C. Component-Level Pivoting (Autonomous Charts)
 
 The visualization components possess independent interactive logic to pivot their perspectives:
 
@@ -212,7 +228,7 @@ The visualization components possess independent interactive logic to pivot thei
 - **TimeEvolutionChart.jsx:** A unified SVG spline rendering system with an interactive **4-checkbox legend**, enabling overlay comparisons of `Total income` vs `Total receipts` curves over the same temporal progression map.
 - **TopEntitiesChart.jsx:** The donut chart automatically recalculates segment boundaries and tabular volumes based on a local toggle, tapping directly into the matrix data payload.
 
-### C. Royal Treasurer's Counsel (Contextual Advisor Insights)
+### D. Royal Treasurer's Counsel (Contextual Advisor Insights)
 
 To assist the Lord of the Realm with decision-making, the dashboard couples every visualization chart with a dedicated `RoyalTreasurerInsights` advisor widget. 
 - **Dynamic Render Architecture**: In the Overview sub-tab, charts are paired side-by-side with an instance of `RoyalTreasurerInsights` on large screens (collapsing to a single-column stack on mobile).
@@ -222,8 +238,34 @@ To assist the Lord of the Realm with decision-making, the dashboard couples ever
   - **Detailed Expenses Advice**: Aggregates filtered expenses by individual entity name to pinpoint the heaviest cash drain, formatting the name and amount into `advice_expenses_detailed`.
   - **Debt Advice**: Reads current liabilities; if debt exists, it displays `advice_debt_positive` with the formatted amount, otherwise it displays `advice_debt_free`.
 
-### D. Compact Currency Formatting Engine (`formatNumberCompact`)
+### E. Compact Currency Formatting Engine (`formatNumberCompact`)
 
 To prevent UI overflows and maintain clean layouts on small viewports, the frontend implements a specialized `formatNumberCompact` formatting function:
 - **Value Compaction**: Automatically converts large gold numbers to use standard shorthand suffixes (`K`, `M`, `B`, `T`).
 - **Medieval Accounting Notation**: Positive values are formatted as `+Value / g` and negative values are wrapped in parentheses as `(Value) / g` (e.g. `+1.2K / g` or `(450) / g`), matching historical double-entry record-keeping style.
+
+---
+
+## 7. Royal Treasury Menu & Navigation Flow
+
+To unify access to different areas of the treasury, the application uses a pop-up **Royal Treasury Menu** modal which acts as the core navigation bridge:
+
+### A. Modal Structure & Button Order
+The menu modal is designed to fit on a single screen without scrolling. The modal uses a `max-w-lg` container, with the content area configured as a centered vertical stack (`flex flex-col gap-3.5 max-w-md mx-auto w-full`):
+1. **Register Transaction (Top)**: Opens the transaction entry form (`isNewTxModalOpen = true`) and closes the menu.
+2. **Treasury Dashboard (Middle)**: Opens the dashboard view (`activeTab = 'dashboard'`), sets the default sub-tab to Overview (`dashSubTab = 'overview'`), and closes the menu. This single option merges the previous *Economic Overview*, *Commercial Accounts*, and *Liabilities & Debt* buttons.
+3. **General Ledger (Bottom)**: Opens the general transaction book page (`activeTab = 'transactions'`) and closes the menu. To prevent duplicate access actions, the ledger toolbar's "Register Movement" action button has been removed from this page.
+4. **Financial Statements (After General Ledger)**: Opens the consolidated statement tabs (`activeTab = 'financial_statement'`) separately in an isolated modal tab. The button is styled with a distinct, highlighted `menu_primary` (Primary) badge to signal its status as a core financial report.
+
+### B. Sub-menu Navigation Hierarchy & Return Flow
+To maintain a structured user experience and prevent unexpected exits directly back to the main map:
+- **Escape Key Interception**: A global keyboard event listener in `App.jsx` intercepts the `Escape` key. If the user is currently viewing the dashboard, general ledger, or financial statements sub-menu, pressing `Escape` resets `activeTab` to `'quests'` and simultaneously sets `isTreasuryMenuOpen` to `true`, instantly returning them to the Royal Treasury Menu.
+- **Close Buttons & Backdrop Clicks**: All wrapper exit channels (e.g. clicking the top-right `✕` button or clicking the semi-transparent overlay backdrop of the sub-menus) are hooked to route the user back to the 4-button Treasury Menu modal instead of exiting directly to the quests map.
+
+### C. Quick Actions Templating Engine (Register Transaction Modal Sidebar)
+To streamline the process of entering frequent transactions, the **Register Transaction** modal features a left-aligned **Quick Actions** sidebar:
+- **Responsive Layout**: On desktop screens, it forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
+- **Transactional Templates**: Pre-configured templates (e.g., *Collect Taxes*, *Pay Blacksmith*, *Tavern Feast*, and *Borrow Gold*) map the four-axis transactional integrity constraints onto safe default inputs.
+- **Form State Pre-filling**: Selecting any template automatically triggers `applyTemplate`, which updates state fields (Class, Subclass, Amount, Payer, Entity, Category, Description, Nature, Flow) and sets both Value Date and Posting Date to the current date.
+
+

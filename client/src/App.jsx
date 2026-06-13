@@ -89,7 +89,8 @@ function App() {
   const [txClass, setTxClass] = useState('Income');
   const [txAmount, setTxAmount] = useState('');
   const [txFrom, setTxFrom] = useState('Pedro');
-  const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [txValueDate, setTxValueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [txPostingDate, setTxPostingDate] = useState(new Date().toISOString().split('T')[0]);
   const [txStatus, setTxStatus] = useState('Pending');
   const [txSubClass, setTxSubClass] = useState('Cash receipt');
   const [txEntity, setTxEntity] = useState('Salary');
@@ -107,6 +108,7 @@ function App() {
       setTxCategory(mapped);
     }
   };
+
 
   // Bind Zustand states
   const email = useKingdomStore((state) => state.email);
@@ -160,6 +162,170 @@ function App() {
     }
   });
 
+  // Quick Actions templates
+  const templates = [
+    {
+      name: t('tpl_salary', 'Salary'),
+      icon: '🪙',
+      data: {
+        from: 'Consolidated',
+        transaction_type: 'Income',
+        transaction_subtype: 'Cash receipt',
+        entity: 'Salary',
+        transaction_category: 'Payroll',
+        transaction_nature: 'cash',
+        transaction_flow: 'inflow',
+        payment_status: 'Completed',
+        description: 'Monthly salary payment',
+        amount: '500'
+      }
+    },
+    {
+      name: t('tpl_blacksmith_payment', 'Pay Blacksmith'),
+      icon: '🔨',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Tools and Equipment',
+        transaction_category: 'Markets',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Purchase blacksmith tools & equipment',
+        amount: '150'
+      }
+    },
+    {
+      name: t('tpl_tavern_feast', 'Tavern Feast'),
+      icon: '🍻',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Restaurant',
+        transaction_category: 'Entertainment',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Feast and drinks with local guild members',
+        amount: '50'
+      }
+    },
+    {
+      name: t('tpl_borrow_king', 'Borrow Gold'),
+      icon: '👑',
+      data: {
+        from: 'Consolidated',
+        transaction_type: 'Debt',
+        transaction_subtype: 'New Debt',
+        entity: 'CGD',
+        transaction_category: 'Banking',
+        transaction_nature: 'accrual',
+        transaction_flow: 'inflow',
+        payment_status: 'Pending',
+        description: 'Emergency gold borrow from the crown',
+        amount: '1000'
+      }
+    },
+    {
+      name: t('tpl_pay_landlord', 'Pay Landlord'),
+      icon: '🏰',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Rent',
+        transaction_category: 'Housing',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Monthly land rent payment to the estate',
+        amount: '800'
+      }
+    },
+    {
+      name: t('tpl_purchase_food', 'Purchase Food'),
+      icon: '🌾',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Supermarket',
+        transaction_category: 'Markets',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Acquisition of wheat and food rations',
+        amount: '120'
+      }
+    },
+    {
+      name: t('tpl_healer_potions', 'Healer Potions'),
+      icon: '🧪',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Medicine',
+        transaction_category: 'Health',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Apothecary herbs and healing potions',
+        amount: '45'
+      }
+    },
+    {
+      name: t('tpl_repay_moneylender', 'Repay Moneylender'),
+      icon: '🪙',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Debt',
+        transaction_subtype: 'Amortization',
+        entity: 'CGD',
+        transaction_category: 'Banking',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Loan amortization payment to the guild',
+        amount: '250'
+      }
+    },
+    {
+      name: t('tpl_moneylender_interest', 'Moneylender Interest'),
+      icon: '📈',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Debt',
+        transaction_subtype: 'Interest',
+        entity: 'CGD',
+        transaction_category: 'Banking',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Interest fee on outstanding gold loan',
+        amount: '35'
+      }
+    }
+  ];
+
+  const applyTemplate = (tpl) => {
+    setTxClass(tpl.data.transaction_type);
+    setTxAmount(tpl.data.amount);
+    setTxFrom(tpl.data.from);
+    setTxStatus(tpl.data.payment_status);
+    setTxSubClass(tpl.data.transaction_subtype);
+    setTxEntity(tpl.data.entity);
+    setTxCategory(tpl.data.transaction_category);
+    setTxDescription(tpl.data.description);
+    setTxNature(tpl.data.transaction_nature);
+    setTxFlow(tpl.data.transaction_flow);
+    setTxValueDate(new Date().toISOString().split('T')[0]);
+    setTxPostingDate(new Date().toISOString().split('T')[0]);
+    toast.success(`${tpl.name} template applied!`);
+  };
+
   // Get unique years for the Year filter selector
   const uniqueYears = Array.from(
     new Set(transactions.map((tx) => tx.year).filter(Boolean))
@@ -177,8 +343,8 @@ function App() {
     if (filterEntity !== 'All' && tx.entity !== filterEntity) return false;
     return true;
   }).sort((a, b) => {
-    const dateA = new Date(a.date || a.created_at);
-    const dateB = new Date(b.date || b.created_at);
+    const dateA = new Date(a.posting_date || a.value_date || a.created_at);
+    const dateB = new Date(b.posting_date || b.value_date || b.created_at);
     return dateB - dateA;
   });
 
@@ -212,7 +378,7 @@ function App() {
     }
 
     return false;
-  }).sort((a, b) => new Date(a.date || a.created_at) - new Date(b.date || b.created_at));
+  }).sort((a, b) => new Date(a.posting_date || a.value_date || a.created_at) - new Date(b.posting_date || b.value_date || b.created_at));
 
   const engineData = useDashboardEngine(dashboardFilteredTransactions);
 
@@ -356,8 +522,12 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       if (e.key === 'Escape') {
         if (isNewTxModalOpen) {
           setIsNewTxModalOpen(false);
+          setIsTreasuryMenuOpen(true);
         } else if (isMineModalOpen) {
           setIsMineModalOpen(false);
+        } else if (activeTab === 'dashboard' || activeTab === 'transactions' || activeTab === 'financial_statement') {
+          setActiveTab('quests');
+          setIsTreasuryMenuOpen(true);
         } else if (activeTab !== 'quests') {
           setActiveTab('quests');
         }
@@ -567,7 +737,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     setTxClass('income');
     setTxAmount('');
     setTxFrom(fromOptions[0] || 'Pedro');
-    setTxDate(new Date().toISOString().split('T')[0]);
+    setTxValueDate(new Date().toISOString().split('T')[0]);
+    setTxPostingDate(new Date().toISOString().split('T')[0]);
     setTxStatus(statusOptions[0] || 'Pending');
     setTxClass(classOptions[0] || 'Income');
     setTxSubClass(subClassOptions[0] || 'Cash receipt');
@@ -674,8 +845,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     const toastId = toast.loading(t('saving_ledger') || 'Saving ledger changes...');
     try {
       const upsertRows = Object.values(editingTxs).map(tx => {
-        const txDate = tx.date || new Date().toISOString().split('T')[0];
-        const dateObj = new Date(txDate);
+        const postingDate = tx.posting_date || new Date().toISOString().split('T')[0];
+        const valueDate = tx.value_date || postingDate;
+        const dateObj = new Date(postingDate);
         const year = dateObj.getFullYear();
         const month = tx.month || dateObj.toLocaleString('default', { month: 'long' });
         const quarter = 'Q' + (Math.floor(dateObj.getMonth() / 3) + 1);
@@ -693,7 +865,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           amount: Number(tx.amount),
           description: tx.description,
           transaction_category: entityMappings[tx.entity] || tx.transaction_category || 'Other Banking',
-          date: txDate,
+          value_date: valueDate,
+          posting_date: postingDate,
           month,
           year,
           quarter
@@ -737,7 +910,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       transaction_type: txClass,
       amount: amountNum,
       from: txFrom,
-      date: txDate,
+      value_date: txValueDate,
+      posting_date: txPostingDate,
       payment_status: txStatus,
       transaction_subtype: txSubClass,
       entity: txEntity,
@@ -760,7 +934,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       setTxSubClass(subClassOptions[0] || 'Cash receipt');
       setTxEntity(entityOptions[0] || 'Salary');
       setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
-      setTxDate(new Date().toISOString().split('T')[0]);
+      setTxValueDate(new Date().toISOString().split('T')[0]);
+      setTxPostingDate(new Date().toISOString().split('T')[0]);
       setTxStatus(statusOptions[0] || 'Pending');
       setTxClass(classOptions[0] || 'Income');
       setIsMineModalOpen(false);
@@ -904,10 +1079,77 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           isOpen={isTreasuryMenuOpen}
           onClose={() => setIsTreasuryMenuOpen(false)}
           title={t('treasury_menu_title', 'Royal Treasury Menu')}
-          size="max-w-2xl"
+          size="max-w-lg"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Financial Statements (Primary Option) */}
+          <div className="flex flex-col gap-3.5 max-w-md mx-auto w-full">
+            {/* Register Transaction (Top) */}
+            <button
+              type="button"
+              onClick={() => {
+                handleNewTxClick();
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                ➕
+              </div>
+              <div className="flex-grow min-w-0">
+                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                  {t('menu_register_transaction', 'Register Transaction')}
+                </h3>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_register_transaction_desc', 'Record a new gold coin movement, income, expense, payable, receivable or debt.')}
+                </p>
+              </div>
+            </button>
+
+            {/* Treasury Dashboard (Middle - Merged Option) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('dashboard');
+                setDashSubTab('overview');
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                📊
+              </div>
+              <div className="flex-grow min-w-0">
+                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                  {t('menu_treasury_dashboard', 'Treasury Dashboard')}
+                </h3>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_treasury_dashboard_desc', 'General view of cash balances, category distribution, commercial accounts, and liabilities.')}
+                </p>
+              </div>
+            </button>
+
+            {/* General Ledger (Bottom) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('transactions');
+                setIsTreasuryMenuOpen(false);
+              }}
+              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
+                📖
+              </div>
+              <div className="flex-grow min-w-0">
+                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
+                  {t('menu_general_ledger', 'General Ledger')}
+                </h3>
+                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
+                  {t('menu_general_ledger_desc', 'Register gold coins movements, manage status, category, entity, and view entire book history.')}
+                </p>
+              </div>
+            </button>
+
+            {/* Financial Statements (After General Ledger) */}
             <button
               type="button"
               onClick={() => {
@@ -930,97 +1172,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
                 <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
                   {t('menu_financial_statements_desc', 'Consolidated financial reports including Balance Sheet, Profit & Loss, and Cash Flow.')}
-                </p>
-              </div>
-            </button>
-
-            {/* Economic Overview */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('dashboard');
-                setDashSubTab('overview');
-                setIsTreasuryMenuOpen(false);
-              }}
-              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
-                📊
-              </div>
-              <div className="flex-grow min-w-0">
-                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
-                  {t('menu_economic_overview', 'Economic Overview')}
-                </h3>
-                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
-                  {t('menu_economic_overview_desc', 'General view of cash balances, time evolution, and category distribution.')}
-                </p>
-              </div>
-            </button>
-
-            {/* Commercial Accounts */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('dashboard');
-                setDashSubTab('payables_receivables');
-                setIsTreasuryMenuOpen(false);
-              }}
-              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
-                💸
-              </div>
-              <div className="flex-grow min-w-0">
-                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
-                  {t('menu_commercial_accounts', 'Commercial Accounts')}
-                </h3>
-                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
-                  {t('menu_commercial_accounts_desc', 'Track outstanding payables, receivables, and payment methods.')}
-                </p>
-              </div>
-            </button>
-
-            {/* Liabilities & Debt */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('dashboard');
-                setDashSubTab('liabilities');
-                setIsTreasuryMenuOpen(false);
-              }}
-              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
-                🏦
-              </div>
-              <div className="flex-grow min-w-0">
-                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
-                  {t('menu_liabilities_debt', 'Liabilities & Debt')}
-                </h3>
-                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
-                  {t('menu_liabilities_debt_desc', 'Monitor outstanding liabilities, debt principal, and amortizations.')}
-                </p>
-              </div>
-            </button>
-
-            {/* General Ledger (Spans 2 columns) */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('transactions');
-                setIsTreasuryMenuOpen(false);
-              }}
-              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer sm:col-span-2"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
-                📖
-              </div>
-              <div className="flex-grow min-w-0">
-                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
-                  {t('menu_general_ledger', 'General Ledger')}
-                </h3>
-                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
-                  {t('menu_general_ledger_desc', 'Register gold coins movements, manage status, category, entity, and view entire book history.')}
                 </p>
               </div>
             </button>
@@ -1049,7 +1200,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             {/* Form in columns */}
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Row 1 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                 {/* From */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
@@ -1066,15 +1217,29 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </select>
                 </div>
 
-                {/* Date */}
+                {/* Value Date */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.date}
+                    {t.value_date}
                   </label>
                   <input
                     type="date"
-                    value={txDate}
-                    onChange={(e) => setTxDate(e.target.value)}
+                    value={txValueDate}
+                    onChange={(e) => setTxValueDate(e.target.value)}
+                    required
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  />
+                </div>
+
+                {/* Posting Date */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    {t.posting_date}
+                  </label>
+                  <input
+                    type="date"
+                    value={txPostingDate}
+                    onChange={(e) => setTxPostingDate(e.target.value)}
                     required
                     className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   />
@@ -1114,7 +1279,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               </div>
 
               {/* Row 2 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                 {/* Class */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
@@ -1160,7 +1325,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     {Object.entries(
                       entityOptions.reduce((acc, opt) => {
                         const cat = entityMappings[opt] || 'Uncategorized';
-                        if (!acc[cat]) acc[cat] = [];
+                        if (!acc[cat]) acc[acc.category || cat] = [];
                         acc[cat].push(opt);
                         return acc;
                       }, {})
@@ -1175,7 +1340,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
 
                 {/* Description / Notes */}
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.description}
                   </label>
@@ -1190,7 +1355,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               </div>
 
               {/* Row 3: Nature & Flow */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mt-2">
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     Nature
@@ -1611,7 +1776,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                   {tx.from} • {tx.transaction_subtype || '-'}
                                 </div>
                                 <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between text-[8.5px] text-stone-500 font-bold">
-                                  <span>📅 {tx.date} ({tx.month} {tx.year})</span>
+                                  <span>📅 V: {tx.value_date} | P: {tx.posting_date} ({tx.month} {tx.year})</span>
                                   <span className="uppercase text-[8px] bg-[#8b4513]/10 text-[#4b2c20] px-1 rounded">{tx.transaction_category || '-'}</span>
                                 </div>
                               </>
@@ -1634,11 +1799,36 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         {/* Modal para Nova Transação a partir do Histórico */}
         <Modal
           isOpen={isNewTxModalOpen}
-          onClose={() => setIsNewTxModalOpen(false)}
+          onClose={() => {
+            setIsNewTxModalOpen(false);
+            setIsTreasuryMenuOpen(true);
+          }}
           title={t.register_movement}
           size="max-w-4xl"
         >
-          <div className="space-y-6">
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Quick Actions Sidebar (Left) */}
+            <div className="w-full md:w-40 bg-[#faf4e5]/60 border border-[#8b4513]/20 rounded-xl p-3 flex flex-col gap-2.5 flex-shrink-0 shadow-sm">
+              <h4 className="text-[9.5px] font-black uppercase tracking-widest text-[#4b2c20] border-b border-[#8b4513]/15 pb-2 mb-1 flex items-center gap-1.5 font-sans">
+                ⚡ {t('quick_actions', 'Quick Actions')}
+              </h4>
+              <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar-subtle pr-1">
+                {templates.map((tpl, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => applyTemplate(tpl)}
+                    className="w-full text-left p-2 py-1.5 rounded-lg border border-[#8b4513]/25 bg-[#faf4e5]/90 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] transition-all text-[8.5px] font-bold uppercase tracking-wider font-sans cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span className="text-xs">{tpl.icon}</span>
+                    <span className="truncate">{tpl.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Main Form Area (Right) */}
+            <div className="flex-grow space-y-6">
             <div className="flex items-center gap-4 border-b border-[#8b4513]/20 pb-4">
               <div className="w-12 h-12 bg-[#8b4513]/10 rounded-full flex items-center justify-center border-2 border-[#8b4513]/20 text-2xl">
                 ➕
@@ -1651,9 +1841,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Row 1 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-12 gap-4">
                 {/* From */}
-                <div>
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.origin_from}
                   </label>
@@ -1668,22 +1858,36 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </select>
                 </div>
 
-                {/* Date */}
-                <div>
+                {/* Value Date */}
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.date}
+                    {t.value_date}
                   </label>
                   <input
                     type="date"
-                    value={txDate}
-                    onChange={(e) => setTxDate(e.target.value)}
+                    value={txValueDate}
+                    onChange={(e) => setTxValueDate(e.target.value)}
                     required
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  />
+                </div>
+
+                {/* Posting Date */}
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    {t.posting_date}
+                  </label>
+                  <input
+                    type="date"
+                    value={txPostingDate}
+                    onChange={(e) => setTxPostingDate(e.target.value)}
+                    required
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
 
                 {/* Amount */}
-                <div>
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.amount_gold}
                   </label>
@@ -1694,12 +1898,15 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     placeholder={t('placeholder.amount')}
                     required
                     min="1"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2.5 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
+              </div>
 
+              {/* Row 2 */}
+              <div className="grid grid-cols-12 gap-4">
                 {/* Status */}
-                <div>
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.status}
                   </label>
@@ -1713,12 +1920,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* Row 2 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Class */}
-                <div>
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.class}
                   </label>
@@ -1733,8 +1937,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </select>
                 </div>
 
-                {/* Subcategory */}
-                <div>
+                {/* Subclass */}
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.sub_class}
                   </label>
@@ -1750,7 +1954,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
 
                 {/* Entity */}
-                <div>
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.entity}
                   </label>
@@ -1775,9 +1979,42 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Row 3 */}
+              <div className="grid grid-cols-12 gap-4">
+                {/* Nature */}
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Nature
+                  </label>
+                  <select
+                    value={txNature}
+                    onChange={(e) => setTxNature(e.target.value)}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="accrual">Accrual</option>
+                  </select>
+                </div>
+
+                {/* Flow */}
+                <div className="col-span-12 sm:col-span-6 md:col-span-3">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Flow
+                  </label>
+                  <select
+                    value={txFlow}
+                    onChange={(e) => setTxFlow(e.target.value)}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="inflow">Inflow</option>
+                    <option value="outflow">Outflow</option>
+                  </select>
+                </div>
 
                 {/* Description / Notes */}
-                <div>
+                <div className="col-span-12 md:col-span-6">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
                     {t.description}
                   </label>
@@ -1800,6 +2037,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 {isLoading ? `${t.register_movement}...` : t.save_transaction}
               </button>
             </form>
+            </div>
           </div>
         </Modal>
 
@@ -1809,6 +2047,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setActiveTab('quests');
+                setIsTreasuryMenuOpen(true);
               }
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
@@ -1830,7 +2069,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               {/* Close Button to return to quests */}
               <button 
                 type="button"
-                onClick={() => setActiveTab('quests')}
+                onClick={() => {
+                  setActiveTab('quests');
+                  setIsTreasuryMenuOpen(true);
+                }}
                 className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
                 title={t.back_to_map}
               >
@@ -2211,6 +2453,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setActiveTab('quests');
+                setIsTreasuryMenuOpen(true);
               }
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
@@ -2232,7 +2475,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               {/* Close Button to return to quests */}
               <button 
                 type="button"
-                onClick={() => setActiveTab('quests')}
+                onClick={() => {
+                  setActiveTab('quests');
+                  setIsTreasuryMenuOpen(true);
+                }}
                 className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
                 title={t.back_to_map}
               >
@@ -2284,6 +2530,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setActiveTab('quests');
+                setIsTreasuryMenuOpen(true);
               }
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
@@ -2305,7 +2552,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               {/* Close Button to return to quests */}
               <button 
                 type="button"
-                onClick={() => setActiveTab('quests')}
+                onClick={() => {
+                  setActiveTab('quests');
+                  setIsTreasuryMenuOpen(true);
+                }}
                 className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
                 title={t.back_to_map}
               >
@@ -2396,13 +2646,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       accept=".csv"
                       className="hidden"
                     />
-                    <button
-                      type="button"
-                      onClick={handleNewTxClick}
-                      className="px-3 py-1.5 bg-[#8b4513] border-2 border-[#d4af37]/30 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <span>➕</span> {t.register_movement}
-                    </button>
+
                     <button
                       type="button"
                       onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
@@ -2905,7 +3149,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     </div>
                                   </div>
                                   <div className="border-t border-[#8b4513]/10 pt-2 flex justify-between items-center text-[8.5px] text-stone-500 font-bold">
-                                    <span>📅 {tx.date} ({tx.month} {tx.year})</span>
+                                    <span>📅 V: {tx.value_date} | P: {tx.posting_date} ({tx.month} {tx.year})</span>
                                     <div className="flex gap-1 flex-wrap justify-end">
                                       <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_nature || '-'}</span>
                                       <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_flow || '-'}</span>

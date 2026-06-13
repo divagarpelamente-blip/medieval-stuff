@@ -51,7 +51,8 @@ export const en = {
   expense: "Expense",
   amount_gold: "Amount (Gold)",
   origin_from: "Origin (From)",
-  date: "Date",
+  value_date: "Value Date",
+  posting_date: "Posting Date",
   status: "Status",
   category: "Category",
   subcategory: "Subcategory",
@@ -102,6 +103,10 @@ export const en = {
   menu_liabilities_debt_desc: "Monitor outstanding liabilities, debt principal, and amortizations.",
   menu_general_ledger: "General Ledger",
   menu_general_ledger_desc: "Register gold coins movements, manage status, category, entity, and view entire book history.",
+  menu_treasury_dashboard: "Treasury Dashboard",
+  menu_treasury_dashboard_desc: "General view of cash balances, category distribution, commercial accounts, and liabilities.",
+  menu_register_transaction: "Register Transaction",
+  menu_register_transaction_desc: "Record a new gold coin movement, income, expense, payable, receivable or debt.",
   gran_month: "Monthly view",
   gran_quarter: "Quarterly view",
   gran_year: "Year view",
@@ -232,6 +237,10 @@ export const en = {
   chart_debt_composition: "Debt Composition by Type",
   advice_liabilities_evolution: '"My Liege, our spline charts track our liabilities over time. Repayments and amortizations represent healthy reductions in our overall principal. Let us balance our borrow rate with repayment velocity."',
   advice_debt_by_entity: '"This chart displays who we owe gold to, my Liege. {entity} is our biggest creditor at {amount}. Prioritizing payments to them will preserve our trade relationships."',
-  advice_debt_composition: '"My Lord, this donut displays the composition of our active debt. We have {amount} outstanding, split among various categories. Diversifying our lines of credit keeps the treasury stable."'
+  advice_debt_composition: '"My Lord, this donut displays the composition of our active debt. We have {amount} outstanding, split among various categories. Diversifying our lines of credit keeps the treasury stable."',
+  tpl_salary: "Salary",
+  tpl_blacksmith_payment: "Pay Blacksmith",
+  tpl_tavern_feast: "Tavern Feast",
+  tpl_borrow_gold: "Borrow Gold"
 };
 

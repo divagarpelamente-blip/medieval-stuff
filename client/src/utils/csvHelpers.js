@@ -4,7 +4,8 @@ export const handleExportCSV = (transactions, t) => {
   const headers = [
     'amount',
     'from',
-    'date',
+    'value_date',
+    'posting_date',
     'payment_status',
     'transaction_type',
     'transaction_subtype',
@@ -134,6 +135,10 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
             tx.payment_status = val;
           } else if (header === 'ouro' || header === 'coins' || header === 'amount') {
             tx.amount = Number(val);
+          } else if (header === 'value_date' || header === 'value date' || header === 'date' || header === 'data') {
+            tx.value_date = val;
+          } else if (header === 'posting_date' || header === 'posting date') {
+            tx.posting_date = val;
           } else {
             tx[header] = val;
           }
@@ -148,6 +153,15 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
         }
         if (!tx.from) {
           tx.from = fromOptions[0] || 'Pedro';
+        }
+
+        // Populate missing dates with safe defaults
+        const todayDate = new Date().toISOString().split('T')[0];
+        if (!tx.posting_date) {
+          tx.posting_date = tx.date || todayDate;
+        }
+        if (!tx.value_date) {
+          tx.value_date = tx.date || tx.posting_date;
         }
 
         // Derive nature and flow if they are missing

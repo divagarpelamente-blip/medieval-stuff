@@ -298,7 +298,7 @@ export function useDashboardEngine(filteredTransactions = []) {
 
     // Balance Sheet Cutoff Calculation
     const cutoffTime = filteredTransactions.length > 0
-      ? Math.max(...filteredTransactions.map(tx => new Date(tx.date || tx.created_at).getTime()))
+      ? Math.max(...filteredTransactions.map(tx => new Date(tx.posting_date || tx.created_at).getTime()))
       : new Date().getTime();
 
     // Accounts for Balance Sheet (Cumulative historically up to cutoff date)
@@ -311,7 +311,7 @@ export function useDashboardEngine(filteredTransactions = []) {
 
     allTxs.forEach((tx) => {
       const txAmount = Number(tx.amount) || 0;
-      const txTime = new Date(tx.date || tx.created_at).getTime();
+      const txTime = new Date(tx.posting_date || tx.created_at).getTime();
 
       // 1. Cumulative Balance Sheet Accumulation
       if (txTime <= cutoffTime) {
