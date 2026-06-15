@@ -130,6 +130,8 @@ function App() {
   const level = useKingdomStore((state) => state.level);
   const xp = useKingdomStore((state) => state.xp);
   const gems = useKingdomStore((state) => state.gems);
+  const user = useKingdomStore((state) => state.user);
+  const role = useKingdomStore((state) => state.role);
   const transactions = useKingdomStore((state) => state.transactions);
   const isLoading = useKingdomStore((state) => state.isLoading);
   
@@ -138,6 +140,7 @@ function App() {
   const fetchDashboardData = useKingdomStore((state) => state.fetchDashboardData);
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
+  const initAuth = useKingdomStore((state) => state.initAuth);
 
   // Default to last 1 year, and current quarter/month on load
   useEffect(() => {
@@ -380,11 +383,13 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const overdueRate = totalPendingExpensesCount > 0 ? (totalOverdueExpensesCount / totalPendingExpensesCount) * 100 : 0;
 
 
-  // Fetch initial profile state and dashboard/transactions data on mount
+  // Initialize auth state and listen for session transitions
   useEffect(() => {
-    fetchKingdomData(GUEST_PROFILE_ID);
-    fetchDashboardData(GUEST_PROFILE_ID);
-  }, [fetchKingdomData, fetchDashboardData]);
+    const unsubscribe = initAuth();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [initAuth]);
 
   // Global key listener to return to previous screen on Escape
   useEffect(() => {

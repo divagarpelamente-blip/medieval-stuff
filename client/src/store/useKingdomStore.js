@@ -43,6 +43,8 @@ export const useKingdomStore = create((set, get) => ({
   topEntities: [],
   isLoading: false,
   language: loadLocal('language', 'en'),
+  user: null,
+  role: 'lord',
 
   // Dropdown manage lists
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
@@ -250,12 +252,13 @@ export const useKingdomStore = create((set, get) => ({
 
   // Fetch lightweight profile data (single-row polling mechanics)
   fetchKingdomData: async (profileId) => {
+    const userId = get().user?.id || profileId;
     set({ isLoading: true });
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', profileId)
+        .eq('id', userId)
         .maybeSingle();
 
       if (error) {
@@ -279,6 +282,7 @@ export const useKingdomStore = create((set, get) => ({
 
   // Native zero-calculation syncing mechanism for the Dashboard Engine
   fetchDashboardData: async (profileId) => {
+    const userId = get().user?.id || profileId;
     set({ isLoading: true });
     try {
       const [
@@ -290,13 +294,13 @@ export const useKingdomStore = create((set, get) => ({
         prKpiRes,
         liabilitiesKpiRes
       ] = await Promise.all([
-        supabase.from('transactions').select('*').eq('profile_id', profileId).order('created_at', { ascending: false }).limit(100),
-        supabase.from('view_dashboard_kpi_summary').select('*').eq('profile_id', profileId).maybeSingle(),
-        supabase.from('view_chart_flow_by_category').select('*').eq('profile_id', profileId),
-        supabase.from('view_chart_time_evolution').select('*').eq('profile_id', profileId).order('dimension_date', { ascending: true }),
-        supabase.from('view_chart_top_entities').select('*').eq('profile_id', profileId).order('total_volume', { ascending: false }),
-        supabase.from('view_payables_receivables_kpis').select('*').eq('profile_id', profileId).maybeSingle(),
-        supabase.from('view_liabilities_kpis').select('*').eq('profile_id', profileId).maybeSingle()
+        supabase.from('transactions').select('*').eq('profile_id', userId).order('created_at', { ascending: false }).limit(100),
+        supabase.from('view_dashboard_kpi_summary').select('*').eq('profile_id', userId).maybeSingle(),
+        supabase.from('view_chart_flow_by_category').select('*').eq('profile_id', userId),
+        supabase.from('view_chart_time_evolution').select('*').eq('profile_id', userId).order('dimension_date', { ascending: true }),
+        supabase.from('view_chart_top_entities').select('*').eq('profile_id', userId).order('total_volume', { ascending: false }),
+        supabase.from('view_payables_receivables_kpis').select('*').eq('profile_id', userId).maybeSingle(),
+        supabase.from('view_liabilities_kpis').select('*').eq('profile_id', userId).maybeSingle()
       ]);
 
       if (transactionsRes.error) console.error('Error fetching transactions:', transactionsRes.error);
@@ -322,13 +326,35 @@ export const useKingdomStore = create((set, get) => ({
 
   // Insert transaction to database, triggering Postgres profile updates, and synchronize state
   registerTransaction: async (profileId, transactionData) => {
-    set({ isLoading: true });
+    const userId = get().user?.id || profileId;
+    const tempId = 'temp-' + Date.now();
+    const tempTx = {
+      id: tempId,
+      profile_id: userId,
+      transaction_type: transactionData.transaction_type,
+      amount: Number(transactionData.amount),
+      from: transactionData.from,
+      value_date: transactionData.value_date || new Date().toISOString().split('T')[0],
+      posting_date: transactionData.posting_date || new Date().toISOString().split('T')[0],
+      payment_status: transactionData.payment_status || 'Completed',
+      transaction_subtype: transactionData.transaction_subtype,
+      entity: transactionData.entity,
+      transaction_category: transactionData.transaction_category,
+      transaction_nature: transactionData.transaction_nature,
+      transaction_flow: transactionData.transaction_flow,
+      description: transactionData.description,
+      created_at: new Date().toISOString()
+    };
+
+    const prevTransactions = get().transactions;
+    set({ transactions: [tempTx, ...prevTransactions], isLoading: true });
+
     try {
       const { data, error } = await supabase
         .from('transactions')
         .insert([
           {
-            profile_id: profileId,
+            profile_id: userId,
             transaction_type: transactionData.transaction_type,
             amount: Number(transactionData.amount),
             from: transactionData.from,
@@ -351,16 +377,17 @@ export const useKingdomStore = create((set, get) => ({
         throw error;
       }
 
-      // Append locally to avoid fetching all historical transactions
       if (data && data.length > 0) {
-        set((state) => ({ transactions: [data[0], ...state.transactions] }));
+        set((state) => ({
+          transactions: state.transactions.map((t) => (t.id === tempId ? data[0] : t))
+        }));
       }
 
       // Fetch only the profile stats to get the new trigger-calculated Gold, XP, and Level
       const profileRes = await supabase
         .from('profiles')
         .select('gold, xp, level')
-        .eq('id', profileId)
+        .eq('id', userId)
         .single();
       
       if (profileRes.data) {
@@ -371,10 +398,11 @@ export const useKingdomStore = create((set, get) => ({
         });
       }
 
-      get().fetchDashboardData(profileId);
+      get().fetchDashboardData(userId);
 
       return { success: true, data };
     } catch (err) {
+      set({ transactions: prevTransactions });
       console.error('Error registering transaction:', err);
       return { success: false, error: err.message || err };
     } finally {
@@ -384,10 +412,36 @@ export const useKingdomStore = create((set, get) => ({
 
   // Insert multiple transactions to database in a single query, triggering updates, and synchronize state
   registerTransactions: async (profileId, transactionsList) => {
-    set({ isLoading: true });
+    const userId = get().user?.id || profileId;
+    const tempIds = [];
+    const tempTxs = transactionsList.map((tx, idx) => {
+      const tempId = 'temp-batch-' + idx + '-' + Date.now();
+      tempIds.push(tempId);
+      return {
+        id: tempId,
+        profile_id: userId,
+        transaction_type: tx.transaction_type,
+        amount: Number(tx.amount),
+        from: tx.from,
+        value_date: tx.value_date || new Date().toISOString().split('T')[0],
+        posting_date: tx.posting_date || new Date().toISOString().split('T')[0],
+        payment_status: tx.payment_status || 'Completed',
+        transaction_subtype: tx.transaction_subtype,
+        entity: tx.entity,
+        transaction_category: tx.transaction_category,
+        transaction_nature: tx.transaction_nature,
+        transaction_flow: tx.transaction_flow,
+        description: tx.description,
+        created_at: new Date().toISOString()
+      };
+    });
+
+    const prevTransactions = get().transactions;
+    set({ transactions: [...tempTxs, ...prevTransactions], isLoading: true });
+
     try {
       const formatted = transactionsList.map((tx) => ({
-        profile_id: profileId,
+        profile_id: userId,
         transaction_type: tx.transaction_type,
         amount: Number(tx.amount),
         from: tx.from,
@@ -413,16 +467,24 @@ export const useKingdomStore = create((set, get) => ({
         throw error;
       }
 
-      // Append locally
       if (data && data.length > 0) {
-        set((state) => ({ transactions: [...data, ...state.transactions] }));
+        set((state) => {
+          const nextTxs = [...state.transactions];
+          tempIds.forEach((tempId, index) => {
+            const matchIdx = nextTxs.findIndex(t => t.id === tempId);
+            if (matchIdx !== -1 && data[index]) {
+              nextTxs[matchIdx] = data[index];
+            }
+          });
+          return { transactions: nextTxs };
+        });
       }
 
       // Fetch only the profile stats
       const profileRes = await supabase
         .from('profiles')
         .select('gold, xp, level')
-        .eq('id', profileId)
+        .eq('id', userId)
         .single();
 
       if (profileRes.data) {
@@ -433,15 +495,44 @@ export const useKingdomStore = create((set, get) => ({
         });
       }
 
-      get().fetchDashboardData(profileId);
+      get().fetchDashboardData(userId);
 
       return { success: true, data };
     } catch (err) {
+      set({ transactions: prevTransactions });
       console.error('Error batch registering transactions:', err);
       return { success: false, error: err.message || err };
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  initAuth: () => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        set({ user: session.user, email: session.user.email });
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileData) {
+          set({
+            gold: Number(profileData.gold) || 0,
+            xp: profileData.xp || 0,
+            level: profileData.level || 1,
+            role: profileData.role || 'lord'
+          });
+        }
+        get().fetchKingdomData(session.user.id);
+        get().fetchDashboardData(session.user.id);
+      } else {
+        set({ user: null, role: 'lord', email: 'guest@medieval.stuff' });
+        get().resetStore();
+      }
+    });
+    return () => subscription.unsubscribe();
   },
 
   borrowLoan: async (profileId, { amount, from, entity, description, date }) => {
