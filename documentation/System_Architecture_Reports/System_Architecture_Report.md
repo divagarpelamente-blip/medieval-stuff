@@ -58,12 +58,20 @@ Eldoria separates state into two primary scopes: **global runtime states (Zustan
 
 Located in `client/src/store/useKingdomStore.js`, the Zustand store handles:
 
-- **Stat State**: `gold`, `gems`, `xp`, `level`, `email`, and loading spinners (`isLoading`).
-- **Ledger Records**: `transactions` array.
-- **Database Operations**: Async dispatches to Supabase for single or batch transaction entries.
-  - **Action Isolation:** Heavy multi-row transaction datasets are strictly isolated to `fetchDashboardTransactions` (only called when visiting the Dashboard or Ledger), keeping `fetchKingdomData` as a lightning-fast single-row profile poller for the core HUD.
-- **Atomic Optimizations**: The `registerTransaction` logic avoids massive full-table synchronization payloads by leveraging local array unshifting (`[newTx, ...transactions]`) while only polling Supabase for the calculated profile scalar values (`gold`, `xp`, `level`).
-- **Synchronizations**: Triggers dynamic language switches inside the `i18next` engine during store action executions.
+- **Stat State**: Core scalar values `gold`, `gems`, `xp`, `level`, `email`, and loading spinners (`isLoading`).
+- **Dashboard Views State**: Pristine adapter layers including `kpiSummary`, `payablesReceivablesKpis`, `liabilitiesKpis`, `flowByCategory` matrix, `timeEvolution` timeline, and `topEntities` arrays.
+- **Ledger Records**: The global `transactions` array representing the audit log.
+- **Interactive Configuration Playloads**: Option arrays (`fromOptions`, `statusOptions`, `classOptions`, `subClassOptions`, `entityOptions`, `categoryOptions`, `monthOptions`), Quick Actions templates (`templates`), and dynamic category mapping schema (`entityMappings`).
+- **Database Operations**: Async dispatches to Supabase:
+  - `fetchKingdomData`: Fast single-row profile state polling that minimizes overhead.
+  - `fetchDashboardData` (Action Isolation): Heavy multi-row transaction reads isolated to the dashboard and ledger layouts.
+  - `registerTransaction`: Installs a single transaction record, updating the local state via local unshifting (`[newTx, ...transactions]`) while reloading profile stats and refreshing dashboard variables.
+  - `registerTransactions`: Multi-row batch inserts via a single transactional query to prevent multiple single updates.
+  - `borrowLoan`: Double-entry transaction compiler generating matching accrual and cash records for liabilities.
+  - `settlePayable`: Toggles the outstanding ledger record to `'Completed'` and registers a corresponding cash outflow transaction.
+  - `addOption` / `deleteOption`: Modifies localized options arrays (and custom Quick Action templates) dynamically and persists updates to LocalStorage.
+- **Atomic Optimizations**: The `registerTransaction` and `registerTransactions` hooks avoid massive synchronization loops by locally unshifting arrays and performing single-row polls for trigger-calculated values (`gold`, `xp`, `level`).
+- **Synchronizations**: Exposes a `setLanguage` dispatch which modifies the store state and synchronizes runtime locales via `i18n.changeLanguage(lang)`.
 
 ### B. LocalStorage Configurations
 
@@ -73,6 +81,7 @@ To ensure a personalized, modular experience without querying DB configurations 
 - `eldoria_categoryOptions`: High-level category groupings.
 - `eldoria_entityOptions`: Specific commercial entities/destinations.
 - `eldoria_entityMappings`: Key-value map linking entities accurately to their parent categories.
+- `eldoria_templates`: User-customizable Quick Action templates.
 - `eldoria_language`: Active locale key.
 
 > [!NOTE]
@@ -141,13 +150,15 @@ Persistence and trigger logic is strictly bound to the 4-tier literal string arc
                                                     | year                 INTEGER       |
                                                     | quarter              TEXT          |
                                                     | payment_status       TEXT          |
-                                                    | transaction_type     TEXT          |
+                                                    | transaction_type     TEXT (CHECK)  |
                                                     | transaction_subtype  TEXT          |
                                                     | entity               TEXT          |
                                                     | transaction_category TEXT          |
                                                     | transaction_nature   TEXT (CHECK)  |
                                                     | transaction_flow     TEXT (CHECK)  |
                                                     | description          TEXT          |
+                                                    | due_date             DATE          |
+                                                    | payment_method       TEXT          |
                                                     | created_at           TIMESTAMPTZ   |
                                                     +------------------------------------+
 
@@ -174,6 +185,8 @@ Contains the detailed financial ledger records natively utilizing a modern `snak
 - `value_date` (`DATE` - Expected transaction completion date)
 - `posting_date` (`DATE` - Ledger posting date, defaults to current date)
 - `month`, `year`, `quarter` - Automatically derived calendar attributes from `posting_date` for analytics.
+- `due_date` (`DATE` - Date limits for payment requirements)
+- `payment_method` (`TEXT` - Asset channel: e.g. `'Vault Cash'`)
 
 ### Automated Database Triggers & Constraints
 
@@ -181,17 +194,21 @@ Contains the detailed financial ledger records natively utilizing a modern `snak
    - A `BEFORE INSERT` trigger that automatically extracts calendar attributes (`year`, `month`, `quarter`) from the inserted `posting_date` (or `CURRENT_DATE`), defaults `value_date` to `posting_date` if empty, and defaults empty `payment_status` to `'Completed'`.
 
 2. **Update Profile Stats (`tr_on_transaction_inserted`)**:
-   - An `AFTER INSERT` trigger (`update_profile_on_transaction`) that updates the user's `gold` balance, and increments `xp` and `level` accordingly based on income.
-   - **Cash vs. Accrual Separation**: Only transactions of nature `'cash'` (or cash-basis transactions of type `'Income'` or `'Expense'`) will alter the player's active profile `gold` balance or award XP.
-   - Accrual invoices and tracking records of types `'Payable'` and `'Receivable'` (which represent outstanding invoices) do NOT update the player's active profile `gold` or XP.
-   - If `NEW.transaction_type = 'Income'` and `NEW.transaction_nature = 'cash'`: Adds the transaction amount to the user's `gold` balance, and calculates `xp`.
-   - If `NEW.transaction_type = 'Expense'` and `NEW.transaction_nature = 'cash'`: Subtracts the transaction amount from the user's `gold` balance.
+   - An `AFTER INSERT` trigger (`update_profile_on_transaction`) that updates the user's `gold` balance, and increments `xp` and `level` accordingly based on transactions.
+   - **Trigger Actions Routing Map**:
+     - `'Income'`: Increments target user `gold` balance and awards corresponding XP (2 XP per gold coin).
+     - `'Expense'`: Decrements user `gold` balance (clamped at a minimum of `0`).
+     - `'Savings'`: Increments user `gold` balance if `transaction_flow` is `'inflow'`, decrements if `'outflow'`. No XP is awarded.
+     - `'Debt'`: Increments user `gold` balance if `transaction_subtype` is `'New Debt'` or `transaction_flow` is `'inflow'`. Decrements if `transaction_subtype` is `'Amortization'` or `'Interest'` or `transaction_flow` is `'outflow'`. No XP is awarded.
+     - `'Payable'` and `'Receivable'`: Discarded entirely from purse updates (no gold or XP calculations) as they represent outstanding unpaid invoices.
 
-3. **Double-Entry Subtype Constraints**:
-   - Accrual `'Receivable'` entries must have `transaction_flow = 'inflow'`.
-   - Accrual `'Payable'` entries must have `transaction_flow = 'outflow'`.
-   - Loan borrows (`'New Debt'` subtype) must have `transaction_flow = 'inflow'`.
-   - Loan payments (`'Amortization'` or `'Interest'` subtypes) must have `transaction_flow = 'outflow'` and `transaction_nature = 'cash'`.
+3. **Double-Entry Subtype Constraints (`check_double_entry_integrity`)**:
+   - An database-level check constraint strictly routing matrix dimensions:
+     - Accrual `'Receivable'` entries must have `transaction_flow = 'inflow'`.
+     - Accrual `'Payable'` entries must have `transaction_flow = 'outflow'`.
+     - Loan borrows (`'New Debt'` subtype) must have `transaction_flow = 'inflow'`.
+     - Loan payments (`'Amortization'` or `'Interest'` subtypes) must have `transaction_flow = 'outflow'` and `transaction_nature = 'cash'`.
+     - Bypasses check constraints for generic `'Income'` and `'Expense'` lines.
 
 ---
 
@@ -201,7 +218,7 @@ The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js
 
 ### A. Summary KPI Headers (Tab-specific KPI Rows)
 
-The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the interface. Rather than showing a fixed 5-card row globally, the KPIs are filtered dynamically based on the active sub-tab:
+The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the interface. Rather than showing a fixed row globally, the KPIs are filtered dynamically based on the active sub-tab:
 
 1. **Revenues & Expenses (`income_expense`):**
    - **Total Income:** Accrual-basis inflow (`transaction_nature = 'accrual'` and `transaction_flow = 'inflow'`).
@@ -211,10 +228,13 @@ The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the
    - **All Payables, Open Payables, All Receivables, Open Receivables, Overdue Rate**: Tracks outstanding assets, liabilities, and their age segments.
 3. **Liabilities (`liabilities`):**
    - **Total Debt, To Be Paid, New Liabilities, Amortizations**: Tracks debt principal, borrowing events, and payments.
+4. **Overview (`overview`) & Financial Ratios (`ratios`):**
+   - The top KPI summary row is hidden, allocating the space entirely to visualization components.
 
 ### B. Consolidated Financial Statement Engine
 
 The dashboard engine runs an O(N) single-pass calculation loop to construct the reports:
+
 1. **Royal Income Statement (Profit & Loss)**: Segments accrued revenues vs accrued expenses to calculate Net Accrued Income.
 2. **Treasury Cash Flow Statement**: Classifies cash-nature movements into Operating, Investing, and Financing activities.
 3. **Balance Sheet**: Dynamically aggregates historical transactions up to the active date filter's cutoff to verify:
@@ -230,7 +250,8 @@ The visualization components possess independent interactive logic to pivot thei
 
 ### D. Royal Treasurer's Counsel (Contextual Advisor Insights)
 
-To assist the Lord of the Realm with decision-making, the dashboard couples every visualization chart with a dedicated `RoyalTreasurerInsights` advisor widget. 
+To assist the Lord of the Realm with decision-making, the dashboard couples every visualization chart with a dedicated `RoyalTreasurerInsights` advisor widget.
+
 - **Dynamic Render Architecture**: In the Overview sub-tab, charts are paired side-by-side with an instance of `RoyalTreasurerInsights` on large screens (collapsing to a single-column stack on mobile).
 - **Contextual Calculations**:
   - **Financial Position Advice**: Evaluates if the net balance is positive (`advice_financial_position_positive`) or negative (`advice_financial_position_negative`), dynamically injecting the formatted inflow or deficit value.
@@ -241,6 +262,7 @@ To assist the Lord of the Realm with decision-making, the dashboard couples ever
 ### E. Compact Currency Formatting Engine (`formatNumberCompact`)
 
 To prevent UI overflows and maintain clean layouts on small viewports, the frontend implements a specialized `formatNumberCompact` formatting function:
+
 - **Value Compaction**: Automatically converts large gold numbers to use standard shorthand suffixes (`K`, `M`, `B`, `T`).
 - **Medieval Accounting Notation**: Positive values are formatted as `+Value / g` and negative values are wrapped in parentheses as `(Value) / g` (e.g. `+1.2K / g` or `(450) / g`), matching historical double-entry record-keeping style.
 
@@ -251,21 +273,34 @@ To prevent UI overflows and maintain clean layouts on small viewports, the front
 To unify access to different areas of the treasury, the application uses a pop-up **Royal Treasury Menu** modal which acts as the core navigation bridge:
 
 ### A. Modal Structure & Button Order
+
 The menu modal is designed to fit on a single screen without scrolling. The modal uses a `max-w-lg` container, with the content area configured as a centered vertical stack (`flex flex-col gap-3.5 max-w-md mx-auto w-full`):
+
 1. **Register Transaction (Top)**: Opens the transaction entry form (`isNewTxModalOpen = true`) and closes the menu.
 2. **Treasury Dashboard (Middle)**: Opens the dashboard view (`activeTab = 'dashboard'`), sets the default sub-tab to Overview (`dashSubTab = 'overview'`), and closes the menu. This single option merges the previous *Economic Overview*, *Commercial Accounts*, and *Liabilities & Debt* buttons.
 3. **General Ledger (Bottom)**: Opens the general transaction book page (`activeTab = 'transactions'`) and closes the menu. To prevent duplicate access actions, the ledger toolbar's "Register Movement" action button has been removed from this page.
 4. **Financial Statements (After General Ledger)**: Opens the consolidated statement tabs (`activeTab = 'financial_statement'`) separately in an isolated modal tab. The button is styled with a distinct, highlighted `menu_primary` (Primary) badge to signal its status as a core financial report.
 
 ### B. Sub-menu Navigation Hierarchy & Return Flow
+
 To maintain a structured user experience and prevent unexpected exits directly back to the main map:
+
 - **Escape Key Interception**: A global keyboard event listener in `App.jsx` intercepts the `Escape` key. If the user is currently viewing the dashboard, general ledger, or financial statements sub-menu, pressing `Escape` resets `activeTab` to `'quests'` and simultaneously sets `isTreasuryMenuOpen` to `true`, instantly returning them to the Royal Treasury Menu.
 - **Close Buttons & Backdrop Clicks**: All wrapper exit channels (e.g. clicking the top-right `✕` button or clicking the semi-transparent overlay backdrop of the sub-menus) are hooked to route the user back to the 4-button Treasury Menu modal instead of exiting directly to the quests map.
 
 ### C. Quick Actions Templating Engine (Register Transaction Modal Sidebar)
+
 To streamline the process of entering frequent transactions, the **Register Transaction** modal features a left-aligned **Quick Actions** sidebar:
-- **Responsive Layout**: On desktop screens, it forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
-- **Transactional Templates**: Pre-configured templates (e.g., *Collect Taxes*, *Pay Blacksmith*, *Tavern Feast*, and *Borrow Gold*) map the four-axis transactional integrity constraints onto safe default inputs.
-- **Form State Pre-filling**: Selecting any template automatically triggers `applyTemplate`, which updates state fields (Class, Subclass, Amount, Payer, Entity, Category, Description, Nature, Flow) and sets both Value Date and Posting Date to the current date.
 
-
+- **Dynamic Zustand Store Integration**: Instead of being hardcoded locally, Quick Action templates are loaded dynamically from the Zustand store (`templates` state array) and persisted to LocalStorage (`eldoria_templates`), allowing full customization.
+- **Manage Quick Actions Configuration View**: A new **Manage Quick Actions** pane inside the Configuration Panel allows users to view, delete, and add custom Quick Actions. Adding a custom action utilizes a multi-column form to set the name, icon, amount, and all 4-axis transaction metadata (origin, class, subclass, entity, default category, nature, flow, payment status, and description).
+- **Responsive Layout**: On desktop screens, the Register Transaction modal forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
+- **Transactional Templates**: Pre-configured templates map the four-axis transactional integrity constraints onto safe default inputs:
+  - **Salary**: Active income, cash basis receipt.
+  - **Pay Blacksmith**: Expense payment for tools/equipment category.
+  - **Tavern Feast**: Entertainment expense payment.
+  - **Borrow Gold**: Direct debt accrual inflow.
+  - **Pay Landlord**: Housing rent expense cash outflow.
+  - **Purchase Food**: Market groceries cash outflow.
+  - **Pay Interest**: Interest payment cash outflow.
+- **Form State Pre-filling**: Selecting any template automatically triggers `applyTemplate`, which updates state fields (Class, Subclass, Amount, Payer, Entity, Category, Description, Nature, Flow) and sets both Value Date and Posting Date to the current date. Localized names use a dynamic `t` translations mapping proxy to fallback gracefully to the default template name when custom templates are added by the user.

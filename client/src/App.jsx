@@ -72,6 +72,20 @@ function App() {
   const [newOptionVal, setNewOptionVal] = useState('');
   const [newEntityCatVal, setNewEntityCatVal] = useState('Payroll');
 
+  // New Quick Action Form States
+  const [qaName, setQaName] = useState('');
+  const [qaIcon, setQaIcon] = useState('⚡');
+  const [qaAmount, setQaAmount] = useState('');
+  const [qaFrom, setQaFrom] = useState('Pedro');
+  const [qaClass, setQaClass] = useState('Income');
+  const [qaStatus, setQaStatus] = useState('Pending');
+  const [qaSubClass, setQaSubClass] = useState('Cash receipt');
+  const [qaEntity, setQaEntity] = useState('Salary');
+  const [qaCategory, setQaCategory] = useState('Payroll');
+  const [qaNature, setQaNature] = useState('cash');
+  const [qaFlow, setQaFlow] = useState('inflow');
+  const [qaDescription, setQaDescription] = useState('');
+
   // Bind Zustand options
   const fromOptions = useKingdomStore((state) => state.fromOptions);
   const statusOptions = useKingdomStore((state) => state.statusOptions);
@@ -163,152 +177,7 @@ function App() {
   });
 
   // Quick Actions templates
-  const templates = [
-    {
-      name: t('tpl_salary', 'Salary'),
-      icon: '🪙',
-      data: {
-        from: 'Consolidated',
-        transaction_type: 'Income',
-        transaction_subtype: 'Cash receipt',
-        entity: 'Salary',
-        transaction_category: 'Payroll',
-        transaction_nature: 'cash',
-        transaction_flow: 'inflow',
-        payment_status: 'Completed',
-        description: 'Monthly salary payment',
-        amount: '500'
-      }
-    },
-    {
-      name: t('tpl_blacksmith_payment', 'Pay Blacksmith'),
-      icon: '🔨',
-      data: {
-        from: 'Pedro',
-        transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
-        entity: 'Tools and Equipment',
-        transaction_category: 'Markets',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
-        description: 'Purchase blacksmith tools & equipment',
-        amount: '150'
-      }
-    },
-    {
-      name: t('tpl_tavern_feast', 'Tavern Feast'),
-      icon: '🍻',
-      data: {
-        from: 'Pedro',
-        transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
-        entity: 'Restaurant',
-        transaction_category: 'Entertainment',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
-        description: 'Feast and drinks with local guild members',
-        amount: '50'
-      }
-    },
-    {
-      name: t('tpl_borrow_king', 'Borrow Gold'),
-      icon: '👑',
-      data: {
-        from: 'Consolidated',
-        transaction_type: 'Debt',
-        transaction_subtype: 'New Debt',
-        entity: 'CGD',
-        transaction_category: 'Banking',
-        transaction_nature: 'accrual',
-        transaction_flow: 'inflow',
-        payment_status: 'Pending',
-        description: 'Emergency gold borrow from the crown',
-        amount: '1000'
-      }
-    },
-    {
-      name: t('tpl_pay_landlord', 'Pay Landlord'),
-      icon: '🏰',
-      data: {
-        from: 'Pedro',
-        transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
-        entity: 'Rent',
-        transaction_category: 'Housing',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
-        description: 'Monthly land rent payment to the estate',
-        amount: '800'
-      }
-    },
-    {
-      name: t('tpl_purchase_food', 'Purchase Food'),
-      icon: '🌾',
-      data: {
-        from: 'Pedro',
-        transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
-        entity: 'Supermarket',
-        transaction_category: 'Markets',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
-        description: 'Acquisition of wheat and food rations',
-        amount: '120'
-      }
-    },
-    {
-      name: t('tpl_healer_potions', 'Healer Potions'),
-      icon: '🧪',
-      data: {
-        from: 'Pedro',
-        transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
-        entity: 'Medicine',
-        transaction_category: 'Health',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
-        description: 'Apothecary herbs and healing potions',
-        amount: '45'
-      }
-    },
-    {
-      name: t('tpl_repay_moneylender', 'Repay Moneylender'),
-      icon: '🪙',
-      data: {
-        from: 'Pedro',
-        transaction_type: 'Debt',
-        transaction_subtype: 'Amortization',
-        entity: 'CGD',
-        transaction_category: 'Banking',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
-        description: 'Loan amortization payment to the guild',
-        amount: '250'
-      }
-    },
-    {
-      name: t('tpl_moneylender_interest', 'Moneylender Interest'),
-      icon: '📈',
-      data: {
-        from: 'Pedro',
-        transaction_type: 'Debt',
-        transaction_subtype: 'Interest',
-        entity: 'CGD',
-        transaction_category: 'Banking',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
-        description: 'Interest fee on outstanding gold loan',
-        amount: '35'
-      }
-    }
-  ];
+  const templates = useKingdomStore((state) => state.templates);
 
   const applyTemplate = (tpl) => {
     setTxClass(tpl.data.transaction_type);
@@ -323,7 +192,8 @@ function App() {
     setTxFlow(tpl.data.transaction_flow);
     setTxValueDate(new Date().toISOString().split('T')[0]);
     setTxPostingDate(new Date().toISOString().split('T')[0]);
-    toast.success(`${tpl.name} template applied!`);
+    const translatedName = t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name);
+    toast.success(`${translatedName} template applied!`);
   };
 
   // Get unique years for the Year filter selector
@@ -576,6 +446,46 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     }
   }, [categoryOptions, txCategory]);
 
+  useEffect(() => {
+    if (fromOptions && !fromOptions.includes(qaFrom)) {
+      setQaFrom(fromOptions[0] || '');
+    }
+  }, [fromOptions, qaFrom]);
+
+  useEffect(() => {
+    if (statusOptions && !statusOptions.includes(qaStatus)) {
+      setQaStatus(statusOptions[0] || '');
+    }
+  }, [statusOptions, qaStatus]);
+
+  useEffect(() => {
+    if (classOptions && !classOptions.includes(qaClass)) {
+      setQaClass(classOptions[0] || '');
+    }
+  }, [classOptions, qaClass]);
+
+  useEffect(() => {
+    if (subClassOptions && !subClassOptions.includes(qaSubClass)) {
+      setQaSubClass(subClassOptions[0] || '');
+    }
+  }, [subClassOptions, qaSubClass]);
+
+  useEffect(() => {
+    if (entityOptions && !entityOptions.includes(qaEntity)) {
+      const firstEntity = entityOptions[0] || '';
+      setQaEntity(firstEntity);
+      setQaCategory(entityMappings[firstEntity] || categoryOptions[0] || '');
+    }
+  }, [entityOptions, entityMappings, qaEntity, categoryOptions]);
+
+  const handleQaEntityChange = (entityVal) => {
+    setQaEntity(entityVal);
+    const mapped = entityMappings[entityVal];
+    if (mapped) {
+      setQaCategory(mapped);
+    }
+  };
+
   const renderSettingsPanel = () => {
     let title = '';
     let currentList = [];
@@ -611,12 +521,51 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         title = t.manage_month;
         currentList = monthOptions;
         break;
+      case 'quickAction':
+        title = t.manage_quick_actions || 'Manage Quick Actions';
+        currentList = templates;
+        break;
       default:
         break;
     }
 
     const handleAddOptionSubmit = (e) => {
       e.preventDefault();
+      if (selectedSettingType === 'quickAction') {
+        if (!qaName.trim()) {
+          toast.error(t.err_enter_value);
+          return;
+        }
+        const nameVal = qaName.trim();
+        if (templates.some(tpl => tpl.name.toLowerCase() === nameVal.toLowerCase())) {
+          toast.error(t.err_value_exists);
+          return;
+        }
+
+        const newTemplateData = {
+          icon: qaIcon || '⚡',
+          data: {
+            from: qaFrom,
+            transaction_type: qaClass,
+            transaction_subtype: qaSubClass,
+            entity: qaEntity,
+            transaction_category: qaCategory,
+            transaction_nature: qaNature,
+            transaction_flow: qaFlow,
+            payment_status: qaStatus,
+            description: qaDescription || `${qaName} action`,
+            amount: qaAmount || '0'
+          }
+        };
+
+        addOption('quickAction', nameVal, newTemplateData);
+        setQaName('');
+        setQaDescription('');
+        setQaAmount('');
+        toast.success(t('success_added_option', { val: nameVal }));
+        return;
+      }
+
       if (!newOptionVal.trim()) {
         toast.error(t.err_enter_value);
         return;
@@ -647,82 +596,270 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         </div>
 
         {/* Add option form */}
-        <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-            <div>
-              <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                {t.new_value}
-              </label>
-              <input
-                type="text"
-                value={newOptionVal}
-                onChange={(e) => setNewOptionVal(e.target.value)}
-                placeholder={t('placeholder.item')}
-                required
-                className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-              />
-            </div>
-
-            {showEntityCategorySelector && (
+        {selectedSettingType === 'quickAction' ? (
+          <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 items-end">
               <div>
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                  {t.default_category}
-                </label>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={qaName}
+                  onChange={(e) => setQaName(e.target.value)}
+                  placeholder="e.g. Purchase Wood"
+                  required
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Icon</label>
+                <input
+                  type="text"
+                  value={qaIcon}
+                  onChange={(e) => setQaIcon(e.target.value)}
+                  placeholder="e.g. 🪵"
+                  required
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Amount (Gold)</label>
+                <input
+                  type="number"
+                  value={qaAmount}
+                  onChange={(e) => setQaAmount(e.target.value)}
+                  placeholder="e.g. 100"
+                  required
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Origin (From)</label>
                 <select
-                  value={newEntityCatVal}
-                  onChange={(e) => setNewEntityCatVal(e.target.value)}
+                  value={qaFrom}
+                  onChange={(e) => setQaFrom(e.target.value)}
                   className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                 >
-                  {categoryOptions.map((opt) => (
+                  {fromOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
-            )}
-
-            <div className={`${!showEntityCategorySelector ? 'sm:col-span-2' : ''} flex justify-end`}>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Type (Class)</label>
+                <select
+                  value={qaClass}
+                  onChange={(e) => setQaClass(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                >
+                  {classOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Subtype</label>
+                <select
+                  value={qaSubClass}
+                  onChange={(e) => setQaSubClass(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                >
+                  {subClassOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Entity</label>
+                <select
+                  value={qaEntity}
+                  onChange={(e) => handleQaEntityChange(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
+                >
+                  {entityOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Category</label>
+                <input
+                  type="text"
+                  value={qaCategory}
+                  readOnly
+                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 focus:outline-none cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Nature</label>
+                <select
+                  value={qaNature}
+                  onChange={(e) => setQaNature(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="accrual">Accrual</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Flow</label>
+                <select
+                  value={qaFlow}
+                  onChange={(e) => setQaFlow(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                >
+                  <option value="inflow">Inflow</option>
+                  <option value="outflow">Outflow</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Status</label>
+                <select
+                  value={qaStatus}
+                  onChange={(e) => setQaStatus(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                >
+                  {statusOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={qaDescription}
+                  onChange={(e) => setQaDescription(e.target.value)}
+                  placeholder="e.g. Custom action"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end pt-1">
               <button
                 type="submit"
-                className="px-4 py-3 md:py-2 min-h-[44px] md:min-h-0 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
+                className="px-4 py-3 md:py-2 min-h-[44px] md:min-h-0 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center h-11 md:h-[34px]"
               >
                 ➕ {t.add}
               </button>
             </div>
-          </div>
-        </form>
+          </form>
+        ) : (
+          <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                  {t.new_value}
+                </label>
+                <input
+                  type="text"
+                  value={newOptionVal}
+                  onChange={(e) => setNewOptionVal(e.target.value)}
+                  placeholder={t('placeholder.item')}
+                  required
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                />
+              </div>
+
+              {showEntityCategorySelector && (
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    {t.default_category}
+                  </label>
+                  <select
+                    value={newEntityCatVal}
+                    onChange={(e) => setNewEntityCatVal(e.target.value)}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    {categoryOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className={`${!showEntityCategorySelector ? 'sm:col-span-2' : ''} flex justify-end`}>
+                <button
+                  type="submit"
+                  className="px-4 py-3 md:py-2 min-h-[44px] md:min-h-0 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
+                >
+                  ➕ {t.add}
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
 
         {/* List of items */}
         <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
           {currentList.length > 0 ? (
-            <table className="w-full text-left border-collapse text-[10px] font-sans">
-              <thead>
-                <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                  <th className="py-2 px-3">{t.value}</th>
-                  {selectedSettingType === 'entity' && <th className="py-2 px-3">{t.default_category}</th>}
-                  <th className="py-2 px-3 text-right">{t.actions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                {currentList.map((val) => (
-                  <tr key={val} className="hover:bg-[#8b4513]/5 transition-colors">
-                    <td className="py-2 px-3 font-bold text-[#4b2c20]">{val}</td>
-                    {selectedSettingType === 'entity' && (
-                      <td className="py-2 px-3 text-stone-500 font-medium">{entityMappings[val] || '-'}</td>
-                    )}
-                    <td className="py-2 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteOption(val)}
-                        className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
-                        title={t.eliminate}
-                      >
-                        ❌ {t.eliminate}
-                      </button>
-                    </td>
+            selectedSettingType === 'quickAction' ? (
+              <table className="w-full text-left border-collapse text-[10px] font-sans">
+                <thead>
+                  <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                    <th className="py-2 px-3">Action</th>
+                    <th className="py-2 px-3">Type/Subtype</th>
+                    <th className="py-2 px-3">Entity</th>
+                    <th className="py-2 px-3">Amount</th>
+                    <th className="py-2 px-3 text-right">{t.actions}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+                  {currentList.map((tpl) => (
+                    <tr key={tpl.name} className="hover:bg-[#8b4513]/5 transition-colors">
+                      <td className="py-2 px-3 font-bold text-[#4b2c20]">
+                        <span className="mr-1.5">{tpl.icon}</span>
+                        {t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}
+                      </td>
+                      <td className="py-2 px-3 text-stone-500 font-medium">
+                        {tpl.data.transaction_type} • {tpl.data.transaction_subtype}
+                      </td>
+                      <td className="py-2 px-3 text-stone-500 font-medium">{tpl.data.entity}</td>
+                      <td className="py-2 px-3 font-mono text-[#4b2c20]">{tpl.data.amount} G</td>
+                      <td className="py-2 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOption(tpl.name)}
+                          className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
+                          title={t.eliminate}
+                        >
+                          ❌ {t.eliminate}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-left border-collapse text-[10px] font-sans">
+                <thead>
+                  <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                    <th className="py-2 px-3">{t.value}</th>
+                    {selectedSettingType === 'entity' && <th className="py-2 px-3">{t.default_category}</th>}
+                    <th className="py-2 px-3 text-right">{t.actions}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+                  {currentList.map((val) => (
+                    <tr key={val} className="hover:bg-[#8b4513]/5 transition-colors">
+                      <td className="py-2 px-3 font-bold text-[#4b2c20]">{val}</td>
+                      {selectedSettingType === 'entity' && (
+                        <td className="py-2 px-3 text-stone-500 font-medium">{entityMappings[val] || '-'}</td>
+                      )}
+                      <td className="py-2 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOption(val)}
+                          className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
+                          title={t.eliminate}
+                        >
+                          ❌ {t.eliminate}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           ) : (
             <p className="text-center py-8 text-xs text-[#5d4037]/60 italic font-serif">
               {t.no_options_registered}
@@ -1036,7 +1173,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     { id: 'subClass', label: t.manage_subcategory, icon: '📂' },
                     { id: 'entity', label: t.manage_entity, icon: '🏢' },
                     { id: 'category', label: t.manage_entityCategory, icon: '🏷️' },
-                    { id: 'month', label: t.manage_month, icon: '📅' }
+                    { id: 'month', label: t.manage_month, icon: '📅' },
+                    { id: 'quickAction', label: t.manage_quick_actions || 'Manage Quick Actions', icon: '⚡' }
                   ].map((btn) => {
                     const isSel = selectedSettingType === btn.id;
                     return (
@@ -1821,7 +1959,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     className="w-full text-left p-2 py-1.5 rounded-lg border border-[#8b4513]/25 bg-[#faf4e5]/90 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] transition-all text-[8.5px] font-bold uppercase tracking-wider font-sans cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
                     <span className="text-xs">{tpl.icon}</span>
-                    <span className="truncate">{tpl.name}</span>
+                    <span className="truncate">{t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}</span>
                   </button>
                 ))}
               </div>

@@ -76,9 +76,130 @@ export const useKingdomStore = create((set, get) => ({
     'January', 'February', 'March', 'April', 'May', 'June', 
     'July', 'August', 'September', 'October', 'November', 'December'
   ],
+  templates: loadLocal('templates', [
+    {
+      name: 'Salary',
+      icon: '🪙',
+      data: {
+        from: 'Consolidated',
+        transaction_type: 'Income',
+        transaction_subtype: 'Cash receipt',
+        entity: 'Salary',
+        transaction_category: 'Payroll',
+        transaction_nature: 'cash',
+        transaction_flow: 'inflow',
+        payment_status: 'Completed',
+        description: 'Monthly salary payment',
+        amount: '500'
+      }
+    },
+    {
+      name: 'Pay Blacksmith',
+      icon: '🔨',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Tools and Equipment',
+        transaction_category: 'Markets',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Purchase blacksmith tools & equipment',
+        amount: '150'
+      }
+    },
+    {
+      name: 'Tavern Feast',
+      icon: '🍻',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Restaurant',
+        transaction_category: 'Entertainment',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Feast and drinks with local guild members',
+        amount: '50'
+      }
+    },
+    {
+      name: 'Borrow Gold',
+      icon: '👑',
+      data: {
+        from: 'Consolidated',
+        transaction_type: 'Debt',
+        transaction_subtype: 'New Debt',
+        entity: 'CGD',
+        transaction_category: 'Banking',
+        transaction_nature: 'accrual',
+        transaction_flow: 'inflow',
+        payment_status: 'Pending',
+        description: 'Emergency gold borrow from the crown',
+        amount: '1000'
+      }
+    },
+    {
+      name: 'Pay Landlord',
+      icon: '🏰',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Rent',
+        transaction_category: 'Housing',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Monthly land rent payment to the estate',
+        amount: '800'
+      }
+    },
+    {
+      name: 'Purchase Food',
+      icon: '🌾',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Cash payment',
+        entity: 'Supermarket',
+        transaction_category: 'Markets',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Acquisition of wheat and food rations',
+        amount: '120'
+      }
+    },
+    {
+      name: 'Pay Interest',
+      icon: '📈',
+      data: {
+        from: 'Pedro',
+        transaction_type: 'Debt',
+        transaction_subtype: 'Interest',
+        entity: 'CGD',
+        transaction_category: 'Banking',
+        transaction_nature: 'cash',
+        transaction_flow: 'outflow',
+        payment_status: 'Completed',
+        description: 'Interest fee on outstanding gold loan',
+        amount: '35'
+      }
+    }
+  ]),
 
   // Actions to manage options
   addOption: (type, value, extraData) => {
+    if (type === 'quickAction') {
+      const updated = [...get().templates, { name: value, icon: extraData.icon || '⚡', data: extraData.data }];
+      set({ templates: updated });
+      saveLocal('templates', updated);
+      return;
+    }
+
     const key = `${type}Options`;
     const currentList = get()[key];
     if (!currentList) return;
@@ -101,6 +222,13 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   deleteOption: (type, value) => {
+    if (type === 'quickAction') {
+      const updated = get().templates.filter(tpl => tpl.name !== value);
+      set({ templates: updated });
+      saveLocal('templates', updated);
+      return;
+    }
+
     const key = `${type}Options`;
     const currentList = get()[key];
     if (!currentList) return;

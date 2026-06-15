@@ -41,6 +41,7 @@ export const en = {
   manage_entity: "Manage Entities (Category)",
   manage_entityCategory: "Manage Entity Categories",
   manage_month: "Manage Months",
+  manage_quick_actions: "Manage Quick Actions",
 
   // Ledger / Mine Modal
   register_movement: "Register Transaction",

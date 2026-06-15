@@ -159,7 +159,14 @@ export default function BaseDashboardTab({
               {/* Fixed Top 5-Card Summary KPI Row */}
               {kpis.length > 0 && (
                 <div className="p-5 sm:p-6 pb-2 space-y-1 flex-shrink-0 z-20 bg-[#f4e4bc] border-b border-[#8b4513]/10">
-                  <div className={`grid grid-cols-1 sm:grid-cols-${kpis.length} gap-1 sm:gap-1.5`}>
+                  <div className={`grid grid-cols-1 ${{
+                    1: 'sm:grid-cols-1',
+                    2: 'sm:grid-cols-2',
+                    3: 'sm:grid-cols-3',
+                    4: 'sm:grid-cols-4',
+                    5: 'sm:grid-cols-5',
+                    6: 'sm:grid-cols-6',
+                  }[kpis.length] || 'sm:grid-cols-5'} gap-1 sm:gap-1.5`}>
                     {kpis.map((kpi, idx) => (
                       <div
                         key={idx}
