@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useDashboardEngine } from './lib/useDashboardEngine';
 import { supabase } from './lib/supabaseClient';
 import HUD from './components/HUD';
+import Login from './components/Login';
 import BottomNav from './components/BottomNav';
 import IsometricMap from './components/IsometricMap';
 import Modal from './components/Modal';
@@ -1086,6 +1087,31 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       toast.error(t('err_transaction_failed', { error: res.error }));
     }
   };
+
+  if (!user) {
+    return (
+      <div className="w-screen h-screen overflow-hidden select-none bg-black flex items-center justify-center">
+        <Toaster 
+          position="top-center" 
+          toastOptions={{
+            style: {
+              background: '#f4e4bc',
+              color: '#4b2c20',
+              borderColor: '#8b4513',
+              borderWidth: '2px'
+            },
+            success: {
+              iconTheme: { primary: '#059669', secondary: '#f4e4bc' },
+            },
+            error: {
+              iconTheme: { primary: '#dc2626', secondary: '#f4e4bc' },
+            },
+          }}
+        />
+        <Login />
+      </div>
+    );
+  }
 
   return (
     <div className="w-screen h-screen overflow-hidden select-none bg-black flex items-center justify-center">

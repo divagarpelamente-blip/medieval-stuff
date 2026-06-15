@@ -304,3 +304,34 @@ To streamline the process of entering frequent transactions, the **Register Tran
   - **Purchase Food**: Market groceries cash outflow.
   - **Pay Interest**: Interest payment cash outflow.
 - **Form State Pre-filling**: Selecting any template automatically triggers `applyTemplate`, which updates state fields (Class, Subclass, Amount, Payer, Entity, Category, Description, Nature, Flow) and sets both Value Date and Posting Date to the current date. Localized names use a dynamic `t` translations mapping proxy to fallback gracefully to the default template name when custom templates are added by the user.
+
+---
+
+## 8. Authentication, Role-Based Security & RLS Architecture
+
+To safeguard the treasury accounts, Eldoria integrates Supabase Authentication with a robust role-based access control (RBAC) schema and Row Level Security (RLS).
+
+### A. Authentication & Session Persistence
+- **Custom Medieval Login Interface (`Login.jsx`)**: An on-screen credential gate handles user authentication (Sign In & Sign Up) and password recovery.
+- **Session Persistence Toggle ("Keep user online")**:
+  - If enabled, the session token persists inside `localStorage` via default Supabase behavior, keeping the user authenticated across page refreshes.
+  - If disabled, a `beforeunload` event handler automatically wipes all local Supabase auth tokens (`sb-*-auth-token`) from storage, forcing session expiration when the tab is closed or refreshed.
+- **Password Recovery Flow**: Users can request a recovery scroll (email reset link) via `supabase.auth.resetPasswordForEmail()`, routing back to the application origin.
+
+### B. Zustand Auth Integration (`initAuth`)
+- **Active Listener**: The Zustand store mounts a subscription to `supabase.auth.onAuthStateChange()`.
+- **Profile & Role Synchronization**: Upon successful login, the listener retrieves the authenticated user's profile and assigns their role (`admin` or `lord`), loading their personal stats (Gold, XP, Level) and triggering the zero-calculation dashboard data syncer.
+- **Fail-Safe Logout**: Clicking the Sign Out button (`🚪`) immediately clears local auth tokens, resets the Zustand state (`user: null`), and dispatches `supabase.auth.signOut({ scope: 'local' })` asynchronously in the background. This guarantees instant UI response and prevents connection hangs.
+
+### C. Row Level Security (RLS) & Access Control Matrix
+Row Level Security is enabled on all tables. A user's role governs their capabilities:
+
+| Table | Operation | Lord Role Constraint | Admin Role Constraint |
+|---|---|---|---|
+| `profiles` | SELECT / UPDATE | `auth.uid() = id` (Own Profile Only) | Can read all profiles |
+| `transactions` | ALL (CRUD) | `auth.uid() = profile_id` (Own Records Only) | Can read and write all records |
+
+### D. Client Write Safety & Rollbacks
+- **Dynamic Payload Injection**: The store's register actions (`registerTransaction` and `registerTransactions`) dynamically inject `profile_id: get().user.id` into Supabase insert payloads to prevent constraint check failures.
+- **Optimistic UI Rollbacks**: Transaction dispatches employ a strict `try/catch` block. The UI optimistically displays new transactions instantly; if Supabase rejects the write (e.g. due to an RLS policy violation or database check constraint), the catch block immediately rolls back the state to the previous immutable cache (`prevTransactions`) and fires a toast error to alert the user.
+

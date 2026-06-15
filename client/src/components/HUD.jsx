@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
+import { supabase } from '../lib/supabaseClient';
 
 const HUD = ({ profile, diamonds = 1000 }) => {
   const level = profile?.level || 1;
@@ -125,6 +126,42 @@ const HUD = ({ profile, diamonds = 1000 }) => {
             </div>
           )}
         </div>
+
+        {/* Sign Out Button */}
+        <button 
+          type="button"
+          onClick={async () => {
+            console.log('[Eldoria Auth] Initiating fail-safe sign out...');
+            try {
+              // 1. Clear Supabase auth keys from localStorage immediately
+              const keys = Object.keys(localStorage);
+              keys.forEach(key => {
+                if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                  localStorage.removeItem(key);
+                }
+              });
+
+              // 2. Update Zustand store state to transition UI to login gate
+              const setStore = useKingdomStore.setState;
+              setStore({ user: null, role: 'lord', email: 'guest@medieval.stuff' });
+              useKingdomStore.getState().resetStore();
+
+              // 3. Call Supabase signOut in fire-and-forget mode
+              supabase.auth.signOut({ scope: 'local' }).catch(err => {
+                console.warn('[Eldoria Auth] Supabase background signOut failed:', err);
+              });
+
+              toast.success('Farewell, my Lord! The gates are locked.');
+            } catch (err) {
+              console.error('[Eldoria Auth] Sign out exception:', err);
+              toast.error(`Sign out failed: ${err.message || err}`);
+            }
+          }}
+          className="w-11 h-11 md:w-9 md:h-9 rounded-lg bg-[#8b0000]/60 backdrop-blur-md hover:bg-[#8b0000]/90 border border-white/25 hover:border-[#ffd700] flex items-center justify-center transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95"
+          title="Sign Out / Leave Keep"
+        >
+          <span className="text-base select-none">🚪</span>
+        </button>
       </div>
     </div>
   );
