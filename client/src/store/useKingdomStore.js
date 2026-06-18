@@ -35,10 +35,7 @@ export const useKingdomStore = create((set, get) => ({
   level: 1,
   email: 'lord.eldoria@kingdom.gov',
   transactions: [],
-  kpiSummary: null,
-  flowByCategory: [],
-  timeEvolution: [],
-  topEntities: [],
+  accountBalances: [],
   isLoading: false,
   language: loadLocal('language', 'en'),
   user: null,
@@ -48,14 +45,14 @@ export const useKingdomStore = create((set, get) => ({
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
   statusOptions: ['Pending', 'Completed'],
   classOptions: ['Income', 'Expense', 'Asset', 'Debt'],
-  subClassOptions: ['Cash receipt', 'Cash payment', 'New Debt', 'Amortization', 'Interest'],
+  subClassOptions: ['Cash receipt', 'Cash payment', 'New Debt', 'Amortization', 'Interest', 'Transfers', 'Transfer'],
   entityOptions: loadLocal('entityOptions', [
     'Salary', 'Bonus', 'Shows', 'Cinema', 'Restaurant', 'Trips', 'Streaming',
     'Rent', 'Landlord', 'Energy', 'IMI', 'Repairs', 'Water', 'Gas', 'Internet',
     'Health Insurance', 'Medicine', 'Health Fees', 'Medical Appointments', 'Medical Exams',
     'Supermarket', 'Tools and Equipment', 'Clothing', 'Gasoline', 'Transport Insurance', 
     'Uber/Glovo/Taxi', 'Vehicle repairs', 'Tolls', 'Parking', 'Bus', 'CGD', 'Universo', 
-    'ActiveBank', 'WizInk', 'Inter(Brasil)', 'Cofidis', 'Jota', 'Mae'
+    'ActiveBank', 'WizInk', 'Inter(Brasil)', 'Cofidis', 'Jota', 'Mae', 'Savings Account'
   ]),
   categoryOptions: loadLocal('categoryOptions', [
     'Payroll', 'Entertainment', 'Housing', 'Health', 'Markets', 
@@ -70,7 +67,8 @@ export const useKingdomStore = create((set, get) => ({
     "Gasoline": "Transport", "Transport Insurance": "Transport", "Uber/Glovo/Taxi": "Transport", "Vehicle repairs": "Transport", "Tolls": "Transport", "Parking": "Transport", "Bus": "Transport",
     "CGD": "Banking", "Universo": "Banking", "ActiveBank": "Banking", "WizInk": "Banking", "Inter(Brasil)": "Banking",
     "Cofidis": "Other Banking",
-    "Jota": "Burrowed", "Mae": "Burrowed"
+    "Jota": "Burrowed", "Mae": "Burrowed",
+    "Savings Account": "Banking"
   }),
   monthOptions: [
     'January', 'February', 'March', 'April', 'May', 'June', 
@@ -203,7 +201,7 @@ export const useKingdomStore = create((set, get) => ({
         from: 'Consolidated',
         transaction_type: 'Asset',
         transaction_subtype: 'Transfers',
-        entity: 'CGD',
+        entity: 'Savings Account',
         transaction_category: 'Banking',
         target_account: '131001',
         source_dest_bank: '111001',
@@ -242,6 +240,20 @@ export const useKingdomStore = create((set, get) => ({
       const updatedMappings = { ...get().entityMappings, [value]: extraData.category };
       set({ entityMappings: updatedMappings });
       saveLocal('entityMappings', updatedMappings);
+    }
+  },
+
+  editOption: (type, oldValue, newValue, extraData) => {
+    if (type === 'quickAction') {
+      const updated = get().templates.map(tpl => {
+        if (tpl.name === oldValue) {
+          return { name: newValue, icon: extraData.icon || '⚡', data: extraData.data };
+        }
+        return tpl;
+      });
+      set({ templates: updated });
+      saveLocal('templates', updated);
+      return;
     }
   },
 
@@ -302,34 +314,22 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Native zero-calculation syncing mechanism for the Dashboard Engine
+  // Fetch raw transactions and account balances for the Dashboard Engine
   fetchDashboardData: async (profileId) => {
     const userId = get().user?.id || profileId;
     set({ isLoading: true });
     try {
-      const [
-        transactionsRes,
-        kpiRes,
-        flowRes,
-        timeRes,
-        topRes
-      ] = await Promise.all([
-        supabase.from('transactions').select('*').eq('profile_id', userId).order('created_at', { ascending: false }).limit(100),
-        supabase.from('view_dashboard_kpi_summary').select('*').eq('profile_id', userId).maybeSingle(),
-        supabase.from('view_chart_flow_by_category').select('*').eq('profile_id', userId),
-        supabase.from('view_chart_time_evolution').select('*').eq('profile_id', userId).order('dimension_date', { ascending: true }),
-        supabase.from('view_chart_top_entities').select('*').eq('profile_id', userId).order('total_volume', { ascending: false })
+      const [transactionsRes, balancesRes] = await Promise.all([
+        supabase.from('transactions').select('*').eq('profile_id', userId).order('created_at', { ascending: false }).limit(200),
+        supabase.from('account_balances').select('*').eq('profile_id', userId)
       ]);
 
       if (transactionsRes.error) console.error('Error fetching transactions:', transactionsRes.error);
-      if (kpiRes.error) console.error('Error fetching KPI view:', kpiRes.error);
+      if (balancesRes.error) console.error('Error fetching account balances:', balancesRes.error);
 
       set({ 
         transactions: transactionsRes.data || [],
-        kpiSummary: kpiRes.data || null,
-        flowByCategory: flowRes.data || [],
-        timeEvolution: timeRes.data || [],
-        topEntities: topRes.data || []
+        accountBalances: balancesRes.data || []
       });
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
@@ -372,19 +372,15 @@ export const useKingdomStore = create((set, get) => ({
             profile_id: userId,
             transaction_type: transactionData.transaction_type,
             amount: Number(transactionData.amount),
-            from: transactionData.from,
             value_date: transactionData.value_date || null,
             posting_date: transactionData.posting_date || null,
             payment_status: transactionData.payment_status || 'Completed',
             transaction_subtype: transactionData.transaction_subtype,
             entity: transactionData.entity,
-            transaction_category: transactionData.transaction_category,
             target_account: transactionData.target_account,
             source_dest_bank: transactionData.source_dest_bank,
             flow: transactionData.flow,
-            description: transactionData.description,
-            due_date: transactionData.due_date || null,
-            payment_method: transactionData.payment_method || null
+            description: transactionData.description
           }
         ])
         .select();
@@ -461,19 +457,15 @@ export const useKingdomStore = create((set, get) => ({
         profile_id: userId,
         transaction_type: tx.transaction_type,
         amount: Number(tx.amount),
-        from: tx.from,
         value_date: tx.value_date || null,
         posting_date: tx.posting_date || null,
         payment_status: tx.payment_status || 'Completed',
         transaction_subtype: tx.transaction_subtype,
         entity: tx.entity,
-        transaction_category: tx.transaction_category,
         target_account: tx.target_account,
         source_dest_bank: tx.source_dest_bank,
         flow: tx.flow,
-        description: tx.description,
-        due_date: tx.due_date || null,
-        payment_method: tx.payment_method || null
+        description: tx.description
       }));
 
       const { data, error } = await supabase
@@ -525,8 +517,45 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
+  deleteTransactions: async (profileId, transactionIds) => {
+    const userId = get().user?.id || profileId;
+    set({ isLoading: true });
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .in('id', transactionIds);
+
+      if (error) throw error;
+
+      // Sync state
+      const profileRes = await supabase
+        .from('profiles')
+        .select('gold, xp, level')
+        .eq('id', userId)
+        .single();
+      
+      if (profileRes.data) {
+        set({
+          gold: profileRes.data.gold ? Number(profileRes.data.gold) : get().gold,
+          level: profileRes.data.level || get().level,
+          xp: profileRes.data.xp || get().xp,
+        });
+      }
+
+      get().fetchDashboardData(userId);
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting transactions:', err);
+      return { success: false, error: err.message || err };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   initAuth: () => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Helper function to load profile and data for a session
+    const loadSessionUser = async (session) => {
       if (session?.user) {
         set({ user: session.user, email: session.user.email });
         const { data: profileData } = await supabase
@@ -548,7 +577,19 @@ export const useKingdomStore = create((set, get) => ({
       } else {
         set({ user: null, role: 'lord', email: 'guest@medieval.stuff' });
         get().resetStore();
+        // Fetch guest profile data and dashboard data from Supabase
+        get().fetchKingdomData('00000000-0000-0000-0000-000000000000');
+        get().fetchDashboardData('00000000-0000-0000-0000-000000000000');
       }
+    };
+
+    // Load initial session immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      loadSessionUser(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      loadSessionUser(session);
     });
     return () => subscription.unsubscribe();
   },
@@ -566,6 +607,7 @@ export const useKingdomStore = create((set, get) => ({
     level: 1,
     email: 'lord.eldoria@kingdom.gov',
     transactions: [],
+    accountBalances: [],
     isLoading: false,
     language: 'en'
   })

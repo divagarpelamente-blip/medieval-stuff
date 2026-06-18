@@ -44,7 +44,7 @@ export const de = {
   type: "Typ",
   income: "Einnahme",
   expense: "Ausgabe",
-  amount_gold: "Menge (Gold)",
+  amount_gold: "Menge",
   origin_from: "Herkunft (From)",
   date: "Datum",
   status: "Status",

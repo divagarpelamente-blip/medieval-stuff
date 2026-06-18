@@ -44,7 +44,7 @@ export const fr = {
   type: "Type",
   income: "Revenu",
   expense: "Dépense",
-  amount_gold: "Montant (Or)",
+  amount_gold: "Montant",
   origin_from: "Origine (From)",
   date: "Date",
   status: "Statut",

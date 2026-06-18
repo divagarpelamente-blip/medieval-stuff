@@ -293,7 +293,11 @@ To maintain a structured user experience and prevent unexpected exits directly b
 To streamline the process of entering frequent transactions, the **Register Transaction** modal features a left-aligned **Quick Actions** sidebar:
 
 - **Dynamic Zustand Store Integration**: Instead of being hardcoded locally, Quick Action templates are loaded dynamically from the Zustand store (`templates` state array) and persisted to LocalStorage (`eldoria_templates`), allowing full customization.
-- **Manage Quick Actions Configuration View**: A new **Manage Quick Actions** pane inside the Configuration Panel allows users to view, delete, and add custom Quick Actions. Adding a custom action utilizes a multi-column form to set the name, icon, amount, and all 4-axis transaction metadata (origin, class, subclass, entity, default category, nature, flow, payment status, and description).
+- **Manage Quick Actions Configuration View**: A dedicated **Manage Quick Actions** panel inside the Configuration Panel allows users to view, delete, and add custom Quick Actions:
+  - **Label Changes**: The field labels have been modernized to use `Source account` (replacing "Source Account / Bank") and `Amount` (replacing "Amount (Gold)").
+  - **Layout Refinement**: The read-only `Source Acc. Name` and `Target Acc. Name` fields have been removed to optimize grid space, and the primary selector dropdowns (`Source account` and `Target Account`) automatically expand to occupy `col-span-8` in the 12-column grid.
+  - **Selector Alignment**: The `Select Quick Action:` label renders directly above its dropdown selector in the header.
+  - **Header Action Controls**: The bottom form `EDIT` button has been removed and replaced with a `Save` button (`💾`). All control action buttons (Save `💾`, Delete `🗑️`, Add `➕`) are positioned in the top-right header workspace to the left of the quick action dropdown, displaying only symbols and hiding their text labels.
 - **Responsive Layout**: On desktop screens, the Register Transaction modal forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
 - **Transactional Templates**: Pre-configured templates map the four-axis transactional integrity constraints onto safe default inputs:
   - **Salary**: Active income, cash basis receipt.

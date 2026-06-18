@@ -16,363 +16,194 @@ const formatNumberCompact = (num) => {
 
 /**
  * useDashboardEngine
- * Pure adapter layer mapping Zero-Calculation PostgreSQL View payloads
- * directly into the legacy UI structure without ANY client-side math arrays.
+ * Processa o array bruto de transações em memória para o Dashboard,
+ * respeitando os 4 pilares e o modelo de previsão com P&L Firewall.
  */
 export function useDashboardEngine(filteredTransactions = []) {
-  const kpiSummary = useKingdomStore(state => state.kpiSummary);
-  const dbPayablesReceivablesKpis = useKingdomStore(state => state.payablesReceivablesKpis);
-  const flowByCategory = useKingdomStore(state => state.flowByCategory);
-  const timeEvolution = useKingdomStore(state => state.timeEvolution);
-  const topEntities = useKingdomStore(state => state.topEntities);
-  const allTxs = useKingdomStore(state => state.transactions);
+  const allTxs = useKingdomStore(state => state.transactions) || [];
+  const accountBalances = useKingdomStore(state => state.accountBalances) || [];
+  const userGold = useKingdomStore(state => state.gold) || 0;
 
   return useMemo(() => {
-    // 1. Dual-Row KPI Summary Metrics
-    const total_income = kpiSummary?.total_income || 0;
-    const total_expenses = kpiSummary?.total_expenses || 0;
-    const total_receipts = kpiSummary?.total_receipts || 0;
-    const total_payments = kpiSummary?.total_payments || 0;
-    const net_cash_balance = kpiSummary?.net_cash_balance || 0;
-    const total_debt = kpiSummary?.total_debt || 0;
-    const savings_efficiency = kpiSummary?.savings_efficiency || 0;
-
-    // 1.5 Payables & Receivables reactive metrics
-    const payables = filteredTransactions.filter(tx => tx.transaction_type === 'Payable');
-    const receivables = filteredTransactions.filter(tx => tx.transaction_type === 'Receivable');
+    const safeFilteredTxs = filteredTransactions || [];
+    const safeAllTxs = allTxs || [];
+    const safeBalances = accountBalances || [];
+    const entityMappings = useKingdomStore.getState().entityMappings || {};
     
-    const all_payables = payables.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const open_payables = payables.filter(tx => ['Open', 'Overdue'].includes(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const all_receivables = receivables.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const open_receivables = receivables.filter(tx => tx.payment_status === 'Open').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const overdue_payables = payables.filter(tx => tx.payment_status === 'Overdue').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const overdue_rate = open_payables === 0 ? 0.0 : Number(((overdue_payables / open_payables) * 100).toFixed(1));
-
-    const payablesReceivablesKpis = {
-      all_payables,
-      open_payables,
-      all_receivables,
-      open_receivables,
-      overdue_rate
-    };
-
-    // 2. Pivot Category Arrays
-    const catMap = {};
-    flowByCategory.forEach(row => {
-      const name = row.transaction_category || 'Unknown';
-      if (!catMap[name]) catMap[name] = { name, income: 0, expense: 0, receipt: 0, payment: 0 };
-      
-      if (row.transaction_nature === 'accrual') {
-        catMap[name].income += Number(row.total_inflow) || 0;
-        catMap[name].expense += Number(row.total_outflow) || 0;
-      } else if (row.transaction_nature === 'cash') {
-        catMap[name].receipt += Number(row.total_inflow) || 0;
-        catMap[name].payment += Number(row.total_outflow) || 0;
-      }
-    });
-    
-    const categoryData = Object.values(catMap).map(vals => ({
-      ...vals,
-      totalClass: vals.income + vals.expense,
-      totalSubclass: vals.receipt + vals.payment
-    }));
-
-    // 3. Pivot Entity Arrays
-    const entMap = {};
-    topEntities.forEach(row => {
-      const name = row.entity || 'Unknown';
-      if (!entMap[name]) entMap[name] = { name, income: 0, expense: 0, receipt: 0, payment: 0 };
-      
-      if (row.transaction_nature === 'accrual') {
-        entMap[name].income = Number(row.total_volume) || 0;
-      } else if (row.transaction_nature === 'cash') {
-        entMap[name].receipt = Number(row.total_volume) || 0;
-      }
-    });
-    
-    const entityData = Object.values(entMap).map(vals => ({
-      ...vals,
-      totalClass: vals.income + vals.expense,
-      totalSubclass: vals.receipt + vals.payment
-    })).sort((a, b) => b.totalClass - a.totalClass);
-
-    // 4. Map Time Evolution Arrays
-    const timeData = timeEvolution.map(row => {
-      const d = new Date(row.dimension_date);
-      return {
-        label: `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`,
-        classIncome: Number(row.accrual_inflow) || 0,
-        classExpense: Number(row.accrual_outflow) || 0,
-        subReceipt: Number(row.cash_inflow) || 0,
-        subPayment: Number(row.cash_outflow) || 0,
-        debtAccrual: Number(row.debt_accrual) || 0,
-        debtPayment: Number(row.debt_payment) || 0
-      };
-    });
-
-    // 5. Payables & Receivables Spline Chart datasets
-    const prTimeLabels = Array.from(new Set(filteredTransactions.map(tx => `${tx.year} ${tx.month}`)));
-    const prTimePoints = prTimeLabels.map(label => {
-      const [yearStr, monthStr] = label.split(' ');
-      const matchedTxs = filteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
-      const payablesVol = matchedTxs.filter(tx => tx.transaction_type === 'Payable').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const receivablesVol = matchedTxs.filter(tx => tx.transaction_type === 'Receivable').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      return { label, payables: payablesVol, receivables: receivablesVol };
-    }).filter(t => t.payables > 0 || t.receivables > 0);
-
-    // 6. Open Payables by Category dataset
-    const openPayablesList = filteredTransactions.filter(tx => tx.transaction_type === 'Payable' && ['Open', 'Overdue'].includes(tx.payment_status));
-    const opCategories = Array.from(new Set(openPayablesList.map(tx => tx.transaction_category).filter(Boolean)));
-    const openPayablesByCategory = opCategories.map(cat => {
-      const amount = openPayablesList.filter(tx => tx.transaction_category === cat).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      return { name: cat, amount };
-    }).sort((a, b) => b.amount - a.amount);
-
-    // 7. Open Payables by Entity dataset
-    const opEntities = Array.from(new Set(openPayablesList.map(tx => tx.entity).filter(Boolean)));
-    const openPayablesByEntity = opEntities.map(ent => {
-      const amount = openPayablesList.filter(tx => tx.entity === ent).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      return { name: ent, amount };
-    }).sort((a, b) => b.amount - a.amount);
-
-    // 8. Open Payables by Month dataset
-    const opMonths = Array.from(new Set(openPayablesList.map(tx => tx.month).filter(Boolean)));
-    const openPayablesByMonth = opMonths.map(m => {
-      const amount = openPayablesList.filter(tx => tx.month === m).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      return { name: m, amount };
-    });
-
-    // 9. Payment Methods Distribution dataset
-    const completedTxs = filteredTransactions.filter(tx => ['Completed', 'Paid'].includes(tx.payment_status) && tx.payment_method);
-    const methods = Array.from(new Set(completedTxs.map(tx => tx.payment_method).filter(Boolean)));
-    const paymentMethodsDistribution = methods.map(method => {
-      const amount = completedTxs.filter(tx => tx.payment_method === method).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      return { name: method, amount };
-    }).sort((a, b) => b.amount - a.amount);
-
-    // 10. Liabilities calculations (differentiating principal pay-downs from interest)
-    const monthIndexes = {
-      'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
-      'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
-    };
-
-    const legacyDebt = allTxs.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0) - allTxs.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const newDebtVal = allTxs.filter(tx => tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const liabilities_total_debt = newDebtVal > 0 ? (newDebtVal - allTxs.filter(tx => tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)) : legacyDebt;
-
-    const liabilities_to_be_paid = filteredTransactions.filter(tx => tx.transaction_subtype === 'Amortization' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const liabilities_new_liabilities = filteredTransactions.filter(tx => tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const liabilities_amortizations = filteredTransactions.filter(tx => tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-    const liabilitiesKpis = {
-      total_debt: liabilities_total_debt,
-      to_be_paid: liabilities_to_be_paid,
-      new_liabilities: liabilities_new_liabilities,
-      amortizations: liabilities_amortizations
-    };
-
-    // Spline chart temporal data
-    const liabilitiesTimeLabels = Array.from(new Set(filteredTransactions.map(tx => `${tx.year} ${tx.month}`)));
-    const sortedLiabilitiesTimeLabels = liabilitiesTimeLabels.sort((a, b) => {
-      const [yA, mA] = a.split(' ');
-      const [yB, mB] = b.split(' ');
-      if (yA !== yB) return Number(yA) - Number(yB);
-      return monthIndexes[mA] - monthIndexes[mB];
-    });
-
-    const liabilitiesTimePoints = sortedLiabilitiesTimeLabels.map(label => {
-      const [yearStr, monthStr] = label.split(' ');
-      const yearNum = Number(yearStr);
-      const monthTxs = filteredTransactions.filter(tx => tx.year === yearNum && tx.month === monthStr);
-      
-      const newDebt = monthTxs.filter(tx => tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const amortization = monthTxs.filter(tx => tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const toBePaid = monthTxs.filter(tx => tx.transaction_subtype === 'Amortization' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      
-      // Cumulative debt historically up to this month
-      const histNewDebt = allTxs.filter(tx => {
-        if (tx.year < yearNum) return tx.transaction_subtype === 'New Debt';
-        if (tx.year === yearNum) {
-          return tx.transaction_subtype === 'New Debt' && monthIndexes[tx.month] <= monthIndexes[monthStr];
-        }
-        return false;
-      }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      
-      const histAmortization = allTxs.filter(tx => {
-        if (tx.year < yearNum) return tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed';
-        if (tx.year === yearNum) {
-          return tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed' && monthIndexes[tx.month] <= monthIndexes[monthStr];
-        }
-        return false;
-      }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-      let totalDebt = histNewDebt - histAmortization;
-      if (histNewDebt === 0) {
-        const legAccrual = allTxs.filter(tx => {
-          if (!['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category)) return false;
-          if (tx.year < yearNum) return tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow';
-          if (tx.year === yearNum) {
-            return tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow' && monthIndexes[tx.month] <= monthIndexes[monthStr];
-          }
-          return false;
-        }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-        
-        const legPayment = allTxs.filter(tx => {
-          if (!['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category)) return false;
-          if (tx.year < yearNum) return tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow';
-          if (tx.year === yearNum) {
-            return tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow' && monthIndexes[tx.month] <= monthIndexes[monthStr];
-          }
-          return false;
-        }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-        
-        totalDebt = legAccrual - legPayment;
-      }
-
-      return {
-        label: `${monthStr.substring(0, 3)} ${yearStr}`,
-        totalDebt,
-        toBePaid,
-        newDebt,
-        amortization
-      };
-    });
-
-    // Debt by Entity
-    const debtEntities = Array.from(new Set(allTxs.map(tx => tx.entity).filter(Boolean)));
-    const debtByEntity = debtEntities.map(ent => {
-      const entNewDebt = allTxs.filter(tx => tx.entity === ent && tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const entAmortization = allTxs.filter(tx => tx.entity === ent && tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      
-      let amount = entNewDebt - entAmortization;
-      
-      if (entNewDebt === 0) {
-        const legAcc = allTxs.filter(tx => tx.entity === ent && ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-        const legPay = allTxs.filter(tx => tx.entity === ent && ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-        amount = legAcc - legPay;
-      }
-      
-      return { name: ent, amount };
-    }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
-
-    // Debt by Type (Category)
-    const debtCategories = Array.from(new Set(allTxs.map(tx => tx.transaction_category).filter(Boolean)));
-    const debtByType = debtCategories.map(cat => {
-      const catNewDebt = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_subtype === 'New Debt').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const catAmortization = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      
-      let amount = catNewDebt - catAmortization;
-      
-      if (catNewDebt === 0 && ['Banking', 'Other Banking', 'Burrowed'].includes(cat)) {
-        const legAcc = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-        const legPay = allTxs.filter(tx => tx.transaction_category === cat && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-        amount = legAcc - legPay;
-      }
-      
-      return { name: cat, amount };
-    }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+    // Status checker for completed cash flows
+    const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
 
     // ==============================================================
-    // FINANCIAL STATEMENT ENGINE (P&L, CASH FLOW, BALANCE SHEET)
+    // 1. P&L FIREWALL: Filtrar apenas Income & Expense
     // ==============================================================
+    const plTransactions = safeFilteredTxs.filter(
+      tx => tx.transaction_type === 'Income' || tx.transaction_type === 'Expense'
+    );
 
-    const incomeStatement = {
-      revenues: {},
-      expenses: {},
-      totalRevenue: 0,
-      totalExpense: 0,
-      netAccruedIncome: 0,
-      formattedNet: '0 / g'
-    };
+    // Totais de Receita (Income)
+    const incomeTxs = plTransactions.filter(tx => tx.transaction_type === 'Income');
+    const realizedIncome = incomeTxs
+      .filter(tx => isCompleted(tx.payment_status))
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const forecastIncome = incomeTxs
+      .filter(tx => tx.payment_status === 'Pending')
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
-    const cashFlowStatement = {
-      operating: {},
-      investing: {},
-      financing: {},
-      netOperating: 0,
-      netInvesting: 0,
-      netFinancing: 0,
-      netCashFlow: 0,
-      formattedNet: '0 / g'
-    };
+    // Totais de Despesa (Expense)
+    const expenseTxs = plTransactions.filter(tx => tx.transaction_type === 'Expense');
+    const realizedExpense = expenseTxs
+      .filter(tx => isCompleted(tx.payment_status))
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const forecastExpense = expenseTxs
+      .filter(tx => tx.payment_status === 'Pending')
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
-    // Balance Sheet Cutoff Calculation
-    const cutoffTime = filteredTransactions.length > 0
-      ? Math.max(...filteredTransactions.map(tx => new Date(tx.posting_date || tx.created_at).getTime()))
-      : new Date().getTime();
+    const netRealized = realizedIncome - realizedExpense;
+    const netForecast = (realizedIncome + forecastIncome) - (realizedExpense + forecastExpense);
 
-    // Accounts for Balance Sheet (Cumulative historically up to cutoff date)
-    const balances = {
-      '111001': 1000 // Initial profile gold default starts in CGD Bank
-    };
+    // ==============================================================
+    // 2. NET WORTH & BALANÇO DE VAULTS (Somente Completed)
+    // ==============================================================
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+    let netVaultCash = userGold; // Saldo de caixa real do Lorde
 
-    const filteredTxIds = new Set(filteredTransactions.map(tx => tx.id));
-
-    allTxs.forEach((tx) => {
-      const txAmount = Number(tx.amount) || 0;
-      const txTime = new Date(tx.posting_date || tx.created_at).getTime();
-
-      // 1. Cumulative Balance Sheet Account Accumulation (Completed transactions only)
-      if (txTime <= cutoffTime && tx.payment_status === 'Completed') {
-        const target = tx.target_account;
-        const source = tx.source_dest_bank;
-
-        if (tx.flow === 'neutral') {
-          if (source) balances[source] = (balances[source] || 0) - txAmount;
-          if (target) balances[target] = (balances[target] || 0) + txAmount;
-        } else if (tx.transaction_type === 'Expense') {
-          if (source) balances[source] = (balances[source] || 0) - txAmount;
-        } else if (tx.transaction_type === 'Income') {
-          if (source) balances[source] = (balances[source] || 0) + txAmount;
-        } else if (tx.transaction_type === 'Asset' && tx.flow === 'inflow') {
-          // e.g. Borrow Cash
-          if (target) balances[target] = (balances[target] || 0) + txAmount;
-          if (source) balances[source] = (balances[source] || 0) + txAmount;
-        } else if (tx.transaction_type === 'Debt' && tx.flow === 'outflow') {
-          // e.g. Pay Credit Card, Amortize Loan, Repay Personal Debt
-          if (source) balances[source] = (balances[source] || 0) - txAmount;
-          if (target) balances[target] = (balances[target] || 0) - txAmount;
+    safeBalances.forEach(row => {
+      const balance = Number(row.balance) || 0;
+      const code = row.account_code || '';
+      if (code.startsWith('1')) {
+        totalAssets += balance;
+        if (code === '111001') {
+          netVaultCash = balance;
         }
-      }
-
-      // 2. Periodic P&L and Cash Flow Statement Reduction
-      if (filteredTxIds.has(tx.id)) {
-        if (tx.transaction_type === 'Income' || tx.transaction_type === 'Expense') {
-          const category = tx.transaction_category || 'Other';
-          if (tx.transaction_type === 'Income') {
-            incomeStatement.revenues[category] = (incomeStatement.revenues[category] || 0) + txAmount;
-            incomeStatement.totalRevenue += txAmount;
-          } else if (tx.transaction_type === 'Expense') {
-            incomeStatement.expenses[category] = (incomeStatement.expenses[category] || 0) + txAmount;
-            incomeStatement.totalExpense += txAmount;
-          }
-        }
-
-        if (tx.payment_status === 'Completed') {
-          const subtype = tx.transaction_subtype || tx.transaction_type || 'Other';
-          let segment = 'operating';
-          if (tx.transaction_type === 'Asset' && tx.flow !== 'neutral') {
-            segment = 'investing';
-          } else if (tx.transaction_type === 'Debt' || tx.transaction_type === 'Asset') {
-            segment = 'financing';
-          }
-
-          if (tx.flow !== 'neutral') {
-            const flowVal = tx.flow === 'inflow' ? txAmount : -txAmount;
-            cashFlowStatement[segment][subtype] = (cashFlowStatement[segment][subtype] || 0) + flowVal;
-
-            if (segment === 'operating') cashFlowStatement.netOperating += flowVal;
-            if (segment === 'investing') cashFlowStatement.netInvesting += flowVal;
-            if (segment === 'financing') cashFlowStatement.netFinancing += flowVal;
-            cashFlowStatement.netCashFlow += flowVal;
-          }
-        }
+      } else if (code.startsWith('2')) {
+        totalLiabilities += balance;
       }
     });
 
-    incomeStatement.netAccruedIncome = incomeStatement.totalRevenue - incomeStatement.totalExpense;
-    incomeStatement.formattedNet = formatNumberCompact(incomeStatement.netAccruedIncome);
+    // Se a tabela account_balances estiver vazia, faz o fallback dinâmico
+    if (safeBalances.length === 0) {
+      netVaultCash = userGold;
+      totalAssets = userGold;
+      // Calcula dívidas acumuladas de transações do tipo Debt Completed
+      const newDebt = safeAllTxs
+        .filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'inflow' && tx.payment_status === 'Completed')
+        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const amortizations = safeAllTxs
+        .filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'outflow' && tx.payment_status === 'Completed')
+        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      totalLiabilities = Math.max(0, newDebt - amortizations);
+      totalAssets += totalLiabilities; // Assets incluem o saldo mais as aplicações/recebíveis
+    }
 
+    const netWorth = totalAssets - totalLiabilities;
+
+    // ==============================================================
+    // 3. ESTRUTURAÇÃO DE DADOS PARA GRÁFICOS (Sem Asset/Debt no P&L)
+    // ==============================================================
+    
+    // Distribuição por Categorias (Apenas P&L)
+    const categoryMap = {};
+    plTransactions.forEach(tx => {
+      const cat = entityMappings[tx.entity] || tx.transaction_category || 'Other';
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = { name: cat, income: 0, expense: 0, totalClass: 0 };
+      }
+      const amt = Number(tx.amount) || 0;
+      if (tx.transaction_type === 'Income') {
+        categoryMap[cat].income += amt;
+      } else {
+        categoryMap[cat].expense += amt;
+      }
+      categoryMap[cat].totalClass += amt;
+    });
+    const categoryData = Object.values(categoryMap).sort((a, b) => b.totalClass - a.totalClass);
+
+    // Distribuição por Entidades (Apenas P&L)
+    const entityMap = {};
+    plTransactions.forEach(tx => {
+      const ent = tx.entity || 'Other';
+      if (!entityMap[ent]) {
+        entityMap[ent] = { name: ent, income: 0, expense: 0, totalClass: 0 };
+      }
+      const amt = Number(tx.amount) || 0;
+      if (tx.transaction_type === 'Income') {
+        entityMap[ent].income += amt;
+      } else {
+        entityMap[ent].expense += amt;
+      }
+      entityMap[ent].totalClass += amt;
+    });
+    const entityData = Object.values(entityMap).sort((a, b) => b.totalClass - a.totalClass);
+
+    // Evolução Temporal (P&L + Debt)
+    const timeMap = {};
+    safeFilteredTxs.forEach(tx => {
+      const dateKey = tx.posting_date || new Date(tx.created_at).toISOString().split('T')[0];
+      if (!timeMap[dateKey]) {
+        timeMap[dateKey] = { date: dateKey, classIncome: 0, classExpense: 0, debtAccrual: 0, debtPayment: 0 };
+      }
+      const amt = Number(tx.amount) || 0;
+      if (tx.transaction_type === 'Income') {
+        timeMap[dateKey].classIncome += amt;
+      } else if (tx.transaction_type === 'Expense') {
+        timeMap[dateKey].classExpense += amt;
+      } else if (tx.transaction_type === 'Debt') {
+        if (tx.flow === 'inflow') timeMap[dateKey].debtAccrual += amt;
+        else timeMap[dateKey].debtPayment += amt;
+      }
+    });
+
+    const timeData = Object.values(timeMap)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(pt => {
+        const d = new Date(pt.date);
+        return {
+          label: `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`,
+          ...pt
+        };
+      });
+
+    // Dívidas por Entidade e Categoria (Apenas Debt Completed)
+    const debtTxs = safeAllTxs.filter(tx => tx.transaction_type === 'Debt');
+    
+    const debtEntMap = {};
+    debtTxs.forEach(tx => {
+      const ent = tx.entity || 'Other';
+      const amt = Number(tx.amount) || 0;
+      if (tx.payment_status === 'Completed') {
+        if (tx.flow === 'inflow') {
+          debtEntMap[ent] = (debtEntMap[ent] || 0) + amt;
+        } else {
+          debtEntMap[ent] = (debtEntMap[ent] || 0) - amt;
+        }
+      }
+    });
+    const debtByEntity = Object.entries(debtEntMap)
+      .map(([name, amount]) => ({ name, amount: Math.max(0, amount) }))
+      .filter(item => item.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+
+    const debtCatMap = {};
+    debtTxs.forEach(tx => {
+      const cat = entityMappings[tx.entity] || tx.transaction_category || 'Other';
+      const amt = Number(tx.amount) || 0;
+      if (tx.payment_status === 'Completed') {
+        if (tx.flow === 'inflow') {
+          debtCatMap[cat] = (debtCatMap[cat] || 0) + amt;
+        } else {
+          debtCatMap[cat] = (debtCatMap[cat] || 0) - amt;
+        }
+      }
+    });
+    const debtByType = Object.entries(debtCatMap)
+      .map(([name, amount]) => ({ name, amount: Math.max(0, amount) }))
+      .filter(item => item.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+
+    // ==============================================================
+    // 4. MAPEAR PARA COMPATIBILIDADE DE RETORNO (Evitar Regressão no App.jsx)
+    // ==============================================================
     const mapToFormattedArray = (dict) => {
       return Object.entries(dict).map(([name, amount]) => ({
         name,
@@ -381,98 +212,180 @@ export function useDashboardEngine(filteredTransactions = []) {
       })).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
     };
 
-    const formattedRevenues = mapToFormattedArray(incomeStatement.revenues);
-    const formattedExpenses = mapToFormattedArray(incomeStatement.expenses);
-
-    const formattedOperating = mapToFormattedArray(cashFlowStatement.operating);
-    const formattedInvesting = mapToFormattedArray(cashFlowStatement.investing);
-    const formattedFinancing = mapToFormattedArray(cashFlowStatement.financing);
-
-    // Sum up Assets (starts with 1) and Liabilities (starts with 2)
-    let totalAssets = 0;
-    let totalLiabilities = 0;
-    let netVaultCash = 0;
-
-    Object.entries(balances).forEach(([code, balance]) => {
-      if (code.startsWith('1')) {
-        totalAssets += balance;
-        if (code.startsWith('11') || code.startsWith('13')) {
-          netVaultCash += balance;
-        }
-      } else if (code.startsWith('2')) {
-        totalLiabilities += balance;
+    const plRevenues = {};
+    const plExpenses = {};
+    plTransactions.forEach(tx => {
+      const cat = entityMappings[tx.entity] || tx.transaction_category || 'Other';
+      const amt = Number(tx.amount) || 0;
+      if (tx.transaction_type === 'Income') {
+        plRevenues[cat] = (plRevenues[cat] || 0) + amt;
+      } else {
+        plExpenses[cat] = (plExpenses[cat] || 0) + amt;
       }
     });
 
-    const accumulatedWealth = totalAssets - totalLiabilities;
+    const incomeStatement = {
+      revenues: mapToFormattedArray(plRevenues),
+      expenses: mapToFormattedArray(plExpenses),
+      totalRevenue: realizedIncome,
+      totalExpense: realizedExpense,
+      netAccruedIncome: netRealized,
+      formattedNet: formatNumberCompact(netRealized)
+    };
+
+    // Cash Flow simplificado sob o novo modelo cash-basis
+    const cashFlowStatement = {
+      operating: mapToFormattedArray(plExpenses),
+      investing: [],
+      financing: [],
+      netOperating: -realizedExpense,
+      netInvesting: 0,
+      netFinancing: realizedIncome,
+      netCashFlow: netRealized,
+      formattedNet: formatNumberCompact(netRealized),
+      formattedOperating: formatNumberCompact(-realizedExpense),
+      formattedInvesting: formatNumberCompact(0),
+      formattedFinancing: formatNumberCompact(realizedIncome)
+    };
+
+    const chartOfAccounts = {
+      '111001': 'Assets Banks CGD',
+      '111002': 'Assets Banks Universo',
+      '111003': 'Assets Banks ActiveBank',
+      '111004': 'Assets Banks Inter(Brasil)',
+      '121001': 'Assets Investment app CGD',
+      '121002': 'Assets Investment app Universo',
+      '121003': 'Assets Investment app ActiveBank',
+      '121004': 'Assets Investment app WizInk',
+      '121005': 'Assets Investment app Inter(Brasil)',
+      '131001': 'Assets Savings Accounts CGD',
+      '131002': 'Assets Savings Accounts ActiveBank',
+      '131003': 'Assets Savings Accounts Inter(Brasil)',
+      '211001': 'Liabilities Loans CGD',
+      '211002': 'Liabilities Loans Universo',
+      '211003': 'Liabilities Loans ActiveBank',
+      '211004': 'Liabilities Loans Inter(Brasil)',
+      '211005': 'Liabilities Loans WizInk',
+      '211006': 'Liabilities Loans Cofidis',
+      '212001': 'Liabilities Personal Debts Jota Food',
+      '212002': 'Liabilities Personal Debts Mum Support',
+      '221001': 'Liabilities Credit Cards CGD',
+      '221002': 'Liabilities Credit Cards Universo',
+      '221003': 'Liabilities Credit Cards ActiveBank',
+      '221004': 'Liabilities Credit Cards WizInk',
+      '221005': 'Liabilities Credit Cards Inter(Brasil)'
+    };
+
+    const balancesByCode = {};
+    Object.keys(chartOfAccounts).forEach(code => {
+      balancesByCode[code] = 0;
+    });
+
+    safeBalances.forEach(row => {
+      const code = row.account_code || '';
+      if (code in balancesByCode) {
+        balancesByCode[code] = Number(row.balance) || 0;
+      }
+    });
+
+    if (safeBalances.length === 0) {
+      balancesByCode['111001'] = userGold;
+      const newDebt = safeAllTxs
+        .filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'inflow' && isCompleted(tx.payment_status))
+        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const amortizations = safeAllTxs
+        .filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'outflow' && isCompleted(tx.payment_status))
+        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      const netDebt = Math.max(0, newDebt - amortizations);
+      if (netDebt > 0) {
+        balancesByCode['211006'] = netDebt;
+      }
+    }
+
+    const assetsList = [];
+    const liabilitiesList = [];
+
+    Object.entries(balancesByCode).forEach(([code, balance]) => {
+      const name = chartOfAccounts[code];
+      const formatted = formatNumberCompact(balance);
+      if (code.startsWith('1')) {
+        assetsList.push({ code, name, balance, formatted });
+      } else if (code.startsWith('2')) {
+        liabilitiesList.push({ code, name, balance, formatted });
+      }
+    });
 
     const balanceSheet = {
       assets: {
         vaultCash: netVaultCash,
-        outstandingReceivables: totalAssets - netVaultCash,
+        outstandingReceivables: Math.max(0, totalAssets - netVaultCash),
         totalAssets,
+        list: assetsList,
         formattedTotal: formatNumberCompact(totalAssets),
         formattedVaultCash: formatNumberCompact(netVaultCash),
-        formattedReceivables: formatNumberCompact(totalAssets - netVaultCash)
+        formattedReceivables: formatNumberCompact(Math.max(0, totalAssets - netVaultCash))
       },
       liabilities: {
         outstandingDebt: totalLiabilities,
         outstandingPayables: 0,
         totalLiabilities,
+        list: liabilitiesList,
         formattedTotal: formatNumberCompact(totalLiabilities),
         formattedDebt: formatNumberCompact(totalLiabilities),
         formattedPayables: formatNumberCompact(0)
       },
       equity: {
-        accumulatedWealth,
-        formattedTotal: formatNumberCompact(accumulatedWealth)
+        accumulatedWealth: netWorth,
+        formattedTotal: formatNumberCompact(netWorth)
       }
     };
 
+    // Métricas de compatibilidade de KPIs de Dívida
+    const liabilitiesKpis = {
+      total_debt: totalLiabilities,
+      to_be_paid: safeFilteredTxs.filter(tx => tx.transaction_type === 'Debt' && tx.payment_status === 'Pending').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
+      new_liabilities: safeFilteredTxs.filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
+      amortizations: safeFilteredTxs.filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'outflow' && isCompleted(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)
+    };
+
     return {
-      total_income,
-      total_expenses,
-      total_receipts,
-      total_payments,
-      net_cash_balance,
-      total_debt,
-      savings_efficiency,
-      payablesReceivablesKpis,
+      // Novas chaves limpas
+      incomeStats: { realized: realizedIncome, forecast: forecastIncome },
+      expenseStats: { realized: realizedExpense, forecast: forecastExpense },
+      netWorth: { totalAssets, totalLiabilities, netWorth, netVaultCash },
       categoryData,
       entityData,
       timeData,
-      prTimePoints,
-      openPayablesByCategory,
-      openPayablesByEntity,
-      openPayablesByMonth,
-      paymentMethodsDistribution,
-      liabilitiesKpis,
-      liabilitiesTimePoints,
       debtByEntity,
       debtByType,
-      incomeStatement: {
-        revenues: formattedRevenues,
-        expenses: formattedExpenses,
-        totalRevenue: incomeStatement.totalRevenue,
-        totalExpense: incomeStatement.totalExpense,
-        netAccruedIncome: incomeStatement.netAccruedIncome,
-        formattedNet: incomeStatement.formattedNet
-      },
-      cashFlowStatement: {
-        operating: formattedOperating,
-        investing: formattedInvesting,
-        financing: formattedFinancing,
-        netOperating: cashFlowStatement.netOperating,
-        netInvesting: cashFlowStatement.netInvesting,
-        netFinancing: cashFlowStatement.netFinancing,
-        netCashFlow: cashFlowStatement.netCashFlow,
-        formattedNet: formatNumberCompact(cashFlowStatement.netCashFlow),
-        formattedOperating: formatNumberCompact(cashFlowStatement.netOperating),
-        formattedInvesting: formatNumberCompact(cashFlowStatement.netInvesting),
-        formattedFinancing: formatNumberCompact(cashFlowStatement.netFinancing)
-      },
-      balanceSheet
-    };
-  }, [kpiSummary, dbPayablesReceivablesKpis, flowByCategory, timeEvolution, topEntities, filteredTransactions, allTxs]);
-}
 
+      // Chaves legadas mantidas para compatibilidade retroativa
+      total_income: realizedIncome,
+      total_expenses: realizedExpense,
+      total_receipts: realizedIncome,
+      total_payments: realizedExpense,
+      net_cash_balance: netRealized,
+      total_debt: totalLiabilities,
+      savings_efficiency: realizedIncome > 0 ? Number(((realizedIncome - realizedExpense) / realizedIncome * 100).toFixed(1)) : 0,
+      payablesReceivablesKpis: {
+        all_payables: forecastExpense,
+        open_payables: forecastExpense,
+        all_receivables: forecastIncome,
+        open_receivables: forecastIncome,
+        overdue_rate: 0
+      },
+      liabilitiesKpis,
+      incomeStatement,
+      cashFlowStatement,
+      balanceSheet,
+
+      // Placeholders vazios para gráficos obsoletos evitarem erros
+      prTimePoints: [],
+      openPayablesByCategory: [],
+      openPayablesByEntity: [],
+      openPayablesByMonth: [],
+      paymentMethodsDistribution: [],
+      liabilitiesTimePoints: []
+    };
+  }, [allTxs, accountBalances, userGold, filteredTransactions]);
+}

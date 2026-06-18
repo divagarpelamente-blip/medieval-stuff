@@ -50,7 +50,7 @@ export const en = {
   type: "Type",
   income: "Income",
   expense: "Expense",
-  amount_gold: "Amount (Gold)",
+  amount_gold: "Amount",
   origin_from: "Origin (From)",
   value_date: "Value Date",
   posting_date: "Posting Date",
@@ -240,8 +240,13 @@ export const en = {
   advice_debt_by_entity: '"This chart displays who we owe gold to, my Liege. {entity} is our biggest creditor at {amount}. Prioritizing payments to them will preserve our trade relationships."',
   advice_debt_composition: '"My Lord, this donut displays the composition of our active debt. We have {amount} outstanding, split among various categories. Diversifying our lines of credit keeps the treasury stable."',
   tpl_salary: "Salary",
-  tpl_blacksmith_payment: "Pay Blacksmith",
-  tpl_tavern_feast: "Tavern Feast",
-  tpl_borrow_gold: "Borrow Gold"
+  tpl_blacksmith_payment: "Tools & Equipment (Pay Blacksmith)",
+  tpl_pay_blacksmith: "Tools & Equipment (Pay Blacksmith)",
+  tpl_tavern_feast: "Restaurant (Tavern Feast)",
+  tpl_borrow_gold: "Bank Loan (Borrow Gold)",
+  tpl_pay_landlord: "Rent (Pay Landlord)",
+  tpl_purchase_food: "Supermarket (Purchase Food)",
+  tpl_pay_interest: "Interest Expense (Pay Interest)",
+  tpl_transfers: "Internal Transfer (Transfers)"
 };
 

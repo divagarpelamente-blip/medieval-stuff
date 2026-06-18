@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useDashboardEngine } from './lib/useDashboardEngine';
 import { supabase } from './lib/supabaseClient';
 import HUD from './components/HUD';
@@ -66,6 +66,8 @@ function App() {
   const [selectedSettingType, setSelectedSettingType] = useState('from');
   const [newOptionVal, setNewOptionVal] = useState('');
   const [newEntityCatVal, setNewEntityCatVal] = useState('Payroll');
+  const [selectedQaNames, setSelectedQaNames] = useState([]);
+  const [selectedQaTemplateName, setSelectedQaTemplateName] = useState('');
 
   // New Quick Action Form States
   const [qaName, setQaName] = useState('');
@@ -93,23 +95,81 @@ function App() {
   const monthOptions = useKingdomStore((state) => state.monthOptions);
 
   const addOption = useKingdomStore((state) => state.addOption);
+  const editOption = useKingdomStore((state) => state.editOption);
   const deleteOption = useKingdomStore((state) => state.deleteOption);
 
   // Form states
-  const [txClass, setTxClass] = useState('Income');
+  const cascadingConfig = {
+    'House & Utilities': {
+      'Rent': { transaction_type: 'Expense', transaction_subtype: 'Rent', transaction_category: 'Housing', target_account: '611001', flow: 'outflow', payment_status: 'Pending' },
+      'Electricity': { transaction_type: 'Expense', transaction_subtype: 'Electricity', transaction_category: 'Housing', target_account: '621001', flow: 'outflow', payment_status: 'Pending' },
+      'Gas': { transaction_type: 'Expense', transaction_subtype: 'Gas', transaction_category: 'Housing', target_account: '621002', flow: 'outflow', payment_status: 'Pending' },
+      'Water': { transaction_type: 'Expense', transaction_subtype: 'Water', transaction_category: 'Housing', target_account: '621003', flow: 'outflow', payment_status: 'Pending' },
+      'Communications': { transaction_type: 'Expense', transaction_subtype: 'Communications', transaction_category: 'Housing', target_account: '621004', flow: 'outflow', payment_status: 'Pending' },
+      'Repairs': { transaction_type: 'Expense', transaction_subtype: 'Repairs', transaction_category: 'Housing', target_account: '611002', flow: 'outflow', payment_status: 'Completed' }
+    },
+    'Transports': {
+      'Gasoline': { transaction_type: 'Expense', transaction_subtype: 'Gasoline', transaction_category: 'Transport', target_account: '631001', flow: 'outflow', payment_status: 'Completed' },
+      'Tolls': { transaction_type: 'Expense', transaction_subtype: 'Tolls', transaction_category: 'Transport', target_account: '631002', flow: 'outflow', payment_status: 'Completed' },
+      'Parking': { transaction_type: 'Expense', transaction_subtype: 'Parking', transaction_category: 'Transport', target_account: '631003', flow: 'outflow', payment_status: 'Completed' }
+    },
+    'Banking & Liabilities': {
+      'Pay Credit card': { transaction_type: 'Debt', transaction_subtype: 'Amortization', transaction_category: 'Banking', target_account: '221002', flow: 'outflow', payment_status: 'Completed' },
+      'Borrow money': { transaction_type: 'Debt', transaction_subtype: 'New Debt', transaction_category: 'Banking', target_account: '111001', flow: 'inflow', payment_status: 'Completed' },
+      'Amortize Loan': { transaction_type: 'Debt', transaction_subtype: 'Amortization', transaction_category: 'Banking', target_account: '211006', flow: 'outflow', payment_status: 'Completed' },
+      'Transfers Savings': { transaction_type: 'Asset', transaction_subtype: 'Transfers', transaction_category: 'Banking', target_account: '131001', flow: 'neutral', payment_status: 'Completed', entity: 'Savings Account' }
+    },
+    'Personal & Lifestyle': {
+      'Restaurant': { transaction_type: 'Expense', transaction_subtype: 'Restaurants', transaction_category: 'Entertainment', target_account: '661', flow: 'outflow', payment_status: 'Completed' },
+      'Cinema': { transaction_type: 'Expense', transaction_subtype: 'Cinema', transaction_category: 'Entertainment', target_account: '662', flow: 'outflow', payment_status: 'Completed' },
+      'Supermarket': { transaction_type: 'Expense', transaction_subtype: 'Supermarket', transaction_category: 'Markets', target_account: '641001', flow: 'outflow', payment_status: 'Completed' },
+      'Clothing': { transaction_type: 'Expense', transaction_subtype: 'Clothing', transaction_category: 'Markets', target_account: '643001', flow: 'outflow', payment_status: 'Completed' }
+    },
+    'Income & Revenue': {
+      'Salary': { transaction_type: 'Income', transaction_subtype: 'Base Salary', transaction_category: 'Payroll', target_account: '711001', flow: 'inflow', payment_status: 'Pending' },
+      'Bonus': { transaction_type: 'Income', transaction_subtype: 'Bonus', transaction_category: 'Payroll', target_account: '711003', flow: 'inflow', payment_status: 'Completed' }
+    }
+  };
+
+  const [mainMenu, setMainMenu] = useState('House & Utilities');
+  const [subMenuAction, setSubMenuAction] = useState('Rent');
+
+  const handleMainMenuChange = (val) => {
+    setMainMenu(val);
+    const subActions = Object.keys(cascadingConfig[val] || {});
+    if (subActions.length > 0) {
+      handleSubMenuChange(val, subActions[0]);
+    }
+  };
+
+  const handleSubMenuChange = (main, sub) => {
+    setSubMenuAction(sub);
+    const payload = cascadingConfig[main]?.[sub];
+    if (payload) {
+      setTxClass(payload.transaction_type);
+      setTxSubClass(payload.transaction_subtype);
+      setTxCategory(payload.transaction_category);
+      setTxTargetAccount(payload.target_account);
+      setTxFlow(payload.flow);
+      setTxStatus(payload.payment_status);
+      setTxEntity(sub);
+    }
+  };
+
+  const [txClass, setTxClass] = useState('Expense');
   const [txAmount, setTxAmount] = useState('');
   const [txFrom, setTxFrom] = useState('Pedro');
   const [txValueDate, setTxValueDate] = useState(new Date().toISOString().split('T')[0]);
   const [txPostingDate, setTxPostingDate] = useState(new Date().toISOString().split('T')[0]);
   const [txStatus, setTxStatus] = useState('Pending');
-  const [txSubClass, setTxSubClass] = useState('Cash receipt');
-  const [txEntity, setTxEntity] = useState('Salary');
-  const [txCategory, setTxCategory] = useState('Payroll');
+  const [txSubClass, setTxSubClass] = useState('Rent');
+  const [txEntity, setTxEntity] = useState('Rent');
+  const [txCategory, setTxCategory] = useState('Housing');
   const [txSubCategory] = useState('');
   const [txDescription, setTxDescription] = useState('');
-  const [txTargetAccount, setTxTargetAccount] = useState('711001');
+  const [txTargetAccount, setTxTargetAccount] = useState('611001');
   const [txSourceDestBank, setTxSourceDestBank] = useState('111001');
-  const [txFlow, setTxFlow] = useState('inflow');
+  const [txFlow, setTxFlow] = useState('outflow');
 
   const entityToTargetAccount = {
     "Salary": "711001",
@@ -136,7 +196,8 @@ function App() {
     "Inter(Brasil)": "111004",
     "Cofidis": "211006",
     "Jota": "212001",
-    "Mae": "212002"
+    "Mae": "212002",
+    "Savings Account": "131001"
   };
 
   // Auto-fill Entity Category when Entity changes
@@ -169,13 +230,17 @@ function App() {
   const fetchDashboardData = useKingdomStore((state) => state.fetchDashboardData);
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
+  const deleteTransactions = useKingdomStore((state) => state.deleteTransactions);
   const initAuth = useKingdomStore((state) => state.initAuth);
 
-  // Default to last 1 year, and current quarter/month on load
+  // Default to current year (or transaction year), and current quarter/month on load
   useEffect(() => {
-    if (transactions.length > 0 && !hasInitializedYears) {
-      const allYears = Array.from(new Set(transactions.map((tx) => tx.year).filter(Boolean))).sort((a, b) => b - a);
-      setSelectedYears(allYears.slice(0, 1).map(String));
+    if (!hasInitializedYears) {
+      const currentYear = new Date().getFullYear();
+      const txYears = Array.from(new Set(transactions.map((tx) => tx.year).filter(Boolean))).map(String);
+      const yearsToSelect = txYears.length > 0 ? [txYears.sort((a, b) => b - a)[0]] : [String(currentYear)];
+      
+      setSelectedYears(yearsToSelect);
       
       const currentMonthIndex = new Date().getMonth();
       const currentQuarterIndex = Math.floor(currentMonthIndex / 3) + 1;
@@ -193,6 +258,15 @@ function App() {
     }
   }, [transactions, hasInitializedYears]);
 
+  // Default origin from to Pedro for divagarpelamente@gmail.com and reset filter initialization state on email change
+  useEffect(() => {
+    setHasInitializedYears(false);
+    if (email === 'divagarpelamente@gmail.com') {
+      setTxFrom('Pedro');
+      setQaFrom('Pedro');
+    }
+  }, [email]);
+
   const profile = { email, gold, level, xp };
 
   const { t: originalT } = useTranslation();
@@ -209,12 +283,24 @@ function App() {
   });
 
   // Quick Actions templates
-  const templates = useKingdomStore((state) => state.templates);
+  const rawTemplates = useKingdomStore((state) => state.templates);
+  const templates = useMemo(() => {
+    if (email === 'divagarpelamente@gmail.com') {
+      return rawTemplates.map(tpl => ({
+        ...tpl,
+        data: {
+          ...tpl.data,
+          from: 'Pedro'
+        }
+      }));
+    }
+    return rawTemplates;
+  }, [rawTemplates, email]);
 
   const applyTemplate = (tpl) => {
     setTxClass(tpl.data.transaction_type);
     setTxAmount(tpl.data.amount);
-    setTxFrom(tpl.data.from);
+    setTxFrom(email === 'divagarpelamente@gmail.com' ? 'Pedro' : tpl.data.from);
     setTxStatus(tpl.data.payment_status);
     setTxSubClass(tpl.data.transaction_subtype);
     setTxEntity(tpl.data.entity);
@@ -225,6 +311,21 @@ function App() {
     setTxFlow(tpl.data.flow || 'outflow');
     setTxValueDate(new Date().toISOString().split('T')[0]);
     setTxPostingDate(new Date().toISOString().split('T')[0]);
+
+    // Try to auto-match template details to cascading config
+    let matched = false;
+    for (const [main, subActions] of Object.entries(cascadingConfig)) {
+      for (const [sub, payload] of Object.entries(subActions)) {
+        if (payload.target_account === tpl.data.target_account || sub.toLowerCase() === tpl.name.toLowerCase() || tpl.name.toLowerCase().includes(sub.toLowerCase())) {
+          setMainMenu(main);
+          setSubMenuAction(sub);
+          matched = true;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+
     const translatedName = t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name);
     toast.success(`${translatedName} template applied!`);
   };
@@ -623,22 +724,155 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       toast.success(t('success_deleted_option', { val }));
     };
 
+    const handleSaveQuickAction = () => {
+      const nameVal = qaName.trim();
+      if (!nameVal) {
+        toast.error(t.err_enter_value);
+        return;
+      }
+      const newTemplateData = {
+        icon: qaIcon || '⚡',
+        data: {
+          from: qaFrom,
+          transaction_type: qaClass,
+          transaction_subtype: qaSubClass,
+          entity: qaEntity,
+          transaction_category: qaCategory,
+          target_account: qaTargetAccount,
+          source_dest_bank: qaSourceDestBank,
+          flow: qaFlow,
+          payment_status: qaStatus,
+          description: qaDescription || `${qaName} action`,
+          amount: qaAmount || '0'
+        }
+      };
+      const oldName = selectedQaNames[0];
+      editOption('quickAction', oldName, nameVal, newTemplateData);
+      toast.success(`Template "${nameVal}" updated successfully!`);
+      setSelectedQaNames([]);
+      setSelectedQaTemplateName('');
+      setQaName('');
+      setQaDescription('');
+      setQaAmount('');
+    };
+
+    const handleDeleteQuickAction = () => {
+      selectedQaNames.forEach(name => {
+        deleteOption('quickAction', name);
+      });
+      toast.success(`Deleted template(s)`);
+      setSelectedQaNames([]);
+      setSelectedQaTemplateName('');
+      setQaName('');
+      setQaDescription('');
+      setQaAmount('');
+    };
+
     return (
       <div className="flex flex-col h-full overflow-hidden">
         {/* Title */}
-        <div className="border-b border-[#8b4513]/20 pb-2 mb-4">
-          <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">{title}</h3>
-          <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t.official_ledger_editor}</p>
+        <div className="border-b border-[#8b4513]/20 pb-2 mb-4 flex justify-between items-center">
+          <div>
+            <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">{title}</h3>
+            <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t.official_ledger_editor}</p>
+          </div>
+          {selectedSettingType === 'quickAction' && (
+            <div className="flex items-end gap-2.5">
+              {/* Buttons on the left of select quick action */}
+              <div className="flex gap-1">
+                {selectedQaNames.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSaveQuickAction}
+                      className="w-[28px] h-[28px] bg-emerald-750 hover:bg-emerald-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                      title={t('save', 'Save')}
+                    >
+                      💾
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteQuickAction}
+                      className="w-[28px] h-[28px] bg-red-750 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                      title={t('delete', 'Delete')}
+                    >
+                      🗑️
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="submit"
+                    form="quick-action-form"
+                    className="w-[28px] h-[28px] bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                    title={t('add', 'Add')}
+                  >
+                    ➕
+                  </button>
+                )}
+              </div>
+
+              {/* Selector */}
+              <div className="flex flex-col items-start gap-0.5">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80">Select Quick Action:</label>
+                <select
+                  value={selectedQaTemplateName || ''}
+                  onChange={(e) => {
+                    const tplName = e.target.value;
+                    setSelectedQaTemplateName(tplName);
+                    if (tplName) {
+                      const tpl = templates.find(t => t.name === tplName);
+                      if (tpl) {
+                        setQaName(tpl.name);
+                        setQaIcon(tpl.icon || '⚡');
+                        setQaFrom(tpl.data.from);
+                        setQaClass(tpl.data.transaction_type);
+                        setQaSubClass(tpl.data.transaction_subtype);
+                        setQaEntity(tpl.data.entity);
+                        setQaCategory(tpl.data.transaction_category);
+                        setQaTargetAccount(tpl.data.target_account);
+                        setQaSourceDestBank(tpl.data.source_dest_bank);
+                        setQaFlow(tpl.data.flow);
+                        setQaStatus(tpl.data.payment_status);
+                        setQaDescription(tpl.data.description || '');
+                        setQaAmount(tpl.data.amount || '');
+                        setSelectedQaNames([tpl.name]);
+                      }
+                    } else {
+                      setQaName('');
+                      setQaIcon('⚡');
+                      setQaFrom(fromOptions[0] || 'Pedro');
+                      setQaClass(classOptions[0] || 'Income');
+                      setQaSubClass(subClassOptions[0] || 'Cash receipt');
+                      setQaEntity(entityOptions[0] || 'Salary');
+                      setQaCategory(entityMappings[entityOptions[0]] || 'Payroll');
+                      setQaTargetAccount('111001');
+                      setQaSourceDestBank('111001');
+                      setQaFlow('inflow');
+                      setQaStatus('Pending');
+                      setQaDescription('');
+                      setQaAmount('');
+                      setSelectedQaNames([]);
+                    }
+                  }}
+                  className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                >
+                  <option value="">-- Choose Quick Action --</option>
+                  {templates.map(tpl => (
+                    <option key={tpl.name} value={tpl.name}>{tpl.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Add option form */}
         {selectedSettingType === 'quickAction' ? (
-          <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
+          <form id="quick-action-form" onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
             {/* Row 1: Source Side */}
             <div className="grid grid-cols-12 gap-3 items-end">
-              {/* Source Account (top left) */}
-              <div className="col-span-12 sm:col-span-4">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Source Account / Bank</label>
+              <div className="col-span-12 sm:col-span-8">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Source account</label>
                 <select
                   value={qaSourceDestBank}
                   onChange={(e) => setQaSourceDestBank(e.target.value)}
@@ -677,46 +911,24 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   <option value="621002">621002 (Expenses Utilities Gas)</option>
                   <option value="621003">621003 (Expenses Utilities Water)</option>
                   <option value="621004">621004 (Expenses Utilities Communications)</option>
-                  <option value="631001">631001 (Expenses Car Gasoline)</option>
-                  <option value="631002">631002 (Expenses Car Repairs / maintenance)</option>
-                  <option value="631003">631003 (Expenses Car Parking)</option>
-                  <option value="631004">631004 (Expenses Car Tolls)</option>
-                  <option value="631005">631005 (Expenses Car Taxes)</option>
-                  <option value="631006">631006 (Expenses Car Fines)</option>
-                  <option value="632001">632001 (Expenses Motorcycle Gasoline)</option>
-                  <option value="632002">632002 (Expenses Motorcycle Repairs / maintenance)</option>
-                  <option value="632003">632003 (Expenses Motorcycle Parking)</option>
-                  <option value="632004">632004 (Expenses Motorcycle Tolls)</option>
-                  <option value="632005">632005 (Expenses Motorcycle Taxes)</option>
-                  <option value="632006">632006 (Expenses Motorcycle Fines)</option>
-                  <option value="633001">633001 (Expenses Public Transports Metro)</option>
-                  <option value="633002">633002 (Expenses Public Transports Bus)</option>
-                  <option value="633003">633003 (Expenses Public Transports Train)</option>
-                  <option value="633004">633004 (Expenses Public Transports Fines)</option>
-                  <option value="641001">641001 (Expenses Food & Consumables Food)</option>
-                  <option value="641002">641002 (Expenses Food & Consumables Drinks)</option>
-                  <option value="641003">641003 (Expenses Food & Consumables Cleaning & House)</option>
-                  <option value="641004">641004 (Expenses Food & Consumables Pet Food)</option>
-                  <option value="641005">641005 (Expenses Food & Consumables Others)</option>
-                  <option value="642001">642001 (Expenses Tools & Materials Tools & Materials)</option>
-                  <option value="642002">642002 (Expenses Tools & Materials Delivery / Freight)</option>
-                  <option value="643001">643001 (Expenses Clothing Clothes)</option>
-                  <option value="643002">643002 (Expenses Clothing Shoes)</option>
-                  <option value="651 font-sans">651 (Expenses Social Security)</option>
-                  <option value="652 font-sans">652 (Expenses Finance)</option>
-                  <option value="653 font-sans">653 (Expenses Other Taxes & State)</option>
-                  <option value="661">661 (Expenses Restaurants)</option>
-                  <option value="662">662 (Expenses Cinema)</option>
-                  <option value="663">663 (Expenses Bars & Nightlife)</option>
-                  <option value="671">671 (Expenses Pharmacy)</option>
-                  <option value="672">672 (Expenses Hospital)</option>
-                  <option value="673">673 (Expenses Exams)</option>
-                  <option value="674">674 (Expenses Haircuts / Grooming)</option>
-                  <option value="675">675 (Expenses Makeups)</option>
-                  <option value="681001">681001 (Expenses Financial Costs Interests)</option>
-                  <option value="681002">681002 (Expenses Financial Costs Penalties)</option>
+                  <option value="631001">631001 (Expenses Transports Gasoline)</option>
+                  <option value="631002">631002 (Expenses Transports Tolls)</option>
+                  <option value="631003">631003 (Expenses Transports Parking)</option>
+                  <option value="641001">641001 (Expenses Food Supermarket)</option>
+                  <option value="642001">642001 (Expenses Food Tools & Equipment)</option>
+                  <option value="643001">643001 (Expenses Food Clothing)</option>
+                  <option value="651001">651001 (Expenses Health Health Insurance)</option>
+                  <option value="651002">651002 (Expenses Health Medicine)</option>
+                  <option value="651003">651003 (Expenses Health Health Fees)</option>
+                  <option value="651004">651004 (Expenses Health Medical Appointments)</option>
+                  <option value="651005">651005 (Expenses Health Medical Exams)</option>
+                  <option value="661">661 (Expenses Personal Restaurants & Food delivery)</option>
+                  <option value="662">662 (Expenses Personal Shows & Cinema)</option>
+                  <option value="663">663 (Expenses Personal Streaming subscriptions)</option>
+                  <option value="681001">681001 (Expenses Bank Costs & Interests Interest)</option>
+                  <option value="681002">681002 (Expenses Bank Costs & Interests Stamp Duty & Fees)</option>
                   <option value="711001">711001 (Income Payroll Base Salary)</option>
-                  <option value="711002">711002 (Income Payroll Meal Allowance)</option>
+                  <option value="711002">711002 (Income Payroll Subsidies)</option>
                   <option value="711003">711003 (Income Payroll Holiday & Christmas Bonuses)</option>
                   <option value="712001">712001 (Income Freelance & Services Consulting / Contracts)</option>
                   <option value="721001">721001 (Income Investments Dividends)</option>
@@ -727,133 +939,39 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   <option value="731003">731003 (Income Windfalls & State Cashbacks & Rewards)</option>
                 </select>
               </div>
-
-              {/* Source Acc. Name (top middle) */}
-              <div className="col-span-12 sm:col-span-4">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Source Acc. Name</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={
-                    qaSourceDestBank === '111001' ? 'Assets Banks CGD' :
-                    qaSourceDestBank === '111002' ? 'Assets Banks Universo' :
-                    qaSourceDestBank === '111003' ? 'Assets Banks ActiveBank' :
-                    qaSourceDestBank === '111004' ? 'Assets Banks Inter(Brasil)' :
-                    qaSourceDestBank === '121001' ? 'Assets Investment app CGD' :
-                    qaSourceDestBank === '121002' ? 'Assets Investment app Universo' :
-                    qaSourceDestBank === '121003' ? 'Assets Investment app ActiveBank' :
-                    qaSourceDestBank === '121004' ? 'Assets Investment app WizInk' :
-                    qaSourceDestBank === '121005' ? 'Assets Investment app Inter(Brasil)' :
-                    qaSourceDestBank === '131001' ? 'Assets Savings Accounts CGD' :
-                    qaSourceDestBank === '131002' ? 'Assets Savings Accounts ActiveBank' :
-                    qaSourceDestBank === '131003' ? 'Assets Savings Accounts Inter(Brasil)' :
-                    qaSourceDestBank === '211001' ? 'Liabilities Loans CGD' :
-                    qaSourceDestBank === '211002' ? 'Liabilities Loans Universo' :
-                    qaSourceDestBank === '211003' ? 'Liabilities Loans ActiveBank' :
-                    qaSourceDestBank === '211004' ? 'Liabilities Loans Inter(Brasil)' :
-                    qaSourceDestBank === '211005' ? 'Liabilities Loans WizInk' :
-                    qaSourceDestBank === '211006' ? 'Liabilities Loans Cofidis' :
-                    qaSourceDestBank === '212001' ? 'Liabilities Personal Debts Jota Food' :
-                    qaSourceDestBank === '212002' ? 'Liabilities Personal Debts Mum Support' :
-                    qaSourceDestBank === '221001' ? 'Liabilities Credit Cards CGD' :
-                    qaSourceDestBank === '221002' ? 'Liabilities Credit Cards Universo' :
-                    qaSourceDestBank === '221003' ? 'Liabilities Credit Cards ActiveBank' :
-                    qaSourceDestBank === '221004' ? 'Liabilities Credit Cards WizInk' :
-                    qaSourceDestBank === '221005' ? 'Liabilities Credit Cards Inter(Brasil)' :
-                    qaSourceDestBank === '611001' ? 'Expenses Houses Rent' :
-                    qaSourceDestBank === '611002' ? 'Expenses Houses Repairs' :
-                    qaSourceDestBank === '611003' ? 'Expenses Houses Decorations' :
-                    qaSourceDestBank === '611004' ? 'Expenses Houses Utensils' :
-                    qaSourceDestBank === '621001' ? 'Expenses Utilities Electricity' :
-                    qaSourceDestBank === '621002' ? 'Expenses Utilities Gas' :
-                    qaSourceDestBank === '621003' ? 'Expenses Utilities Water' :
-                    qaSourceDestBank === '621004' ? 'Expenses Utilities Communications' :
-                    qaSourceDestBank === '631001' ? 'Expenses Car Gasoline' :
-                    qaSourceDestBank === '631002' ? 'Expenses Car Repairs / maintenance' :
-                    qaSourceDestBank === '631003' ? 'Expenses Car Parking' :
-                    qaSourceDestBank === '631004' ? 'Expenses Car Tolls' :
-                    qaSourceDestBank === '631005' ? 'Expenses Car Taxes' :
-                    qaSourceDestBank === '631006' ? 'Expenses Car Fines' :
-                    qaSourceDestBank === '632001' ? 'Expenses Motorcycle Gasoline' :
-                    qaSourceDestBank === '632002' ? 'Expenses Motorcycle Repairs / maintenance' :
-                    qaSourceDestBank === '632003' ? 'Expenses Motorcycle Parking' :
-                    qaSourceDestBank === '632004' ? 'Expenses Motorcycle Tolls' :
-                    qaSourceDestBank === '632005' ? 'Expenses Motorcycle Taxes' :
-                    qaSourceDestBank === '632006' ? 'Expenses Motorcycle Fines' :
-                    qaSourceDestBank === '633001' ? 'Expenses Public Transports Metro' :
-                    qaSourceDestBank === '633002' ? 'Expenses Public Transports Bus' :
-                    qaSourceDestBank === '633003' ? 'Expenses Public Transports Train' :
-                    qaSourceDestBank === '633004' ? 'Expenses Public Transports Fines' :
-                    qaSourceDestBank === '641001' ? 'Expenses Food & Consumables Food' :
-                    qaSourceDestBank === '641002' ? 'Expenses Food & Consumables Drinks' :
-                    qaSourceDestBank === '641003' ? 'Expenses Food & Consumables Cleaning & House' :
-                    qaSourceDestBank === '641004' ? 'Expenses Food & Consumables Pet Food' :
-                    qaSourceDestBank === '641005' ? 'Expenses Food & Consumables Others' :
-                    qaSourceDestBank === '642001' ? 'Expenses Tools & Materials Tools & Materials' :
-                    qaSourceDestBank === '642002' ? 'Expenses Tools & Materials Delivery / Freight' :
-                    qaSourceDestBank === '643001' ? 'Expenses Clothing Clothes' :
-                    qaSourceDestBank === '643002' ? 'Expenses Clothing Shoes' :
-                    qaSourceDestBank === '651' ? 'Expenses Social Security' :
-                    qaSourceDestBank === '652' ? 'Expenses Finance' :
-                    qaSourceDestBank === '653' ? 'Expenses Other Taxes & State' :
-                    qaSourceDestBank === '661' ? 'Expenses Restaurants' :
-                    qaSourceDestBank === '662' ? 'Expenses Cinema' :
-                    qaSourceDestBank === '663' ? 'Expenses Bars & Nightlife' :
-                    qaSourceDestBank === '671' ? 'Expenses Pharmacy' :
-                    qaSourceDestBank === '672' ? 'Expenses Hospital' :
-                    qaSourceDestBank === '673' ? 'Expenses Exams' :
-                    qaSourceDestBank === '674' ? 'Expenses Haircuts / Grooming' :
-                    qaSourceDestBank === '675' ? 'Expenses Makeups' :
-                    qaSourceDestBank === '681001' ? 'Expenses Financial Costs Interests' :
-                    qaSourceDestBank === '681002' ? 'Expenses Financial Costs Penalties' :
-                    qaSourceDestBank === '711001' ? 'Income Payroll Base Salary' :
-                    qaSourceDestBank === '711002' ? 'Income Payroll Meal Allowance' :
-                    qaSourceDestBank === '711003' ? 'Income Payroll Holiday & Christmas Bonuses' :
-                    qaSourceDestBank === '712001' ? 'Income Freelance & Services Consulting / Contracts' :
-                    qaSourceDestBank === '721001' ? 'Income Investments Dividends' :
-                    qaSourceDestBank === '721002' ? 'Income Investments Bank Interest' :
-                    qaSourceDestBank === '721003' ? 'Income Investments Capital Gains' :
-                    qaSourceDestBank === '731001' ? 'Income Windfalls & State IRS Tax Refund' :
-                    qaSourceDestBank === '731002' ? 'Income Windfalls & State Family Gifts' :
-                    qaSourceDestBank === '731003' ? 'Income Windfalls & State Cashbacks & Rewards' : 'Other Account'
-                  }
-                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
-                />
+              {/* Flow Selector */}
+              <div className="col-span-12 sm:col-span-2">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Flow</label>
+                <select
+                  value={qaFlow}
+                  onChange={(e) => setQaFlow(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
+                >
+                  <option value="inflow">Inflow</option>
+                  <option value="outflow">Outflow</option>
+                  <option value="neutral">Neutral</option>
+                </select>
               </div>
 
-              {/* Flow & Status (Top Right) */}
-              <div className="col-span-12 sm:col-span-4 flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Flow</label>
-                  <select
-                    value={qaFlow}
-                    onChange={(e) => setQaFlow(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="inflow">Inflow</option>
-                    <option value="outflow">Outflow</option>
-                    <option value="neutral">Neutral</option>
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Status</label>
-                  <select
-                    value={qaStatus}
-                    onChange={(e) => setQaStatus(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
-                  >
-                    {statusOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* Status Selector */}
+              <div className="col-span-12 sm:col-span-2">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Status</label>
+                <select
+                  value={qaStatus}
+                  onChange={(e) => setQaStatus(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
+                >
+                  {statusOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
             {/* Row 2: Target Side */}
             <div className="grid grid-cols-12 gap-3 items-end">
-              {/* Target Account (bottom left) */}
-              <div className="col-span-12 sm:col-span-4">
+              {/* Target Account */}
+              <div className="col-span-12 sm:col-span-8">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Target Account</label>
                 <select
                   value={qaTargetAccount}
@@ -893,46 +1011,24 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   <option value="621002">621002 (Expenses Utilities Gas)</option>
                   <option value="621003">621003 (Expenses Utilities Water)</option>
                   <option value="621004">621004 (Expenses Utilities Communications)</option>
-                  <option value="631001">631001 (Expenses Car Gasoline)</option>
-                  <option value="631002">631002 (Expenses Car Repairs / maintenance)</option>
-                  <option value="631003">631003 (Expenses Car Parking)</option>
-                  <option value="631004">631004 (Expenses Car Tolls)</option>
-                  <option value="631005">631005 (Expenses Car Taxes)</option>
-                  <option value="631006">631006 (Expenses Car Fines)</option>
-                  <option value="632001">632001 (Expenses Motorcycle Gasoline)</option>
-                  <option value="632002">632002 (Expenses Motorcycle Repairs / maintenance)</option>
-                  <option value="632003">632003 (Expenses Motorcycle Parking)</option>
-                  <option value="632004">632004 (Expenses Motorcycle Tolls)</option>
-                  <option value="632005">632005 (Expenses Motorcycle Taxes)</option>
-                  <option value="632006">632006 (Expenses Motorcycle Fines)</option>
-                  <option value="633001">633001 (Expenses Public Transports Metro)</option>
-                  <option value="633002">633002 (Expenses Public Transports Bus)</option>
-                  <option value="633003">633003 (Expenses Public Transports Train)</option>
-                  <option value="633004">633004 (Expenses Public Transports Fines)</option>
-                  <option value="641001">641001 (Expenses Food & Consumables Food)</option>
-                  <option value="641002">641002 (Expenses Food & Consumables Drinks)</option>
-                  <option value="641003">641003 (Expenses Food & Consumables Cleaning & House)</option>
-                  <option value="641004">641004 (Expenses Food & Consumables Pet Food)</option>
-                  <option value="641005">641005 (Expenses Food & Consumables Others)</option>
-                  <option value="642001">642001 (Expenses Tools & Materials Tools & Materials)</option>
-                  <option value="642002">642002 (Expenses Tools & Materials Delivery / Freight)</option>
-                  <option value="643001">643001 (Expenses Clothing Clothes)</option>
-                  <option value="643002">643002 (Expenses Clothing Shoes)</option>
-                  <option value="651">651 (Expenses Social Security)</option>
-                  <option value="652">652 (Expenses Finance)</option>
-                  <option value="653">653 (Expenses Other Taxes & State)</option>
-                  <option value="661">661 (Expenses Restaurants)</option>
-                  <option value="662">662 (Expenses Cinema)</option>
-                  <option value="663">663 (Expenses Bars & Nightlife)</option>
-                  <option value="671">671 (Expenses Pharmacy)</option>
-                  <option value="672">672 (Expenses Hospital)</option>
-                  <option value="673">673 (Expenses Exams)</option>
-                  <option value="674">674 (Expenses Haircuts / Grooming)</option>
-                  <option value="675">675 (Expenses Makeups)</option>
-                  <option value="681001">681001 (Expenses Financial Costs Interests)</option>
-                  <option value="681002">681002 (Expenses Financial Costs Penalties)</option>
+                  <option value="631001">631001 (Expenses Transports Gasoline)</option>
+                  <option value="631002">631002 (Expenses Transports Tolls)</option>
+                  <option value="631003">631003 (Expenses Transports Parking)</option>
+                  <option value="641001">641001 (Expenses Food Supermarket)</option>
+                  <option value="642001">642001 (Expenses Food Tools & Equipment)</option>
+                  <option value="643001">643001 (Expenses Food Clothing)</option>
+                  <option value="651001">651001 (Expenses Health Health Insurance)</option>
+                  <option value="651002">651002 (Expenses Health Medicine)</option>
+                  <option value="651003">651003 (Expenses Health Health Fees)</option>
+                  <option value="651004">651004 (Expenses Health Medical Appointments)</option>
+                  <option value="651005">651005 (Expenses Health Medical Exams)</option>
+                  <option value="661">661 (Expenses Personal Restaurants & Food delivery)</option>
+                  <option value="662">662 (Expenses Personal Shows & Cinema)</option>
+                  <option value="663">663 (Expenses Personal Streaming subscriptions)</option>
+                  <option value="681001">681001 (Expenses Bank Costs & Interests Interest)</option>
+                  <option value="681002">681002 (Expenses Bank Costs & Interests Stamp Duty & Fees)</option>
                   <option value="711001">711001 (Income Payroll Base Salary)</option>
-                  <option value="711002">711002 (Income Payroll Meal Allowance)</option>
+                  <option value="711002">711002 (Income Payroll Subsidies)</option>
                   <option value="711003">711003 (Income Payroll Holiday & Christmas Bonuses)</option>
                   <option value="712001">712001 (Income Freelance & Services Consulting / Contracts)</option>
                   <option value="721001">721001 (Income Investments Dividends)</option>
@@ -944,100 +1040,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </select>
               </div>
 
-              {/* Target Acc. Name (bottom middle) */}
-              <div className="col-span-12 sm:col-span-4">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Target Acc. Name</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={
-                    qaTargetAccount === '111001' ? 'Assets Banks CGD' :
-                    qaTargetAccount === '111002' ? 'Assets Banks Universo' :
-                    qaTargetAccount === '111003' ? 'Assets Banks ActiveBank' :
-                    qaTargetAccount === '111004' ? 'Assets Banks Inter(Brasil)' :
-                    qaTargetAccount === '121001' ? 'Assets Investment app CGD' :
-                    qaTargetAccount === '121002' ? 'Assets Investment app Universo' :
-                    qaTargetAccount === '121003' ? 'Assets Investment app ActiveBank' :
-                    qaTargetAccount === '121004' ? 'Assets Investment app WizInk' :
-                    qaTargetAccount === '121005' ? 'Assets Investment app Inter(Brasil)' :
-                    qaTargetAccount === '131001' ? 'Assets Savings Accounts CGD' :
-                    qaTargetAccount === '131002' ? 'Assets Savings Accounts ActiveBank' :
-                    qaTargetAccount === '131003' ? 'Assets Savings Accounts Inter(Brasil)' :
-                    qaTargetAccount === '211001' ? 'Liabilities Loans CGD' :
-                    qaTargetAccount === '211002' ? 'Liabilities Loans Universo' :
-                    qaTargetAccount === '211003' ? 'Liabilities Loans ActiveBank' :
-                    qaTargetAccount === '211004' ? 'Liabilities Loans Inter(Brasil)' :
-                    qaTargetAccount === '211005' ? 'Liabilities Loans WizInk' :
-                    qaTargetAccount === '211006' ? 'Liabilities Loans Cofidis' :
-                    qaTargetAccount === '212001' ? 'Liabilities Personal Debts Jota Food' :
-                    qaTargetAccount === '212002' ? 'Liabilities Personal Debts Mum Support' :
-                    qaTargetAccount === '221001' ? 'Liabilities Credit Cards CGD' :
-                    qaTargetAccount === '221002' ? 'Liabilities Credit Cards Universo' :
-                    qaTargetAccount === '221003' ? 'Liabilities Credit Cards ActiveBank' :
-                    qaTargetAccount === '221004' ? 'Liabilities Credit Cards WizInk' :
-                    qaTargetAccount === '221005' ? 'Liabilities Credit Cards Inter(Brasil)' :
-                    qaTargetAccount === '611001' ? 'Expenses Houses Rent' :
-                    qaTargetAccount === '611002' ? 'Expenses Houses Repairs' :
-                    qaTargetAccount === '611003' ? 'Expenses Houses Decorations' :
-                    qaTargetAccount === '611004' ? 'Expenses Houses Utensils' :
-                    qaTargetAccount === '621001' ? 'Expenses Utilities Electricity' :
-                    qaTargetAccount === '621002' ? 'Expenses Utilities Gas' :
-                    qaTargetAccount === '621003' ? 'Expenses Utilities Water' :
-                    qaTargetAccount === '621004' ? 'Expenses Utilities Communications' :
-                    qaTargetAccount === '631001' ? 'Expenses Car Gasoline' :
-                    qaTargetAccount === '631002' ? 'Expenses Car Repairs / maintenance' :
-                    qaTargetAccount === '631003' ? 'Expenses Car Parking' :
-                    qaTargetAccount === '631004' ? 'Expenses Car Tolls' :
-                    qaTargetAccount === '631005' ? 'Expenses Car Taxes' :
-                    qaTargetAccount === '631006' ? 'Expenses Car Fines' :
-                    qaTargetAccount === '632001' ? 'Expenses Motorcycle Gasoline' :
-                    qaTargetAccount === '632002' ? 'Expenses Motorcycle Repairs / maintenance' :
-                    qaTargetAccount === '632003' ? 'Expenses Motorcycle Parking' :
-                    qaTargetAccount === '632004' ? 'Expenses Motorcycle Tolls' :
-                    qaTargetAccount === '632005' ? 'Expenses Motorcycle Taxes' :
-                    qaTargetAccount === '632006' ? 'Expenses Motorcycle Fines' :
-                    qaTargetAccount === '633001' ? 'Expenses Public Transports Metro' :
-                    qaTargetAccount === '633002' ? 'Expenses Public Transports Bus' :
-                    qaTargetAccount === '633003' ? 'Expenses Public Transports Train' :
-                    qaTargetAccount === '633004' ? 'Expenses Public Transports Fines' :
-                    qaTargetAccount === '641001' ? 'Expenses Food & Consumables Food' :
-                    qaTargetAccount === '641002' ? 'Expenses Food & Consumables Drinks' :
-                    qaTargetAccount === '641003' ? 'Expenses Food & Consumables Cleaning & House' :
-                    qaTargetAccount === '641004' ? 'Expenses Food & Consumables Pet Food' :
-                    qaTargetAccount === '641005' ? 'Expenses Food & Consumables Others' :
-                    qaTargetAccount === '642001' ? 'Expenses Tools & Materials Tools & Materials' :
-                    qaTargetAccount === '642002' ? 'Expenses Tools & Materials Delivery / Freight' :
-                    qaTargetAccount === '643001' ? 'Expenses Clothing Clothes' :
-                    qaTargetAccount === '643002' ? 'Expenses Clothing Shoes' :
-                    qaTargetAccount === '651' ? 'Expenses Social Security' :
-                    qaTargetAccount === '652' ? 'Expenses Finance' :
-                    qaTargetAccount === '653' ? 'Expenses Other Taxes & State' :
-                    qaTargetAccount === '661' ? 'Expenses Restaurants' :
-                    qaTargetAccount === '662' ? 'Expenses Cinema' :
-                    qaTargetAccount === '663' ? 'Expenses Bars & Nightlife' :
-                    qaTargetAccount === '671' ? 'Expenses Pharmacy' :
-                    qaTargetAccount === '672' ? 'Expenses Hospital' :
-                    qaTargetAccount === '673' ? 'Expenses Exams' :
-                    qaTargetAccount === '674' ? 'Expenses Haircuts / Grooming' :
-                    qaTargetAccount === '675' ? 'Expenses Makeups' :
-                    qaTargetAccount === '681001' ? 'Expenses Financial Costs Interests' :
-                    qaTargetAccount === '681002' ? 'Expenses Financial Costs Penalties' :
-                    qaTargetAccount === '711001' ? 'Income Payroll Base Salary' :
-                    qaTargetAccount === '711002' ? 'Income Payroll Meal Allowance' :
-                    qaTargetAccount === '711003' ? 'Income Payroll Holiday & Christmas Bonuses' :
-                    qaTargetAccount === '712001' ? 'Income Freelance & Services Consulting / Contracts' :
-                    qaTargetAccount === '721001' ? 'Income Investments Dividends' :
-                    qaTargetAccount === '721002' ? 'Income Investments Bank Interest' :
-                    qaTargetAccount === '721003' ? 'Income Investments Capital Gains' :
-                    qaTargetAccount === '731001' ? 'Income Windfalls & State IRS Tax Refund' :
-                    qaTargetAccount === '731002' ? 'Income Windfalls & State Family Gifts' :
-                    qaTargetAccount === '731003' ? 'Income Windfalls & State Cashbacks & Rewards' : 'Other Account'
-                  }
-                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
-                />
-              </div>
-
-              {/* Description (bottom right - aligned) */}
+              {/* Description */}
               <div className="col-span-12 sm:col-span-4">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Description</label>
                 <input
@@ -1050,7 +1053,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               </div>
             </div>
 
-            {/* Row 3: Other parameters */}
+            {/* Row 3 & 4 */}
             <div className="grid grid-cols-12 gap-3 items-end">
               <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Name</label>
@@ -1075,7 +1078,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 />
               </div>
               <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Amount (Gold)</label>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Amount</label>
                 <input
                   type="number"
                   value={qaAmount}
@@ -1098,63 +1101,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </select>
               </div>
             </div>
-
-            <div className="grid grid-cols-12 gap-3 items-end">
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Type (Class)</label>
-                <select
-                  value={qaClass}
-                  onChange={(e) => setQaClass(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
-                >
-                  {classOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Subtype</label>
-                <select
-                  value={qaSubClass}
-                  onChange={(e) => setQaSubClass(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
-                >
-                  {subClassOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Entity</label>
-                <select
-                  value={qaEntity}
-                  onChange={(e) => handleQaEntityChange(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none font-sans"
-                >
-                  {entityOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Category</label>
-                <input
-                  type="text"
-                  value={qaCategory}
-                  readOnly
-                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 focus:outline-none cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-1">
-              <button
-                type="submit"
-                className="px-4 h-[34px] bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
-              >
-                ➕ {t.add}
-              </button>
-            </div>
           </form>
         ) : (
           <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
@@ -1169,7 +1115,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   onChange={(e) => setNewOptionVal(e.target.value)}
                   placeholder={t('placeholder.item')}
                   required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                 />
               </div>
 
@@ -1181,7 +1127,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   <select
                     value={newEntityCatVal}
                     onChange={(e) => setNewEntityCatVal(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {categoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -1193,7 +1139,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               <div className={`${!showEntityCategorySelector ? 'sm:col-span-2' : ''} flex justify-end`}>
                 <button
                   type="submit"
-                  className="px-4 py-3 md:py-2 min-h-[44px] md:min-h-0 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
+                  className="px-3 h-[28px] bg-[#8b4513] text-white font-black text-[9px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
                 >
                   ➕ {t.add}
                 </button>
@@ -1209,37 +1155,94 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               <table className="w-full text-left border-collapse text-[10px] font-sans">
                 <thead>
                   <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                    <th className="py-2 px-3">Action</th>
-                    <th className="py-2 px-3">Type/Subtype</th>
-                    <th className="py-2 px-3">Entity</th>
-                    <th className="py-2 px-3">Amount</th>
-                    <th className="py-2 px-3 text-right">{t.actions}</th>
+                    <th className="py-2 px-2 w-8 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedQaNames.length === currentList.length && currentList.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedQaNames(currentList.map(tpl => tpl.name));
+                            if (currentList.length > 0) {
+                              const tpl = currentList[0];
+                              setQaName(tpl.name);
+                              setQaIcon(tpl.icon || '⚡');
+                              setQaFrom(tpl.data.from);
+                              setQaClass(tpl.data.transaction_type);
+                              setQaSubClass(tpl.data.transaction_subtype);
+                              setQaEntity(tpl.data.entity);
+                              setQaCategory(tpl.data.transaction_category);
+                              setQaTargetAccount(tpl.data.target_account);
+                              setQaSourceDestBank(tpl.data.source_dest_bank);
+                              setQaFlow(tpl.data.flow);
+                              setQaStatus(tpl.data.payment_status);
+                              setQaDescription(tpl.data.description || '');
+                              setQaAmount(tpl.data.amount || '');
+                              setSelectedQaTemplateName(tpl.name);
+                            }
+                          } else {
+                            setSelectedQaNames([]);
+                            setSelectedQaTemplateName('');
+                          }
+                        }}
+                        className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
+                      />
+                    </th>
+                    <th className="py-2 px-2">Action</th>
+                    <th className="py-2 px-2">Type/Subtype</th>
+                    <th className="py-2 px-2">Entity</th>
+                    <th className="py-2 px-2">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                  {currentList.map((tpl) => (
-                    <tr key={tpl.name} className="hover:bg-[#8b4513]/5 transition-colors">
-                      <td className="py-2 px-3 font-bold text-[#4b2c20]">
-                        <span className="mr-1.5">{tpl.icon}</span>
-                        {t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}
-                      </td>
-                      <td className="py-2 px-3 text-stone-500 font-medium">
-                        {tpl.data.transaction_type} • {tpl.data.transaction_subtype}
-                      </td>
-                      <td className="py-2 px-3 text-stone-500 font-medium">{tpl.data.entity}</td>
-                      <td className="py-2 px-3 font-mono text-[#4b2c20]">{tpl.data.amount} G</td>
-                      <td className="py-2 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOption(tpl.name)}
-                          className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
-                          title={t.eliminate}
-                        >
-                          ❌ {t.eliminate}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {currentList.map((tpl) => {
+                    const isChecked = selectedQaNames.includes(tpl.name);
+                    return (
+                      <tr key={tpl.name} className={`hover:bg-[#8b4513]/5 transition-colors ${isChecked ? 'bg-[#8b4513]/10' : ''}`}>
+                        <td className="py-2 px-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let updated;
+                              if (e.target.checked) {
+                                updated = [...selectedQaNames, tpl.name];
+                                setQaName(tpl.name);
+                                setQaIcon(tpl.icon || '⚡');
+                                setQaFrom(tpl.data.from);
+                                setQaClass(tpl.data.transaction_type);
+                                setQaSubClass(tpl.data.transaction_subtype);
+                                setQaEntity(tpl.data.entity);
+                                setQaCategory(tpl.data.transaction_category);
+                                setQaTargetAccount(tpl.data.target_account);
+                                setQaSourceDestBank(tpl.data.source_dest_bank);
+                                setQaFlow(tpl.data.flow);
+                                setQaStatus(tpl.data.payment_status);
+                                setQaDescription(tpl.data.description || '');
+                                setQaAmount(tpl.data.amount || '');
+                                setSelectedQaTemplateName(tpl.name);
+                              } else {
+                                updated = selectedQaNames.filter(n => n !== tpl.name);
+                                if (selectedQaTemplateName === tpl.name) {
+                                  setSelectedQaTemplateName('');
+                                }
+                              }
+                              setSelectedQaNames(updated);
+                            }}
+                            className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
+                          />
+                        </td>
+                        <td className="py-2 px-2 font-bold text-[#4b2c20]">
+                          <span className="mr-1.5">{tpl.icon}</span>
+                          {t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}
+                        </td>
+                        <td className="py-2 px-2 text-stone-500 font-medium">
+                          {tpl.data.transaction_type} • {tpl.data.transaction_subtype}
+                        </td>
+                        <td className="py-2 px-2 text-stone-500 font-medium">{tpl.data.entity}</td>
+                        <td className="py-2 px-2 font-mono text-[#4b2c20]">{tpl.data.amount} G</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
@@ -1284,7 +1287,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   };
 
   const resetFormState = () => {
-    setTxClass('income');
+    setTxClass('Income');
     setTxAmount('');
     setTxFrom(fromOptions[0] || 'Pedro');
     setTxValueDate(new Date().toISOString().split('T')[0]);
@@ -1405,7 +1408,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         return {
           id: tx.id,
           profile_id: tx.profile_id,
-          from: tx.from,
           payment_status: tx.payment_status,
           transaction_type: tx.transaction_type,
           target_account: tx.target_account,
@@ -1415,7 +1417,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           entity: tx.entity,
           amount: Number(tx.amount),
           description: tx.description,
-          transaction_category: entityMappings[tx.entity] || tx.transaction_category || 'Other Banking',
           value_date: valueDate,
           posting_date: postingDate,
           month,
@@ -1436,66 +1437,111 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       setEditingTxs({});
 
       // Sync both store state and profile stats
-      await fetchKingdomData(GUEST_PROFILE_ID);
-      await fetchDashboardData(GUEST_PROFILE_ID);
+      const activeProfileId = user?.id || GUEST_PROFILE_ID;
+      await fetchKingdomData(activeProfileId);
+      await fetchDashboardData(activeProfileId);
     } catch (err) {
       console.error('Error saving edits:', err);
       toast.error(`${t('err_save_failed') || 'Save failed'}: ${err.message || err}`, { id: toastId });
     }
   };
 
+  const handleDeleteSelectedTransactions = async () => {
+    if (selectedTxIds.length === 0) return;
+
+    const confirmMessage = t('confirm_delete_transactions', 'Are you sure you want to delete the selected transactions?') || 'Are you sure you want to delete the selected transactions?';
+    if (!window.confirm(confirmMessage)) return;
+
+    const toastId = toast.loading(t('deleting_ledger') || 'Deleting ledger entries...');
+    try {
+      const activeProfileId = user?.id || GUEST_PROFILE_ID;
+      const res = await deleteTransactions(activeProfileId, selectedTxIds);
+      if (res && res.success) {
+        toast.success(t('success_deleted_transactions') || 'Selected transactions deleted successfully!', { id: toastId });
+        setSelectedTxIds([]);
+        // Sync both store state and profile stats
+        await fetchKingdomData(activeProfileId);
+        await fetchDashboardData(activeProfileId);
+      } else {
+        throw new Error(res?.error || 'Unknown error');
+      }
+    } catch (err) {
+      console.error('Error deleting transactions:', err);
+      toast.error(`${t('err_delete_failed') || 'Delete failed'}: ${err.message || err}`, { id: toastId });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!txAmount || isNaN(txAmount) || Number(txAmount) <= 0) {
-      toast.error(t.err_invalid_amount);
-      return;
-    }
-    if (!txFrom) {
-      toast.error(t.err_invalid_from);
-      return;
-    }
+    try {
+      if (!txAmount || isNaN(txAmount) || Number(txAmount) <= 0) {
+        toast.error(t.err_invalid_amount);
+        return;
+      }
+      if (!txFrom) {
+        toast.error(t.err_invalid_from);
+        return;
+      }
 
-    const amountNum = Number(txAmount);
+      // Account code validations (3-6 digits)
+      const accountCodeRegex = /^\d{3,6}$/;
+      const safeTarget = txTargetAccount || '';
+      const safeSource = txSourceDestBank || '';
 
-    const res = await registerTransaction(GUEST_PROFILE_ID, {
-      transaction_type: txClass,
-      amount: amountNum,
-      from: txFrom,
-      value_date: txValueDate,
-      posting_date: txPostingDate,
-      payment_status: txStatus,
-      transaction_subtype: txSubClass,
-      entity: txEntity,
-      transaction_category: txCategory,
-      target_account: txTargetAccount,
-      source_dest_bank: txSourceDestBank,
-      flow: txFlow,
-      description: txDescription || `${txClass} log`
-    });
+      if (!accountCodeRegex.test(safeTarget)) {
+        toast.error(`Erro de Validação: Código da Conta de Destino (Target Account: "${safeTarget}") deve ter entre 3 e 6 dígitos.`);
+        return;
+      }
+      if (!accountCodeRegex.test(safeSource)) {
+        toast.error(`Erro de Validação: Código da Conta de Origem (Source account: "${safeSource}") deve ter entre 3 e 6 dígitos.`);
+        return;
+      }
 
-    if (res.success) {
-      toast.success(
-        txClass === 'Income'
-          ? t('success_added_gold', { amount: amountNum })
-          : t('success_spent_gold', { amount: amountNum })
-      );
-      setTxAmount('');
-      setTxDescription('');
-      setTxFrom(fromOptions[0] || 'Pedro');
-      setTxSubClass(subClassOptions[0] || 'Cash receipt');
-      setTxEntity(entityOptions[0] || 'Salary');
-      setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
-      setTxTargetAccount('711001');
-      setTxSourceDestBank('111001');
-      setTxFlow('inflow');
-      setTxValueDate(new Date().toISOString().split('T')[0]);
-      setTxPostingDate(new Date().toISOString().split('T')[0]);
-      setTxStatus(statusOptions[0] || 'Pending');
-      setTxClass(classOptions[0] || 'Income');
-      setIsMineModalOpen(false);
-      setIsNewTxModalOpen(false);
-    } else {
-      toast.error(t('err_transaction_failed', { error: res.error }));
+      const amountNum = Number(txAmount);
+
+      const res = await registerTransaction(user?.id || GUEST_PROFILE_ID, {
+        transaction_type: txClass,
+        amount: amountNum,
+        from: txFrom,
+        value_date: txValueDate,
+        posting_date: txPostingDate,
+        payment_status: txStatus,
+        transaction_subtype: txSubClass,
+        entity: txEntity,
+        transaction_category: txCategory,
+        target_account: safeTarget,
+        source_dest_bank: safeSource,
+        flow: txFlow,
+        description: txDescription || `${txClass} log`
+      });
+
+      if (res.success) {
+        toast.success(
+          txClass === 'Income'
+            ? t('success_added_gold', { amount: amountNum })
+            : t('success_spent_gold', { amount: amountNum })
+        );
+        setTxAmount('');
+        setTxDescription('');
+        setTxFrom(fromOptions[0] || 'Pedro');
+        setTxSubClass(subClassOptions[0] || 'Cash receipt');
+        setTxEntity(entityOptions[0] || 'Salary');
+        setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
+        setTxTargetAccount('711001');
+        setTxSourceDestBank('111001');
+        setTxFlow('inflow');
+        setTxValueDate(new Date().toISOString().split('T')[0]);
+        setTxPostingDate(new Date().toISOString().split('T')[0]);
+        setTxStatus(statusOptions[0] || 'Pending');
+        setTxClass(classOptions[0] || 'Income');
+        setIsMineModalOpen(false);
+        setIsNewTxModalOpen(false);
+      } else {
+        toast.error(t('err_transaction_failed', { error: res.error }));
+      }
+    } catch (err) {
+      console.error('Error in handleSubmit:', err);
+      toast.error(`Error saving transaction: ${err.message || err}`);
     }
   };
 
@@ -1606,8 +1652,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               <div className="p-4 sm:p-6 overflow-hidden flex-grow relative z-10 text-[#2d1b0d] flex gap-4">
                 
                 {/* Left Navigation Menu (Wood buttons) */}
-                <div className="w-1/3 min-w-[150px] border-r border-[#8b4513]/25 pr-3 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar-subtle">
-                  <h4 className="text-[10px] font-black uppercase text-[#8b4513]/70 tracking-widest mb-1.5 pl-1 title-font">{t.kingdom_lists}</h4>
+                <div className="w-[22%] min-w-[115px] max-w-[145px] border-r border-[#8b4513]/25 pr-2 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar-subtle flex-shrink-0">
+                  <h4 className="text-[8.5px] font-black uppercase text-[#8b4513]/70 tracking-widest mb-1.5 pl-1 title-font">{t.kingdom_lists}</h4>
                   {[
                     { id: 'from', label: t.manage_from, icon: '👤' },
                     { id: 'status', label: t.manage_status, icon: '📊' },
@@ -1627,14 +1673,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           setSelectedSettingType(btn.id);
                           setNewOptionVal('');
                         }}
-                        className={`text-left px-3 py-3 md:py-2 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all border cursor-pointer min-h-[44px] md:min-h-0 flex items-center ${
+                        className={`text-left px-2 py-2 md:py-1.5 rounded-lg font-black text-[8.5px] leading-tight uppercase tracking-wider transition-all border cursor-pointer min-h-[36px] md:min-h-0 flex items-center ${
                           isSel
                             ? 'bg-[#8b4513]/20 border-[#8b4513] text-[#4b2c20] shadow-inner font-black scale-[1.02]'
                             : 'bg-[#faf4e5]/80 border-[#8b4513]/10 text-[#5d4037]/80 hover:bg-[#8b4513]/5 hover:text-[#4b2c20]'
                         }`}
                       >
-                        <span className="mr-1.5">{btn.icon}</span>
-                        {btn.label}
+                        <span className="mr-1 text-[10px] flex-shrink-0">{btn.icon}</span>
+                        <span className="truncate">{btn.label}</span>
                       </button>
                     );
                   })}
@@ -2024,13 +2070,22 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         </button>
                       </>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={handleStartEditing}
-                        className="px-3 py-1.5 bg-[#8b4513] hover:bg-[#8b4513]/90 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        ✏️ {t('edit') || 'Edit'}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleStartEditing}
+                          className="px-3 py-1.5 bg-[#8b4513] hover:bg-[#8b4513]/90 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          ✏️ {t('edit') || 'Edit'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeleteSelectedTransactions}
+                          className="px-3 py-1.5 bg-[#8b0000] hover:bg-[#8b0000]/90 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          🗑️ {t('delete') || 'Delete'}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -2442,7 +2497,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             </div>
 
             {/* Main Form Area (Right) */}
-            <div className="flex-grow space-y-6">
+            <form onSubmit={handleSubmit} className="flex-grow space-y-6">
             <div className="flex items-center gap-4 border-b border-[#8b4513]/20 pb-4">
               <div className="w-12 h-12 bg-[#8b4513]/10 rounded-full flex items-center justify-center border-2 border-[#8b4513]/20 text-2xl">
                 ➕
@@ -2453,54 +2508,70 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Cascading UI Dropdowns */}
+              <div className="bg-[#faf4e5]/80 border border-[#8b4513]/30 rounded-xl p-3.5 space-y-3 shadow-sm mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Main Menu (Category)
+                    </label>
+                    <select
+                      value={mainMenu}
+                      onChange={(e) => handleMainMenuChange(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      {Object.keys(cascadingConfig).map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Submenu Action
+                    </label>
+                    <select
+                      value={subMenuAction}
+                      onChange={(e) => handleSubMenuChange(mainMenu, e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      {Object.keys(cascadingConfig[mainMenu] || {}).map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Core Accounting Layout Grid */}
               <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-3.5 space-y-3.5">
-                {/* Row 1: Source Side */}
+                {/* Row 1: Source Side & Flow + Status */}
                 <div className="grid grid-cols-12 gap-4 items-end">
                   {/* Source account (top left) */}
                   <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                      Source Account / Bank
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Source account
                     </label>
                     <select
                       value={txSourceDestBank}
                       onChange={(e) => setTxSourceDestBank(e.target.value)}
                       className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
                     >
-                      <option value="111001">111001 (CGD Bank)</option>
-                      <option value="111002">111002 (BPI Bank)</option>
-                      <option value="111003">111003 (ActiveBank)</option>
-                      <option value="111004">111004 (Inter Bank)</option>
-                      <option value="121004">121004 (WizInk Card)</option>
-                      <option value="131001">131001 (Cash Chest/Vault)</option>
-                      <option value="211006">211006 (Cofidis Loan)</option>
-                      <option value="212001">212001 (Jota Loan)</option>
-                      <option value="212002">212002 (Mae Loan)</option>
-                      <option value="221002">221002 (Universo Card)</option>
-                      <option value="611001">611001 (Rent Expense)</option>
-                      <option value="611002">611002 (Repairs Expense)</option>
-                      <option value="611003">611003 (Decorations Expense)</option>
-                      <option value="611004">611004 (Utensils Expense)</option>
-                      <option value="621001">621001 (Electricity Expense)</option>
-                      <option value="621002">621002 (Gas Expense)</option>
-                      <option value="621003">621003 (Water Expense)</option>
-                      <option value="621004">621004 (Communications Expense)</option>
-                      <option value="631001">631001 (Gasoline Expense)</option>
-                      <option value="641001">641001 (Supermarket Food)</option>
-                      <option value="642001">642001 (Tools & Equipment)</option>
-                      <option value="643001">643001 (Clothing Expense)</option>
-                      <option value="661">661 (Restaurant Feast)</option>
-                      <option value="662">662 (Cinema Entertainment)</option>
-                      <option value="663">663 (Streaming Entertainment)</option>
-                      <option value="711001">711001 (Base Salary Income)</option>
-                      <option value="711003">711003 (Bonus Income)</option>
+                      <option value="111001">111001 - CGD</option>
+                      <option value="111002">111002 - BPI</option>
+                      <option value="111003">111003 - ActiveBank</option>
+                      <option value="111004">111004 - Inter</option>
+                      <option value="121004">121004 - WizInk</option>
+                      <option value="131001">131001 - Cash Chest</option>
+                      <option value="211006">211006 - Cofidis</option>
+                      <option value="212001">212001 - Jota Support</option>
+                      <option value="212002">212002 - Mum Support</option>
+                      <option value="221002">221002 - Universo</option>
                     </select>
                   </div>
 
                   {/* Source acc. name (top middle) */}
                   <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                       Source Acc. Name
                     </label>
                     <input
@@ -2516,24 +2587,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         txSourceDestBank === '211006' ? 'Cofidis Loan' :
                         txSourceDestBank === '212001' ? 'Jota Loan' :
                         txSourceDestBank === '212002' ? 'Mae Loan' :
-                        txSourceDestBank === '221002' ? 'Universo Card' :
-                        txSourceDestBank === '611001' ? 'Rent Expense' :
-                        txSourceDestBank === '611002' ? 'Repairs Expense' :
-                        txSourceDestBank === '611003' ? 'Decorations Expense' :
-                        txSourceDestBank === '611004' ? 'Utensils Expense' :
-                        txSourceDestBank === '621001' ? 'Electricity Expense' :
-                        txSourceDestBank === '621002' ? 'Gas Expense' :
-                        txSourceDestBank === '621003' ? 'Water Expense' :
-                        txSourceDestBank === '621004' ? 'Communications Expense' :
-                        txSourceDestBank === '631001' ? 'Gasoline Expense' :
-                        txSourceDestBank === '641001' ? 'Supermarket Food' :
-                        txSourceDestBank === '642001' ? 'Tools & Equipment' :
-                        txSourceDestBank === '643001' ? 'Clothing Expense' :
-                        txSourceDestBank === '661' ? 'Restaurant Feast' :
-                        txSourceDestBank === '662' ? 'Cinema Entertainment' :
-                        txSourceDestBank === '663' ? 'Streaming Entertainment' :
-                        txSourceDestBank === '711001' ? 'Base Salary Income' :
-                        txSourceDestBank === '711003' ? 'Bonus Income' : 'Other Account'
+                        txSourceDestBank === '221002' ? 'Universo Card' : 'Other Account'
                       }
                       className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
                     />
@@ -2542,21 +2596,18 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   {/* Flow + Status (Top right) */}
                   <div className="col-span-12 sm:col-span-4 flex gap-2">
                     <div className="flex-1">
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                         Flow
                       </label>
-                      <select
+                      <input
+                        type="text"
+                        readOnly
                         value={txFlow}
-                        onChange={(e) => setTxFlow(e.target.value)}
-                        className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                      >
-                        <option value="inflow">Inflow</option>
-                        <option value="outflow">Outflow</option>
-                        <option value="neutral">Neutral</option>
-                      </select>
+                        className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none uppercase"
+                      />
                     </div>
                     <div className="flex-1">
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                         Status
                       </label>
                       <select
@@ -2572,51 +2623,24 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </div>
                 </div>
 
-                {/* Row 2: Target Side */}
+                {/* Row 2: Target Side & Description */}
                 <div className="grid grid-cols-12 gap-4 items-end">
                   {/* Target account (bottom left) */}
                   <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                       Target Account
                     </label>
-                    <select
+                    <input
+                      type="text"
+                      readOnly
                       value={txTargetAccount}
-                      onChange={(e) => setTxTargetAccount(e.target.value)}
-                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
-                    >
-                      <option value="111001">111001 (CGD Bank)</option>
-                      <option value="111002">111002 (BPI Bank)</option>
-                      <option value="111003">111003 (ActiveBank)</option>
-                      <option value="111004">111004 (Inter Bank)</option>
-                      <option value="121004">121004 (WizInk Card)</option>
-                      <option value="131001">131001 (Cash Chest/Vault)</option>
-                      <option value="211006">211006 (Cofidis Loan)</option>
-                      <option value="212001">212001 (Jota Loan)</option>
-                      <option value="212002">212002 (Mae Loan)</option>
-                      <option value="221002">221002 (Universo Card)</option>
-                      <option value="611001">611001 (Rent Expense)</option>
-                      <option value="611002">611002 (Repairs Expense)</option>
-                      <option value="611003">611003 (Decorations Expense)</option>
-                      <option value="611004">611004 (Utensils Expense)</option>
-                      <option value="621001">621001 (Electricity Expense)</option>
-                      <option value="621002">621002 (Gas Expense)</option>
-                      <option value="621003">621003 (Water Expense)</option>
-                      <option value="621004">621004 (Communications Expense)</option>
-                      <option value="631001">631001 (Gasoline Expense)</option>
-                      <option value="641001">641001 (Supermarket Food)</option>
-                      <option value="642001">642001 (Tools & Equipment)</option>
-                      <option value="643001">643001 (Clothing Expense)</option>
-                      <option value="661">661 (Restaurant Feast)</option>
-                      <option value="662">662 (Cinema Entertainment)</option>
-                      <option value="663">663 (Streaming Entertainment)</option>
-                      <option value="711001">711001 (Base Salary Income)</option>
-                      <option value="711003">711003 (Bonus Income)</option>
-                    </select>
+                      className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none font-mono"
+                    />
                   </div>
 
                   {/* Target acc. name (bottom middle) */}
                   <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                       Target Acc. Name
                     </label>
                     <input
@@ -2657,7 +2681,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
                   {/* Description (bottom right) */}
                   <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                       {t.description}
                     </label>
                     <input
@@ -2805,7 +2829,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 {isLoading ? `${t.register_movement}...` : t.save_transaction}
               </button>
             </form>
-            </div>
           </div>
         </Modal>
 
@@ -3304,23 +3327,32 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     {selectedTxIds.length > 0 && (
                       <>
                         {!isEditing ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsEditing(true);
-                              const initialEdits = {};
-                              selectedTxIds.forEach(id => {
-                                const tx = transactions.find(t => t.id === id);
-                                if (tx) {
-                                  initialEdits[id] = { ...tx };
-                                }
-                              });
-                              setEditingTxs(initialEdits);
-                            }}
-                            className="px-3 py-1.5 bg-[#b8860b] border-2 border-[#d4af37]/30 text-white font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer animate-in fade-in zoom-in duration-150"
-                          >
-                            <span>✏️</span> {t('edit') || 'Edit'}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsEditing(true);
+                                const initialEdits = {};
+                                selectedTxIds.forEach(id => {
+                                  const tx = transactions.find(t => t.id === id);
+                                  if (tx) {
+                                    initialEdits[id] = { ...tx };
+                                  }
+                                });
+                                setEditingTxs(initialEdits);
+                              }}
+                              className="px-3 py-1.5 bg-[#b8860b] border-2 border-[#d4af37]/30 text-white font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer animate-in fade-in zoom-in duration-150"
+                            >
+                              <span>✏️</span> {t('edit') || 'Edit'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleDeleteSelectedTransactions}
+                              className="px-3 py-1.5 bg-[#8b0000] border-2 border-[#ffd700]/30 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer animate-in fade-in zoom-in duration-150"
+                            >
+                              <span>🗑️</span> {t('delete') || 'Delete'}
+                            </button>
+                          </>
                         ) : (
                           <>
                             <button

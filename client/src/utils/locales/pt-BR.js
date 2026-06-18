@@ -44,7 +44,7 @@ export const ptBR = {
   type: "Tipo",
   income: "Rendimento",
   expense: "Despesa",
-  amount_gold: "Quantidade (Ouro)",
+  amount_gold: "Quantidade",
   origin_from: "Origem (From)",
   value_date: "Data de Valor",
   posting_date: "Data de Lançamento",
@@ -211,8 +211,13 @@ export const ptBR = {
   advice_debt_by_entity: '"Este gráfico exibe a quem devemos ouro, meu suserano. {entity} é o nosso maior credor com {amount}. Priorizar pagamentos a ele preservará nossas relações comerciais."',
   advice_debt_composition: '"Meu Senhor, esta rosca exibe a composição de nossa dívida ativa. Temos {amount} pendente, dividido entre várias categorias. Diversificar nossas linhas de crédito mantém a tesouraria estável."',
   tpl_salary: "Salário",
-  tpl_blacksmith_payment: "Pagar Ferreiro",
-  tpl_tavern_feast: "Banquete na Taverna",
-  tpl_borrow_gold: "Pegar Ouro Emprestado"
+  tpl_blacksmith_payment: "Equipamentos e Ferramentas (Pagar Ferreiro)",
+  tpl_pay_blacksmith: "Equipamentos e Ferramentas (Pagar Ferreiro)",
+  tpl_tavern_feast: "Restaurante (Banquete na Taverna)",
+  tpl_borrow_gold: "Empréstimo Bancário (Pegar Ouro Emprestado)",
+  tpl_pay_landlord: "Aluguel (Pagar Proprietário)",
+  tpl_purchase_food: "Supermercado (Comprar Alimento)",
+  tpl_pay_interest: "Despesa de Juros (Pagar Juros)",
+  tpl_transfers: "Transferência Interna (Transferências)"
 };
 
