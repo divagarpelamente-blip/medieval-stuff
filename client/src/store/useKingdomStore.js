@@ -36,8 +36,6 @@ export const useKingdomStore = create((set, get) => ({
   email: 'lord.eldoria@kingdom.gov',
   transactions: [],
   kpiSummary: null,
-  payablesReceivablesKpis: null,
-  liabilitiesKpis: null,
   flowByCategory: [],
   timeEvolution: [],
   topEntities: [],
@@ -314,32 +312,24 @@ export const useKingdomStore = create((set, get) => ({
         kpiRes,
         flowRes,
         timeRes,
-        topRes,
-        prKpiRes,
-        liabilitiesKpiRes
+        topRes
       ] = await Promise.all([
         supabase.from('transactions').select('*').eq('profile_id', userId).order('created_at', { ascending: false }).limit(100),
         supabase.from('view_dashboard_kpi_summary').select('*').eq('profile_id', userId).maybeSingle(),
         supabase.from('view_chart_flow_by_category').select('*').eq('profile_id', userId),
         supabase.from('view_chart_time_evolution').select('*').eq('profile_id', userId).order('dimension_date', { ascending: true }),
-        supabase.from('view_chart_top_entities').select('*').eq('profile_id', userId).order('total_volume', { ascending: false }),
-        supabase.from('view_payables_receivables_kpis').select('*').eq('profile_id', userId).maybeSingle(),
-        supabase.from('view_liabilities_kpis').select('*').eq('profile_id', userId).maybeSingle()
+        supabase.from('view_chart_top_entities').select('*').eq('profile_id', userId).order('total_volume', { ascending: false })
       ]);
 
       if (transactionsRes.error) console.error('Error fetching transactions:', transactionsRes.error);
       if (kpiRes.error) console.error('Error fetching KPI view:', kpiRes.error);
-      if (prKpiRes.error) console.error('Error fetching payables/receivables KPIs view:', prKpiRes.error);
-      if (liabilitiesKpiRes.error) console.error('Error fetching liabilities KPIs view:', liabilitiesKpiRes.error);
 
       set({ 
         transactions: transactionsRes.data || [],
         kpiSummary: kpiRes.data || null,
         flowByCategory: flowRes.data || [],
         timeEvolution: timeRes.data || [],
-        topEntities: topRes.data || [],
-        payablesReceivablesKpis: prKpiRes.data || null,
-        liabilitiesKpis: liabilitiesKpiRes.data || null
+        topEntities: topRes.data || []
       });
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
@@ -561,51 +551,6 @@ export const useKingdomStore = create((set, get) => ({
       }
     });
     return () => subscription.unsubscribe();
-  },
-
-  borrowLoan: async (profileId, { amount, from, entity, description, date }) => {
-    return get().registerTransaction(profileId, {
-      amount: Number(amount),
-      from,
-      entity,
-      description: description || 'New Loan Borrowed',
-      value_date: date || new Date().toISOString().split('T')[0],
-      posting_date: date || new Date().toISOString().split('T')[0],
-      transaction_type: 'Asset',
-      transaction_subtype: 'Borrow cash',
-      target_account: '111001',
-      source_dest_bank: '212002',
-      flow: 'inflow',
-      payment_status: 'Completed'
-    });
-  },
-
-  settlePayable: async (profileId, payableTx, paymentMethod) => {
-    set({ isLoading: true });
-    try {
-      const { error: updateErr } = await supabase
-        .from('transactions')
-        .update({ payment_status: 'Completed' })
-        .eq('id', payableTx.id);
-
-      if (updateErr) throw updateErr;
-
-      set(state => ({
-        transactions: state.transactions.map(tx => 
-          tx.id === payableTx.id ? { ...tx, payment_status: 'Completed' } : tx
-        )
-      }));
-
-      await get().fetchKingdomData(profileId);
-      await get().fetchDashboardData(profileId);
-
-      return { success: true };
-    } catch (err) {
-      console.error('Error settling payable:', err);
-      return { success: false, error: err.message || err };
-    } finally {
-      set({ isLoading: false });
-    }
   },
 
   setLanguage: (lang) => {

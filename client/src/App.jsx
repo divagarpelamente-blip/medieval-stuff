@@ -17,16 +17,10 @@ import TopEntitiesChart from './components/charts/TopEntitiesChart';
 import ExpensesDonutChart from './components/charts/ExpensesDonutChart';
 import ExpensesDetailedChart from './components/charts/ExpensesDetailedChart';
 import DebtEvolutionChart from './components/charts/DebtEvolutionChart';
-import LiabilitiesEvolutionChart from './components/charts/LiabilitiesEvolutionChart';
 import DebtByEntityChart from './components/charts/DebtByEntityChart';
 import DebtCompositionChart from './components/charts/DebtCompositionChart';
 import RoyalTreasurerInsights from './components/RoyalTreasurerInsights';
 import BaseDashboardTab from './components/BaseDashboardTab';
-import PayablesReceivablesSplineChart from './components/charts/PayablesReceivablesSplineChart';
-import OpenPayablesByCategoryChart from './components/charts/OpenPayablesByCategoryChart';
-import OpenPayablesByEntityChart from './components/charts/OpenPayablesByEntityChart';
-import OpenPayablesByMonthChart from './components/charts/OpenPayablesByMonthChart';
-import PaymentMethodsChart from './components/charts/PaymentMethodsChart';
 import RoyalIncomeStatement from './components/RoyalIncomeStatement';
 import TreasuryStatements from './components/TreasuryStatements';
 import ConsolidatedFinancialStatement from './components/ConsolidatedFinancialStatement';
@@ -3102,56 +3096,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       : t('advice_pr_payment_method_none');
 
                     return (
-                      <div className="flex flex-col gap-8">
-                        {/* Spline Evolution Chart */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
-                            <PayablesReceivablesSplineChart prTimePoints={engineData.prTimePoints} t={t} />
-                          </div>
-                          <div className="h-[280px]">
-                            <RoyalTreasurerInsights adviceText={evolutionAdvice} t={t} />
-                          </div>
-                        </div>
-
-                        {/* Open Payables by Category Chart */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
-                            <OpenPayablesByCategoryChart openPayablesByCategory={engineData.openPayablesByCategory} t={t} formatNumberCompact={formatNumberCompact} />
-                          </div>
-                          <div className="h-[280px]">
-                            <RoyalTreasurerInsights adviceText={categoryAdvice} t={t} />
-                          </div>
-                        </div>
-
-                        {/* Open Payables by Entity Chart */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
-                            <OpenPayablesByEntityChart openPayablesByEntity={engineData.openPayablesByEntity} t={t} formatNumberCompact={formatNumberCompact} />
-                          </div>
-                          <div className="h-[280px]">
-                            <RoyalTreasurerInsights adviceText={entityAdvice} t={t} />
-                          </div>
-                        </div>
-
-                        {/* Open Payables by Month Chart */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
-                            <OpenPayablesByMonthChart openPayablesByMonth={engineData.openPayablesByMonth} t={t} />
-                          </div>
-                          <div className="h-[280px]">
-                            <RoyalTreasurerInsights adviceText={monthAdvice} t={t} />
-                          </div>
-                        </div>
-
-                        {/* Payment Methods Chart */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
-                            <PaymentMethodsChart paymentMethodsDistribution={engineData.paymentMethodsDistribution} t={t} />
-                          </div>
-                          <div className="h-[280px]">
-                            <RoyalTreasurerInsights adviceText={paymentMethodAdvice} t={t} />
-                          </div>
-                        </div>
+                      <div className="flex flex-col items-center justify-center p-8 text-center opacity-60">
+                        <div className="text-4xl">📜</div>
+                        <p className="text-xs font-serif italic mt-2">{t('payables_receivables_deprecated', 'Commercial accounts payable & receivable views have been retired in the Personal Finance model.')}</p>
                       </div>
                     );
                   })()
@@ -3174,8 +3121,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       <div className="flex flex-col gap-8">
                         {/* Spline Evolution Chart */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
-                            <LiabilitiesEvolutionChart liabilitiesTimePoints={engineData.liabilitiesTimePoints} t={t} />
+                          <div className="h-[280px] flex items-center justify-center border border-[#8b4513]/10 rounded bg-[#faf4e5]/40 text-xs italic font-serif text-[#5d4037]/60">
+                            {t('liabilities_evolution_chart_deprecated', 'Evolution chart is deprecated.')}
                           </div>
                           <div className="h-[280px]">
                             <RoyalTreasurerInsights adviceText={evolutionAdvice} t={t} />
