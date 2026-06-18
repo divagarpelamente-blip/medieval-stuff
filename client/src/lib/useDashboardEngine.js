@@ -302,10 +302,9 @@ export function useDashboardEngine(filteredTransactions = []) {
       : new Date().getTime();
 
     // Accounts for Balance Sheet (Cumulative historically up to cutoff date)
-    let netVaultCash = 0;
-    let outstandingReceivables = 0;
-    let outstandingPayables = 0;
-    let outstandingDebt = 0;
+    const balances = {
+      '111001': 1000 // Initial profile gold default starts in CGD Bank
+    };
 
     const filteredTxIds = new Set(filteredTransactions.map(tx => tx.id));
 
@@ -313,36 +312,32 @@ export function useDashboardEngine(filteredTransactions = []) {
       const txAmount = Number(tx.amount) || 0;
       const txTime = new Date(tx.posting_date || tx.created_at).getTime();
 
-      // 1. Cumulative Balance Sheet Accumulation
-      if (txTime <= cutoffTime) {
-        if (tx.transaction_nature === 'cash') {
-          if (tx.transaction_flow === 'inflow') {
-            netVaultCash += txAmount;
-          } else if (tx.transaction_flow === 'outflow') {
-            netVaultCash -= txAmount;
-          }
-        }
+      // 1. Cumulative Balance Sheet Account Accumulation (Completed transactions only)
+      if (txTime <= cutoffTime && tx.payment_status === 'Completed') {
+        const target = tx.target_account;
+        const source = tx.source_dest_bank;
 
-        if (tx.transaction_type === 'Receivable' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)) {
-          outstandingReceivables += txAmount;
-        }
-
-        if (tx.transaction_type === 'Payable' && ['Open', 'Pending', 'Overdue'].includes(tx.payment_status)) {
-          outstandingPayables += txAmount;
-        }
-
-        if (tx.transaction_type === 'Debt') {
-          if (tx.transaction_subtype === 'New Debt') {
-            outstandingDebt += txAmount;
-          } else if (tx.transaction_subtype === 'Amortization' && tx.payment_status === 'Completed') {
-            outstandingDebt -= txAmount;
-          }
+        if (tx.flow === 'neutral') {
+          if (source) balances[source] = (balances[source] || 0) - txAmount;
+          if (target) balances[target] = (balances[target] || 0) + txAmount;
+        } else if (tx.transaction_type === 'Expense') {
+          if (source) balances[source] = (balances[source] || 0) - txAmount;
+        } else if (tx.transaction_type === 'Income') {
+          if (source) balances[source] = (balances[source] || 0) + txAmount;
+        } else if (tx.transaction_type === 'Asset' && tx.flow === 'inflow') {
+          // e.g. Borrow Cash
+          if (target) balances[target] = (balances[target] || 0) + txAmount;
+          if (source) balances[source] = (balances[source] || 0) + txAmount;
+        } else if (tx.transaction_type === 'Debt' && tx.flow === 'outflow') {
+          // e.g. Pay Credit Card, Amortize Loan, Repay Personal Debt
+          if (source) balances[source] = (balances[source] || 0) - txAmount;
+          if (target) balances[target] = (balances[target] || 0) - txAmount;
         }
       }
 
       // 2. Periodic P&L and Cash Flow Statement Reduction
       if (filteredTxIds.has(tx.id)) {
-        if (tx.transaction_nature === 'accrual') {
+        if (tx.transaction_type === 'Income' || tx.transaction_type === 'Expense') {
           const category = tx.transaction_category || 'Other';
           if (tx.transaction_type === 'Income') {
             incomeStatement.revenues[category] = (incomeStatement.revenues[category] || 0) + txAmount;
@@ -353,28 +348,24 @@ export function useDashboardEngine(filteredTransactions = []) {
           }
         }
 
-        if (tx.transaction_nature === 'cash') {
-          const subtype = tx.transaction_subtype || 'Other';
-          const category = tx.transaction_category || 'Other';
-          
+        if (tx.payment_status === 'Completed') {
+          const subtype = tx.transaction_subtype || tx.transaction_type || 'Other';
           let segment = 'operating';
-          if (tx.transaction_type === 'Savings') {
+          if (tx.transaction_type === 'Asset' && tx.flow !== 'neutral') {
             segment = 'investing';
-          } else if (
-            tx.transaction_type === 'Debt' ||
-            ['Amortization', 'Interest', 'New Debt'].includes(subtype) ||
-            ['Banking', 'Other Banking', 'Burrowed'].includes(category)
-          ) {
+          } else if (tx.transaction_type === 'Debt' || tx.transaction_type === 'Asset') {
             segment = 'financing';
           }
 
-          const flowVal = tx.transaction_flow === 'inflow' ? txAmount : -txAmount;
-          cashFlowStatement[segment][subtype] = (cashFlowStatement[segment][subtype] || 0) + flowVal;
+          if (tx.flow !== 'neutral') {
+            const flowVal = tx.flow === 'inflow' ? txAmount : -txAmount;
+            cashFlowStatement[segment][subtype] = (cashFlowStatement[segment][subtype] || 0) + flowVal;
 
-          if (segment === 'operating') cashFlowStatement.netOperating += flowVal;
-          if (segment === 'investing') cashFlowStatement.netInvesting += flowVal;
-          if (segment === 'financing') cashFlowStatement.netFinancing += flowVal;
-          cashFlowStatement.netCashFlow += flowVal;
+            if (segment === 'operating') cashFlowStatement.netOperating += flowVal;
+            if (segment === 'investing') cashFlowStatement.netInvesting += flowVal;
+            if (segment === 'financing') cashFlowStatement.netFinancing += flowVal;
+            cashFlowStatement.netCashFlow += flowVal;
+          }
         }
       }
     });
@@ -397,26 +388,40 @@ export function useDashboardEngine(filteredTransactions = []) {
     const formattedInvesting = mapToFormattedArray(cashFlowStatement.investing);
     const formattedFinancing = mapToFormattedArray(cashFlowStatement.financing);
 
-    const totalAssets = netVaultCash + outstandingReceivables;
-    const totalLiabilities = outstandingDebt + outstandingPayables;
+    // Sum up Assets (starts with 1) and Liabilities (starts with 2)
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+    let netVaultCash = 0;
+
+    Object.entries(balances).forEach(([code, balance]) => {
+      if (code.startsWith('1')) {
+        totalAssets += balance;
+        if (code.startsWith('11') || code.startsWith('13')) {
+          netVaultCash += balance;
+        }
+      } else if (code.startsWith('2')) {
+        totalLiabilities += balance;
+      }
+    });
+
     const accumulatedWealth = totalAssets - totalLiabilities;
 
     const balanceSheet = {
       assets: {
         vaultCash: netVaultCash,
-        outstandingReceivables,
+        outstandingReceivables: totalAssets - netVaultCash,
         totalAssets,
         formattedTotal: formatNumberCompact(totalAssets),
         formattedVaultCash: formatNumberCompact(netVaultCash),
-        formattedReceivables: formatNumberCompact(outstandingReceivables)
+        formattedReceivables: formatNumberCompact(totalAssets - netVaultCash)
       },
       liabilities: {
-        outstandingDebt,
-        outstandingPayables,
+        outstandingDebt: totalLiabilities,
+        outstandingPayables: 0,
         totalLiabilities,
         formattedTotal: formatNumberCompact(totalLiabilities),
-        formattedDebt: formatNumberCompact(outstandingDebt),
-        formattedPayables: formatNumberCompact(outstandingPayables)
+        formattedDebt: formatNumberCompact(totalLiabilities),
+        formattedPayables: formatNumberCompact(0)
       },
       equity: {
         accumulatedWealth,

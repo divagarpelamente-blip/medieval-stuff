@@ -83,7 +83,8 @@ function App() {
   const [qaSubClass, setQaSubClass] = useState('Cash receipt');
   const [qaEntity, setQaEntity] = useState('Salary');
   const [qaCategory, setQaCategory] = useState('Payroll');
-  const [qaNature, setQaNature] = useState('cash');
+  const [qaTargetAccount, setQaTargetAccount] = useState('611001');
+  const [qaSourceDestBank, setQaSourceDestBank] = useState('111001');
   const [qaFlow, setQaFlow] = useState('inflow');
   const [qaDescription, setQaDescription] = useState('');
 
@@ -112,8 +113,37 @@ function App() {
   const [txCategory, setTxCategory] = useState('Payroll');
   const [txSubCategory] = useState('');
   const [txDescription, setTxDescription] = useState('');
-  const [txNature, setTxNature] = useState('cash');
-  const [txFlow, setTxFlow] = useState('outflow');
+  const [txTargetAccount, setTxTargetAccount] = useState('711001');
+  const [txSourceDestBank, setTxSourceDestBank] = useState('111001');
+  const [txFlow, setTxFlow] = useState('inflow');
+
+  const entityToTargetAccount = {
+    "Salary": "711001",
+    "Bonus": "711003",
+    "Rent": "611001",
+    "Repairs": "611002",
+    "Decorations": "611003",
+    "Utensils": "611004",
+    "Electricity": "621001",
+    "Gas": "621002",
+    "Water": "621003",
+    "Communications": "621004",
+    "Gasoline": "631001",
+    "Supermarket": "641001",
+    "Tools and Equipment": "642001",
+    "Clothing": "643001",
+    "Restaurant": "661",
+    "Cinema": "662",
+    "Streaming": "663",
+    "CGD": "111001",
+    "Universo": "221002",
+    "ActiveBank": "111003",
+    "WizInk": "121004",
+    "Inter(Brasil)": "111004",
+    "Cofidis": "211006",
+    "Jota": "212001",
+    "Mae": "212002"
+  };
 
   // Auto-fill Entity Category when Entity changes
   const handleEntityChange = (entityVal) => {
@@ -121,6 +151,10 @@ function App() {
     const mapped = entityMappings[entityVal];
     if (mapped) {
       setTxCategory(mapped);
+    }
+    const defaultTarget = entityToTargetAccount[entityVal];
+    if (defaultTarget) {
+      setTxTargetAccount(defaultTarget);
     }
   };
 
@@ -192,8 +226,9 @@ function App() {
     setTxEntity(tpl.data.entity);
     setTxCategory(tpl.data.transaction_category);
     setTxDescription(tpl.data.description);
-    setTxNature(tpl.data.transaction_nature);
-    setTxFlow(tpl.data.transaction_flow);
+    setTxTargetAccount(tpl.data.target_account || '611001');
+    setTxSourceDestBank(tpl.data.source_dest_bank || '111001');
+    setTxFlow(tpl.data.flow || 'outflow');
     setTxValueDate(new Date().toISOString().split('T')[0]);
     setTxPostingDate(new Date().toISOString().split('T')[0]);
     const translatedName = t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name);
@@ -258,16 +293,16 @@ function App() {
 
 
   // Calculate Dashboard Stats (dependent on filters)
-  const dashInflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-  const dashOutflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const dashInflow = dashboardFilteredTransactions.filter(tx => tx.transaction_type === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const dashOutflow = dashboardFilteredTransactions.filter(tx => tx.transaction_type === 'Expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   
-  const subclassInflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'cash' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-  const subclassOutflow = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const subclassInflow = dashboardFilteredTransactions.filter(tx => tx.payment_status === 'Completed' && tx.flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const subclassOutflow = dashboardFilteredTransactions.filter(tx => tx.payment_status === 'Completed' && tx.flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   
   const dashNetBalance = subclassInflow - subclassOutflow;
   
-  const debtAccrual = dashboardFilteredTransactions.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-  const debtPayment = dashboardFilteredTransactions.filter(tx => ['Banking', 'Other Banking', 'Burrowed'].includes(tx.transaction_category) && tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const debtAccrual = dashboardFilteredTransactions.filter(tx => tx.transaction_type === 'Asset' && tx.flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const debtPayment = dashboardFilteredTransactions.filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   const dashDebt = debtAccrual - debtPayment;
 
   const dashEfficiencyRatio = dashInflow > 0 ? ((dashInflow - dashOutflow) / dashInflow) * 100 : 0;
@@ -293,13 +328,13 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const timePoints = [...dashboardFilteredTransactions].reverse().reduce((acc, tx) => {
     const existing = acc.find(p => p.label === tx.month);
     if (existing) {
-      if ((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')) existing.income += Number(tx.amount);
-      if ((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')) existing.expense += Number(tx.amount);
+      if (tx.transaction_type === 'Income') existing.income += Number(tx.amount);
+      if (tx.transaction_type === 'Expense') existing.expense += Number(tx.amount);
     } else {
       acc.push({
         label: tx.month,
-        income: (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : 0,
-        expense: (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow') ? Number(tx.amount) : 0,
+        income: tx.transaction_type === 'Income' ? Number(tx.amount) : 0,
+        expense: tx.transaction_type === 'Expense' ? Number(tx.amount) : 0,
       });
     }
     return acc;
@@ -307,8 +342,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
   const dashCategoryData = uniqueCategories.map((cat) => {
     const catTxs = dashboardFilteredTransactions.filter((tx) => tx.transaction_category === cat);
-    const income = catTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const expense = catTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const income = catTxs.filter((tx) => tx.transaction_type === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expense = catTxs.filter((tx) => tx.transaction_type === 'Expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { "Transaction Category": cat, income, expense, total: income + expense };
   }).filter((c) => c.total > 0);
 
@@ -322,10 +357,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     const [yearStr, monthStr] = label.split(' ');
     const matchedTxs = dashboardFilteredTransactions.filter(tx => String(tx.year) === yearStr && tx.month === monthStr);
 
-    const classIncome = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const classExpense = matchedTxs.filter((tx) => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const subReceipt = matchedTxs.filter((tx) => (tx.transaction_nature === 'cash' && tx.transaction_flow === 'inflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const subPayment = matchedTxs.filter((tx) => (tx.transaction_nature === 'cash' && tx.transaction_flow === 'outflow')).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const classIncome = matchedTxs.filter((tx) => tx.transaction_type === 'Income').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const classExpense = matchedTxs.filter((tx) => tx.transaction_type === 'Expense').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const subReceipt = matchedTxs.filter((tx) => tx.payment_status === 'Completed' && tx.flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const subPayment = matchedTxs.filter((tx) => tx.payment_status === 'Completed' && tx.flow === 'outflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     
     return { label, classIncome, classExpense, subReceipt, subPayment, total: classIncome + classExpense + subReceipt + subPayment };
   }).filter((t) => t.total > 0);
@@ -352,7 +387,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const uniqueFroms = Array.from(new Set(transactions.map(tx => tx.from).filter(Boolean)));
   const fromAllocation = uniqueFroms.map(fromName => {
     const amount = dashboardFilteredTransactions
-      .filter(tx => tx.from === fromName && (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow'))
+      .filter(tx => tx.from === fromName && tx.transaction_type === 'Income')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: fromName, amount };
   }).filter(f => f.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -366,15 +401,15 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const uniqueEntityCats = Array.from(new Set(transactions.map(tx => tx.transaction_category).filter(Boolean)));
   const entityCatExpenses = uniqueEntityCats.map(catName => {
     const amount = transactions
-      .filter(tx => tx.transaction_category === catName && (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow'))
+      .filter(tx => tx.transaction_category === catName && tx.transaction_type === 'Expense')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return { name: catName, amount };
   }).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
   const maxEntityCatExp = Math.max(...entityCatExpenses.map(c => c.amount), 1);
 
   // Payables & Receivables variables
-  const pendingIncomeList = transactions.filter(tx => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') && tx.payment_status === 'Pending');
-  const pendingExpenseList = transactions.filter(tx => (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow') && (tx.payment_status === 'Pending' || tx.payment_status === 'Overdue'));
+  const pendingIncomeList = transactions.filter(tx => tx.transaction_type === 'Income' && tx.payment_status === 'Pending');
+  const pendingExpenseList = transactions.filter(tx => tx.transaction_type === 'Expense' && tx.payment_status === 'Pending');
 
   const totalReceivables = pendingIncomeList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   const totalPayables = pendingExpenseList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
@@ -556,8 +591,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             transaction_subtype: qaSubClass,
             entity: qaEntity,
             transaction_category: qaCategory,
-            transaction_nature: qaNature,
-            transaction_flow: qaFlow,
+            target_account: qaTargetAccount,
+            source_dest_bank: qaSourceDestBank,
+            flow: qaFlow,
             payment_status: qaStatus,
             description: qaDescription || `${qaName} action`,
             amount: qaAmount || '0'
@@ -604,8 +640,425 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         {/* Add option form */}
         {selectedSettingType === 'quickAction' ? (
           <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 items-end">
-              <div>
+            {/* Row 1: Source Side */}
+            <div className="grid grid-cols-12 gap-3 items-end">
+              {/* Source Account (top left) */}
+              <div className="col-span-12 sm:col-span-4">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Source Account / Bank</label>
+                <select
+                  value={qaSourceDestBank}
+                  onChange={(e) => setQaSourceDestBank(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
+                >
+                  <option value="111001">111001 (Assets Banks CGD)</option>
+                  <option value="111002">111002 (Assets Banks Universo)</option>
+                  <option value="111003">111003 (Assets Banks ActiveBank)</option>
+                  <option value="111004">111004 (Assets Banks Inter(Brasil))</option>
+                  <option value="121001">121001 (Assets Investment app CGD)</option>
+                  <option value="121002">121002 (Assets Investment app Universo)</option>
+                  <option value="121003">121003 (Assets Investment app ActiveBank)</option>
+                  <option value="121004">121004 (Assets Investment app WizInk)</option>
+                  <option value="121005">121005 (Assets Investment app Inter(Brasil))</option>
+                  <option value="131001">131001 (Assets Savings Accounts CGD)</option>
+                  <option value="131002">131002 (Assets Savings Accounts ActiveBank)</option>
+                  <option value="131003">131003 (Assets Savings Accounts Inter(Brasil))</option>
+                  <option value="211001">211001 (Liabilities Loans CGD)</option>
+                  <option value="211002">211002 (Liabilities Loans Universo)</option>
+                  <option value="211003">211003 (Liabilities Loans ActiveBank)</option>
+                  <option value="211004">211004 (Liabilities Loans Inter(Brasil))</option>
+                  <option value="211005">211005 (Liabilities Loans WizInk)</option>
+                  <option value="211006">211006 (Liabilities Loans Cofidis)</option>
+                  <option value="212001">212001 (Liabilities Personal Debts Jota Food)</option>
+                  <option value="212002">212002 (Liabilities Personal Debts Mum Support)</option>
+                  <option value="221001">221001 (Liabilities Credit Cards CGD)</option>
+                  <option value="221002">221002 (Liabilities Credit Cards Universo)</option>
+                  <option value="221003">221003 (Liabilities Credit Cards ActiveBank)</option>
+                  <option value="221004">221004 (Liabilities Credit Cards WizInk)</option>
+                  <option value="221005">221005 (Liabilities Credit Cards Inter(Brasil))</option>
+                  <option value="611001">611001 (Expenses Houses Rent)</option>
+                  <option value="611002">611002 (Expenses Houses Repairs)</option>
+                  <option value="611003">611003 (Expenses Houses Decorations)</option>
+                  <option value="611004">611004 (Expenses Houses Utensils)</option>
+                  <option value="621001">621001 (Expenses Utilities Electricity)</option>
+                  <option value="621002">621002 (Expenses Utilities Gas)</option>
+                  <option value="621003">621003 (Expenses Utilities Water)</option>
+                  <option value="621004">621004 (Expenses Utilities Communications)</option>
+                  <option value="631001">631001 (Expenses Car Gasoline)</option>
+                  <option value="631002">631002 (Expenses Car Repairs / maintenance)</option>
+                  <option value="631003">631003 (Expenses Car Parking)</option>
+                  <option value="631004">631004 (Expenses Car Tolls)</option>
+                  <option value="631005">631005 (Expenses Car Taxes)</option>
+                  <option value="631006">631006 (Expenses Car Fines)</option>
+                  <option value="632001">632001 (Expenses Motorcycle Gasoline)</option>
+                  <option value="632002">632002 (Expenses Motorcycle Repairs / maintenance)</option>
+                  <option value="632003">632003 (Expenses Motorcycle Parking)</option>
+                  <option value="632004">632004 (Expenses Motorcycle Tolls)</option>
+                  <option value="632005">632005 (Expenses Motorcycle Taxes)</option>
+                  <option value="632006">632006 (Expenses Motorcycle Fines)</option>
+                  <option value="633001">633001 (Expenses Public Transports Metro)</option>
+                  <option value="633002">633002 (Expenses Public Transports Bus)</option>
+                  <option value="633003">633003 (Expenses Public Transports Train)</option>
+                  <option value="633004">633004 (Expenses Public Transports Fines)</option>
+                  <option value="641001">641001 (Expenses Food & Consumables Food)</option>
+                  <option value="641002">641002 (Expenses Food & Consumables Drinks)</option>
+                  <option value="641003">641003 (Expenses Food & Consumables Cleaning & House)</option>
+                  <option value="641004">641004 (Expenses Food & Consumables Pet Food)</option>
+                  <option value="641005">641005 (Expenses Food & Consumables Others)</option>
+                  <option value="642001">642001 (Expenses Tools & Materials Tools & Materials)</option>
+                  <option value="642002">642002 (Expenses Tools & Materials Delivery / Freight)</option>
+                  <option value="643001">643001 (Expenses Clothing Clothes)</option>
+                  <option value="643002">643002 (Expenses Clothing Shoes)</option>
+                  <option value="651 font-sans">651 (Expenses Social Security)</option>
+                  <option value="652 font-sans">652 (Expenses Finance)</option>
+                  <option value="653 font-sans">653 (Expenses Other Taxes & State)</option>
+                  <option value="661">661 (Expenses Restaurants)</option>
+                  <option value="662">662 (Expenses Cinema)</option>
+                  <option value="663">663 (Expenses Bars & Nightlife)</option>
+                  <option value="671">671 (Expenses Pharmacy)</option>
+                  <option value="672">672 (Expenses Hospital)</option>
+                  <option value="673">673 (Expenses Exams)</option>
+                  <option value="674">674 (Expenses Haircuts / Grooming)</option>
+                  <option value="675">675 (Expenses Makeups)</option>
+                  <option value="681001">681001 (Expenses Financial Costs Interests)</option>
+                  <option value="681002">681002 (Expenses Financial Costs Penalties)</option>
+                  <option value="711001">711001 (Income Payroll Base Salary)</option>
+                  <option value="711002">711002 (Income Payroll Meal Allowance)</option>
+                  <option value="711003">711003 (Income Payroll Holiday & Christmas Bonuses)</option>
+                  <option value="712001">712001 (Income Freelance & Services Consulting / Contracts)</option>
+                  <option value="721001">721001 (Income Investments Dividends)</option>
+                  <option value="721002">721002 (Income Investments Bank Interest)</option>
+                  <option value="721003">721003 (Income Investments Capital Gains)</option>
+                  <option value="731001">731001 (Income Windfalls & State IRS Tax Refund)</option>
+                  <option value="731002">731002 (Income Windfalls & State Family Gifts)</option>
+                  <option value="731003">731003 (Income Windfalls & State Cashbacks & Rewards)</option>
+                </select>
+              </div>
+
+              {/* Source Acc. Name (top middle) */}
+              <div className="col-span-12 sm:col-span-4">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Source Acc. Name</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    qaSourceDestBank === '111001' ? 'Assets Banks CGD' :
+                    qaSourceDestBank === '111002' ? 'Assets Banks Universo' :
+                    qaSourceDestBank === '111003' ? 'Assets Banks ActiveBank' :
+                    qaSourceDestBank === '111004' ? 'Assets Banks Inter(Brasil)' :
+                    qaSourceDestBank === '121001' ? 'Assets Investment app CGD' :
+                    qaSourceDestBank === '121002' ? 'Assets Investment app Universo' :
+                    qaSourceDestBank === '121003' ? 'Assets Investment app ActiveBank' :
+                    qaSourceDestBank === '121004' ? 'Assets Investment app WizInk' :
+                    qaSourceDestBank === '121005' ? 'Assets Investment app Inter(Brasil)' :
+                    qaSourceDestBank === '131001' ? 'Assets Savings Accounts CGD' :
+                    qaSourceDestBank === '131002' ? 'Assets Savings Accounts ActiveBank' :
+                    qaSourceDestBank === '131003' ? 'Assets Savings Accounts Inter(Brasil)' :
+                    qaSourceDestBank === '211001' ? 'Liabilities Loans CGD' :
+                    qaSourceDestBank === '211002' ? 'Liabilities Loans Universo' :
+                    qaSourceDestBank === '211003' ? 'Liabilities Loans ActiveBank' :
+                    qaSourceDestBank === '211004' ? 'Liabilities Loans Inter(Brasil)' :
+                    qaSourceDestBank === '211005' ? 'Liabilities Loans WizInk' :
+                    qaSourceDestBank === '211006' ? 'Liabilities Loans Cofidis' :
+                    qaSourceDestBank === '212001' ? 'Liabilities Personal Debts Jota Food' :
+                    qaSourceDestBank === '212002' ? 'Liabilities Personal Debts Mum Support' :
+                    qaSourceDestBank === '221001' ? 'Liabilities Credit Cards CGD' :
+                    qaSourceDestBank === '221002' ? 'Liabilities Credit Cards Universo' :
+                    qaSourceDestBank === '221003' ? 'Liabilities Credit Cards ActiveBank' :
+                    qaSourceDestBank === '221004' ? 'Liabilities Credit Cards WizInk' :
+                    qaSourceDestBank === '221005' ? 'Liabilities Credit Cards Inter(Brasil)' :
+                    qaSourceDestBank === '611001' ? 'Expenses Houses Rent' :
+                    qaSourceDestBank === '611002' ? 'Expenses Houses Repairs' :
+                    qaSourceDestBank === '611003' ? 'Expenses Houses Decorations' :
+                    qaSourceDestBank === '611004' ? 'Expenses Houses Utensils' :
+                    qaSourceDestBank === '621001' ? 'Expenses Utilities Electricity' :
+                    qaSourceDestBank === '621002' ? 'Expenses Utilities Gas' :
+                    qaSourceDestBank === '621003' ? 'Expenses Utilities Water' :
+                    qaSourceDestBank === '621004' ? 'Expenses Utilities Communications' :
+                    qaSourceDestBank === '631001' ? 'Expenses Car Gasoline' :
+                    qaSourceDestBank === '631002' ? 'Expenses Car Repairs / maintenance' :
+                    qaSourceDestBank === '631003' ? 'Expenses Car Parking' :
+                    qaSourceDestBank === '631004' ? 'Expenses Car Tolls' :
+                    qaSourceDestBank === '631005' ? 'Expenses Car Taxes' :
+                    qaSourceDestBank === '631006' ? 'Expenses Car Fines' :
+                    qaSourceDestBank === '632001' ? 'Expenses Motorcycle Gasoline' :
+                    qaSourceDestBank === '632002' ? 'Expenses Motorcycle Repairs / maintenance' :
+                    qaSourceDestBank === '632003' ? 'Expenses Motorcycle Parking' :
+                    qaSourceDestBank === '632004' ? 'Expenses Motorcycle Tolls' :
+                    qaSourceDestBank === '632005' ? 'Expenses Motorcycle Taxes' :
+                    qaSourceDestBank === '632006' ? 'Expenses Motorcycle Fines' :
+                    qaSourceDestBank === '633001' ? 'Expenses Public Transports Metro' :
+                    qaSourceDestBank === '633002' ? 'Expenses Public Transports Bus' :
+                    qaSourceDestBank === '633003' ? 'Expenses Public Transports Train' :
+                    qaSourceDestBank === '633004' ? 'Expenses Public Transports Fines' :
+                    qaSourceDestBank === '641001' ? 'Expenses Food & Consumables Food' :
+                    qaSourceDestBank === '641002' ? 'Expenses Food & Consumables Drinks' :
+                    qaSourceDestBank === '641003' ? 'Expenses Food & Consumables Cleaning & House' :
+                    qaSourceDestBank === '641004' ? 'Expenses Food & Consumables Pet Food' :
+                    qaSourceDestBank === '641005' ? 'Expenses Food & Consumables Others' :
+                    qaSourceDestBank === '642001' ? 'Expenses Tools & Materials Tools & Materials' :
+                    qaSourceDestBank === '642002' ? 'Expenses Tools & Materials Delivery / Freight' :
+                    qaSourceDestBank === '643001' ? 'Expenses Clothing Clothes' :
+                    qaSourceDestBank === '643002' ? 'Expenses Clothing Shoes' :
+                    qaSourceDestBank === '651' ? 'Expenses Social Security' :
+                    qaSourceDestBank === '652' ? 'Expenses Finance' :
+                    qaSourceDestBank === '653' ? 'Expenses Other Taxes & State' :
+                    qaSourceDestBank === '661' ? 'Expenses Restaurants' :
+                    qaSourceDestBank === '662' ? 'Expenses Cinema' :
+                    qaSourceDestBank === '663' ? 'Expenses Bars & Nightlife' :
+                    qaSourceDestBank === '671' ? 'Expenses Pharmacy' :
+                    qaSourceDestBank === '672' ? 'Expenses Hospital' :
+                    qaSourceDestBank === '673' ? 'Expenses Exams' :
+                    qaSourceDestBank === '674' ? 'Expenses Haircuts / Grooming' :
+                    qaSourceDestBank === '675' ? 'Expenses Makeups' :
+                    qaSourceDestBank === '681001' ? 'Expenses Financial Costs Interests' :
+                    qaSourceDestBank === '681002' ? 'Expenses Financial Costs Penalties' :
+                    qaSourceDestBank === '711001' ? 'Income Payroll Base Salary' :
+                    qaSourceDestBank === '711002' ? 'Income Payroll Meal Allowance' :
+                    qaSourceDestBank === '711003' ? 'Income Payroll Holiday & Christmas Bonuses' :
+                    qaSourceDestBank === '712001' ? 'Income Freelance & Services Consulting / Contracts' :
+                    qaSourceDestBank === '721001' ? 'Income Investments Dividends' :
+                    qaSourceDestBank === '721002' ? 'Income Investments Bank Interest' :
+                    qaSourceDestBank === '721003' ? 'Income Investments Capital Gains' :
+                    qaSourceDestBank === '731001' ? 'Income Windfalls & State IRS Tax Refund' :
+                    qaSourceDestBank === '731002' ? 'Income Windfalls & State Family Gifts' :
+                    qaSourceDestBank === '731003' ? 'Income Windfalls & State Cashbacks & Rewards' : 'Other Account'
+                  }
+                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
+                />
+              </div>
+
+              {/* Flow & Status (Top Right) */}
+              <div className="col-span-12 sm:col-span-4 flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Flow</label>
+                  <select
+                    value={qaFlow}
+                    onChange={(e) => setQaFlow(e.target.value)}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="inflow">Inflow</option>
+                    <option value="outflow">Outflow</option>
+                    <option value="neutral">Neutral</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Status</label>
+                  <select
+                    value={qaStatus}
+                    onChange={(e) => setQaStatus(e.target.value)}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
+                  >
+                    {statusOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Target Side */}
+            <div className="grid grid-cols-12 gap-3 items-end">
+              {/* Target Account (bottom left) */}
+              <div className="col-span-12 sm:col-span-4">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Target Account</label>
+                <select
+                  value={qaTargetAccount}
+                  onChange={(e) => setQaTargetAccount(e.target.value)}
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
+                >
+                  <option value="111001">111001 (Assets Banks CGD)</option>
+                  <option value="111002">111002 (Assets Banks Universo)</option>
+                  <option value="111003">111003 (Assets Banks ActiveBank)</option>
+                  <option value="111004">111004 (Assets Banks Inter(Brasil))</option>
+                  <option value="121001">121001 (Assets Investment app CGD)</option>
+                  <option value="121002">121002 (Assets Investment app Universo)</option>
+                  <option value="121003">121003 (Assets Investment app ActiveBank)</option>
+                  <option value="121004">121004 (Assets Investment app WizInk)</option>
+                  <option value="121005">121005 (Assets Investment app Inter(Brasil))</option>
+                  <option value="131001">131001 (Assets Savings Accounts CGD)</option>
+                  <option value="131002">131002 (Assets Savings Accounts ActiveBank)</option>
+                  <option value="131003">131003 (Assets Savings Accounts Inter(Brasil))</option>
+                  <option value="211001">211001 (Liabilities Loans CGD)</option>
+                  <option value="211002">211002 (Liabilities Loans Universo)</option>
+                  <option value="211003">211003 (Liabilities Loans ActiveBank)</option>
+                  <option value="211004">211004 (Liabilities Loans Inter(Brasil))</option>
+                  <option value="211005">211005 (Liabilities Loans WizInk)</option>
+                  <option value="211006">211006 (Liabilities Loans Cofidis)</option>
+                  <option value="212001">212001 (Liabilities Personal Debts Jota Food)</option>
+                  <option value="212002">212002 (Liabilities Personal Debts Mum Support)</option>
+                  <option value="221001">221001 (Liabilities Credit Cards CGD)</option>
+                  <option value="221002">221002 (Liabilities Credit Cards Universo)</option>
+                  <option value="221003">221003 (Liabilities Credit Cards ActiveBank)</option>
+                  <option value="221004">221004 (Liabilities Credit Cards WizInk)</option>
+                  <option value="221005">221005 (Liabilities Credit Cards Inter(Brasil))</option>
+                  <option value="611001">611001 (Expenses Houses Rent)</option>
+                  <option value="611002">611002 (Expenses Houses Repairs)</option>
+                  <option value="611003">611003 (Expenses Houses Decorations)</option>
+                  <option value="611004">611004 (Expenses Houses Utensils)</option>
+                  <option value="621001">621001 (Expenses Utilities Electricity)</option>
+                  <option value="621002">621002 (Expenses Utilities Gas)</option>
+                  <option value="621003">621003 (Expenses Utilities Water)</option>
+                  <option value="621004">621004 (Expenses Utilities Communications)</option>
+                  <option value="631001">631001 (Expenses Car Gasoline)</option>
+                  <option value="631002">631002 (Expenses Car Repairs / maintenance)</option>
+                  <option value="631003">631003 (Expenses Car Parking)</option>
+                  <option value="631004">631004 (Expenses Car Tolls)</option>
+                  <option value="631005">631005 (Expenses Car Taxes)</option>
+                  <option value="631006">631006 (Expenses Car Fines)</option>
+                  <option value="632001">632001 (Expenses Motorcycle Gasoline)</option>
+                  <option value="632002">632002 (Expenses Motorcycle Repairs / maintenance)</option>
+                  <option value="632003">632003 (Expenses Motorcycle Parking)</option>
+                  <option value="632004">632004 (Expenses Motorcycle Tolls)</option>
+                  <option value="632005">632005 (Expenses Motorcycle Taxes)</option>
+                  <option value="632006">632006 (Expenses Motorcycle Fines)</option>
+                  <option value="633001">633001 (Expenses Public Transports Metro)</option>
+                  <option value="633002">633002 (Expenses Public Transports Bus)</option>
+                  <option value="633003">633003 (Expenses Public Transports Train)</option>
+                  <option value="633004">633004 (Expenses Public Transports Fines)</option>
+                  <option value="641001">641001 (Expenses Food & Consumables Food)</option>
+                  <option value="641002">641002 (Expenses Food & Consumables Drinks)</option>
+                  <option value="641003">641003 (Expenses Food & Consumables Cleaning & House)</option>
+                  <option value="641004">641004 (Expenses Food & Consumables Pet Food)</option>
+                  <option value="641005">641005 (Expenses Food & Consumables Others)</option>
+                  <option value="642001">642001 (Expenses Tools & Materials Tools & Materials)</option>
+                  <option value="642002">642002 (Expenses Tools & Materials Delivery / Freight)</option>
+                  <option value="643001">643001 (Expenses Clothing Clothes)</option>
+                  <option value="643002">643002 (Expenses Clothing Shoes)</option>
+                  <option value="651">651 (Expenses Social Security)</option>
+                  <option value="652">652 (Expenses Finance)</option>
+                  <option value="653">653 (Expenses Other Taxes & State)</option>
+                  <option value="661">661 (Expenses Restaurants)</option>
+                  <option value="662">662 (Expenses Cinema)</option>
+                  <option value="663">663 (Expenses Bars & Nightlife)</option>
+                  <option value="671">671 (Expenses Pharmacy)</option>
+                  <option value="672">672 (Expenses Hospital)</option>
+                  <option value="673">673 (Expenses Exams)</option>
+                  <option value="674">674 (Expenses Haircuts / Grooming)</option>
+                  <option value="675">675 (Expenses Makeups)</option>
+                  <option value="681001">681001 (Expenses Financial Costs Interests)</option>
+                  <option value="681002">681002 (Expenses Financial Costs Penalties)</option>
+                  <option value="711001">711001 (Income Payroll Base Salary)</option>
+                  <option value="711002">711002 (Income Payroll Meal Allowance)</option>
+                  <option value="711003">711003 (Income Payroll Holiday & Christmas Bonuses)</option>
+                  <option value="712001">712001 (Income Freelance & Services Consulting / Contracts)</option>
+                  <option value="721001">721001 (Income Investments Dividends)</option>
+                  <option value="721002">721002 (Income Investments Bank Interest)</option>
+                  <option value="721003">721003 (Income Investments Capital Gains)</option>
+                  <option value="731001">731001 (Income Windfalls & State IRS Tax Refund)</option>
+                  <option value="731002">731002 (Income Windfalls & State Family Gifts)</option>
+                  <option value="731003">731003 (Income Windfalls & State Cashbacks & Rewards)</option>
+                </select>
+              </div>
+
+              {/* Target Acc. Name (bottom middle) */}
+              <div className="col-span-12 sm:col-span-4">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Target Acc. Name</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    qaTargetAccount === '111001' ? 'Assets Banks CGD' :
+                    qaTargetAccount === '111002' ? 'Assets Banks Universo' :
+                    qaTargetAccount === '111003' ? 'Assets Banks ActiveBank' :
+                    qaTargetAccount === '111004' ? 'Assets Banks Inter(Brasil)' :
+                    qaTargetAccount === '121001' ? 'Assets Investment app CGD' :
+                    qaTargetAccount === '121002' ? 'Assets Investment app Universo' :
+                    qaTargetAccount === '121003' ? 'Assets Investment app ActiveBank' :
+                    qaTargetAccount === '121004' ? 'Assets Investment app WizInk' :
+                    qaTargetAccount === '121005' ? 'Assets Investment app Inter(Brasil)' :
+                    qaTargetAccount === '131001' ? 'Assets Savings Accounts CGD' :
+                    qaTargetAccount === '131002' ? 'Assets Savings Accounts ActiveBank' :
+                    qaTargetAccount === '131003' ? 'Assets Savings Accounts Inter(Brasil)' :
+                    qaTargetAccount === '211001' ? 'Liabilities Loans CGD' :
+                    qaTargetAccount === '211002' ? 'Liabilities Loans Universo' :
+                    qaTargetAccount === '211003' ? 'Liabilities Loans ActiveBank' :
+                    qaTargetAccount === '211004' ? 'Liabilities Loans Inter(Brasil)' :
+                    qaTargetAccount === '211005' ? 'Liabilities Loans WizInk' :
+                    qaTargetAccount === '211006' ? 'Liabilities Loans Cofidis' :
+                    qaTargetAccount === '212001' ? 'Liabilities Personal Debts Jota Food' :
+                    qaTargetAccount === '212002' ? 'Liabilities Personal Debts Mum Support' :
+                    qaTargetAccount === '221001' ? 'Liabilities Credit Cards CGD' :
+                    qaTargetAccount === '221002' ? 'Liabilities Credit Cards Universo' :
+                    qaTargetAccount === '221003' ? 'Liabilities Credit Cards ActiveBank' :
+                    qaTargetAccount === '221004' ? 'Liabilities Credit Cards WizInk' :
+                    qaTargetAccount === '221005' ? 'Liabilities Credit Cards Inter(Brasil)' :
+                    qaTargetAccount === '611001' ? 'Expenses Houses Rent' :
+                    qaTargetAccount === '611002' ? 'Expenses Houses Repairs' :
+                    qaTargetAccount === '611003' ? 'Expenses Houses Decorations' :
+                    qaTargetAccount === '611004' ? 'Expenses Houses Utensils' :
+                    qaTargetAccount === '621001' ? 'Expenses Utilities Electricity' :
+                    qaTargetAccount === '621002' ? 'Expenses Utilities Gas' :
+                    qaTargetAccount === '621003' ? 'Expenses Utilities Water' :
+                    qaTargetAccount === '621004' ? 'Expenses Utilities Communications' :
+                    qaTargetAccount === '631001' ? 'Expenses Car Gasoline' :
+                    qaTargetAccount === '631002' ? 'Expenses Car Repairs / maintenance' :
+                    qaTargetAccount === '631003' ? 'Expenses Car Parking' :
+                    qaTargetAccount === '631004' ? 'Expenses Car Tolls' :
+                    qaTargetAccount === '631005' ? 'Expenses Car Taxes' :
+                    qaTargetAccount === '631006' ? 'Expenses Car Fines' :
+                    qaTargetAccount === '632001' ? 'Expenses Motorcycle Gasoline' :
+                    qaTargetAccount === '632002' ? 'Expenses Motorcycle Repairs / maintenance' :
+                    qaTargetAccount === '632003' ? 'Expenses Motorcycle Parking' :
+                    qaTargetAccount === '632004' ? 'Expenses Motorcycle Tolls' :
+                    qaTargetAccount === '632005' ? 'Expenses Motorcycle Taxes' :
+                    qaTargetAccount === '632006' ? 'Expenses Motorcycle Fines' :
+                    qaTargetAccount === '633001' ? 'Expenses Public Transports Metro' :
+                    qaTargetAccount === '633002' ? 'Expenses Public Transports Bus' :
+                    qaTargetAccount === '633003' ? 'Expenses Public Transports Train' :
+                    qaTargetAccount === '633004' ? 'Expenses Public Transports Fines' :
+                    qaTargetAccount === '641001' ? 'Expenses Food & Consumables Food' :
+                    qaTargetAccount === '641002' ? 'Expenses Food & Consumables Drinks' :
+                    qaTargetAccount === '641003' ? 'Expenses Food & Consumables Cleaning & House' :
+                    qaTargetAccount === '641004' ? 'Expenses Food & Consumables Pet Food' :
+                    qaTargetAccount === '641005' ? 'Expenses Food & Consumables Others' :
+                    qaTargetAccount === '642001' ? 'Expenses Tools & Materials Tools & Materials' :
+                    qaTargetAccount === '642002' ? 'Expenses Tools & Materials Delivery / Freight' :
+                    qaTargetAccount === '643001' ? 'Expenses Clothing Clothes' :
+                    qaTargetAccount === '643002' ? 'Expenses Clothing Shoes' :
+                    qaTargetAccount === '651' ? 'Expenses Social Security' :
+                    qaTargetAccount === '652' ? 'Expenses Finance' :
+                    qaTargetAccount === '653' ? 'Expenses Other Taxes & State' :
+                    qaTargetAccount === '661' ? 'Expenses Restaurants' :
+                    qaTargetAccount === '662' ? 'Expenses Cinema' :
+                    qaTargetAccount === '663' ? 'Expenses Bars & Nightlife' :
+                    qaTargetAccount === '671' ? 'Expenses Pharmacy' :
+                    qaTargetAccount === '672' ? 'Expenses Hospital' :
+                    qaTargetAccount === '673' ? 'Expenses Exams' :
+                    qaTargetAccount === '674' ? 'Expenses Haircuts / Grooming' :
+                    qaTargetAccount === '675' ? 'Expenses Makeups' :
+                    qaTargetAccount === '681001' ? 'Expenses Financial Costs Interests' :
+                    qaTargetAccount === '681002' ? 'Expenses Financial Costs Penalties' :
+                    qaTargetAccount === '711001' ? 'Income Payroll Base Salary' :
+                    qaTargetAccount === '711002' ? 'Income Payroll Meal Allowance' :
+                    qaTargetAccount === '711003' ? 'Income Payroll Holiday & Christmas Bonuses' :
+                    qaTargetAccount === '712001' ? 'Income Freelance & Services Consulting / Contracts' :
+                    qaTargetAccount === '721001' ? 'Income Investments Dividends' :
+                    qaTargetAccount === '721002' ? 'Income Investments Bank Interest' :
+                    qaTargetAccount === '721003' ? 'Income Investments Capital Gains' :
+                    qaTargetAccount === '731001' ? 'Income Windfalls & State IRS Tax Refund' :
+                    qaTargetAccount === '731002' ? 'Income Windfalls & State Family Gifts' :
+                    qaTargetAccount === '731003' ? 'Income Windfalls & State Cashbacks & Rewards' : 'Other Account'
+                  }
+                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
+                />
+              </div>
+
+              {/* Description (bottom right - aligned) */}
+              <div className="col-span-12 sm:col-span-4">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={qaDescription}
+                  onChange={(e) => setQaDescription(e.target.value)}
+                  placeholder="e.g. Custom action"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Other parameters */}
+            <div className="grid grid-cols-12 gap-3 items-end">
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Name</label>
                 <input
                   type="text"
@@ -613,10 +1066,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   onChange={(e) => setQaName(e.target.value)}
                   placeholder="e.g. Purchase Wood"
                   required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                 />
               </div>
-              <div>
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Icon</label>
                 <input
                   type="text"
@@ -624,10 +1077,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   onChange={(e) => setQaIcon(e.target.value)}
                   placeholder="e.g. 🪵"
                   required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                 />
               </div>
-              <div>
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Amount (Gold)</label>
                 <input
                   type="number"
@@ -635,115 +1088,75 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   onChange={(e) => setQaAmount(e.target.value)}
                   placeholder="e.g. 100"
                   required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
                 />
               </div>
-              <div>
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Origin (From)</label>
                 <select
                   value={qaFrom}
                   onChange={(e) => setQaFrom(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
                 >
                   {fromOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
-              <div>
+            </div>
+
+            <div className="grid grid-cols-12 gap-3 items-end">
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Type (Class)</label>
                 <select
                   value={qaClass}
                   onChange={(e) => setQaClass(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
                 >
                   {classOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Subtype</label>
                 <select
                   value={qaSubClass}
                   onChange={(e) => setQaSubClass(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
                 >
                   {subClassOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Entity</label>
                 <select
                   value={qaEntity}
                   onChange={(e) => handleQaEntityChange(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
+                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none font-sans"
                 >
                   {entityOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-12 sm:col-span-3">
                 <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Category</label>
                 <input
                   type="text"
                   value={qaCategory}
                   readOnly
-                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 focus:outline-none cursor-not-allowed"
-                />
-              </div>
-              <div>
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Nature</label>
-                <select
-                  value={qaNature}
-                  onChange={(e) => setQaNature(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                >
-                  <option value="cash">Cash</option>
-                  <option value="accrual">Accrual</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Flow</label>
-                <select
-                  value={qaFlow}
-                  onChange={(e) => setQaFlow(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                >
-                  <option value="inflow">Inflow</option>
-                  <option value="outflow">Outflow</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Status</label>
-                <select
-                  value={qaStatus}
-                  onChange={(e) => setQaStatus(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                >
-                  {statusOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={qaDescription}
-                  onChange={(e) => setQaDescription(e.target.value)}
-                  placeholder="e.g. Custom action"
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                  className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 focus:outline-none cursor-not-allowed"
                 />
               </div>
             </div>
+
             <div className="flex justify-end pt-1">
               <button
                 type="submit"
-                className="px-4 py-3 md:py-2 min-h-[44px] md:min-h-0 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center h-11 md:h-[34px]"
+                className="px-4 h-[34px] bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
               >
                 ➕ {t.add}
               </button>
@@ -1001,8 +1414,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           from: tx.from,
           payment_status: tx.payment_status,
           transaction_type: tx.transaction_type,
-          transaction_nature: tx.transaction_nature,
-          transaction_flow: tx.transaction_flow,
+          target_account: tx.target_account,
+          source_dest_bank: tx.source_dest_bank,
+          flow: tx.flow,
           transaction_subtype: tx.transaction_subtype,
           entity: tx.entity,
           amount: Number(tx.amount),
@@ -1059,9 +1473,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       transaction_subtype: txSubClass,
       entity: txEntity,
       transaction_category: txCategory,
-      transaction_nature: txNature,
-      transaction_flow: txFlow,
-      subCategory: txSubCategory,
+      target_account: txTargetAccount,
+      source_dest_bank: txSourceDestBank,
+      flow: txFlow,
       description: txDescription || `${txClass} log`
     });
 
@@ -1077,6 +1491,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       setTxSubClass(subClassOptions[0] || 'Cash receipt');
       setTxEntity(entityOptions[0] || 'Salary');
       setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
+      setTxTargetAccount('711001');
+      setTxSourceDestBank('111001');
+      setTxFlow('inflow');
       setTxValueDate(new Date().toISOString().split('T')[0]);
       setTxPostingDate(new Date().toISOString().split('T')[0]);
       setTxStatus(statusOptions[0] || 'Pending');
@@ -1523,20 +1940,32 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
               </div>
 
-              {/* Row 3: Nature & Flow */}
+              {/* Row 3: Account & Flow Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mt-2">
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Nature
+                    Target Account (CoA)
                   </label>
-                  <select
-                    value={txNature}
-                    onChange={(e) => setTxNature(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="accrual">Accrual</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={txTargetAccount}
+                    onChange={(e) => setTxTargetAccount(e.target.value)}
+                    required
+                    placeholder="e.g. 621001"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Source/Dest Bank (CoA)
+                  </label>
+                  <input
+                    type="text"
+                    value={txSourceDestBank}
+                    onChange={(e) => setTxSourceDestBank(e.target.value)}
+                    placeholder="e.g. 111001"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
@@ -1549,6 +1978,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   >
                     <option value="inflow">Inflow</option>
                     <option value="outflow">Outflow</option>
+                    <option value="neutral">Neutral</option>
                   </select>
                 </div>
               </div>
@@ -1613,7 +2043,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               )}
 
               {/* Responsive Table with horizontal scroll */}
-              <div className="max-h-64 overflow-y-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar">
+              <div className="max-h-[170px] overflow-y-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar">
                 {transactions && transactions.length > 0 ? (
                   <>
                     {/* Desktop table view */}
@@ -1642,6 +2072,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
                           <th className="py-2.5 px-3 whitespace-nowrap">{t.description}</th>
+                          <th className="py-2.5 px-3 whitespace-nowrap">Target Account / Source Bank</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
@@ -1762,6 +2193,23 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                       className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-full px-1 py-0.5 focus:outline-none"
                                     />
                                   </td>
+                                  {/* target_account & source_dest_bank */}
+                                  <td className="py-1 px-1 whitespace-nowrap flex gap-1 items-center">
+                                    <input
+                                      type="text"
+                                      value={editingTxs[tx.id]?.target_account || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'target_account', e.target.value)}
+                                      placeholder="Target"
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-12 px-1 py-0.5 focus:outline-none font-mono"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={editingTxs[tx.id]?.source_dest_bank || ''}
+                                      onChange={(e) => handleFieldChange(tx.id, 'source_dest_bank', e.target.value)}
+                                      placeholder="Source"
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-12 px-1 py-0.5 focus:outline-none font-mono"
+                                    />
+                                  </td>
                                 </>
                               ) : (
                                 <>
@@ -1779,9 +2227,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                   </td>
                                   <td className="py-2 px-3 whitespace-nowrap">
                                     <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                      (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
+                                      tx.flow === 'inflow' 
                                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-250' 
-                                        : 'bg-rose-100 text-rose-800 border border-rose-250'
+                                        : tx.flow === 'outflow'
+                                          ? 'bg-rose-100 text-rose-800 border border-rose-250'
+                                          : 'bg-stone-100 text-stone-800 border border-stone-250'
                                     }`}>
                                       {tx.transaction_type}
                                     </span>
@@ -1789,11 +2239,12 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                   <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
                                   <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                                   <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                                    (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
+                                    tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')
                                   }`}>
-                                    {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
+                                    {formatNumberCompact(tx.flow === 'inflow' ? Number(tx.amount) : (tx.flow === 'outflow' ? -Number(tx.amount) : Number(tx.amount)))}
                                   </td>
                                   <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
+                                  <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-mono text-[9px]">{tx.target_account || '-'}{tx.source_dest_bank ? ` / ${tx.source_dest_bank}` : ''}</td>
                                 </>
                               )}
                             </tr>
@@ -1834,8 +2285,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                 </span>
                               </div>
                               <div className="text-right">
-                                <div className={`font-mono font-black text-xs ${(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                  {formatNumberCompact((tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? Number(tx.amount) : -Number(tx.amount))}
+                                <div className={`font-mono font-black text-xs ${tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')}`}>
+                                  {formatNumberCompact(tx.flow === 'inflow' ? Number(tx.amount) : (tx.flow === 'outflow' ? -Number(tx.amount) : Number(tx.amount)))}
                                 </div>
                                 <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1 ${
                                   tx.payment_status === 'Completed' 
@@ -2009,17 +2460,234 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Row 1 */}
-              <div className="grid grid-cols-12 gap-4">
+              {/* Core Accounting Layout Grid */}
+              <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-3.5 space-y-3.5">
+                {/* Row 1: Source Side */}
+                <div className="grid grid-cols-12 gap-4 items-end">
+                  {/* Source account (top left) */}
+                  <div className="col-span-12 sm:col-span-4">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      Source Account / Bank
+                    </label>
+                    <select
+                      value={txSourceDestBank}
+                      onChange={(e) => setTxSourceDestBank(e.target.value)}
+                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
+                    >
+                      <option value="111001">111001 (CGD Bank)</option>
+                      <option value="111002">111002 (BPI Bank)</option>
+                      <option value="111003">111003 (ActiveBank)</option>
+                      <option value="111004">111004 (Inter Bank)</option>
+                      <option value="121004">121004 (WizInk Card)</option>
+                      <option value="131001">131001 (Cash Chest/Vault)</option>
+                      <option value="211006">211006 (Cofidis Loan)</option>
+                      <option value="212001">212001 (Jota Loan)</option>
+                      <option value="212002">212002 (Mae Loan)</option>
+                      <option value="221002">221002 (Universo Card)</option>
+                      <option value="611001">611001 (Rent Expense)</option>
+                      <option value="611002">611002 (Repairs Expense)</option>
+                      <option value="611003">611003 (Decorations Expense)</option>
+                      <option value="611004">611004 (Utensils Expense)</option>
+                      <option value="621001">621001 (Electricity Expense)</option>
+                      <option value="621002">621002 (Gas Expense)</option>
+                      <option value="621003">621003 (Water Expense)</option>
+                      <option value="621004">621004 (Communications Expense)</option>
+                      <option value="631001">631001 (Gasoline Expense)</option>
+                      <option value="641001">641001 (Supermarket Food)</option>
+                      <option value="642001">642001 (Tools & Equipment)</option>
+                      <option value="643001">643001 (Clothing Expense)</option>
+                      <option value="661">661 (Restaurant Feast)</option>
+                      <option value="662">662 (Cinema Entertainment)</option>
+                      <option value="663">663 (Streaming Entertainment)</option>
+                      <option value="711001">711001 (Base Salary Income)</option>
+                      <option value="711003">711003 (Bonus Income)</option>
+                    </select>
+                  </div>
+
+                  {/* Source acc. name (top middle) */}
+                  <div className="col-span-12 sm:col-span-4">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      Source Acc. Name
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={
+                        txSourceDestBank === '111001' ? 'CGD Bank' :
+                        txSourceDestBank === '111002' ? 'BPI Bank' :
+                        txSourceDestBank === '111003' ? 'ActiveBank' :
+                        txSourceDestBank === '111004' ? 'Inter Bank' :
+                        txSourceDestBank === '121004' ? 'WizInk Card' :
+                        txSourceDestBank === '131001' ? 'Cash Chest/Vault' :
+                        txSourceDestBank === '211006' ? 'Cofidis Loan' :
+                        txSourceDestBank === '212001' ? 'Jota Loan' :
+                        txSourceDestBank === '212002' ? 'Mae Loan' :
+                        txSourceDestBank === '221002' ? 'Universo Card' :
+                        txSourceDestBank === '611001' ? 'Rent Expense' :
+                        txSourceDestBank === '611002' ? 'Repairs Expense' :
+                        txSourceDestBank === '611003' ? 'Decorations Expense' :
+                        txSourceDestBank === '611004' ? 'Utensils Expense' :
+                        txSourceDestBank === '621001' ? 'Electricity Expense' :
+                        txSourceDestBank === '621002' ? 'Gas Expense' :
+                        txSourceDestBank === '621003' ? 'Water Expense' :
+                        txSourceDestBank === '621004' ? 'Communications Expense' :
+                        txSourceDestBank === '631001' ? 'Gasoline Expense' :
+                        txSourceDestBank === '641001' ? 'Supermarket Food' :
+                        txSourceDestBank === '642001' ? 'Tools & Equipment' :
+                        txSourceDestBank === '643001' ? 'Clothing Expense' :
+                        txSourceDestBank === '661' ? 'Restaurant Feast' :
+                        txSourceDestBank === '662' ? 'Cinema Entertainment' :
+                        txSourceDestBank === '663' ? 'Streaming Entertainment' :
+                        txSourceDestBank === '711001' ? 'Base Salary Income' :
+                        txSourceDestBank === '711003' ? 'Bonus Income' : 'Other Account'
+                      }
+                      className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Flow + Status (Top right) */}
+                  <div className="col-span-12 sm:col-span-4 flex gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                        Flow
+                      </label>
+                      <select
+                        value={txFlow}
+                        onChange={(e) => setTxFlow(e.target.value)}
+                        className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                      >
+                        <option value="inflow">Inflow</option>
+                        <option value="outflow">Outflow</option>
+                        <option value="neutral">Neutral</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={txStatus}
+                        onChange={(e) => setTxStatus(e.target.value)}
+                        className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                      >
+                        {statusOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Target Side */}
+                <div className="grid grid-cols-12 gap-4 items-end">
+                  {/* Target account (bottom left) */}
+                  <div className="col-span-12 sm:col-span-4">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      Target Account
+                    </label>
+                    <select
+                      value={txTargetAccount}
+                      onChange={(e) => setTxTargetAccount(e.target.value)}
+                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
+                    >
+                      <option value="111001">111001 (CGD Bank)</option>
+                      <option value="111002">111002 (BPI Bank)</option>
+                      <option value="111003">111003 (ActiveBank)</option>
+                      <option value="111004">111004 (Inter Bank)</option>
+                      <option value="121004">121004 (WizInk Card)</option>
+                      <option value="131001">131001 (Cash Chest/Vault)</option>
+                      <option value="211006">211006 (Cofidis Loan)</option>
+                      <option value="212001">212001 (Jota Loan)</option>
+                      <option value="212002">212002 (Mae Loan)</option>
+                      <option value="221002">221002 (Universo Card)</option>
+                      <option value="611001">611001 (Rent Expense)</option>
+                      <option value="611002">611002 (Repairs Expense)</option>
+                      <option value="611003">611003 (Decorations Expense)</option>
+                      <option value="611004">611004 (Utensils Expense)</option>
+                      <option value="621001">621001 (Electricity Expense)</option>
+                      <option value="621002">621002 (Gas Expense)</option>
+                      <option value="621003">621003 (Water Expense)</option>
+                      <option value="621004">621004 (Communications Expense)</option>
+                      <option value="631001">631001 (Gasoline Expense)</option>
+                      <option value="641001">641001 (Supermarket Food)</option>
+                      <option value="642001">642001 (Tools & Equipment)</option>
+                      <option value="643001">643001 (Clothing Expense)</option>
+                      <option value="661">661 (Restaurant Feast)</option>
+                      <option value="662">662 (Cinema Entertainment)</option>
+                      <option value="663">663 (Streaming Entertainment)</option>
+                      <option value="711001">711001 (Base Salary Income)</option>
+                      <option value="711003">711003 (Bonus Income)</option>
+                    </select>
+                  </div>
+
+                  {/* Target acc. name (bottom middle) */}
+                  <div className="col-span-12 sm:col-span-4">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      Target Acc. Name
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={
+                        txTargetAccount === '111001' ? 'CGD Bank' :
+                        txTargetAccount === '111002' ? 'BPI Bank' :
+                        txTargetAccount === '111003' ? 'ActiveBank' :
+                        txTargetAccount === '111004' ? 'Inter Bank' :
+                        txTargetAccount === '121004' ? 'WizInk Card' :
+                        txTargetAccount === '131001' ? 'Cash Chest/Vault' :
+                        txTargetAccount === '211006' ? 'Cofidis Loan' :
+                        txTargetAccount === '212001' ? 'Jota Loan' :
+                        txTargetAccount === '212002' ? 'Mae Loan' :
+                        txTargetAccount === '221002' ? 'Universo Card' :
+                        txTargetAccount === '611001' ? 'Rent Expense' :
+                        txTargetAccount === '611002' ? 'Repairs Expense' :
+                        txTargetAccount === '611003' ? 'Decorations Expense' :
+                        txTargetAccount === '611004' ? 'Utensils Expense' :
+                        txTargetAccount === '621001' ? 'Electricity Expense' :
+                        txTargetAccount === '621002' ? 'Gas Expense' :
+                        txTargetAccount === '621003' ? 'Water Expense' :
+                        txTargetAccount === '621004' ? 'Communications Expense' :
+                        txTargetAccount === '631001' ? 'Gasoline Expense' :
+                        txTargetAccount === '641001' ? 'Supermarket Food' :
+                        txTargetAccount === '642001' ? 'Tools & Equipment' :
+                        txTargetAccount === '643001' ? 'Clothing Expense' :
+                        txTargetAccount === '661' ? 'Restaurant Feast' :
+                        txTargetAccount === '662' ? 'Cinema Entertainment' :
+                        txTargetAccount === '663' ? 'Streaming Entertainment' :
+                        txTargetAccount === '711001' ? 'Base Salary Income' :
+                        txTargetAccount === '711003' ? 'Bonus Income' : 'Other Account'
+                      }
+                      className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Description (bottom right) */}
+                  <div className="col-span-12 sm:col-span-4">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      {t.description}
+                    </label>
+                    <input
+                      type="text"
+                      value={txDescription}
+                      onChange={(e) => setTxDescription(e.target.value)}
+                      placeholder={t('placeholder.notes')}
+                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Auxiliary Fields & Metadata */}
+              <div className="grid grid-cols-12 gap-3">
                 {/* From */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                <div className="col-span-12 sm:col-span-4">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
                     {t.origin_from}
                   </label>
                   <select
                     value={txFrom}
                     onChange={(e) => setTxFrom(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                   >
                     {fromOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -2027,37 +2695,37 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </select>
                 </div>
 
-                {/* Value Date */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.value_date}
-                  </label>
-                  <input
-                    type="date"
-                    value={txValueDate}
-                    onChange={(e) => setTxValueDate(e.target.value)}
-                    required
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  />
-                </div>
-
-                {/* Posting Date */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.posting_date}
-                  </label>
-                  <input
-                    type="date"
-                    value={txPostingDate}
-                    onChange={(e) => setTxPostingDate(e.target.value)}
-                    required
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  />
+                {/* Dates */}
+                <div className="col-span-12 sm:col-span-4 flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
+                      Value Date
+                    </label>
+                    <input
+                      type="date"
+                      value={txValueDate}
+                      onChange={(e) => setTxValueDate(e.target.value)}
+                      required
+                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
+                      Posting Date
+                    </label>
+                    <input
+                      type="date"
+                      value={txPostingDate}
+                      onChange={(e) => setTxPostingDate(e.target.value)}
+                      required
+                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    />
+                  </div>
                 </div>
 
                 {/* Amount */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                <div className="col-span-12 sm:col-span-4">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
                     {t.amount_gold}
                   </label>
                   <input
@@ -2067,38 +2735,22 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     placeholder={t('placeholder.amount')}
                     required
                     min="1"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2.5 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-3 text-[11px] font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
               </div>
 
-              {/* Row 2 */}
-              <div className="grid grid-cols-12 gap-4">
-                {/* Status */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.status}
-                  </label>
-                  <select
-                    value={txStatus}
-                    onChange={(e) => setTxStatus(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    {statusOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
+              {/* Class, Subclass, Entity Selection */}
+              <div className="grid grid-cols-12 gap-3">
                 {/* Class */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.class}
+                <div className="col-span-12 sm:col-span-4">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
+                    Class (Type)
                   </label>
                   <select
                     value={txClass}
                     onChange={(e) => setTxClass(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none"
                   >
                     {classOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -2107,14 +2759,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
 
                 {/* Subclass */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.sub_class}
+                <div className="col-span-12 sm:col-span-4">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
+                    Subclass
                   </label>
                   <select
                     value={txSubClass}
                     onChange={(e) => setTxSubClass(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none"
                   >
                     {subClassOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -2123,14 +2775,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
 
                 {/* Entity */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.entity}
+                <div className="col-span-12 sm:col-span-4">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
+                    Entity
                   </label>
                   <select
                     value={txEntity}
                     onChange={(e) => handleEntityChange(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none font-sans"
                   >
                     {Object.entries(
                       entityOptions.reduce((acc, opt) => {
@@ -2150,58 +2802,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
               </div>
 
-              {/* Row 3 */}
-              <div className="grid grid-cols-12 gap-4">
-                {/* Nature */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Nature
-                  </label>
-                  <select
-                    value={txNature}
-                    onChange={(e) => setTxNature(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="accrual">Accrual</option>
-                  </select>
-                </div>
-
-                {/* Flow */}
-                <div className="col-span-12 sm:col-span-6 md:col-span-3">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Flow
-                  </label>
-                  <select
-                    value={txFlow}
-                    onChange={(e) => setTxFlow(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="inflow">Inflow</option>
-                    <option value="outflow">Outflow</option>
-                  </select>
-                </div>
-
-                {/* Description / Notes */}
-                <div className="col-span-12 md:col-span-6">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.description}
-                  </label>
-                  <input
-                    type="text"
-                    value={txDescription}
-                    onChange={(e) => setTxDescription(e.target.value)}
-                    placeholder={t('placeholder.notes')}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-11 md:h-[38px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                  />
-                </div>
-              </div>
-
               {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 bg-[#8b4513] text-white font-black text-xs uppercase tracking-widest rounded-xl hover:scale-[1.01] active:scale-99 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md border-2 border-[#d4af37]/30 cursor-pointer"
+                className="w-full py-2 bg-[#8b4513] text-white font-black text-[11px] uppercase tracking-widest rounded-lg hover:scale-[1.01] active:scale-99 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow border border-[#d4af37]/30 cursor-pointer"
               >
                 {isLoading ? `${t.register_movement}...` : t.save_transaction}
               </button>
@@ -2962,7 +3567,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 )}
 
                 {/* Ledger Data Table */}
-                <div className="max-h-[380px] overflow-y-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar shadow-inner">
+                <div className="max-h-[170px] overflow-y-auto border border-[#8b4513]/25 rounded-xl bg-[#faf4e5]/40 custom-scrollbar shadow-inner">
                   {filteredTransactions.length > 0 ? (
                     <>
                       {/* Desktop Table View */}
@@ -3138,23 +3743,25 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                 </td>
                                 <td className="py-2 px-3 whitespace-nowrap">
                                   <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                    (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') 
+                                    tx.flow === 'inflow' 
                                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                      : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                      : tx.flow === 'outflow'
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                        : 'bg-stone-100 text-stone-800 border border-stone-200'
                                   }`}>
                                     {tx.transaction_type}
                                   </span>
                                 </td>
                                 <td className="py-2 px-3 whitespace-nowrap">
-                                  <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase mr-1">{tx.transaction_nature || '-'}</span>
-                                  <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase">{tx.transaction_flow || '-'}</span>
+                                  <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase mr-1" title="Target Account">{tx.target_account || '-'}</span>
+                                  <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase" title="Source/Dest Bank">{tx.source_dest_bank || '-'}</span>
                                 </td>
                                 <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
                                 <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                                 <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                                  (tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? 'text-emerald-700' : 'text-rose-700'
+                                  tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')
                                 }`}>
-                                  {(tx.transaction_nature === 'accrual' && tx.transaction_flow === 'inflow') ? '+' : '-'}{Number(tx.amount).toLocaleString()}g
+                                  {tx.flow === 'inflow' ? '+' : (tx.flow === 'outflow' ? '-' : '')}{Number(tx.amount).toLocaleString()}g
                                 </td>
                                 <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
                               </tr>

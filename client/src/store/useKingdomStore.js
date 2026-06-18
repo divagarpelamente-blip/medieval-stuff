@@ -48,9 +48,9 @@ export const useKingdomStore = create((set, get) => ({
 
   // Dropdown manage lists
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
-  statusOptions: ['Pending', 'Overdue', 'Paid on Time', 'Paid Late'],
-  classOptions: ['Income', 'Expense', 'Savings', 'Debt'],
-  subClassOptions: ['Cash receipt', 'Cash payment', 'Credit receipt', 'Credit payment', 'New Debt', 'Amortization', 'Interest'],
+  statusOptions: ['Pending', 'Completed'],
+  classOptions: ['Income', 'Expense', 'Asset', 'Debt'],
+  subClassOptions: ['Cash receipt', 'Cash payment', 'New Debt', 'Amortization', 'Interest'],
   entityOptions: loadLocal('entityOptions', [
     'Salary', 'Bonus', 'Shows', 'Cinema', 'Restaurant', 'Trips', 'Streaming',
     'Rent', 'Landlord', 'Energy', 'IMI', 'Repairs', 'Water', 'Gas', 'Internet',
@@ -85,12 +85,13 @@ export const useKingdomStore = create((set, get) => ({
       data: {
         from: 'Consolidated',
         transaction_type: 'Income',
-        transaction_subtype: 'Cash receipt',
+        transaction_subtype: 'Base Salary',
         entity: 'Salary',
         transaction_category: 'Payroll',
-        transaction_nature: 'cash',
-        transaction_flow: 'inflow',
-        payment_status: 'Completed',
+        target_account: '711001',
+        source_dest_bank: '111001',
+        flow: 'inflow',
+        payment_status: 'Pending',
         description: 'Monthly salary payment',
         amount: '500'
       }
@@ -101,11 +102,12 @@ export const useKingdomStore = create((set, get) => ({
       data: {
         from: 'Pedro',
         transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
+        transaction_subtype: 'Tools & Materials',
         entity: 'Tools and Equipment',
         transaction_category: 'Markets',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
+        target_account: '642001',
+        source_dest_bank: '111001',
+        flow: 'outflow',
         payment_status: 'Completed',
         description: 'Purchase blacksmith tools & equipment',
         amount: '150'
@@ -117,11 +119,12 @@ export const useKingdomStore = create((set, get) => ({
       data: {
         from: 'Pedro',
         transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
+        transaction_subtype: 'Bars & Nightlife',
         entity: 'Restaurant',
         transaction_category: 'Entertainment',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
+        target_account: '663',
+        source_dest_bank: '111001',
+        flow: 'outflow',
         payment_status: 'Completed',
         description: 'Feast and drinks with local guild members',
         amount: '50'
@@ -132,13 +135,14 @@ export const useKingdomStore = create((set, get) => ({
       icon: '👑',
       data: {
         from: 'Consolidated',
-        transaction_type: 'Debt',
-        transaction_subtype: 'New Debt',
+        transaction_type: 'Asset',
+        transaction_subtype: 'Borrow cash',
         entity: 'CGD',
         transaction_category: 'Banking',
-        transaction_nature: 'accrual',
-        transaction_flow: 'inflow',
-        payment_status: 'Pending',
+        target_account: '111001',
+        source_dest_bank: '212002',
+        flow: 'inflow',
+        payment_status: 'Completed',
         description: 'Emergency gold borrow from the crown',
         amount: '1000'
       }
@@ -149,12 +153,13 @@ export const useKingdomStore = create((set, get) => ({
       data: {
         from: 'Pedro',
         transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
+        transaction_subtype: 'Rent',
         entity: 'Rent',
         transaction_category: 'Housing',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        payment_status: 'Completed',
+        target_account: '611001',
+        source_dest_bank: '111001',
+        flow: 'outflow',
+        payment_status: 'Pending',
         description: 'Monthly land rent payment to the estate',
         amount: '800'
       }
@@ -165,11 +170,12 @@ export const useKingdomStore = create((set, get) => ({
       data: {
         from: 'Pedro',
         transaction_type: 'Expense',
-        transaction_subtype: 'Cash payment',
+        transaction_subtype: 'Food',
         entity: 'Supermarket',
         transaction_category: 'Markets',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
+        target_account: '641001',
+        source_dest_bank: '111001',
+        flow: 'outflow',
         payment_status: 'Completed',
         description: 'Acquisition of wheat and food rations',
         amount: '120'
@@ -180,15 +186,33 @@ export const useKingdomStore = create((set, get) => ({
       icon: '📈',
       data: {
         from: 'Pedro',
-        transaction_type: 'Debt',
-        transaction_subtype: 'Interest',
+        transaction_type: 'Expense',
+        transaction_subtype: 'Interests',
         entity: 'CGD',
         transaction_category: 'Banking',
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
+        target_account: '681001',
+        source_dest_bank: '111001',
+        flow: 'outflow',
         payment_status: 'Completed',
         description: 'Interest fee on outstanding gold loan',
         amount: '35'
+      }
+    },
+    {
+      name: 'Transfers',
+      icon: '💸',
+      data: {
+        from: 'Consolidated',
+        transaction_type: 'Asset',
+        transaction_subtype: 'Transfers',
+        entity: 'CGD',
+        transaction_category: 'Banking',
+        target_account: '131001',
+        source_dest_bank: '111001',
+        flow: 'neutral',
+        payment_status: 'Completed',
+        description: 'Shift gold value between asset vaults',
+        amount: '200'
       }
     }
   ]),
@@ -340,8 +364,9 @@ export const useKingdomStore = create((set, get) => ({
       transaction_subtype: transactionData.transaction_subtype,
       entity: transactionData.entity,
       transaction_category: transactionData.transaction_category,
-      transaction_nature: transactionData.transaction_nature,
-      transaction_flow: transactionData.transaction_flow,
+      target_account: transactionData.target_account,
+      source_dest_bank: transactionData.source_dest_bank,
+      flow: transactionData.flow,
       description: transactionData.description,
       created_at: new Date().toISOString()
     };
@@ -364,8 +389,9 @@ export const useKingdomStore = create((set, get) => ({
             transaction_subtype: transactionData.transaction_subtype,
             entity: transactionData.entity,
             transaction_category: transactionData.transaction_category,
-            transaction_nature: transactionData.transaction_nature,
-            transaction_flow: transactionData.transaction_flow,
+            target_account: transactionData.target_account,
+            source_dest_bank: transactionData.source_dest_bank,
+            flow: transactionData.flow,
             description: transactionData.description,
             due_date: transactionData.due_date || null,
             payment_method: transactionData.payment_method || null
@@ -429,8 +455,9 @@ export const useKingdomStore = create((set, get) => ({
         transaction_subtype: tx.transaction_subtype,
         entity: tx.entity,
         transaction_category: tx.transaction_category,
-        transaction_nature: tx.transaction_nature,
-        transaction_flow: tx.transaction_flow,
+        target_account: tx.target_account,
+        source_dest_bank: tx.source_dest_bank,
+        flow: tx.flow,
         description: tx.description,
         created_at: new Date().toISOString()
       };
@@ -451,8 +478,9 @@ export const useKingdomStore = create((set, get) => ({
         transaction_subtype: tx.transaction_subtype,
         entity: tx.entity,
         transaction_category: tx.transaction_category,
-        transaction_nature: tx.transaction_nature,
-        transaction_flow: tx.transaction_flow,
+        target_account: tx.target_account,
+        source_dest_bank: tx.source_dest_bank,
+        flow: tx.flow,
         description: tx.description,
         due_date: tx.due_date || null,
         payment_method: tx.payment_method || null
@@ -536,32 +564,20 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   borrowLoan: async (profileId, { amount, from, entity, description, date }) => {
-    const common = {
+    return get().registerTransaction(profileId, {
       amount: Number(amount),
       from,
       entity,
       description: description || 'New Loan Borrowed',
       value_date: date || new Date().toISOString().split('T')[0],
-      posting_date: date || new Date().toISOString().split('T')[0]
-    };
-    return get().registerTransactions(profileId, [
-      {
-        ...common,
-        transaction_type: 'Debt',
-        transaction_subtype: 'New Debt',
-        transaction_nature: 'accrual',
-        transaction_flow: 'inflow',
-        payment_status: 'Open'
-      },
-      {
-        ...common,
-        transaction_type: 'Debt',
-        transaction_subtype: 'New Debt',
-        transaction_nature: 'cash',
-        transaction_flow: 'inflow',
-        payment_status: 'Completed'
-      }
-    ]);
+      posting_date: date || new Date().toISOString().split('T')[0],
+      transaction_type: 'Asset',
+      transaction_subtype: 'Borrow cash',
+      target_account: '111001',
+      source_dest_bank: '212002',
+      flow: 'inflow',
+      payment_status: 'Completed'
+    });
   },
 
   settlePayable: async (profileId, payableTx, paymentMethod) => {
@@ -574,39 +590,11 @@ export const useKingdomStore = create((set, get) => ({
 
       if (updateErr) throw updateErr;
 
-      const cashPayment = {
-        profile_id: profileId,
-        transaction_type: 'Expense',
-        amount: Number(payableTx.amount),
-        from: payableTx.from,
-        value_date: new Date().toISOString().split('T')[0],
-        posting_date: new Date().toISOString().split('T')[0],
-        payment_status: 'Completed',
-        transaction_subtype: 'Cash payment',
-        entity: payableTx.entity,
-        transaction_category: payableTx.transaction_category,
-        transaction_nature: 'cash',
-        transaction_flow: 'outflow',
-        description: `Payment for invoice: ${payableTx.description || payableTx.id}`,
-        payment_method: paymentMethod || 'Vault Cash'
-      };
-
-      const { data: cashData, error: cashErr } = await supabase
-        .from('transactions')
-        .insert([cashPayment])
-        .select();
-
-      if (cashErr) throw cashErr;
-
-      set(state => {
-        const nextTxs = state.transactions.map(tx => 
+      set(state => ({
+        transactions: state.transactions.map(tx => 
           tx.id === payableTx.id ? { ...tx, payment_status: 'Completed' } : tx
-        );
-        if (cashData && cashData.length > 0) {
-          nextTxs.unshift(cashData[0]);
-        }
-        return { transactions: nextTxs };
-      });
+        )
+      }));
 
       await get().fetchKingdomData(profileId);
       await get().fetchDashboardData(profileId);
