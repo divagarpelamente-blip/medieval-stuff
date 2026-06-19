@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { Z_LAYERS } from '../constants/UI_UX';
 
 const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl', align = 'items-center' }) => {
   useEffect(() => {
@@ -22,7 +23,8 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl', al
           onClose();
         }
       }}
-      className={`absolute inset-0 bg-black/90 z-[100] flex ${align} justify-center p-4 backdrop-blur-sm`}
+      className={`absolute inset-0 bg-black/90 flex ${align} justify-center p-4 backdrop-blur-sm`}
+      style={{ zIndex: Z_LAYERS.OVERLAY }}
     >
       <div className={`bg-[#f4e4bc] w-full max-h-[88%] ${size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
         
@@ -41,7 +43,8 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl', al
         {/* Wax Seal Close Button */}
         <button 
           onClick={onClose}
-          className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+          className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+          style={{ zIndex: Z_LAYERS.MODAL_CONTENT }}
         >
           <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
           <X size={24} className="text-[#ffd700] group-hover:rotate-90 transition-transform" />

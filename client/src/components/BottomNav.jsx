@@ -1,5 +1,6 @@
 import { Compass, Trophy, BookOpen, LayoutDashboard, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Z_LAYERS } from '../constants/UI_UX';
 
 const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
   const { t } = useTranslation();
@@ -12,7 +13,7 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
   ];
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[48%] max-w-[384px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-0.5 flex justify-around items-center z-[120] shadow-2xl">
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[48%] max-w-[384px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-0.5 flex justify-around items-center shadow-2xl" style={{ zIndex: Z_LAYERS.BOTTOM_NAV }}>
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id || (item.id === 'dashboard' && (activeTab === 'financial_statement' || activeTab === 'transactions'));

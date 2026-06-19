@@ -11,7 +11,7 @@ import bgMap from './assets/Medieval_Town_Backround.png';
 import { useKingdomStore } from './store/useKingdomStore';
 import { Toaster, toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { STANDARD_MODAL_PROPS } from './constants/UI_UX';
+import { STANDARD_MODAL_PROPS, Z_LAYERS, SAFE_AREAS } from './constants/UI_UX';
 import FlowByCategoryChart from './components/charts/FlowByCategoryChart';
 import TimeEvolutionChart from './components/charts/TimeEvolutionChart';
 import TopEntitiesChart from './components/charts/TopEntitiesChart';
@@ -1499,7 +1499,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           },
         }}
       />
-      <div className="game-viewport">
+      <div className={`game-viewport ${SAFE_AREAS.TOP_CLEARANCE}`}>
         {/* HUD Superior */}
         {activeTab === 'quests' && !isMineModalOpen && !isNewTxModalOpen && (
           <HUD profile={profile} diamonds={gems} />
@@ -1524,7 +1524,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 setActiveTab('quests');
               }
             }}
-            className={`absolute inset-0 z-[100] flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
+            className={`absolute inset-0 flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
+            style={{ zIndex: Z_LAYERS.OVERLAY }}
           >
             <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
               
@@ -1543,7 +1544,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               {/* Close Button to return to quests */}
               <button 
                 onClick={() => setActiveTab('quests')}
-                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+                style={{ zIndex: Z_LAYERS.MODAL_CONTENT }}
                 title={t.back_to_map}
               >
                 <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
@@ -2560,7 +2562,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 setIsTreasuryMenuOpen(true);
               }
             }}
-            className={`absolute inset-0 z-[100] flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
+            className={`absolute inset-0 flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
+            style={{ zIndex: Z_LAYERS.OVERLAY }}
           >
             <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
               
@@ -2583,7 +2586,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   setActiveTab('quests');
                   setIsTreasuryMenuOpen(true);
                 }}
-                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+                style={{ zIndex: Z_LAYERS.MODAL_CONTENT }}
                 title={t.back_to_map}
               >
                 <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
@@ -2888,7 +2892,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 setIsTreasuryMenuOpen(true);
               }
             }}
-            className={`absolute inset-0 z-[100] flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
+            className={`absolute inset-0 flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
+            style={{ zIndex: Z_LAYERS.OVERLAY }}
           >
             <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
               
@@ -2911,7 +2916,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   setActiveTab('quests');
                   setIsTreasuryMenuOpen(true);
                 }}
-                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
+                style={{ zIndex: Z_LAYERS.MODAL_CONTENT }}
                 title={t.back_to_map}
               >
                 <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />

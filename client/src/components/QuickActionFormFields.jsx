@@ -1,3 +1,9 @@
+// =====================================================================
+// 🛑 AI AGENT DIRECTIVE: DO NOT MODIFY THIS FILE
+// This component's 7-row grid layout is fully modularized and strictly final.
+// Antigravity: Treat this file as strictly READ-ONLY.
+// @antigravity-ignore
+// =====================================================================
 import React from 'react';
 
 const QuickActionFormFields = ({
@@ -51,9 +57,9 @@ const QuickActionFormFields = ({
 
   return (
     <div className={`${rowSpacing} text-[#4b2c20]`}>
-      {/* Row 1: Name (4), Icon (2), Type (3), Subtype (3) */}
+      {/* Row 1: Name / Icon */}
       <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-4">
+        <div className="col-span-12 sm:col-span-6">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Name</label>
           <input
             type="text"
@@ -64,7 +70,7 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
           />
         </div>
-        <div className="col-span-12 sm:col-span-2">
+        <div className="col-span-12 sm:col-span-6">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Icon</label>
           <input
             type="text"
@@ -75,6 +81,10 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
           />
         </div>
+      </div>
+
+      {/* Row 2: Type / Subtype / Flow / Status */}
+      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Type</label>
           <select
@@ -101,10 +111,6 @@ const QuickActionFormFields = ({
             ))}
           </select>
         </div>
-      </div>
-
-      {/* Row 2: Flow (3), Status (3), Origin/From (3), Category (3) */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Flow</label>
           <select
@@ -131,6 +137,10 @@ const QuickActionFormFields = ({
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Row 3: Origin/From / Category / Entity / Amount */}
+      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Origin/From</label>
           <select
@@ -157,10 +167,6 @@ const QuickActionFormFields = ({
             ))}
           </select>
         </div>
-      </div>
-
-      {/* Row 3: Entity (3), Amount (3), Value Date (3), Due Date (3) */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Entity</label>
           <select
@@ -195,6 +201,10 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono`}
           />
         </div>
+      </div>
+
+      {/* Row 4: Value date / Due date / Posting date */}
+      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Value Date</label>
           <input
@@ -213,10 +223,6 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
           />
         </div>
-      </div>
-
-      {/* Row 4: Posting Date (3), Description (3), Source Account (3), Target Account (3) */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Posting Date</label>
           <input
@@ -226,7 +232,11 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
           />
         </div>
-        <div className="col-span-12 sm:col-span-3">
+      </div>
+
+      {/* Row 5: Description */}
+      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
+        <div className="col-span-12 sm:col-span-6">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Description</label>
           <input
             type="text"
@@ -236,7 +246,11 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
           />
         </div>
-        <div className="col-span-12 sm:col-span-3">
+      </div>
+
+      {/* Row 6: Source Account */}
+      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
+        <div className="col-span-12 sm:col-span-6">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Source Account</label>
           <select
             value={qaSourceDestBank}
@@ -252,7 +266,11 @@ const QuickActionFormFields = ({
             }
           </select>
         </div>
-        <div className="col-span-12 sm:col-span-3">
+      </div>
+
+      {/* Row 7: Target Account */}
+      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
+        <div className="col-span-12 sm:col-span-6">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Target Account</label>
           <select
             value={qaTargetAccount}

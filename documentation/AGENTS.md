@@ -90,6 +90,7 @@ Under NO circumstances should you modify, refactor, or suggest changes to the fo
 * `client/src/components/FinancialStatements/*`
 * `client/src/context/useDashboardEngine.js`
 * `client/src/constants/UI_UX.js`
+* `client/src/components/QuickActionFormFields.jsx`
 * Any file containing the `// @antigravity-ignore` header.
 
 ### 2. Add Plan Mode Requirement
