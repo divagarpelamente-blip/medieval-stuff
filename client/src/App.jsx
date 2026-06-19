@@ -2676,116 +2676,116 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
 
                     return (
-                      <div className="flex flex-col gap-8">
+                      <div className="flex flex-col gap-4">
                         {/* Row 1: Financial Position */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <TimeEvolutionChart timePoints={dashTimeData} t={t} />
                           </div>
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <RoyalTreasurerInsights adviceText={financialPositionInsight} t={t} />
                           </div>
                         </div>
 
                         {/* Row 2: Expenses Donut */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <ExpensesDonutChart dashCategoryData={dashCategoryData} t={t} />
                           </div>
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <RoyalTreasurerInsights adviceText={expensesReportInsight} t={t} />
                           </div>
                         </div>
 
                         {/* Row 3: Expenses Detailed */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <ExpensesDetailedChart transactions={dashboardFilteredTransactions} t={t} />
                           </div>
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <RoyalTreasurerInsights adviceText={expensesDetailedInsight} t={t} />
                           </div>
                         </div>
 
                         {/* Side-by-side evolution */}
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[245px]">
                           <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
                             <span>{t.flow_comparison} ({dashGranularity === 'month' ? t.gran_month : dashGranularity === 'quarter' ? t.gran_quarter : t.gran_year})</span>
                             <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.revenue_vs_expense}</span>
                           </h4>
                           <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                             {dashTimeData.length > 0 ? (
-                              dashTimeData.map((tItem) => {
-                                const incWidth = (tItem.classIncome / maxDashTimeVal) * 100;
-                                const expWidth = (tItem.classExpense / maxDashTimeVal) * 100;
-                                const net = tItem.classIncome - tItem.classExpense;
-                                return (
-                                  <div key={tItem.label} className="space-y-2 border-b border-[#8b4513]/5 pb-2">
-                                    <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                      <span>{tItem.label}</span>
-                                      <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                        {t.balance}: {formatNumberCompact(net)}
-                                      </span>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                      {/* Income bar */}
-                                      <div className="space-y-0.5">
-                                        <div className="flex justify-between text-[8px] text-emerald-800 font-bold font-mono">
-                                          <span>{t.income}</span>
-                                          <span>{formatNumberCompact(tItem.classIncome)}</span>
+                                dashTimeData.map((tItem) => {
+                                  const incWidth = (tItem.classIncome / maxDashTimeVal) * 100;
+                                  const expWidth = (tItem.classExpense / maxDashTimeVal) * 100;
+                                  const net = tItem.classIncome - tItem.classExpense;
+                                  return (
+                                    <div key={tItem.label} className="space-y-2 border-b border-[#8b4513]/5 pb-2">
+                                      <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
+                                        <span>{tItem.label}</span>
+                                        <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                          {t.balance}: {formatNumberCompact(net)}
+                                        </span>
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {/* Income bar */}
+                                        <div className="space-y-0.5">
+                                          <div className="flex justify-between text-[8px] text-emerald-800 font-bold font-mono">
+                                            <span>{t.income}</span>
+                                            <span>{formatNumberCompact(tItem.classIncome)}</span>
+                                          </div>
+                                          <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
+                                            <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
+                                          </div>
                                         </div>
-                                        <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                          <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
+                                        {/* Expense bar */}
+                                        <div className="space-y-0.5">
+                                          <div className="flex justify-between text-[8px] text-rose-800 font-bold font-mono">
+                                            <span>{t.expense}</span>
+                                            <span>{formatNumberCompact(-tItem.classExpense)}</span>
+                                          </div>
+                                          <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
+                                            <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
+                                          </div>
                                         </div>
                                       </div>
-                                      {/* Expense bar */}
-                                      <div className="space-y-0.5">
-                                        <div className="flex justify-between text-[8px] text-rose-800 font-bold font-mono">
-                                          <span>{t.expense}</span>
-                                          <span>{formatNumberCompact(-tItem.classExpense)}</span>
-                                        </div>
-                                        <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                          <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
-                                        </div>
-                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })
+                                  );
+                                })
                             ) : (
-                              <div className="h-full flex items-center justify-center">
-                                <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_records_active_period}</p>
-                              </div>
+                               <div className="h-full flex items-center justify-center">
+                                 <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_records_active_period}</p>
+                               </div>
                             )}
                           </div>
                         </div>
 
                         {/* Cost breakdown by Entity Category */}
-                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[245px]">
                           <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
                             <span>{t.expenses_by_entity_category}</span>
                             <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.spending_distribution}</span>
                           </h4>
                           <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
                             {entityCatExpenses.length > 0 ? (
-                              entityCatExpenses.map((cat) => {
-                                const pctWidth = (cat.amount / maxEntityCatExp) * 100;
-                                return (
-                                  <div key={cat.name} className="space-y-1">
-                                    <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                      <span>🏷️ {cat.name}</span>
-                                      <span className="font-mono text-rose-700">{formatNumberCompact(-cat.amount)}</span>
-                                    </div>
-                                    <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pctWidth}%` }} />
-                                    </div>
-                                  </div>
-                                );
-                              })
+                               entityCatExpenses.map((cat) => {
+                                 const pctWidth = (cat.amount / maxEntityCatExp) * 100;
+                                 return (
+                                   <div key={cat.name} className="space-y-1">
+                                     <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
+                                       <span>🏷️ {cat.name}</span>
+                                       <span className="font-mono text-rose-700">{formatNumberCompact(-cat.amount)}</span>
+                                     </div>
+                                     <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
+                                       <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pctWidth}%` }} />
+                                     </div>
+                                   </div>
+                                 );
+                               })
                             ) : (
-                              <div className="h-full flex items-center justify-center">
-                                <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_expenses_registered}</p>
-                              </div>
+                               <div className="h-full flex items-center justify-center">
+                                 <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_expenses_registered}</p>
+                               </div>
                             )}
                           </div>
                         </div>
@@ -2820,33 +2820,33 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     const debtTypeAdvice = t('advice_debt_composition', { amount: formatNumberCompact(engineData.liabilitiesKpis?.total_debt || 0) });
 
                     return (
-                      <div className="flex flex-col gap-8">
+                      <div className="flex flex-col gap-4">
                         {/* Debt Evolution Chart */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <DebtEvolutionChart timePoints={engineData.timeData} t={t} />
                           </div>
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <RoyalTreasurerInsights adviceText={evolutionAdvice} t={t} />
                           </div>
                         </div>
 
                         {/* Debt by Entity Chart */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <DebtByEntityChart debtByEntity={engineData.debtByEntity} t={t} formatNumberCompact={formatNumberCompact} />
                           </div>
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <RoyalTreasurerInsights adviceText={entityAdvice} t={t} />
                           </div>
                         </div>
 
                         {/* Debt Composition Chart */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <DebtCompositionChart debtByType={engineData.debtByType} t={t} />
                           </div>
-                          <div className="h-[280px]">
+                          <div className="h-[245px]">
                             <RoyalTreasurerInsights adviceText={debtTypeAdvice} t={t} />
                           </div>
                         </div>

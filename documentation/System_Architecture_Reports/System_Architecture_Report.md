@@ -133,6 +133,11 @@ The layout is structured using a mobile-first responsive framework that guarante
 - **Filters Default State**: The filter panel defaults to the last year, and automatically initializes the month list up to the current month and quarter list up to the current quarter to avoid showing empty charts on initial load.
 - **Interactive Dimming and Focus**: During ledger editing, unselected items (table rows on desktop and cards on mobile) are styled with `opacity-50` and transition easing. This visually isolates the editing set and keeps the UI clean and concentrated.
 
+### D. Centralized Z-Index Stacking & Spacing
+To ensure structural integrity and prevent visual layering bugs:
+- **Z-Index Layering**: System z-indexes are centralized in `Z_LAYERS` (`OVERLAY: 100`, `MODAL_CONTENT: 110`, `BOTTOM_NAV: 120`). Elements like overlays, modals, and the bottom nav use inline style property mappings (e.g. `style={{ zIndex: Z_LAYERS.OVERLAY }}`) to prevent layout conflicts.
+- **Top Safe-Area Clearance**: The simulated camera notch has been removed, and a top spacing clearance is applied to the main wrapper viewport container via `SAFE_AREAS.TOP_CLEARANCE` (resolving to `"pt-4"` padding) to prevent contents from clipping the top edge on mobile viewports.
+
 ---
 
 ### 5. Database Schema & Triggers (Supabase PostgreSQL)
@@ -297,12 +302,8 @@ To maintain a structured user experience and prevent unexpected exits directly b
 
 To ensure that full-screen overlay panels never clash with or hide the persistent bottom navigation menu, the layout employs strict sizing and stacking constraints:
 
-- **Persistent Bottom Menu Layering:** The bottom navigation component (`BottomNav.jsx`) is layered above all standard content and dialogs with a high z-index (`z-[120]`).
-- **Modal Height Safety Bounds:** Standard modals are centered vertically using `flex items-center justify-center p-4` and constrained to a maximum height:
-  - Default modal wrapper (`Modal.jsx`) is capped at `max-h-[74%]`.
-  - Financial statements modal layout in `App.jsx` is capped at `max-h-[74%]`.
-  - Configuration panel layout modal in `App.jsx` is capped at `max-h-[72%]`.
-  These bounds prevent components from overlapping the bottom menu on all screen sizes.
+- **Persistent Bottom Menu Layering:** The bottom navigation component (`BottomNav.jsx`) is layered above all standard content and dialogs utilizing the centralized `Z_LAYERS.BOTTOM_NAV` (index value `120`).
+- **Modal Height Safety Bounds:** Standard modals are aligned at the top using `align="items-start"` and sized dynamically via `STANDARD_MODAL_PROPS.size` (`max-w-[97.5%] max-h-[calc(100%-4.15rem)] h-[calc(100%-4.15rem)]`). This guarantees that all modals are consistently sized, top-aligned, and leave precisely a `4.15rem` gap at the bottom to prevent overlapping the persistent bottom menu. The "Royal Treasury Menu" modal is the single exception, retaining its compact centering style bounds.
 - **Tab Change Transitions:** The `handleTabChange` hook in `App.jsx` automatically closes any active modals (`setIsTreasuryMenuOpen(false)`, `setIsNewTxModalOpen(false)`, `setIsMineModalOpen(false)`) during transitions. Clicking `'dashboard'` sets `activeTab` to `'quests'` and triggers `setIsTreasuryMenuOpen(true)` to open the Treasury menu, synchronizing the bottom navigation highlight state.
 
 ### D. Quick Actions Templating Engine (Register Transaction Modal Sidebar)
@@ -314,7 +315,7 @@ To streamline the process of entering frequent transactions, the **Register Tran
   - **Label Changes**: The field labels have been modernized to use `Source account` (replacing "Source Account / Bank") and `Amount` (replacing "Amount (Gold)").
   - **Layout Refinement**: The read-only `Source Acc. Name` and `Target Acc. Name` fields have been removed to optimize grid space, and the primary selector dropdowns (`Source account` and `Target Account`) automatically expand to occupy `col-span-8` in the 12-column grid.
   - **Selector Alignment**: The `Choose Quick Action:` dropdown selector is positioned on the rightmost side of the header/title row, to the right of the control buttons.
-  - **Compact Fields View**: All 16 configuration fields are set to compact mode (`isCompact={true}` with input heights of 26px and tighter margins) to guarantee that all fields are fully visible on screen without requiring vertical scrolling.
+  - **Compact Fields View**: All 16 configuration fields are set to compact mode (`isCompact={true}` with input heights of 26px and tighter margins) organized in a strict 7-row responsive grid to guarantee that all fields are fully visible on screen without requiring vertical scrolling.
   - **Header Action Controls**: The bottom form `EDIT` button has been removed and replaced with a `Save` button (`💾`). All control action buttons (Save `💾`, Delete `🗑️`, Add `➕`) are positioned in the top header workspace to the left of the Choose Quick Action selector, displaying only symbols.
 - **Responsive Layout**: On desktop screens, the Register Transaction modal forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
 - **Transactional Templates**: Pre-configured templates map the three-axis transactional integrity constraints (Type, Subtype, Flow) onto safe default inputs:
