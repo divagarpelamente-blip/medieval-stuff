@@ -25,6 +25,7 @@ import RoyalIncomeStatement from './components/RoyalIncomeStatement';
 import TreasuryStatements from './components/TreasuryStatements';
 import ConsolidatedFinancialStatement from './components/ConsolidatedFinancialStatement';
 import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
+import { accountMappings, getAccountName } from './utils/accountMappings';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -2243,21 +2244,25 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     />
                                   </td>
                                   {/* target_account & source_dest_bank */}
-                                  <td className="py-1 px-1 whitespace-nowrap flex gap-1 items-center">
-                                    <input
-                                      type="text"
+                                  <td className="py-1 px-1 whitespace-nowrap flex flex-col gap-1">
+                                    <select
                                       value={editingTxs[tx.id]?.target_account || ''}
                                       onChange={(e) => handleFieldChange(tx.id, 'target_account', e.target.value)}
-                                      placeholder="Target"
-                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-12 px-1 py-0.5 focus:outline-none font-mono"
-                                    />
-                                    <input
-                                      type="text"
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-24 px-1 py-0.5 focus:outline-none font-sans"
+                                    >
+                                      {Object.entries(accountMappings).map(([code, name]) => (
+                                        <option key={code} value={code}>{name}</option>
+                                      ))}
+                                    </select>
+                                    <select
                                       value={editingTxs[tx.id]?.source_dest_bank || ''}
                                       onChange={(e) => handleFieldChange(tx.id, 'source_dest_bank', e.target.value)}
-                                      placeholder="Source"
-                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-12 px-1 py-0.5 focus:outline-none font-mono"
-                                    />
+                                      className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] w-24 px-1 py-0.5 focus:outline-none font-sans"
+                                    >
+                                      {Object.entries(accountMappings).map(([code, name]) => (
+                                        <option key={code} value={code}>{name}</option>
+                                      ))}
+                                    </select>
                                   </td>
                                 </>
                               ) : (
@@ -2293,7 +2298,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     {formatNumberCompact(tx.flow === 'inflow' ? Number(tx.amount) : (tx.flow === 'outflow' ? -Number(tx.amount) : Number(tx.amount)))}
                                   </td>
                                   <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
-                                  <td className="py-2 px-3 whitespace-nowrap text-stone-500 font-mono text-[9px]">{tx.target_account || '-'}{tx.source_dest_bank ? ` / ${tx.source_dest_bank}` : ''}</td>
+                                  <td className="py-2 px-3 whitespace-nowrap text-stone-650 font-bold text-[9.5px]" title={`${tx.target_account}${tx.source_dest_bank ? ` / ${tx.source_dest_bank}` : ''}`}>
+                                    {getAccountName(tx.target_account)}
+                                    {tx.source_dest_bank ? ` / ${getAccountName(tx.source_dest_bank)}` : ''}
+                                  </td>
                                 </>
                               )}
                             </tr>
@@ -2475,248 +2483,219 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           title={t.register_movement}
           size="max-w-4xl"
         >
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Quick Actions Sidebar (Left) */}
-            <div className="w-full md:w-40 bg-[#faf4e5]/60 border border-[#8b4513]/20 rounded-xl p-3 flex flex-col gap-2.5 flex-shrink-0 shadow-sm">
-              <h4 className="text-[9.5px] font-black uppercase tracking-widest text-[#4b2c20] border-b border-[#8b4513]/15 pb-2 mb-1 flex items-center gap-1.5 font-sans">
-                ⚡ {t('quick_actions', 'Quick Actions')}
-              </h4>
-              <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar-subtle pr-1">
-                {templates.map((tpl, idx) => (
+          <div className="w-full">
+            {/* Main Form Area */}
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="flex items-center justify-end gap-3 border-b border-[#8b4513]/20 pb-2.5 mb-2.5">
+                {/* Save Button Symbol */}
+                <div className="flex flex-col items-center">
+                  <span className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 text-center font-sans">
+                    Save
+                  </span>
                   <button
-                    key={idx}
-                    type="button"
-                    onClick={() => applyTemplate(tpl)}
-                    className="w-full text-left p-2 py-1.5 rounded-lg border border-[#8b4513]/25 bg-[#faf4e5]/90 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] transition-all text-[8.5px] font-bold uppercase tracking-wider font-sans cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    type="submit"
+                    disabled={isLoading}
+                    className="bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-md h-[28px] w-[36px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow cursor-pointer"
+                    title={t.save_transaction || "Save"}
                   >
-                    <span className="text-xs">{tpl.icon}</span>
-                    <span className="truncate">{t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}</span>
+                    <span className="text-[14px]">{isLoading ? '⏳' : '💾'}</span>
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Main Form Area (Right) */}
-            <form onSubmit={handleSubmit} className="flex-grow space-y-6">
-            <div className="flex items-center gap-4 border-b border-[#8b4513]/20 pb-4">
-              <div className="w-12 h-12 bg-[#8b4513]/10 rounded-full flex items-center justify-center border-2 border-[#8b4513]/20 text-2xl">
-                ➕
-              </div>
-              <div>
-                <h3 className="title-font text-lg font-black text-[#4b2c20] uppercase">{t.register_movement}</h3>
-                <p className="text-[10px] text-[#5d4037]/75 font-bold uppercase tracking-wider">{t.gold_mine_commerce}</p>
-              </div>
-            </div>
-
-              {/* Cascading UI Dropdowns */}
-              <div className="bg-[#faf4e5]/80 border border-[#8b4513]/30 rounded-xl p-3.5 space-y-3 shadow-sm mb-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Main Menu (Category)
-                    </label>
-                    <select
-                      value={mainMenu}
-                      onChange={(e) => handleMainMenuChange(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      {Object.keys(cascadingConfig).map((key) => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Submenu Action
-                    </label>
-                    <select
-                      value={subMenuAction}
-                      onChange={(e) => handleSubMenuChange(mainMenu, e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      {Object.keys(cascadingConfig[mainMenu] || {}).map((key) => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Core Accounting Layout Grid */}
-              <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-3.5 space-y-3.5">
-                {/* Row 1: Source Side & Flow + Status */}
-                <div className="grid grid-cols-12 gap-4 items-end">
-                  {/* Source account (top left) */}
-                  <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Source account
-                    </label>
-                    <select
-                      value={txSourceDestBank}
-                      onChange={(e) => setTxSourceDestBank(e.target.value)}
-                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
-                    >
-                      <option value="111001">111001 - CGD</option>
-                      <option value="111002">111002 - BPI</option>
-                      <option value="111003">111003 - ActiveBank</option>
-                      <option value="111004">111004 - Inter</option>
-                      <option value="121004">121004 - WizInk</option>
-                      <option value="131001">131001 - Cash Chest</option>
-                      <option value="211006">211006 - Cofidis</option>
-                      <option value="212001">212001 - Jota Support</option>
-                      <option value="212002">212002 - Mum Support</option>
-                      <option value="221002">221002 - Universo</option>
-                    </select>
-                  </div>
-
-                  {/* Source acc. name (top middle) */}
-                  <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Source Acc. Name
-                    </label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={
-                        txSourceDestBank === '111001' ? 'CGD Bank' :
-                        txSourceDestBank === '111002' ? 'BPI Bank' :
-                        txSourceDestBank === '111003' ? 'ActiveBank' :
-                        txSourceDestBank === '111004' ? 'Inter Bank' :
-                        txSourceDestBank === '121004' ? 'WizInk Card' :
-                        txSourceDestBank === '131001' ? 'Cash Chest/Vault' :
-                        txSourceDestBank === '211006' ? 'Cofidis Loan' :
-                        txSourceDestBank === '212001' ? 'Jota Loan' :
-                        txSourceDestBank === '212002' ? 'Mae Loan' :
-                        txSourceDestBank === '221002' ? 'Universo Card' : 'Other Account'
-                      }
-                      className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Flow + Status (Top right) */}
-                  <div className="col-span-12 sm:col-span-4 flex gap-2">
-                    <div className="flex-1">
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                        Flow
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={txFlow}
-                        className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none uppercase"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                        Status
-                      </label>
-                      <select
-                        value={txStatus}
-                        onChange={(e) => setTxStatus(e.target.value)}
-                        className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                      >
-                        {statusOptions.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Row 2: Target Side & Description */}
-                <div className="grid grid-cols-12 gap-4 items-end">
-                  {/* Target account (bottom left) */}
-                  <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Target Account
-                    </label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={txTargetAccount}
-                      className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none font-mono"
-                    />
-                  </div>
-
-                  {/* Target acc. name (bottom middle) */}
-                  <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Target Acc. Name
-                    </label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={
-                        txTargetAccount === '111001' ? 'CGD Bank' :
-                        txTargetAccount === '111002' ? 'BPI Bank' :
-                        txTargetAccount === '111003' ? 'ActiveBank' :
-                        txTargetAccount === '111004' ? 'Inter Bank' :
-                        txTargetAccount === '121004' ? 'WizInk Card' :
-                        txTargetAccount === '131001' ? 'Cash Chest/Vault' :
-                        txTargetAccount === '211006' ? 'Cofidis Loan' :
-                        txTargetAccount === '212001' ? 'Jota Loan' :
-                        txTargetAccount === '212002' ? 'Mae Loan' :
-                        txTargetAccount === '221002' ? 'Universo Card' :
-                        txTargetAccount === '611001' ? 'Rent Expense' :
-                        txTargetAccount === '611002' ? 'Repairs Expense' :
-                        txTargetAccount === '611003' ? 'Decorations Expense' :
-                        txTargetAccount === '611004' ? 'Utensils Expense' :
-                        txTargetAccount === '621001' ? 'Electricity Expense' :
-                        txTargetAccount === '621002' ? 'Gas Expense' :
-                        txTargetAccount === '621003' ? 'Water Expense' :
-                        txTargetAccount === '621004' ? 'Communications Expense' :
-                        txTargetAccount === '631001' ? 'Gasoline Expense' :
-                        txTargetAccount === '641001' ? 'Supermarket Food' :
-                        txTargetAccount === '642001' ? 'Tools & Equipment' :
-                        txTargetAccount === '643001' ? 'Clothing Expense' :
-                        txTargetAccount === '661' ? 'Restaurant Feast' :
-                        txTargetAccount === '662' ? 'Cinema Entertainment' :
-                        txTargetAccount === '663' ? 'Streaming Entertainment' :
-                        txTargetAccount === '711001' ? 'Base Salary Income' :
-                        txTargetAccount === '711003' ? 'Bonus Income' : 'Other Account'
-                      }
-                      className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/10 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Description (bottom right) */}
-                  <div className="col-span-12 sm:col-span-4">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      {t.description}
-                    </label>
-                    <input
-                      type="text"
-                      value={txDescription}
-                      onChange={(e) => setTxDescription(e.target.value)}
-                      placeholder={t('placeholder.notes')}
-                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Auxiliary Fields & Metadata */}
-              <div className="grid grid-cols-12 gap-3">
-                {/* From */}
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
-                    {t.origin_from}
+                {/* Quick Actions Dropdown */}
+                <div className="flex flex-col items-center">
+                  <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 text-center font-sans">
+                    Quick Actions
                   </label>
                   <select
-                    value={txFrom}
-                    onChange={(e) => setTxFrom(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    onChange={(e) => {
+                      const tplName = e.target.value;
+                      if (tplName) {
+                        const tpl = templates.find(t => t.name === tplName);
+                        if (tpl) applyTemplate(tpl);
+                      }
+                    }}
+                    value=""
+                    className="bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans cursor-pointer"
                   >
-                    {fromOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
+                    <option value="" disabled hidden>-- Select --</option>
+                    <option value="">-- Choose --</option>
+                    {templates.map((tpl, idx) => (
+                      <option key={idx} value={tpl.name}>
+                        {tpl.icon} {tpl.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Dates */}
-                <div className="col-span-12 sm:col-span-4 flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
+                {/* All Actions Dropdown (Placeholder) */}
+                <div className="flex flex-col items-center">
+                  <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 text-center font-sans">
+                    All Actions
+                  </label>
+                  <select
+                    disabled
+                    value=""
+                    className="bg-[#faf4e5]/50 border border-[#8b4513]/20 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none font-sans"
+                  >
+                    <option value="" disabled hidden>-- Select --</option>
+                    <option value="">-- All Actions --</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Form Fields Grid */}
+              <div className="bg-[#faf4e5]/80 border border-[#8b4513]/30 rounded-xl p-3.5 space-y-3 shadow-sm">
+                
+                {/* Row 1: Class (Type) / SubClass / Flow / Status */}
+                <div className="grid grid-cols-12 gap-3">
+                  {/* Class (Type) */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Class (Type)
+                    </label>
+                    <select
+                      value={txClass}
+                      onChange={(e) => setTxClass(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      {classOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Subclass */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Subclass
+                    </label>
+                    <select
+                      value={txSubClass}
+                      onChange={(e) => setTxSubClass(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      {subClassOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Flow */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Flow
+                    </label>
+                    <select
+                      value={txFlow}
+                      onChange={(e) => setTxFlow(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      <option value="inflow">Inflow</option>
+                      <option value="outflow">Outflow</option>
+                      <option value="neutral">Neutral</option>
+                    </select>
+                  </div>
+
+                  {/* Status */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Status
+                    </label>
+                    <select
+                      value={txStatus}
+                      onChange={(e) => setTxStatus(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      {statusOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 2: origin (from) / Category / Entity / Amount */}
+                <div className="grid grid-cols-12 gap-3">
+                  {/* Origin (From) */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      {t.origin_from}
+                    </label>
+                    <select
+                      value={txFrom}
+                      onChange={(e) => setTxFrom(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      {fromOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Category */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Category
+                    </label>
+                    <select
+                      value={txCategory}
+                      onChange={(e) => setTxCategory(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                    >
+                      {categoryOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Entity */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      Entity
+                    </label>
+                    <select
+                      value={txEntity}
+                      onChange={(e) => handleEntityChange(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
+                    >
+                      {Object.entries(
+                        entityOptions.reduce((acc, opt) => {
+                          const cat = entityMappings[opt] || 'Uncategorized';
+                          if (!acc[cat]) acc[cat] = [];
+                          acc[cat].push(opt);
+                          return acc;
+                        }, {})
+                      ).map(([cat, opts]) => (
+                        <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
+                          {opts.map((opt) => (
+                            <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                      {t.amount_gold}
+                    </label>
+                    <input
+                      type="number"
+                      value={txAmount}
+                      onChange={(e) => setTxAmount(e.target.value)}
+                      placeholder={t('placeholder.amount')}
+                      required
+                      min="1"
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 3: Value Date / Posting Date */}
+                <div className="grid grid-cols-12 gap-3">
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                       Value Date
                     </label>
                     <input
@@ -2724,11 +2703,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       value={txValueDate}
                       onChange={(e) => setTxValueDate(e.target.value)}
                       required
-                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                     />
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                       Posting Date
                     </label>
                     <input
@@ -2736,98 +2715,61 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       value={txPostingDate}
                       onChange={(e) => setTxPostingDate(e.target.value)}
                       required
-                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
                     />
                   </div>
                 </div>
 
-                {/* Amount */}
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
-                    {t.amount_gold}
+                {/* Row 4: Description */}
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                    {t.description}
                   </label>
                   <input
-                    type="number"
-                    value={txAmount}
-                    onChange={(e) => setTxAmount(e.target.value)}
-                    placeholder={t('placeholder.amount')}
-                    required
-                    min="1"
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-3 text-[11px] font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    type="text"
+                    value={txDescription}
+                    onChange={(e) => setTxDescription(e.target.value)}
+                    placeholder={t('placeholder.notes')}
+                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
                   />
                 </div>
+
+                {/* Row 5: Source Account */}
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                    Source Account
+                  </label>
+                  <select
+                    value={txSourceDestBank}
+                    onChange={(e) => setTxSourceDestBank(e.target.value)}
+                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
+                  >
+                    {Object.entries(accountMappings)
+                      .filter(([code]) => code.startsWith('1') || code.startsWith('2'))
+                      .map(([code, name]) => (
+                        <option key={code} value={code}>{code} - {name}</option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                {/* Row 6: Target Account */}
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+                    Target Account
+                  </label>
+                  <select
+                    value={txTargetAccount}
+                    onChange={(e) => setTxTargetAccount(e.target.value)}
+                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
+                  >
+                    {Object.entries(accountMappings).map(([code, name]) => (
+                      <option key={code} value={code}>{code} - {name}</option>
+                    ))}
+                  </select>
+                </div>
+
               </div>
-
-              {/* Class, Subclass, Entity Selection */}
-              <div className="grid grid-cols-12 gap-3">
-                {/* Class */}
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
-                    Class (Type)
-                  </label>
-                  <select
-                    value={txClass}
-                    onChange={(e) => setTxClass(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none"
-                  >
-                    {classOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Subclass */}
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
-                    Subclass
-                  </label>
-                  <select
-                    value={txSubClass}
-                    onChange={(e) => setTxSubClass(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none"
-                  >
-                    {subClassOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Entity */}
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5">
-                    Entity
-                  </label>
-                  <select
-                    value={txEntity}
-                    onChange={(e) => handleEntityChange(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[30px] px-2 text-[11px] font-bold text-[#4b2c20] focus:outline-none font-sans"
-                  >
-                    {Object.entries(
-                      entityOptions.reduce((acc, opt) => {
-                        const cat = entityMappings[opt] || 'Uncategorized';
-                        if (!acc[cat]) acc[cat] = [];
-                        acc[cat].push(opt);
-                        return acc;
-                      }, {})
-                    ).map(([cat, opts]) => (
-                      <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
-                        {opts.map((opt) => (
-                          <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2 bg-[#8b4513] text-white font-black text-[11px] uppercase tracking-widest rounded-lg hover:scale-[1.01] active:scale-99 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow border border-[#d4af37]/30 cursor-pointer"
-              >
-                {isLoading ? `${t.register_movement}...` : t.save_transaction}
-              </button>
             </form>
           </div>
         </Modal>

@@ -41,6 +41,33 @@ export const useKingdomStore = create((set, get) => ({
   user: null,
   role: 'lord',
 
+  syncSettings: async (updates) => {
+    set(updates);
+    Object.entries(updates).forEach(([key, val]) => {
+      saveLocal(key, val);
+    });
+    const userId = get().user?.id;
+    if (userId) {
+      const settings = {
+        templates: get().templates,
+        fromOptions: get().fromOptions,
+        entityOptions: get().entityOptions,
+        categoryOptions: get().categoryOptions,
+        entityMappings: get().entityMappings,
+        language: get().language,
+        ...updates
+      };
+      try {
+        await supabase
+          .from('profiles')
+          .update({ settings })
+          .eq('id', userId);
+      } catch (err) {
+        console.error('Failed to sync settings with DB:', err);
+      }
+    }
+  },
+
   // Dropdown manage lists
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
   statusOptions: ['Pending', 'Completed'],
@@ -87,7 +114,7 @@ export const useKingdomStore = create((set, get) => ({
         target_account: '711001',
         source_dest_bank: '111001',
         flow: 'inflow',
-        payment_status: 'Pending',
+        payment_status: 'Completed',
         description: 'Monthly salary payment',
         amount: '500'
       }
@@ -217,8 +244,7 @@ export const useKingdomStore = create((set, get) => ({
   addOption: (type, value, extraData) => {
     if (type === 'quickAction') {
       const updated = [...get().templates, { name: value, icon: extraData.icon || '⚡', data: extraData.data }];
-      set({ templates: updated });
-      saveLocal('templates', updated);
+      get().syncSettings({ templates: updated });
       return;
     }
 
@@ -228,19 +254,14 @@ export const useKingdomStore = create((set, get) => ({
     if (currentList.includes(value)) return;
 
     const updated = [...currentList, value];
-    set({ [key]: updated });
+    const updates = { [key]: updated };
     
-    // Only persist user-customizable options
-    if (['fromOptions', 'entityOptions', 'categoryOptions'].includes(key)) {
-      saveLocal(key, updated);
-    }
-
     // If adding an entity, we also add its category mapping
     if (type === 'entity' && extraData?.category) {
-      const updatedMappings = { ...get().entityMappings, [value]: extraData.category };
-      set({ entityMappings: updatedMappings });
-      saveLocal('entityMappings', updatedMappings);
+      updates.entityMappings = { ...get().entityMappings, [value]: extraData.category };
     }
+
+    get().syncSettings(updates);
   },
 
   editOption: (type, oldValue, newValue, extraData) => {
@@ -251,8 +272,7 @@ export const useKingdomStore = create((set, get) => ({
         }
         return tpl;
       });
-      set({ templates: updated });
-      saveLocal('templates', updated);
+      get().syncSettings({ templates: updated });
       return;
     }
   },
@@ -260,8 +280,7 @@ export const useKingdomStore = create((set, get) => ({
   deleteOption: (type, value) => {
     if (type === 'quickAction') {
       const updated = get().templates.filter(tpl => tpl.name !== value);
-      set({ templates: updated });
-      saveLocal('templates', updated);
+      get().syncSettings({ templates: updated });
       return;
     }
 
@@ -270,18 +289,15 @@ export const useKingdomStore = create((set, get) => ({
     if (!currentList) return;
 
     const updated = currentList.filter(v => v !== value);
-    set({ [key]: updated });
+    const updates = { [key]: updated };
     
-    if (['fromOptions', 'entityOptions', 'categoryOptions'].includes(key)) {
-      saveLocal(key, updated);
-    }
-
     if (type === 'entity') {
       const updatedMappings = { ...get().entityMappings };
       delete updatedMappings[value];
-      set({ entityMappings: updatedMappings });
-      saveLocal('entityMappings', updatedMappings);
+      updates.entityMappings = updatedMappings;
     }
+
+    get().syncSettings(updates);
   },
 
   // Fetch lightweight profile data (single-row polling mechanics)
@@ -306,6 +322,21 @@ export const useKingdomStore = create((set, get) => ({
           level: data.level || 1,
           xp: data.xp || 0,
         });
+
+        if (data.settings) {
+          const s = data.settings;
+          set({
+            templates: s.templates || get().templates,
+            fromOptions: s.fromOptions || get().fromOptions,
+            entityOptions: s.entityOptions || get().entityOptions,
+            categoryOptions: s.categoryOptions || get().categoryOptions,
+            entityMappings: s.entityMappings || get().entityMappings,
+            language: s.language || get().language
+          });
+          if (s.language) {
+            i18n.changeLanguage(s.language);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to fetch kingdom data:', err);
@@ -361,6 +392,40 @@ export const useKingdomStore = create((set, get) => ({
       created_at: new Date().toISOString()
     };
 
+    // Calculate Gold, XP, and Level locally as a fail-safe
+    let newGold = get().gold;
+    let earnedXp = 0;
+    const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
+    const isCompletedStatus = isCompleted(transactionData.payment_status || 'Completed');
+
+    if (isCompletedStatus) {
+      const amt = Number(transactionData.amount) || 0;
+      if (transactionData.transaction_type === 'Income') {
+        newGold += amt;
+        earnedXp = amt * 2;
+      } else if (transactionData.transaction_type === 'Expense') {
+        newGold = Math.max(0, newGold - amt);
+      } else if (transactionData.transaction_type === 'Savings') {
+        if (transactionData.flow === 'inflow') newGold += amt;
+        else if (transactionData.flow === 'outflow') newGold = Math.max(0, newGold - amt);
+      } else if (transactionData.transaction_type === 'Debt') {
+        if (transactionData.flow === 'inflow') newGold += amt;
+        else if (transactionData.flow === 'outflow') newGold = Math.max(0, newGold - amt);
+      }
+    }
+
+    let newXp = get().xp + earnedXp;
+    let newLevel = get().level;
+    while (true) {
+      const maxXp = 100 * Math.pow(1.5, newLevel - 1);
+      if (newXp >= maxXp) {
+        newXp -= Math.floor(maxXp);
+        newLevel += 1;
+      } else {
+        break;
+      }
+    }
+
     const prevTransactions = get().transactions;
     set({ transactions: [tempTx, ...prevTransactions], isLoading: true });
 
@@ -377,6 +442,7 @@ export const useKingdomStore = create((set, get) => ({
             payment_status: transactionData.payment_status || 'Completed',
             transaction_subtype: transactionData.transaction_subtype,
             entity: transactionData.entity,
+            from: transactionData.from,
             target_account: transactionData.target_account,
             source_dest_bank: transactionData.source_dest_bank,
             flow: transactionData.flow,
@@ -395,20 +461,21 @@ export const useKingdomStore = create((set, get) => ({
         }));
       }
 
-      // Fetch only the profile stats to get the new trigger-calculated Gold, XP, and Level
-      const profileRes = await supabase
+      // Update profiles directly in database to ensure sync even if trigger is missing
+      await supabase
         .from('profiles')
-        .select('gold, xp, level')
-        .eq('id', userId)
-        .single();
-      
-      if (profileRes.data) {
-        set({
-          gold: profileRes.data.gold ? Number(profileRes.data.gold) : get().gold,
-          level: profileRes.data.level || get().level,
-          xp: profileRes.data.xp || get().xp,
-        });
-      }
+        .update({
+          gold: newGold,
+          xp: newXp,
+          level: newLevel
+        })
+        .eq('id', userId);
+
+      set({
+        gold: newGold,
+        xp: newXp,
+        level: newLevel
+      });
 
       get().fetchDashboardData(userId);
 
@@ -571,6 +638,21 @@ export const useKingdomStore = create((set, get) => ({
             level: profileData.level || 1,
             role: profileData.role || 'lord'
           });
+
+          if (profileData.settings) {
+            const s = profileData.settings;
+            set({
+              templates: s.templates || get().templates,
+              fromOptions: s.fromOptions || get().fromOptions,
+              entityOptions: s.entityOptions || get().entityOptions,
+              categoryOptions: s.categoryOptions || get().categoryOptions,
+              entityMappings: s.entityMappings || get().entityMappings,
+              language: s.language || get().language
+            });
+            if (s.language) {
+              i18n.changeLanguage(s.language);
+            }
+          }
         }
         get().fetchKingdomData(session.user.id);
         get().fetchDashboardData(session.user.id);
@@ -595,8 +677,7 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   setLanguage: (lang) => {
-    set({ language: lang });
-    saveLocal('language', lang);
+    get().syncSettings({ language: lang });
     i18n.changeLanguage(lang);
   },
 

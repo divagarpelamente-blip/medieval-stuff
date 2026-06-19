@@ -56,7 +56,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl' }) 
         </div>
 
         {/* Body */}
-        <div className="p-6 sm:p-10 overflow-y-auto custom-scrollbar-subtle flex-grow relative z-10 text-[#2d1b0d]">
+        <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar-subtle flex-grow relative z-10 text-[#2d1b0d]">
           {children}
         </div>
 

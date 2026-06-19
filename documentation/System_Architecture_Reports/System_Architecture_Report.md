@@ -73,16 +73,18 @@ Located in `client/src/store/useKingdomStore.js`, the Zustand store handles:
 - **Atomic Optimizations**: The `registerTransaction` and `registerTransactions` hooks avoid massive synchronization loops by locally unshifting arrays and performing single-row polls for trigger-calculated values (`gold`, `xp`, `level`).
 - **Synchronizations**: Exposes a `setLanguage` dispatch which modifies the store state and synchronizes runtime locales via `i18n.changeLanguage(lang)`.
 
-### B. LocalStorage Configurations
+### B. User-Specific Settings Persistence (Database & LocalStorage Fallback)
 
-To ensure a personalized, modular experience without querying DB configurations continuously, customizable user inputs are saved directly under the `eldoria_` prefix:
+To ensure custom settings (such as templates, lists, and language preferences) persist across versions, refactoring cycles, and are isolated to specific user roles (e.g. `admin` vs `lord`), the store employs a dual-persistence strategy:
 
-- `eldoria_fromOptions`: List of payers/origins.
-- `eldoria_categoryOptions`: High-level category groupings.
-- `eldoria_entityOptions`: Specific commercial entities/destinations.
-- `eldoria_entityMappings`: Key-value map linking entities accurately to their parent categories.
-- `eldoria_templates`: User-customizable Quick Action templates.
-- `eldoria_language`: Active locale key.
+- **Database Synchronization:** Authenticated users' settings are serialized and stored inside the `profiles.settings` JSONB column in Supabase. Any modification immediately updates the database row.
+- **LocalStorage Fallback:** Settings are also saved under the `eldoria_` prefix in `localStorage` for instant loadtimes and fallback usage for guest sessions:
+  - `eldoria_fromOptions`: List of payers/origins.
+  - `eldoria_categoryOptions`: High-level category groupings.
+  - `eldoria_entityOptions`: Specific commercial entities/destinations.
+  - `eldoria_entityMappings`: Key-value map linking entities to parent categories.
+  - `eldoria_templates`: Customizable Quick Action templates.
+  - `eldoria_language`: Active locale key.
 
 > [!NOTE]
 > Fixed database taxonomy constraints (e.g., `classOptions`, `subClassOptions`, `statusOptions`, `monthOptions`) have been explicitly purged from LocalStorage initialization loops and exist purely as static state configurations to guarantee Engine stability.
@@ -133,9 +135,9 @@ The layout is structured using a mobile-first responsive framework that guarante
 
 ---
 
-## 5. Database Schema & Triggers (Supabase PostgreSQL)
+### 5. Database Schema & Triggers (Supabase PostgreSQL)
 
-Persistence and trigger logic is strictly bound to the 4-tier literal string architecture.
+Persistence and trigger logic is strictly bound to the 4-pillar literal string architecture.
 
     +------------------------------------+          +------------------------------------+
     |              profiles              |          |            transactions            |
@@ -154,8 +156,9 @@ Persistence and trigger logic is strictly bound to the 4-tier literal string arc
                                                     | transaction_subtype  TEXT          |
                                                     | entity               TEXT          |
                                                     | transaction_category TEXT          |
-                                                    | transaction_nature   TEXT (CHECK)  |
-                                                    | transaction_flow     TEXT (CHECK)  |
+                                                    | target_account       TEXT          |
+                                                    | source_dest_bank     TEXT          |
+                                                    | flow                 TEXT (CHECK)  |
                                                     | description          TEXT          |
                                                     | due_date             DATE          |
                                                     | payment_method       TEXT          |
@@ -173,13 +176,14 @@ Represents the lord's metadata and statistics.
 
 #### 2. Table: `transactions`
 
-Contains the detailed financial ledger records natively utilizing a modern `snake_case` schema with strict double-entry checks.
+Contains the detailed financial ledger records natively utilizing a modern `snake_case` schema.
 
 - `transaction_type` (`TEXT` - e.g. `'Income'`, `'Expense'`)
-- `transaction_subtype` (`TEXT` - e.g. `'Cash receipt'`, `'Cash payment'`)
+- `transaction_subtype` (`TEXT` - e.g. `'Base Salary'`, `'Cash payment'`)
 - `transaction_category` (`TEXT` - High-level grouping, e.g. `'Payroll'`, `'Housing'`)
-- `transaction_nature` (`TEXT` - Matrix axis: `'cash'` or `'accrual'`)
-- `transaction_flow` (`TEXT` - Matrix axis: `'inflow'` or `'outflow'`)
+- `target_account` (`TEXT` - Destination Chart of Accounts code, e.g. `'711001'`)
+- `source_dest_bank` (`TEXT` - Origin Chart of Accounts code, e.g. `'111001'`)
+- `flow` (`TEXT` - Check: `'inflow'`, `'outflow'`, or `'neutral'`)
 - `entity` (`TEXT` - Specific destination/origin)
 - `"from"` (`TEXT` - Payer/originator of funds)
 - `value_date` (`DATE` - Expected transaction completion date)
@@ -196,19 +200,11 @@ Contains the detailed financial ledger records natively utilizing a modern `snak
 2. **Update Profile Stats (`tr_on_transaction_inserted`)**:
    - An `AFTER INSERT` trigger (`update_profile_on_transaction`) that updates the user's `gold` balance, and increments `xp` and `level` accordingly based on transactions.
    - **Trigger Actions Routing Map**:
-     - `'Income'`: Increments target user `gold` balance and awards corresponding XP (2 XP per gold coin).
-     - `'Expense'`: Decrements user `gold` balance (clamped at a minimum of `0`).
-     - `'Savings'`: Increments user `gold` balance if `transaction_flow` is `'inflow'`, decrements if `'outflow'`. No XP is awarded.
-     - `'Debt'`: Increments user `gold` balance if `transaction_subtype` is `'New Debt'` or `transaction_flow` is `'inflow'`. Decrements if `transaction_subtype` is `'Amortization'` or `'Interest'` or `transaction_flow` is `'outflow'`. No XP is awarded.
-     - `'Payable'` and `'Receivable'`: Discarded entirely from purse updates (no gold or XP calculations) as they represent outstanding unpaid invoices.
-
-3. **Double-Entry Subtype Constraints (`check_double_entry_integrity`)**:
-   - An database-level check constraint strictly routing matrix dimensions:
-     - Accrual `'Receivable'` entries must have `transaction_flow = 'inflow'`.
-     - Accrual `'Payable'` entries must have `transaction_flow = 'outflow'`.
-     - Loan borrows (`'New Debt'` subtype) must have `transaction_flow = 'inflow'`.
-     - Loan payments (`'Amortization'` or `'Interest'` subtypes) must have `transaction_flow = 'outflow'` and `transaction_nature = 'cash'`.
-     - Bypasses check constraints for generic `'Income'` and `'Expense'` lines.
+     - `'Income'`: Increments target user `gold` balance and awards corresponding XP (2 XP per gold coin) if status is `'Completed'`.
+     - `'Expense'`: Decrements user `gold` balance (clamped at a minimum of `0`) if status is `'Completed'`.
+     - `'Savings'`: Increments user `gold` balance if `flow` is `'inflow'`, decrements if `'outflow'` (only when status is `'Completed'`). No XP is awarded.
+     - `'Debt'`: Increments user `gold` balance if `flow` is `'inflow'`, decrements if `flow` is `'outflow'` (only when status is `'Completed'`). No XP is awarded.
+     - Transactions with `payment_status = 'Pending'` are bypassed entirely from balance updates.
 
 ---
 
@@ -221,13 +217,13 @@ The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js
 The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the interface. Rather than showing a fixed row globally, the KPIs are filtered dynamically based on the active sub-tab:
 
 1. **Revenues & Expenses (`income_expense`):**
-   - **Total Income:** Accrual-basis inflow (`transaction_nature = 'accrual'` and `transaction_flow = 'inflow'`).
-   - **Total Expenses:** Accrual-basis outflow (`transaction_nature = 'accrual'` and `transaction_flow = 'outflow'`).
-   - **Net Cash Balance:** Derived from cash-basis movements (receipts vs payments).
+   - **Total Income:** Realized income flow (`transaction_type = 'Income'` and `payment_status = 'Completed'`).
+   - **Total Expenses:** Realized expense flow (`transaction_type = 'Expense'` and `payment_status = 'Completed'`).
+   - **Net Cash Balance:** Derived from completed movements (`Realized Income - Realized Expense`).
 2. **Payables & Receivables (`payables_receivables`):**
-   - **All Payables, Open Payables, All Receivables, Open Receivables, Overdue Rate**: Tracks outstanding assets, liabilities, and their age segments.
+   - **All Payables, Open Payables, All Receivables, Open Receivables, Overdue Rate**: Tracks outstanding budget items (Pending status).
 3. **Liabilities (`liabilities`):**
-   - **Total Debt, To Be Paid, New Liabilities, Amortizations**: Tracks debt principal, borrowing events, and payments.
+   - **Total Debt, To Be Paid, New Liabilities, Amortizations**: Tracks completed and pending debt items.
 4. **Overview (`overview`) & Financial Ratios (`ratios`):**
    - The top KPI summary row is hidden, allocating the space entirely to visualization components.
 
@@ -235,17 +231,17 @@ The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the
 
 The dashboard engine runs an O(N) single-pass calculation loop to construct the reports:
 
-1. **Royal Income Statement (Profit & Loss)**: Segments accrued revenues vs accrued expenses to calculate Net Accrued Income.
-2. **Treasury Cash Flow Statement**: Classifies cash-nature movements into Operating, Investing, and Financing activities.
-3. **Balance Sheet**: Dynamically aggregates historical transactions up to the active date filter's cutoff to verify:
-   $$\text{Assets (Cash + Receivables)} = \text{Liabilities (Debt)} + \text{Equity (Net Wealth)}$$
+1. **Royal Income Statement (Profit & Loss)**: Segments realized revenues vs realized expenses to calculate Net Realized Income, tracking pending items separately for forecasts.
+2. **Treasury Cash Flow Statement**: Classifies Completed Operating (`Expense` outflows) and Financing (`Income` inflows) cash movements.
+3. **Balance Sheet**: Dynamically aggregates historical balances from the `account_balances` table. If the `account_balances` table is empty, a dynamic transaction-based engine calculates the exact balances of all asset and liability accounts by applying historical transactions starting from the profile's initial cash balance to verify:
+   $$\text{Assets} = \text{Liabilities} + \text{Equity (Net Wealth)}$$
 
 ### C. Component-Level Pivoting (Autonomous Charts)
 
 The visualization components possess independent interactive logic to pivot their perspectives:
 
-- **FlowByCategoryChart.jsx:** A local `[ Accrual | Cash ]` toggle seamlessly swaps the bar chart metrics between mapping `Total income`/`Total expenses` and `Total receipts`/`Total payments`.
-- **TimeEvolutionChart.jsx:** A unified SVG spline rendering system with an interactive **4-checkbox legend**, enabling overlay comparisons of `Total income` vs `Total receipts` curves over the same temporal progression map.
+- **FlowByCategoryChart.jsx:** Maps category-wise distribution based on filtered Income and Expense transactions.
+- **TimeEvolutionChart.jsx:** A unified SVG spline rendering system displaying cumulative income vs expense curves over the temporal progression map.
 - **TopEntitiesChart.jsx:** The donut chart automatically recalculates segment boundaries and tabular volumes based on a local toggle, tapping directly into the matrix data payload.
 
 ### D. Royal Treasurer's Counsel (Contextual Advisor Insights)
@@ -299,15 +295,15 @@ To streamline the process of entering frequent transactions, the **Register Tran
   - **Selector Alignment**: The `Select Quick Action:` label renders directly above its dropdown selector in the header.
   - **Header Action Controls**: The bottom form `EDIT` button has been removed and replaced with a `Save` button (`💾`). All control action buttons (Save `💾`, Delete `🗑️`, Add `➕`) are positioned in the top-right header workspace to the left of the quick action dropdown, displaying only symbols and hiding their text labels.
 - **Responsive Layout**: On desktop screens, the Register Transaction modal forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
-- **Transactional Templates**: Pre-configured templates map the four-axis transactional integrity constraints onto safe default inputs:
-  - **Salary**: Active income, cash basis receipt.
+- **Transactional Templates**: Pre-configured templates map the three-axis transactional integrity constraints (Type, Subtype, Flow) onto safe default inputs:
+  - **Salary**: Active income, cash receipt.
   - **Pay Blacksmith**: Expense payment for tools/equipment category.
   - **Tavern Feast**: Entertainment expense payment.
-  - **Borrow Gold**: Direct debt accrual inflow.
-  - **Pay Landlord**: Housing rent expense cash outflow.
-  - **Purchase Food**: Market groceries cash outflow.
-  - **Pay Interest**: Interest payment cash outflow.
-- **Form State Pre-filling**: Selecting any template automatically triggers `applyTemplate`, which updates state fields (Class, Subclass, Amount, Payer, Entity, Category, Description, Nature, Flow) and sets both Value Date and Posting Date to the current date. Localized names use a dynamic `t` translations mapping proxy to fallback gracefully to the default template name when custom templates are added by the user.
+  - **Borrow Gold**: Direct debt inflow.
+  - **Pay Landlord**: Housing rent expense outflow.
+  - **Purchase Food**: Market groceries outflow.
+  - **Pay Interest**: Interest payment outflow.
+- **Form State Pre-filling**: Selecting any template automatically triggers `applyTemplate`, which updates state fields (Class, Subclass, Amount, Payer, Entity, Category, Description, Flow) and sets both Value Date and Posting Date to the current date. Localized names use a dynamic `t` translations mapping proxy to fallback gracefully to the default template name when custom templates are added by the user.
 
 ---
 
