@@ -34,7 +34,7 @@ export const en = {
   eliminate: "Delete",
 
   // Settings Manage Titles
-  manage_from: "Manage Origins (From)",
+  manage_from: "Manage Origins/From",
   manage_status: "Manage Statuses",
   manage_category: "Manage Categories",
   manage_subcategory: "Manage Subcategories",
@@ -51,7 +51,7 @@ export const en = {
   income: "Income",
   expense: "Expense",
   amount_gold: "Amount",
-  origin_from: "Origin (From)",
+  origin_from: "Origin/From",
   value_date: "Value Date",
   posting_date: "Posting Date",
   status: "Status",

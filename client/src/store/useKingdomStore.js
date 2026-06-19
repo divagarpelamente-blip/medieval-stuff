@@ -358,8 +358,41 @@ export const useKingdomStore = create((set, get) => ({
       if (transactionsRes.error) console.error('Error fetching transactions:', transactionsRes.error);
       if (balancesRes.error) console.error('Error fetching account balances:', balancesRes.error);
 
+      const txs = (transactionsRes.data || []).map((tx) => ({
+        ...tx,
+        from: tx.origin || tx.from
+      }));
+      
+      // Calculate live gold from transaction history to verify synchronization
+      const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
+      const netCash = txs
+        .filter(t => isCompleted(t.payment_status))
+        .reduce((sum, t) => {
+          const amt = Number(t.amount) || 0;
+          if (t.transaction_type === 'Income') return sum + amt;
+          if (t.transaction_type === 'Expense') return sum - amt;
+          if (t.transaction_type === 'Savings' || t.transaction_type === 'Debt') {
+            if (t.flow === 'inflow') return sum + amt;
+            if (t.flow === 'outflow') return sum - amt;
+          }
+          return sum;
+        }, 0);
+      
+      const startingGold = userId === '00000000-0000-0000-0000-000000000000' ? 5000 : 1000;
+      const calculatedGold = Math.max(0, startingGold + netCash);
+
+      // If calculatedGold is different from state gold, sync it to state and database
+      if (calculatedGold !== get().gold) {
+        set({ gold: calculatedGold });
+        supabase
+          .from('profiles')
+          .update({ gold: calculatedGold })
+          .eq('id', userId)
+          .then();
+      }
+
       set({ 
-        transactions: transactionsRes.data || [],
+        transactions: txs,
         accountBalances: balancesRes.data || []
       });
     } catch (err) {
@@ -442,7 +475,7 @@ export const useKingdomStore = create((set, get) => ({
             payment_status: transactionData.payment_status || 'Completed',
             transaction_subtype: transactionData.transaction_subtype,
             entity: transactionData.entity,
-            from: transactionData.from,
+            origin: transactionData.from,
             target_account: transactionData.target_account,
             source_dest_bank: transactionData.source_dest_bank,
             flow: transactionData.flow,
@@ -456,8 +489,9 @@ export const useKingdomStore = create((set, get) => ({
       }
 
       if (data && data.length > 0) {
+        const savedTx = { ...data[0], from: data[0].origin || data[0].from };
         set((state) => ({
-          transactions: state.transactions.map((t) => (t.id === tempId ? data[0] : t))
+          transactions: state.transactions.map((t) => (t.id === tempId ? savedTx : t))
         }));
       }
 
@@ -529,6 +563,7 @@ export const useKingdomStore = create((set, get) => ({
         payment_status: tx.payment_status || 'Completed',
         transaction_subtype: tx.transaction_subtype,
         entity: tx.entity,
+        origin: tx.from,
         target_account: tx.target_account,
         source_dest_bank: tx.source_dest_bank,
         flow: tx.flow,
@@ -550,7 +585,7 @@ export const useKingdomStore = create((set, get) => ({
           tempIds.forEach((tempId, index) => {
             const matchIdx = nextTxs.findIndex(t => t.id === tempId);
             if (matchIdx !== -1 && data[index]) {
-              nextTxs[matchIdx] = data[index];
+              nextTxs[matchIdx] = { ...data[index], from: data[index].origin || data[index].from };
             }
           });
           return { transactions: nextTxs };

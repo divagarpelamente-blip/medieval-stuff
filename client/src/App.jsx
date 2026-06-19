@@ -1090,7 +1090,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 />
               </div>
               <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Origin (From)</label>
+                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Origin/From</label>
                 <select
                   value={qaFrom}
                   onChange={(e) => setQaFrom(e.target.value)}
@@ -1316,7 +1316,12 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   };
 
   const handleTabChange = (tabId) => {
+    setIsTreasuryMenuOpen(false);
+    setIsNewTxModalOpen(false);
+    setIsMineModalOpen(false);
+
     if (tabId === 'dashboard') {
+      setActiveTab('quests');
       setIsTreasuryMenuOpen(true);
     } else {
       setActiveTab(tabId);
@@ -1416,6 +1421,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           flow: tx.flow,
           transaction_subtype: tx.transaction_subtype,
           entity: tx.entity,
+          origin: tx.from,
           amount: Number(tx.amount),
           description: tx.description,
           value_date: valueDate,
@@ -1535,8 +1541,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         setTxPostingDate(new Date().toISOString().split('T')[0]);
         setTxStatus(statusOptions[0] || 'Pending');
         setTxClass(classOptions[0] || 'Income');
-        setIsMineModalOpen(false);
-        setIsNewTxModalOpen(false);
       } else {
         toast.error(t('err_transaction_failed', { error: res.error }));
       }
@@ -1617,7 +1621,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
           >
-            <div className="bg-[#f4e4bc] w-full max-w-4xl max-h-[80%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-[#f4e4bc] w-full max-w-4xl max-h-[72%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
               <div 
@@ -2614,9 +2618,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </div>
                 </div>
 
-                {/* Row 2: origin (from) / Category / Entity / Amount */}
+                {/* Row 2: origin/from / Category / Entity / Amount */}
                 <div className="grid grid-cols-12 gap-3">
-                  {/* Origin (From) */}
+                  {/* Origin/From */}
                   <div className="col-span-12 sm:col-span-3">
                     <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
                       {t.origin_from}
@@ -2785,7 +2789,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
           >
-            <div className="bg-[#f4e4bc] w-full max-w-6xl h-[88%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-[#f4e4bc] w-full max-w-6xl h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
               <div 
@@ -3144,7 +3148,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
           >
-            <div className="bg-[#f4e4bc] w-full max-w-6xl h-[88%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-[#f4e4bc] w-full max-w-6xl h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
               <div 
@@ -3204,6 +3208,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   balanceSheet={engineData.balanceSheet}
                   t={t}
                   formatNumberCompact={formatNumberCompact}
+                  selectedYears={selectedYears}
+                  selectedQuarters={selectedQuarters}
+                  selectedMonths={selectedMonths}
                 />
               </BaseDashboardTab>
             </div>
@@ -3221,7 +3228,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
           >
-            <div className="bg-[#f4e4bc] w-full max-w-5xl max-h-[82%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-[#f4e4bc] w-full max-w-5xl max-h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
               <div 

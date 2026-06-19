@@ -12,7 +12,7 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
   ];
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[60%] max-w-[480px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-1 flex justify-around items-center z-[60] shadow-2xl">
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[60%] max-w-[480px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-1 flex justify-around items-center z-[120] shadow-2xl">
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id || (item.id === 'dashboard' && (activeTab === 'financial_statement' || activeTab === 'transactions'));

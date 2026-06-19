@@ -30,7 +30,7 @@ export const fr = {
   clear: "Effacer",
   eliminate: "Éliminer",
 
-  manage_from: "Gérer les Origines (From)",
+  manage_from: "Gérer les Origines/From",
   manage_status: "Gérer les Statuts",
   manage_category: "Gérer les Catégories",
   manage_subcategory: "Gérer les Sous-catégories",
@@ -45,7 +45,7 @@ export const fr = {
   income: "Revenu",
   expense: "Dépense",
   amount_gold: "Montant",
-  origin_from: "Origine (From)",
+  origin_from: "Origine/From",
   date: "Date",
   status: "Statut",
   category: "Catégorie",

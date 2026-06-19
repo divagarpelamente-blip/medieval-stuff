@@ -30,7 +30,7 @@ export const de = {
   clear: "Bereinigen",
   eliminate: "Eliminieren",
 
-  manage_from: "Quellen verwalten (From)",
+  manage_from: "Quellen verwalten/From",
   manage_status: "Status verwalten",
   manage_category: "Kategorien verwalten",
   manage_subcategory: "Unterkategorien verwalten",
@@ -45,7 +45,7 @@ export const de = {
   income: "Einnahme",
   expense: "Ausgabe",
   amount_gold: "Menge",
-  origin_from: "Herkunft (From)",
+  origin_from: "Herkunft/From",
   date: "Datum",
   status: "Status",
   category: "Kategorie",

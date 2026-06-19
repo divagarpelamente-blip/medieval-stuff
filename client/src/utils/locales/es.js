@@ -30,7 +30,7 @@ export const es = {
   clear: "Limpiar",
   eliminate: "Eliminar",
 
-  manage_from: "Gestionar Orígenes (From)",
+  manage_from: "Gestionar Orígenes/From",
   manage_status: "Gestionar Estados",
   manage_category: "Gestionar Categorías",
   manage_subcategory: "Gestionar Subcategorías",
@@ -45,7 +45,7 @@ export const es = {
   income: "Ingreso",
   expense: "Gasto",
   amount_gold: "Cantidad",
-  origin_from: "Origen (From)",
+  origin_from: "Origen/From",
   date: "Fecha",
   status: "Estado",
   category: "Categoría",

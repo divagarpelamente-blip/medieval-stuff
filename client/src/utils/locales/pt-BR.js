@@ -30,14 +30,14 @@ export const ptBR = {
   clear: "Limpar",
   eliminate: "Eliminar",
 
-  manage_from: "Gerenciar Origens (From)",
+  manage_from: "Gerenciar Origens/From",
   manage_status: "Gerenciar Status (Estados)",
   manage_category: "Gerenciar Categorias",
   manage_subcategory: "Gerenciar Subcategorias",
   manage_entity: "Gerenciar Entidades (Entities)",
   manage_entityCategory: "Gerenciar Categoria das Entidades",
   manage_month: "Gerenciar Meses",
-
+ 
   register_movement: "Registrar Movimento",
   gold_mine_commerce: "Mina de Ouro & Comércio",
   ledger_transactions: "Livro Razão Geral",
@@ -45,7 +45,7 @@ export const ptBR = {
   income: "Rendimento",
   expense: "Despesa",
   amount_gold: "Quantidade",
-  origin_from: "Origem (From)",
+  origin_from: "Origem/From",
   value_date: "Data de Valor",
   posting_date: "Data de Lançamento",
   status: "Status",

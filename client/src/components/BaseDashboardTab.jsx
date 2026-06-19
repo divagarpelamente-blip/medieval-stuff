@@ -22,7 +22,7 @@ export default function BaseDashboardTab({
   return (
     <div className="flex flex-col flex-grow overflow-hidden h-full">
       {/* Top Navigation Bar: Sub-tabs & Sidebar Toggle */}
-      <div className="px-4 py-2.5 border-b border-[#8b4513]/25 flex flex-col md:flex-row justify-between items-center gap-3 bg-[#faf4e5]/40 z-10">
+      <div className={`px-4 ${subTabs.length > 0 ? 'py-2.5 flex' : 'py-1.5 md:hidden flex'} border-b border-[#8b4513]/25 flex-col md:flex-row justify-between items-center gap-3 bg-[#faf4e5]/40 z-10`}>
         <div className="flex flex-wrap gap-1.5 items-center justify-start md:justify-end w-full">
           {subTabs.map((tab) => {
             const isSel = dashSubTab === tab.id;
@@ -192,7 +192,7 @@ export default function BaseDashboardTab({
               )}
 
               {/* Scrollable Children Content Area */}
-              <div className="flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-8 mt-4 h-full">
+              <div className={`flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-8 ${subTabs.length > 0 ? 'mt-4' : 'mt-1'} h-full`}>
                 {children}
               </div>
             </>

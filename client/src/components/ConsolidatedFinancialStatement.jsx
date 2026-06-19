@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import TreasuryStatements from './TreasuryStatements';
 import RoyalIncomeStatement from './RoyalIncomeStatement';
 
-export default function ConsolidatedFinancialStatement({ incomeStatement, cashFlowStatement, balanceSheet, t, formatNumberCompact }) {
+export default function ConsolidatedFinancialStatement({ incomeStatement, cashFlowStatement, balanceSheet, t, formatNumberCompact, selectedYears, selectedQuarters, selectedMonths }) {
   const [activeTab, setActiveTab] = useState('balanceSheet'); // balanceSheet, pnl, cashFlow
 
   const tabs = [
@@ -45,6 +45,9 @@ export default function ConsolidatedFinancialStatement({ incomeStatement, cashFl
             balanceSheet={balanceSheet}
             t={t}
             formatNumberCompact={formatNumberCompact}
+            selectedYears={selectedYears}
+            selectedQuarters={selectedQuarters}
+            selectedMonths={selectedMonths}
           />
         )}
         {activeTab === 'pnl' && (
@@ -52,6 +55,9 @@ export default function ConsolidatedFinancialStatement({ incomeStatement, cashFl
             incomeStatement={incomeStatement}
             t={t}
             formatNumberCompact={formatNumberCompact}
+            selectedYears={selectedYears}
+            selectedQuarters={selectedQuarters}
+            selectedMonths={selectedMonths}
           />
         )}
         {activeTab === 'cashFlow' && (
@@ -61,6 +67,9 @@ export default function ConsolidatedFinancialStatement({ incomeStatement, cashFl
             balanceSheet={balanceSheet}
             t={t}
             formatNumberCompact={formatNumberCompact}
+            selectedYears={selectedYears}
+            selectedQuarters={selectedQuarters}
+            selectedMonths={selectedMonths}
           />
         )}
       </div>
