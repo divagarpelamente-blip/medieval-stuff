@@ -12,7 +12,7 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
   ];
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[60%] max-w-[480px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-1 flex justify-around items-center z-[120] shadow-2xl">
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[48%] max-w-[384px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-0.5 flex justify-around items-center z-[120] shadow-2xl">
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id || (item.id === 'dashboard' && (activeTab === 'financial_statement' || activeTab === 'transactions'));
@@ -23,7 +23,7 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
             key={item.id}
             onClick={isSupported ? () => onTabChange(item.id) : undefined}
             disabled={!isSupported}
-            className={`w-11 h-11 sm:w-13 sm:h-13 flex flex-col items-center justify-center rounded-lg border transition-all select-none ${
+            className={`w-9 h-9 sm:w-[41px] sm:h-[41px] flex flex-col items-center justify-center rounded-lg border transition-all select-none ${
               !isSupported
                 ? 'border-transparent text-gray-400/50 opacity-40 cursor-not-allowed'
                 : isActive 
@@ -32,8 +32,8 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
             }`}
             title={isSupported ? item.label : `${item.label} (Under Construction)`}
           >
-            <Icon size={14} className="sm:w-4.5 sm:h-4.5 mb-0.5" />
-            <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider">{item.label}</span>
+            <Icon size={11} className="sm:w-3.5 sm:h-3.5 mb-0.5" />
+            <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-wider">{item.label}</span>
           </button>
         );
       })}

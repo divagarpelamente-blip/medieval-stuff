@@ -1,5 +1,6 @@
 import React from 'react';
 import Modal from './Modal';
+import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
 import QuickActionFormFields from './QuickActionFormFields';
 
 const EditQuickActionModal = ({
@@ -52,14 +53,14 @@ const EditQuickActionModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Quick Action Settings"
-      size="max-w-xl"
+      {...STANDARD_MODAL_PROPS}
     >
       <form
         onSubmit={(e) => {
           e.preventDefault();
           onSave();
         }}
-        className="space-y-1.5 p-1 pr-1"
+        className="space-y-1.5 p-1 pr-1 h-full overflow-y-auto custom-scrollbar-subtle"
       >
         <QuickActionFormFields
           qaName={qaName}

@@ -1,6 +1,7 @@
 import React from 'react';
 import BaseDashboardTab from './BaseDashboardTab';
 import ConsolidatedFinancialStatement from './ConsolidatedFinancialStatement';
+import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
 
 const FinancialStatementsModal = ({
   isOpen,
@@ -31,9 +32,9 @@ const FinancialStatementsModal = ({
           onClose();
         }
       }}
-      className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      className={`absolute inset-0 z-[100] flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
     >
-      <div className="bg-[#f4e4bc] w-full max-w-6xl h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
         
         {/* Parchment Texture */}
         <div 

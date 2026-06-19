@@ -220,16 +220,18 @@ The Treasury Dashboard is engineered around a centralized `useDashboardEngine.js
 
 The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the interface. Rather than showing a fixed row globally, the KPIs are filtered dynamically based on the active sub-tab:
 
-1. **Revenues & Expenses (`income_expense`):**
+1. **Income & Expenses (`income_expense`):**
    - **Total Income:** Realized income flow (`transaction_type = 'Income'` and `payment_status = 'Completed'`).
    - **Total Expenses:** Realized expense flow (`transaction_type = 'Expense'` and `payment_status = 'Completed'`).
    - **Net Cash Balance:** Derived from completed movements (`Realized Income - Realized Expense`).
+   - **Visualization Widgets**: Houses the **Financial Position** chart, **Expenses Report** (by category), and **Expenses Detailed** (by entity) charts.
 2. **Payables & Receivables (`payables_receivables`):**
    - **Retired View Status**: In the Personal Finance model, the commercial accounts payable & receivable views have been retired. The sub-tab renders a static deprecation warning placeholder (`payables_receivables_deprecated` key) rather than calculating active pending KPI elements.
 3. **Liabilities (`liabilities`):**
    - **Total Debt, To Be Paid, New Liabilities, Amortizations**: Tracks completed and pending debt items.
-4. **Overview (`overview`) & Financial Ratios (`ratios`):**
-   - The top KPI summary row is hidden, allocating the space entirely to visualization components.
+   - **Visualization Widgets**: Houses the **Debt Evolution** chart.
+4. **Overview & Ratios (`overview`):**
+   - The top KPI summary row is hidden, allocating the space entirely to visualization components. This tab provides a high-level visual and analytical overview combining ratios and top indicators. (The separate "Ratios" tab has been retired).
 
 ### B. Consolidated Financial Statement Engine
 
@@ -239,6 +241,9 @@ The dashboard engine runs an O(N) single-pass calculation loop to construct the 
 2. **Treasury Cash Flow Statement**: Classifies Completed Operating (`Expense` outflows) and Financing (`Income` inflows) cash movements.
 3. **Balance Sheet**: Dynamically aggregates historical balances from the `account_balances` table. If the `account_balances` table is empty, a dynamic transaction-based engine calculates the exact balances of all asset and liability accounts by applying historical transactions starting from the profile's initial cash balance to verify:
    $$\text{Assets} = \text{Liabilities} + \text{Equity (Net Wealth)}$$
+
+> [!NOTE]
+> Financial Statements (Income Statement, Cash Flow, and Balance Sheet) have been fully modularized and removed from the sub-tabs of the Income & Expenses / Overview & Ratios dashboard, rendering instead in their own isolated modal tab view.
 
 ### C. Component-Level Pivoting (Autonomous Charts)
 
@@ -252,12 +257,12 @@ The visualization components possess independent interactive logic to pivot thei
 
 To assist the Lord of the Realm with decision-making, the dashboard couples every visualization chart with a dedicated `RoyalTreasurerInsights` advisor widget.
 
-- **Dynamic Render Architecture**: In the Overview sub-tab, charts are paired side-by-side with an instance of `RoyalTreasurerInsights` on large screens (collapsing to a single-column stack on mobile).
+- **Dynamic Render Architecture**: In the Overview & Ratios sub-tab, charts are paired side-by-side with an instance of `RoyalTreasurerInsights` on large screens (collapsing to a single-column stack on mobile).
 - **Contextual Calculations**:
-  - **Financial Position Advice**: Evaluates if the net balance is positive (`advice_financial_position_positive`) or negative (`advice_financial_position_negative`), dynamically injecting the formatted inflow or deficit value.
-  - **Expenses Distribution Advice**: Identifies the single highest-spending category using the filtered dataset and injects the category name and amount into `advice_expenses_report`.
-  - **Detailed Expenses Advice**: Aggregates filtered expenses by individual entity name to pinpoint the heaviest cash drain, formatting the name and amount into `advice_expenses_detailed`.
-  - **Debt Advice**: Reads current liabilities; if debt exists, it displays `advice_debt_positive` with the formatted amount, otherwise it displays `advice_debt_free`.
+   - **Financial Position Advice**: Evaluates if the net balance is positive (`advice_financial_position_positive`) or negative (`advice_financial_position_negative`), dynamically injecting the formatted inflow or deficit value.
+   - **Expenses Distribution Advice**: Identifies the single highest-spending category using the filtered dataset and injects the category name and amount into `advice_expenses_report`.
+   - **Detailed Expenses Advice**: Aggregates filtered expenses by individual entity name to pinpoint the heaviest cash drain, formatting the name and amount into `advice_expenses_detailed`.
+   - **Debt Advice**: Reads current liabilities; if debt exists, it displays `advice_debt_positive` with the formatted amount, otherwise it displays `advice_debt_free`.
 
 ### E. Compact Currency Formatting Engine (`formatNumberCompact`)
 
@@ -277,7 +282,7 @@ To unify access to different areas of the treasury, the application uses a pop-u
 The menu modal is designed to fit on a single screen without scrolling. The modal uses a `max-w-lg` container, with the content area configured as a centered vertical stack (`flex flex-col gap-3.5 max-w-md mx-auto w-full`):
 
 1. **Register Transaction (Top)**: Opens the transaction entry form (`isNewTxModalOpen = true`) and closes the menu.
-2. **Treasury Dashboard (Middle)**: Opens the dashboard view (`activeTab = 'dashboard'`), sets the default sub-tab to Overview (`dashSubTab = 'overview'`), and closes the menu. This single option merges the previous *Economic Overview*, *Commercial Accounts*, and *Liabilities & Debt* buttons.
+2. **Treasury Dashboard (Middle)**: Opens the dashboard view (`activeTab = 'dashboard'`), sets the default sub-tab to Overview & Ratios (`dashSubTab = 'overview'`), and closes the menu. This single option merges the previous *Economic Overview*, *Commercial Accounts*, and *Liabilities & Debt* buttons.
 3. **General Ledger (Bottom)**: Opens the general transaction book page (`activeTab = 'transactions'`) and closes the menu. To prevent duplicate access actions, the ledger toolbar's "Register Movement" action button has been removed from this page.
 4. **Financial Statements (After General Ledger)**: Opens the consolidated statement tabs (`activeTab = 'financial_statement'`) separately in an isolated modal tab. The button is styled with a distinct, highlighted `menu_primary` (Primary) badge to signal its status as a core financial report.
 
@@ -308,8 +313,9 @@ To streamline the process of entering frequent transactions, the **Register Tran
 - **Manage Quick Actions Configuration View**: A dedicated **Manage Quick Actions** panel inside the Configuration Panel allows users to view, delete, and add custom Quick Actions:
   - **Label Changes**: The field labels have been modernized to use `Source account` (replacing "Source Account / Bank") and `Amount` (replacing "Amount (Gold)").
   - **Layout Refinement**: The read-only `Source Acc. Name` and `Target Acc. Name` fields have been removed to optimize grid space, and the primary selector dropdowns (`Source account` and `Target Account`) automatically expand to occupy `col-span-8` in the 12-column grid.
-  - **Selector Alignment**: The `Select Quick Action:` label renders directly above its dropdown selector in the header.
-  - **Header Action Controls**: The bottom form `EDIT` button has been removed and replaced with a `Save` button (`💾`). All control action buttons (Save `💾`, Delete `🗑️`, Add `➕`) are positioned in the top-right header workspace to the left of the quick action dropdown, displaying only symbols and hiding their text labels.
+  - **Selector Alignment**: The `Choose Quick Action:` dropdown selector is positioned on the rightmost side of the header/title row, to the right of the control buttons.
+  - **Compact Fields View**: All 16 configuration fields are set to compact mode (`isCompact={true}` with input heights of 26px and tighter margins) to guarantee that all fields are fully visible on screen without requiring vertical scrolling.
+  - **Header Action Controls**: The bottom form `EDIT` button has been removed and replaced with a `Save` button (`💾`). All control action buttons (Save `💾`, Delete `🗑️`, Add `➕`) are positioned in the top header workspace to the left of the Choose Quick Action selector, displaying only symbols.
 - **Responsive Layout**: On desktop screens, the Register Transaction modal forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
 - **Transactional Templates**: Pre-configured templates map the three-axis transactional integrity constraints (Type, Subtype, Flow) onto safe default inputs:
   - **Salary**: Active income, cash receipt.

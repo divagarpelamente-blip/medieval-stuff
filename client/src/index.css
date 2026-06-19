@@ -90,19 +90,7 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 50px 100px -20px rgba(0,0,0,1), 0 0 40px rgba(212, 175, 55, 0.15);
   }
   
-  /* Notch simulation for iPad */
-  .game-viewport::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 120px;
-    height: 25px;
-    background: #1c1917;
-    border-radius: 0 0 15px 15px;
-    z-index: 100;
-  }
+
 }
 
 @keyframes float {

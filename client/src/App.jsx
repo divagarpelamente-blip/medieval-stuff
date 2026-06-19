@@ -11,6 +11,7 @@ import bgMap from './assets/Medieval_Town_Backround.png';
 import { useKingdomStore } from './store/useKingdomStore';
 import { Toaster, toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { STANDARD_MODAL_PROPS } from './constants/UI_UX';
 import FlowByCategoryChart from './components/charts/FlowByCategoryChart';
 import TimeEvolutionChart from './components/charts/TimeEvolutionChart';
 import TopEntitiesChart from './components/charts/TopEntitiesChart';
@@ -60,6 +61,7 @@ function App() {
   // Dashboard Page Sub-Tabs and Granularity state
   const [dashSubTab, setDashSubTab] = useState('overview'); // overview, income_expense, payables_receivables
   const [isTreasuryMenuOpen, setIsTreasuryMenuOpen] = useState(false);
+  const [isQuestsModalOpen, setIsQuestsModalOpen] = useState(false);
   const [dashGranularity] = useState('month'); // month, quarter, year
 
   // Unified Sidebar Filter state
@@ -1217,10 +1219,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     setIsTreasuryMenuOpen(false);
     setIsNewTxModalOpen(false);
     setIsMineModalOpen(false);
+    setIsQuestsModalOpen(false);
 
     if (tabId === 'dashboard') {
       setActiveTab('quests');
       setIsTreasuryMenuOpen(true);
+    } else if (tabId === 'quests') {
+      setActiveTab('quests');
+      setIsQuestsModalOpen(true);
     } else {
       setActiveTab(tabId);
     }
@@ -1518,9 +1524,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 setActiveTab('quests');
               }
             }}
-            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            className={`absolute inset-0 z-[100] flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
           >
-            <div className="bg-[#f4e4bc] w-full max-w-4xl max-h-[90%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
               
               {/* Parchment Texture */}
               <div 
@@ -1649,6 +1655,18 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         {/* Navegação Inferior (Estática) */}
         <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
 
+        {/* Modal das Quests (Vazio) */}
+        <Modal
+          isOpen={isQuestsModalOpen}
+          onClose={() => setIsQuestsModalOpen(false)}
+          title={t('quests_modal_title', 'Quests')}
+          {...STANDARD_MODAL_PROPS}
+        >
+          <div className="text-center py-8 text-[#5d4037]/60 italic font-serif">
+            {t('quests_empty_msg', 'No quests registered at this time.')}
+          </div>
+        </Modal>
+
         {/* Modal do Menu da Tesouraria Real */}
         <Modal
           isOpen={isTreasuryMenuOpen}
@@ -1758,9 +1776,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           isOpen={isMineModalOpen}
           onClose={() => setIsMineModalOpen(false)}
           title={t.ledger_transactions}
-          size="max-w-6xl"
+          {...STANDARD_MODAL_PROPS}
         >
-          <div className="space-y-6">
+          <div className="space-y-6 h-full overflow-y-auto custom-scrollbar-subtle pr-1">
             {/* Form Title & Icon */}
             <div className="flex items-center gap-4 border-b border-[#8b4513]/20 pb-4">
               <div className="w-12 h-12 bg-[#8b4513]/10 rounded-full flex items-center justify-center border-2 border-[#8b4513]/20 text-2xl">
@@ -2429,9 +2447,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             setIsTreasuryMenuOpen(true);
           }}
           title={t.register_movement}
-          size="max-w-4xl"
+          {...STANDARD_MODAL_PROPS}
         >
-          <div className="w-full">
+          <div className="w-full h-full overflow-y-auto custom-scrollbar-subtle pr-1">
             {/* Main Form Area */}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="flex items-center justify-end gap-3 border-b border-[#8b4513]/20 pb-2.5 mb-2.5">
@@ -2542,9 +2560,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 setIsTreasuryMenuOpen(true);
               }
             }}
-            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            className={`absolute inset-0 z-[100] flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
           >
-            <div className="bg-[#f4e4bc] w-full max-w-6xl h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
               
               {/* Parchment Texture */}
               <div 
@@ -2870,9 +2888,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 setIsTreasuryMenuOpen(true);
               }
             }}
-            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            className={`absolute inset-0 z-[100] flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
           >
-            <div className="bg-[#f4e4bc] w-full max-w-5xl max-h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
               
               {/* Parchment Texture */}
               <div 

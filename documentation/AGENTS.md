@@ -81,3 +81,19 @@ import BaseDashboardTab from './components/BaseDashboardTab';
   {/* Sub-tab main scrollable charts/content go here */}
 </BaseDashboardTab>
 ```
+
+### 1. Add Read-Only Boundaries
+Append the following section to establish strict file protections:
+
+**CRITICAL DIRECTIVE: READ-ONLY MODULES**
+Under NO circumstances should you modify, refactor, or suggest changes to the following modularized files and directories. They are finalized and maintain strict structural integrity. You may read them for context, but treat them as strictly READ-ONLY:
+* `client/src/components/FinancialStatements/*`
+* `client/src/context/useDashboardEngine.js`
+* `client/src/constants/UI_UX.js`
+* Any file containing the `// @antigravity-ignore` header.
+
+### 2. Add Plan Mode Requirement
+Append the following section to establish execution rules:
+
+**CRITICAL DIRECTIVE: PLAN-FIRST EXECUTION**
+Before writing code, creating new files, or modifying any existing architecture, you MUST always act in "Plan Mode" first. You are required to output a clear, step-by-step proposal detailing exactly which files you intend to touch and a summary of the logic you intend to implement. You must wait for explicit user approval on this plan before executing any actual code modifications.

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl' }) => {
+const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl', align = 'items-center' }) => {
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
@@ -22,9 +22,9 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl' }) 
           onClose();
         }
       }}
-      className="absolute inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
+      className={`absolute inset-0 bg-black/90 z-[100] flex ${align} justify-center p-4 backdrop-blur-sm`}
     >
-      <div className={`bg-[#f4e4bc] w-full ${size} max-h-[88%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
+      <div className={`bg-[#f4e4bc] w-full max-h-[88%] ${size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
         
         {/* Parchment Texture */}
         <div 
