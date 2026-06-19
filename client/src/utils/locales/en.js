@@ -82,8 +82,8 @@ export const en = {
   err_value_exists: "This value already exists in the list!",
 
   // Dashboard General
-  subtab_overview: "Overview",
-  subtab_income_expense: "Revenues & Expenses",
+  subtab_overview: "Overview & Ratios",
+  subtab_income_expense: "Income & Expenses",
   subtab_financial_statement: "Financial Statements",
   subtab_payables_receivables: "Payables & Receivables",
   subtab_liabilities: "Liabilities",

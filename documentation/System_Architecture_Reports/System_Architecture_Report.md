@@ -145,11 +145,11 @@ Persistence and trigger logic is strictly bound to the 4-pillar literal string a
     | id          UUID (PK)              |<----+    | id                   UUID (PK)     |
     | email       TEXT                   |     |    | profile_id           UUID (FK)     |
     | gold        BIGINT                 |     +---o| amount               NUMERIC       |
-    | level       INTEGER                |          | "from"               TEXT          |
+    | level       INTEGER                |          | origin               TEXT          |
     | xp          INTEGER                |          | value_date           DATE          |
-    | updated_at  TIMESTAMPTZ            |          | posting_date         DATE          |
-    +------------------------------------+          | month                TEXT          |
-                                                    | year                 INTEGER       |
+    | settings    JSONB                  |          | posting_date         DATE          |
+    | updated_at  TIMESTAMPTZ            |          | month                TEXT          |
+    +------------------------------------+          | year                 INTEGER       |
                                                     | quarter              TEXT          |
                                                     | payment_status       TEXT          |
                                                     | transaction_type     TEXT (CHECK)  |
@@ -169,23 +169,27 @@ Persistence and trigger logic is strictly bound to the 4-pillar literal string a
 
 #### 1. Table: `profiles`
 
-Represents the lord's metadata and statistics.
+Represents the lord's metadata, configurations, and statistics.
 
 - `id` (`UUID`, PK) - Connected to Supabase Auth.
+- `email` (`TEXT`) - Account email address.
 - `gold` (`BIGINT`) - Real-time wallet balance.
+- `level` (`INTEGER`) - Lord's level based on XP.
+- `xp` (`INTEGER`) - Accumulated experience points from Completed income transactions.
+- `settings` (`JSONB`) - User-specific configurations (templates, lists, mappings, locales).
 
 #### 2. Table: `transactions`
 
 Contains the detailed financial ledger records natively utilizing a modern `snake_case` schema.
 
-- `transaction_type` (`TEXT` - e.g. `'Income'`, `'Expense'`)
+- `transaction_type` (`TEXT` - e.g. `'Income'`, `'Expense'`, `'Asset'`, `'Debt'`)
 - `transaction_subtype` (`TEXT` - e.g. `'Base Salary'`, `'Cash payment'`)
 - `transaction_category` (`TEXT` - High-level grouping, e.g. `'Payroll'`, `'Housing'`)
 - `target_account` (`TEXT` - Destination Chart of Accounts code, e.g. `'711001'`)
 - `source_dest_bank` (`TEXT` - Origin Chart of Accounts code, e.g. `'111001'`)
 - `flow` (`TEXT` - Check: `'inflow'`, `'outflow'`, or `'neutral'`)
 - `entity` (`TEXT` - Specific destination/origin)
-- `"from"` (`TEXT` - Payer/originator of funds)
+- `origin` (`TEXT` - Payer/originator of funds, renamed from `"from"` to prevent reserved SQL keyword conflicts)
 - `value_date` (`DATE` - Expected transaction completion date)
 - `posting_date` (`DATE` - Ledger posting date, defaults to current date)
 - `month`, `year`, `quarter` - Automatically derived calendar attributes from `posting_date` for analytics.
@@ -221,7 +225,7 @@ The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the
    - **Total Expenses:** Realized expense flow (`transaction_type = 'Expense'` and `payment_status = 'Completed'`).
    - **Net Cash Balance:** Derived from completed movements (`Realized Income - Realized Expense`).
 2. **Payables & Receivables (`payables_receivables`):**
-   - **All Payables, Open Payables, All Receivables, Open Receivables, Overdue Rate**: Tracks outstanding budget items (Pending status).
+   - **Retired View Status**: In the Personal Finance model, the commercial accounts payable & receivable views have been retired. The sub-tab renders a static deprecation warning placeholder (`payables_receivables_deprecated` key) rather than calculating active pending KPI elements.
 3. **Liabilities (`liabilities`):**
    - **Total Debt, To Be Paid, New Liabilities, Amortizations**: Tracks completed and pending debt items.
 4. **Overview (`overview`) & Financial Ratios (`ratios`):**
@@ -284,7 +288,19 @@ To maintain a structured user experience and prevent unexpected exits directly b
 - **Escape Key Interception**: A global keyboard event listener in `App.jsx` intercepts the `Escape` key. If the user is currently viewing the dashboard, general ledger, or financial statements sub-menu, pressing `Escape` resets `activeTab` to `'quests'` and simultaneously sets `isTreasuryMenuOpen` to `true`, instantly returning them to the Royal Treasury Menu.
 - **Close Buttons & Backdrop Clicks**: All wrapper exit channels (e.g. clicking the top-right `✕` button or clicking the semi-transparent overlay backdrop of the sub-menus) are hooked to route the user back to the 4-button Treasury Menu modal instead of exiting directly to the quests map.
 
-### C. Quick Actions Templating Engine (Register Transaction Modal Sidebar)
+### C. Layout Constraints & Non-Overlapping Modals
+
+To ensure that full-screen overlay panels never clash with or hide the persistent bottom navigation menu, the layout employs strict sizing and stacking constraints:
+
+- **Persistent Bottom Menu Layering:** The bottom navigation component (`BottomNav.jsx`) is layered above all standard content and dialogs with a high z-index (`z-[120]`).
+- **Modal Height Safety Bounds:** Standard modals are centered vertically using `flex items-center justify-center p-4` and constrained to a maximum height:
+  - Default modal wrapper (`Modal.jsx`) is capped at `max-h-[74%]`.
+  - Financial statements modal layout in `App.jsx` is capped at `max-h-[74%]`.
+  - Configuration panel layout modal in `App.jsx` is capped at `max-h-[72%]`.
+  These bounds prevent components from overlapping the bottom menu on all screen sizes.
+- **Tab Change Transitions:** The `handleTabChange` hook in `App.jsx` automatically closes any active modals (`setIsTreasuryMenuOpen(false)`, `setIsNewTxModalOpen(false)`, `setIsMineModalOpen(false)`) during transitions. Clicking `'dashboard'` sets `activeTab` to `'quests'` and triggers `setIsTreasuryMenuOpen(true)` to open the Treasury menu, synchronizing the bottom navigation highlight state.
+
+### D. Quick Actions Templating Engine (Register Transaction Modal Sidebar)
 
 To streamline the process of entering frequent transactions, the **Register Transaction** modal features a left-aligned **Quick Actions** sidebar:
 

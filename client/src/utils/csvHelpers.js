@@ -6,6 +6,7 @@ export const handleExportCSV = (transactions, t) => {
     'from',
     'value_date',
     'posting_date',
+    'due_date',
     'payment_status',
     'transaction_type',
     'transaction_subtype',
@@ -139,6 +140,8 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
             tx.value_date = val;
           } else if (header === 'posting_date' || header === 'posting date') {
             tx.posting_date = val;
+          } else if (header === 'due_date' || header === 'due date') {
+            tx.due_date = val || null;
           } else {
             tx[header] = val;
           }

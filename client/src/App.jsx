@@ -26,6 +26,12 @@ import TreasuryStatements from './components/TreasuryStatements';
 import ConsolidatedFinancialStatement from './components/ConsolidatedFinancialStatement';
 import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
 import { accountMappings, getAccountName } from './utils/accountMappings';
+import QuickActionFormFields from './components/QuickActionFormFields';
+import EditQuickActionModal from './components/EditQuickActionModal';
+import ManageQuickActionsPanel from './components/ManageQuickActionsPanel';
+import RegisterTransactionForm from './components/RegisterTransactionForm';
+import FinancialStatementsModal from './components/FinancialStatementsModal';
+
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -74,16 +80,20 @@ function App() {
   const [qaName, setQaName] = useState('');
   const [qaIcon, setQaIcon] = useState('⚡');
   const [qaAmount, setQaAmount] = useState('');
-  const [qaFrom, setQaFrom] = useState('Pedro');
-  const [qaClass, setQaClass] = useState('Income');
-  const [qaStatus, setQaStatus] = useState('Pending');
-  const [qaSubClass, setQaSubClass] = useState('Cash receipt');
-  const [qaEntity, setQaEntity] = useState('Salary');
-  const [qaCategory, setQaCategory] = useState('Payroll');
-  const [qaTargetAccount, setQaTargetAccount] = useState('611001');
-  const [qaSourceDestBank, setQaSourceDestBank] = useState('111001');
-  const [qaFlow, setQaFlow] = useState('inflow');
+  const [qaFrom, setQaFrom] = useState('');
+  const [qaClass, setQaClass] = useState('');
+  const [qaStatus, setQaStatus] = useState('');
+  const [qaSubClass, setQaSubClass] = useState('');
+  const [qaEntity, setQaEntity] = useState('');
+  const [qaCategory, setQaCategory] = useState('');
+  const [qaTargetAccount, setQaTargetAccount] = useState('');
+  const [qaSourceDestBank, setQaSourceDestBank] = useState('');
+  const [qaFlow, setQaFlow] = useState('');
   const [qaDescription, setQaDescription] = useState('');
+  const [qaDueDate, setQaDueDate] = useState('');
+  const [qaValueDate, setQaValueDate] = useState('');
+  const [qaPostingDate, setQaPostingDate] = useState('');
+  const [isEditingQa, setIsEditingQa] = useState(false);
 
   // Bind Zustand options
   const fromOptions = useKingdomStore((state) => state.fromOptions);
@@ -461,7 +471,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     return { label, classIncome, classExpense, subReceipt, subPayment, total: classIncome + classExpense + subReceipt + subPayment };
   }).filter((t) => t.total > 0);
 
-  const maxDashTimeVal = Math.max(...dashTimeData.map(t => Math.max(t.income, t.expense)), 1);
+  const maxDashTimeVal = Math.max(...dashTimeData.map(t => Math.max(t.classIncome, t.classExpense)), 1);
 
   let dashTreasurerAdvice;
   if (transactions.length === 0) {
@@ -623,6 +633,78 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     }
   };
 
+  const handleSaveQuickAction = () => {
+    const nameVal = qaName.trim();
+    if (!nameVal) {
+      toast.error(t.err_enter_value);
+      return;
+    }
+    const newTemplateData = {
+      icon: qaIcon || '⚡',
+      data: {
+        from: qaFrom,
+        transaction_type: qaClass,
+        transaction_subtype: qaSubClass,
+        entity: qaEntity,
+        transaction_category: qaCategory,
+        target_account: qaTargetAccount,
+        source_dest_bank: qaSourceDestBank,
+        flow: qaFlow,
+        payment_status: qaStatus,
+        description: qaDescription || `${qaName} action`,
+        amount: qaAmount || '0',
+        due_date: qaDueDate || null,
+        value_date: qaValueDate || null,
+        posting_date: qaPostingDate || null
+      }
+    };
+    const oldName = selectedQaNames[0];
+    editOption('quickAction', oldName, nameVal, newTemplateData);
+    toast.success(`Template "${nameVal}" updated successfully!`);
+    setSelectedQaNames([]);
+    setSelectedQaTemplateName('');
+    setQaName('');
+    setQaDescription('');
+    setQaAmount('');
+    setQaDueDate('');
+    setQaValueDate('');
+    setQaPostingDate('');
+    setQaFrom('');
+    setQaClass('');
+    setQaStatus('');
+    setQaSubClass('');
+    setQaEntity('');
+    setQaCategory('');
+    setQaTargetAccount('');
+    setQaSourceDestBank('');
+    setQaFlow('');
+    setIsEditingQa(false);
+  };
+
+  const handleDeleteQuickAction = () => {
+    selectedQaNames.forEach(name => {
+      deleteOption('quickAction', name);
+    });
+    toast.success(`Deleted template(s)`);
+    setSelectedQaNames([]);
+    setSelectedQaTemplateName('');
+    setQaName('');
+    setQaDescription('');
+    setQaAmount('');
+    setQaDueDate('');
+    setQaValueDate('');
+    setQaPostingDate('');
+    setQaFrom('');
+    setQaClass('');
+    setQaStatus('');
+    setQaSubClass('');
+    setQaEntity('');
+    setQaCategory('');
+    setQaTargetAccount('');
+    setQaSourceDestBank('');
+    setQaFlow('');
+  };
+
   const renderSettingsPanel = () => {
     let title = '';
     let currentList = [];
@@ -662,6 +744,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         title = t.manage_quick_actions || 'Manage Quick Actions';
         currentList = templates;
         break;
+      case 'allActions':
+        title = 'All actions';
+        currentList = templates;
+        break;
       default:
         break;
     }
@@ -692,7 +778,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             flow: qaFlow,
             payment_status: qaStatus,
             description: qaDescription || `${qaName} action`,
-            amount: qaAmount || '0'
+            amount: qaAmount || '0',
+            due_date: qaDueDate || null,
+            value_date: qaValueDate || null,
+            posting_date: qaPostingDate || null
           }
         };
 
@@ -700,6 +789,18 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         setQaName('');
         setQaDescription('');
         setQaAmount('');
+        setQaDueDate('');
+        setQaValueDate('');
+        setQaPostingDate('');
+        setQaFrom('');
+        setQaClass('');
+        setQaStatus('');
+        setQaSubClass('');
+        setQaEntity('');
+        setQaCategory('');
+        setQaTargetAccount('');
+        setQaSourceDestBank('');
+        setQaFlow('');
         toast.success(t('success_added_option', { val: nameVal }));
         return;
       }
@@ -725,49 +826,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       toast.success(t('success_deleted_option', { val }));
     };
 
-    const handleSaveQuickAction = () => {
-      const nameVal = qaName.trim();
-      if (!nameVal) {
-        toast.error(t.err_enter_value);
-        return;
-      }
-      const newTemplateData = {
-        icon: qaIcon || '⚡',
-        data: {
-          from: qaFrom,
-          transaction_type: qaClass,
-          transaction_subtype: qaSubClass,
-          entity: qaEntity,
-          transaction_category: qaCategory,
-          target_account: qaTargetAccount,
-          source_dest_bank: qaSourceDestBank,
-          flow: qaFlow,
-          payment_status: qaStatus,
-          description: qaDescription || `${qaName} action`,
-          amount: qaAmount || '0'
-        }
-      };
-      const oldName = selectedQaNames[0];
-      editOption('quickAction', oldName, nameVal, newTemplateData);
-      toast.success(`Template "${nameVal}" updated successfully!`);
-      setSelectedQaNames([]);
-      setSelectedQaTemplateName('');
-      setQaName('');
-      setQaDescription('');
-      setQaAmount('');
-    };
 
-    const handleDeleteQuickAction = () => {
-      selectedQaNames.forEach(name => {
-        deleteOption('quickAction', name);
-      });
-      toast.success(`Deleted template(s)`);
-      setSelectedQaNames([]);
-      setSelectedQaTemplateName('');
-      setQaName('');
-      setQaDescription('');
-      setQaAmount('');
-    };
 
     return (
       <div className="flex flex-col h-full overflow-hidden">
@@ -777,20 +836,54 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">{title}</h3>
             <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t.official_ledger_editor}</p>
           </div>
-          {selectedSettingType === 'quickAction' && (
+          {(selectedSettingType === 'quickAction' || selectedSettingType === 'allActions') && (
             <div className="flex items-end gap-2.5">
-              {/* Buttons on the left of select quick action */}
+              {/* Buttons */}
               <div className="flex gap-1">
                 {selectedQaNames.length > 0 ? (
                   <>
-                    <button
-                      type="button"
-                      onClick={handleSaveQuickAction}
-                      className="w-[28px] h-[28px] bg-emerald-750 hover:bg-emerald-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
-                      title={t('save', 'Save')}
-                    >
-                      💾
-                    </button>
+                    {selectedSettingType === 'quickAction' && (
+                      <button
+                        type="button"
+                        onClick={handleSaveQuickAction}
+                        className="w-[28px] h-[28px] bg-emerald-750 hover:bg-emerald-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                        title={t('save', 'Save')}
+                      >
+                        💾
+                      </button>
+                    )}
+                    {selectedSettingType === 'allActions' && selectedQaNames.length === 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const tpl = templates.find(t => t.name === selectedQaNames[0]);
+                          if (tpl) {
+                            setSelectedQaTemplateName(tpl.name);
+                            setQaName(tpl.name);
+                            setQaIcon(tpl.icon || '⚡');
+                            setQaFrom(tpl.data.from);
+                            setQaClass(tpl.data.transaction_type);
+                            setQaSubClass(tpl.data.transaction_subtype);
+                            setQaEntity(tpl.data.entity);
+                            setQaCategory(tpl.data.transaction_category);
+                            setQaTargetAccount(tpl.data.target_account);
+                            setQaSourceDestBank(tpl.data.source_dest_bank);
+                            setQaFlow(tpl.data.flow);
+                            setQaStatus(tpl.data.payment_status);
+                            setQaDescription(tpl.data.description || '');
+                            setQaAmount(tpl.data.amount || '');
+                            setQaDueDate(tpl.data.due_date || '');
+                            setQaValueDate(tpl.data.value_date || '');
+                            setQaPostingDate(tpl.data.posting_date || '');
+                            setIsEditingQa(true);
+                          }
+                        }}
+                        className="w-[28px] h-[28px] bg-blue-700 hover:bg-blue-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                        title="Edit Quick Action"
+                      >
+                        ✏️
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleDeleteQuickAction}
@@ -801,309 +894,73 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="submit"
-                    form="quick-action-form"
-                    className="w-[28px] h-[28px] bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
-                    title={t('add', 'Add')}
-                  >
-                    ➕
-                  </button>
+                  selectedSettingType === 'quickAction' && (
+                    <button
+                      type="submit"
+                      form="quick-action-form"
+                      className="w-[28px] h-[28px] bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                      title={t('add', 'Add')}
+                    >
+                      ➕
+                    </button>
+                  )
                 )}
               </div>
 
-              {/* Selector */}
-              <div className="flex flex-col items-start gap-0.5">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80">Select Quick Action:</label>
-                <select
-                  value={selectedQaTemplateName || ''}
-                  onChange={(e) => {
-                    const tplName = e.target.value;
-                    setSelectedQaTemplateName(tplName);
-                    if (tplName) {
-                      const tpl = templates.find(t => t.name === tplName);
-                      if (tpl) {
-                        setQaName(tpl.name);
-                        setQaIcon(tpl.icon || '⚡');
-                        setQaFrom(tpl.data.from);
-                        setQaClass(tpl.data.transaction_type);
-                        setQaSubClass(tpl.data.transaction_subtype);
-                        setQaEntity(tpl.data.entity);
-                        setQaCategory(tpl.data.transaction_category);
-                        setQaTargetAccount(tpl.data.target_account);
-                        setQaSourceDestBank(tpl.data.source_dest_bank);
-                        setQaFlow(tpl.data.flow);
-                        setQaStatus(tpl.data.payment_status);
-                        setQaDescription(tpl.data.description || '');
-                        setQaAmount(tpl.data.amount || '');
-                        setSelectedQaNames([tpl.name]);
-                      }
-                    } else {
-                      setQaName('');
-                      setQaIcon('⚡');
-                      setQaFrom(fromOptions[0] || 'Pedro');
-                      setQaClass(classOptions[0] || 'Income');
-                      setQaSubClass(subClassOptions[0] || 'Cash receipt');
-                      setQaEntity(entityOptions[0] || 'Salary');
-                      setQaCategory(entityMappings[entityOptions[0]] || 'Payroll');
-                      setQaTargetAccount('111001');
-                      setQaSourceDestBank('111001');
-                      setQaFlow('inflow');
-                      setQaStatus('Pending');
-                      setQaDescription('');
-                      setQaAmount('');
-                      setSelectedQaNames([]);
-                    }
-                  }}
-                  className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                >
-                  <option value="">-- Choose Quick Action --</option>
-                  {templates.map(tpl => (
-                    <option key={tpl.name} value={tpl.name}>{tpl.name}</option>
-                  ))}
-                </select>
-              </div>
+              {selectedSettingType === 'quickAction' && (
+                <ManageQuickActionsPanel
+                  qaName={qaName}
+                  setQaName={setQaName}
+                  qaIcon={qaIcon}
+                  setQaIcon={setQaIcon}
+                  qaClass={qaClass}
+                  setQaClass={setQaClass}
+                  qaSubClass={qaSubClass}
+                  setQaSubClass={setQaSubClass}
+                  qaFlow={qaFlow}
+                  setQaFlow={setQaFlow}
+                  qaStatus={qaStatus}
+                  setQaStatus={setQaStatus}
+                  qaFrom={qaFrom}
+                  setQaFrom={setQaFrom}
+                  qaCategory={qaCategory}
+                  setQaCategory={setQaCategory}
+                  qaEntity={qaEntity}
+                  setQaEntity={setQaEntity}
+                  qaAmount={qaAmount}
+                  setQaAmount={setQaAmount}
+                  qaValueDate={qaValueDate}
+                  setQaValueDate={setQaValueDate}
+                  qaDueDate={qaDueDate}
+                  setQaDueDate={setQaDueDate}
+                  qaPostingDate={qaPostingDate}
+                  setQaPostingDate={setQaPostingDate}
+                  qaDescription={qaDescription}
+                  setQaDescription={setQaDescription}
+                  qaSourceDestBank={qaSourceDestBank}
+                  setQaSourceDestBank={setQaSourceDestBank}
+                  qaTargetAccount={qaTargetAccount}
+                  setQaTargetAccount={setQaTargetAccount}
+                  classOptions={classOptions}
+                  subClassOptions={subClassOptions}
+                  statusOptions={statusOptions}
+                  fromOptions={fromOptions}
+                  categoryOptions={categoryOptions}
+                  entityOptions={entityOptions}
+                  entityMappings={entityMappings}
+                  accountMappings={accountMappings}
+                  templates={templates}
+                  selectedQaTemplateName={selectedQaTemplateName}
+                  setSelectedQaTemplateName={setSelectedQaTemplateName}
+                  setSelectedQaNames={setSelectedQaNames}
+                  onSubmit={handleAddOptionSubmit}
+                />
+              )}
             </div>
           )}
         </div>
 
-        {/* Add option form */}
-        {selectedSettingType === 'quickAction' ? (
-          <form id="quick-action-form" onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
-            {/* Row 1: Source Side */}
-            <div className="grid grid-cols-12 gap-3 items-end">
-              <div className="col-span-12 sm:col-span-8">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Source account</label>
-                <select
-                  value={qaSourceDestBank}
-                  onChange={(e) => setQaSourceDestBank(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
-                >
-                  <option value="111001">111001 (Assets Banks CGD)</option>
-                  <option value="111002">111002 (Assets Banks Universo)</option>
-                  <option value="111003">111003 (Assets Banks ActiveBank)</option>
-                  <option value="111004">111004 (Assets Banks Inter(Brasil))</option>
-                  <option value="121001">121001 (Assets Investment app CGD)</option>
-                  <option value="121002">121002 (Assets Investment app Universo)</option>
-                  <option value="121003">121003 (Assets Investment app ActiveBank)</option>
-                  <option value="121004">121004 (Assets Investment app WizInk)</option>
-                  <option value="121005">121005 (Assets Investment app Inter(Brasil))</option>
-                  <option value="131001">131001 (Assets Savings Accounts CGD)</option>
-                  <option value="131002">131002 (Assets Savings Accounts ActiveBank)</option>
-                  <option value="131003">131003 (Assets Savings Accounts Inter(Brasil))</option>
-                  <option value="211001">211001 (Liabilities Loans CGD)</option>
-                  <option value="211002">211002 (Liabilities Loans Universo)</option>
-                  <option value="211003">211003 (Liabilities Loans ActiveBank)</option>
-                  <option value="211004">211004 (Liabilities Loans Inter(Brasil))</option>
-                  <option value="211005">211005 (Liabilities Loans WizInk)</option>
-                  <option value="211006">211006 (Liabilities Loans Cofidis)</option>
-                  <option value="212001">212001 (Liabilities Personal Debts Jota Food)</option>
-                  <option value="212002">212002 (Liabilities Personal Debts Mum Support)</option>
-                  <option value="221001">221001 (Liabilities Credit Cards CGD)</option>
-                  <option value="221002">221002 (Liabilities Credit Cards Universo)</option>
-                  <option value="221003">221003 (Liabilities Credit Cards ActiveBank)</option>
-                  <option value="221004">221004 (Liabilities Credit Cards WizInk)</option>
-                  <option value="221005">221005 (Liabilities Credit Cards Inter(Brasil))</option>
-                  <option value="611001">611001 (Expenses Houses Rent)</option>
-                  <option value="611002">611002 (Expenses Houses Repairs)</option>
-                  <option value="611003">611003 (Expenses Houses Decorations)</option>
-                  <option value="611004">611004 (Expenses Houses Utensils)</option>
-                  <option value="621001">621001 (Expenses Utilities Electricity)</option>
-                  <option value="621002">621002 (Expenses Utilities Gas)</option>
-                  <option value="621003">621003 (Expenses Utilities Water)</option>
-                  <option value="621004">621004 (Expenses Utilities Communications)</option>
-                  <option value="631001">631001 (Expenses Transports Gasoline)</option>
-                  <option value="631002">631002 (Expenses Transports Tolls)</option>
-                  <option value="631003">631003 (Expenses Transports Parking)</option>
-                  <option value="641001">641001 (Expenses Food Supermarket)</option>
-                  <option value="642001">642001 (Expenses Food Tools & Equipment)</option>
-                  <option value="643001">643001 (Expenses Food Clothing)</option>
-                  <option value="651001">651001 (Expenses Health Health Insurance)</option>
-                  <option value="651002">651002 (Expenses Health Medicine)</option>
-                  <option value="651003">651003 (Expenses Health Health Fees)</option>
-                  <option value="651004">651004 (Expenses Health Medical Appointments)</option>
-                  <option value="651005">651005 (Expenses Health Medical Exams)</option>
-                  <option value="661">661 (Expenses Personal Restaurants & Food delivery)</option>
-                  <option value="662">662 (Expenses Personal Shows & Cinema)</option>
-                  <option value="663">663 (Expenses Personal Streaming subscriptions)</option>
-                  <option value="681001">681001 (Expenses Bank Costs & Interests Interest)</option>
-                  <option value="681002">681002 (Expenses Bank Costs & Interests Stamp Duty & Fees)</option>
-                  <option value="711001">711001 (Income Payroll Base Salary)</option>
-                  <option value="711002">711002 (Income Payroll Subsidies)</option>
-                  <option value="711003">711003 (Income Payroll Holiday & Christmas Bonuses)</option>
-                  <option value="712001">712001 (Income Freelance & Services Consulting / Contracts)</option>
-                  <option value="721001">721001 (Income Investments Dividends)</option>
-                  <option value="721002">721002 (Income Investments Bank Interest)</option>
-                  <option value="721003">721003 (Income Investments Capital Gains)</option>
-                  <option value="731001">731001 (Income Windfalls & State IRS Tax Refund)</option>
-                  <option value="731002">731002 (Income Windfalls & State Family Gifts)</option>
-                  <option value="731003">731003 (Income Windfalls & State Cashbacks & Rewards)</option>
-                </select>
-              </div>
-              {/* Flow Selector */}
-              <div className="col-span-12 sm:col-span-2">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Flow</label>
-                <select
-                  value={qaFlow}
-                  onChange={(e) => setQaFlow(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
-                >
-                  <option value="inflow">Inflow</option>
-                  <option value="outflow">Outflow</option>
-                  <option value="neutral">Neutral</option>
-                </select>
-              </div>
-
-              {/* Status Selector */}
-              <div className="col-span-12 sm:col-span-2">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Status</label>
-                <select
-                  value={qaStatus}
-                  onChange={(e) => setQaStatus(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
-                >
-                  {statusOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 2: Target Side */}
-            <div className="grid grid-cols-12 gap-3 items-end">
-              {/* Target Account */}
-              <div className="col-span-12 sm:col-span-8">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Target Account</label>
-                <select
-                  value={qaTargetAccount}
-                  onChange={(e) => setQaTargetAccount(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
-                >
-                  <option value="111001">111001 (Assets Banks CGD)</option>
-                  <option value="111002">111002 (Assets Banks Universo)</option>
-                  <option value="111003">111003 (Assets Banks ActiveBank)</option>
-                  <option value="111004">111004 (Assets Banks Inter(Brasil))</option>
-                  <option value="121001">121001 (Assets Investment app CGD)</option>
-                  <option value="121002">121002 (Assets Investment app Universo)</option>
-                  <option value="121003">121003 (Assets Investment app ActiveBank)</option>
-                  <option value="121004">121004 (Assets Investment app WizInk)</option>
-                  <option value="121005">121005 (Assets Investment app Inter(Brasil))</option>
-                  <option value="131001">131001 (Assets Savings Accounts CGD)</option>
-                  <option value="131002">131002 (Assets Savings Accounts ActiveBank)</option>
-                  <option value="131003">131003 (Assets Savings Accounts Inter(Brasil))</option>
-                  <option value="211001">211001 (Liabilities Loans CGD)</option>
-                  <option value="211002">211002 (Liabilities Loans Universo)</option>
-                  <option value="211003">211003 (Liabilities Loans ActiveBank)</option>
-                  <option value="211004">211004 (Liabilities Loans Inter(Brasil))</option>
-                  <option value="211005">211005 (Liabilities Loans WizInk)</option>
-                  <option value="211006">211006 (Liabilities Loans Cofidis)</option>
-                  <option value="212001">212001 (Liabilities Personal Debts Jota Food)</option>
-                  <option value="212002">212002 (Liabilities Personal Debts Mum Support)</option>
-                  <option value="221001">221001 (Liabilities Credit Cards CGD)</option>
-                  <option value="221002">221002 (Liabilities Credit Cards Universo)</option>
-                  <option value="221003">221003 (Liabilities Credit Cards ActiveBank)</option>
-                  <option value="221004">221004 (Liabilities Credit Cards WizInk)</option>
-                  <option value="221005">221005 (Liabilities Credit Cards Inter(Brasil))</option>
-                  <option value="611001">611001 (Expenses Houses Rent)</option>
-                  <option value="611002">611002 (Expenses Houses Repairs)</option>
-                  <option value="611003">611003 (Expenses Houses Decorations)</option>
-                  <option value="611004">611004 (Expenses Houses Utensils)</option>
-                  <option value="621001">621001 (Expenses Utilities Electricity)</option>
-                  <option value="621002">621002 (Expenses Utilities Gas)</option>
-                  <option value="621003">621003 (Expenses Utilities Water)</option>
-                  <option value="621004">621004 (Expenses Utilities Communications)</option>
-                  <option value="631001">631001 (Expenses Transports Gasoline)</option>
-                  <option value="631002">631002 (Expenses Transports Tolls)</option>
-                  <option value="631003">631003 (Expenses Transports Parking)</option>
-                  <option value="641001">641001 (Expenses Food Supermarket)</option>
-                  <option value="642001">642001 (Expenses Food Tools & Equipment)</option>
-                  <option value="643001">643001 (Expenses Food Clothing)</option>
-                  <option value="651001">651001 (Expenses Health Health Insurance)</option>
-                  <option value="651002">651002 (Expenses Health Medicine)</option>
-                  <option value="651003">651003 (Expenses Health Health Fees)</option>
-                  <option value="651004">651004 (Expenses Health Medical Appointments)</option>
-                  <option value="651005">651005 (Expenses Health Medical Exams)</option>
-                  <option value="661">661 (Expenses Personal Restaurants & Food delivery)</option>
-                  <option value="662">662 (Expenses Personal Shows & Cinema)</option>
-                  <option value="663">663 (Expenses Personal Streaming subscriptions)</option>
-                  <option value="681001">681001 (Expenses Bank Costs & Interests Interest)</option>
-                  <option value="681002">681002 (Expenses Bank Costs & Interests Stamp Duty & Fees)</option>
-                  <option value="711001">711001 (Income Payroll Base Salary)</option>
-                  <option value="711002">711002 (Income Payroll Subsidies)</option>
-                  <option value="711003">711003 (Income Payroll Holiday & Christmas Bonuses)</option>
-                  <option value="712001">712001 (Income Freelance & Services Consulting / Contracts)</option>
-                  <option value="721001">721001 (Income Investments Dividends)</option>
-                  <option value="721002">721002 (Income Investments Bank Interest)</option>
-                  <option value="721003">721003 (Income Investments Capital Gains)</option>
-                  <option value="731001">731001 (Income Windfalls & State IRS Tax Refund)</option>
-                  <option value="731002">731002 (Income Windfalls & State Family Gifts)</option>
-                  <option value="731003">731003 (Income Windfalls & State Cashbacks & Rewards)</option>
-                </select>
-              </div>
-
-              {/* Description */}
-              <div className="col-span-12 sm:col-span-4">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={qaDescription}
-                  onChange={(e) => setQaDescription(e.target.value)}
-                  placeholder="e.g. Custom action"
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                />
-              </div>
-            </div>
-
-            {/* Row 3 & 4 */}
-            <div className="grid grid-cols-12 gap-3 items-end">
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={qaName}
-                  onChange={(e) => setQaName(e.target.value)}
-                  placeholder="e.g. Purchase Wood"
-                  required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                />
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Icon</label>
-                <input
-                  type="text"
-                  value={qaIcon}
-                  onChange={(e) => setQaIcon(e.target.value)}
-                  placeholder="e.g. 🪵"
-                  required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                />
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Amount</label>
-                <input
-                  type="number"
-                  value={qaAmount}
-                  onChange={(e) => setQaAmount(e.target.value)}
-                  placeholder="e.g. 100"
-                  required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
-                />
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Origin/From</label>
-                <select
-                  value={qaFrom}
-                  onChange={(e) => setQaFrom(e.target.value)}
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none"
-                >
-                  {fromOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </form>
-        ) : (
+        {selectedSettingType !== 'quickAction' && selectedSettingType !== 'allActions' && (
           <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
               <div>
@@ -1153,7 +1010,20 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
           {currentList.length > 0 ? (
             selectedSettingType === 'quickAction' ? (
-              <table className="w-full text-left border-collapse text-[10px] font-sans">
+              <div className="p-8 text-center text-xs text-[#5d4037]/75 font-serif italic">
+                Use the form above to add a new quick action or edit an existing one. View all created quick actions under the &quot;All actions&quot; tab.
+              </div>
+            ) : selectedSettingType === 'allActions' ? (
+              <div className="flex flex-col h-full overflow-hidden">
+                {selectedQaNames.length > 0 && (
+                  <div className="flex items-center justify-between bg-[#8b4513]/10 border border-[#8b4513]/20 rounded-lg p-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <span className="text-[9px] font-black uppercase text-[#4b2c20] tracking-wider pl-1">
+                      Selected: <span className="font-bold text-amber-900">{selectedQaNames.length}</span>
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 overflow-y-auto">
+                  <table className="w-full text-left border-collapse text-[10px] font-sans">
                 <thead>
                   <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
                     <th className="py-2 px-2 w-8 text-center">
@@ -1163,26 +1033,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         onChange={(e) => {
                           if (e.target.checked) {
                             setSelectedQaNames(currentList.map(tpl => tpl.name));
-                            if (currentList.length > 0) {
-                              const tpl = currentList[0];
-                              setQaName(tpl.name);
-                              setQaIcon(tpl.icon || '⚡');
-                              setQaFrom(tpl.data.from);
-                              setQaClass(tpl.data.transaction_type);
-                              setQaSubClass(tpl.data.transaction_subtype);
-                              setQaEntity(tpl.data.entity);
-                              setQaCategory(tpl.data.transaction_category);
-                              setQaTargetAccount(tpl.data.target_account);
-                              setQaSourceDestBank(tpl.data.source_dest_bank);
-                              setQaFlow(tpl.data.flow);
-                              setQaStatus(tpl.data.payment_status);
-                              setQaDescription(tpl.data.description || '');
-                              setQaAmount(tpl.data.amount || '');
-                              setSelectedQaTemplateName(tpl.name);
-                            }
                           } else {
                             setSelectedQaNames([]);
-                            setSelectedQaTemplateName('');
                           }
                         }}
                         className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
@@ -1207,25 +1059,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                               let updated;
                               if (e.target.checked) {
                                 updated = [...selectedQaNames, tpl.name];
-                                setQaName(tpl.name);
-                                setQaIcon(tpl.icon || '⚡');
-                                setQaFrom(tpl.data.from);
-                                setQaClass(tpl.data.transaction_type);
-                                setQaSubClass(tpl.data.transaction_subtype);
-                                setQaEntity(tpl.data.entity);
-                                setQaCategory(tpl.data.transaction_category);
-                                setQaTargetAccount(tpl.data.target_account);
-                                setQaSourceDestBank(tpl.data.source_dest_bank);
-                                setQaFlow(tpl.data.flow);
-                                setQaStatus(tpl.data.payment_status);
-                                setQaDescription(tpl.data.description || '');
-                                setQaAmount(tpl.data.amount || '');
-                                setSelectedQaTemplateName(tpl.name);
                               } else {
                                 updated = selectedQaNames.filter(n => n !== tpl.name);
-                                if (selectedQaTemplateName === tpl.name) {
-                                  setSelectedQaTemplateName('');
-                                }
                               }
                               setSelectedQaNames(updated);
                             }}
@@ -1246,6 +1081,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   })}
                 </tbody>
               </table>
+                </div>
+              </div>
             ) : (
               <table className="w-full text-left border-collapse text-[10px] font-sans">
                 <thead>
@@ -1426,6 +1263,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           description: tx.description,
           value_date: valueDate,
           posting_date: postingDate,
+          due_date: tx.due_date || null,
           month,
           year,
           quarter
@@ -1621,7 +1459,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
           >
-            <div className="bg-[#f4e4bc] w-full max-w-4xl max-h-[72%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-[#f4e4bc] w-full max-w-4xl max-h-[90%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
               
               {/* Parchment Texture */}
               <div 
@@ -1667,7 +1505,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     { id: 'entity', label: t.manage_entity, icon: '🏢' },
                     { id: 'category', label: t.manage_entityCategory, icon: '🏷️' },
                     { id: 'month', label: t.manage_month, icon: '📅' },
-                    { id: 'quickAction', label: t.manage_quick_actions || 'Manage Quick Actions', icon: '⚡' }
+                    { id: 'quickAction', label: t.manage_quick_actions || 'Manage Quick Actions', icon: '⚡' },
+                    { id: 'allActions', label: 'All actions', icon: '📋' }
                   ].map((btn) => {
                     const isSel = selectedSettingType === btn.id;
                     return (
@@ -1701,7 +1540,51 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             </div>
           </div>
         )}
-
+        <EditQuickActionModal
+          isOpen={isEditingQa}
+          onClose={() => setIsEditingQa(false)}
+          onSave={handleSaveQuickAction}
+          qaName={qaName}
+          setQaName={setQaName}
+          qaIcon={qaIcon}
+          setQaIcon={setQaIcon}
+          qaClass={qaClass}
+          setQaClass={setQaClass}
+          qaSubClass={qaSubClass}
+          setQaSubClass={setQaSubClass}
+          qaFlow={qaFlow}
+          setQaFlow={setQaFlow}
+          qaStatus={qaStatus}
+          setQaStatus={setQaStatus}
+          qaFrom={qaFrom}
+          setQaFrom={setQaFrom}
+          qaCategory={qaCategory}
+          setQaCategory={setQaCategory}
+          qaEntity={qaEntity}
+          setQaEntity={setQaEntity}
+          qaAmount={qaAmount}
+          setQaAmount={setQaAmount}
+          qaValueDate={qaValueDate}
+          setQaValueDate={setQaValueDate}
+          qaDueDate={qaDueDate}
+          setQaDueDate={setQaDueDate}
+          qaPostingDate={qaPostingDate}
+          setQaPostingDate={setQaPostingDate}
+          qaDescription={qaDescription}
+          setQaDescription={setQaDescription}
+          qaSourceDestBank={qaSourceDestBank}
+          setQaSourceDestBank={setQaSourceDestBank}
+          qaTargetAccount={qaTargetAccount}
+          setQaTargetAccount={setQaTargetAccount}
+          classOptions={classOptions}
+          subClassOptions={subClassOptions}
+          statusOptions={statusOptions}
+          fromOptions={fromOptions}
+          categoryOptions={categoryOptions}
+          entityOptions={entityOptions}
+          entityMappings={entityMappings}
+          accountMappings={accountMappings}
+        />
         {/* Navegação Inferior (Estática) */}
         <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
 
@@ -2548,232 +2431,43 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
               </div>
 
-              {/* Form Fields Grid */}
-              <div className="bg-[#faf4e5]/80 border border-[#8b4513]/30 rounded-xl p-3.5 space-y-3 shadow-sm">
-                
-                {/* Row 1: Class (Type) / SubClass / Flow / Status */}
-                <div className="grid grid-cols-12 gap-3">
-                  {/* Class (Type) */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Class (Type)
-                    </label>
-                    <select
-                      value={txClass}
-                      onChange={(e) => setTxClass(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      {classOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Subclass */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Subclass
-                    </label>
-                    <select
-                      value={txSubClass}
-                      onChange={(e) => setTxSubClass(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      {subClassOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Flow */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Flow
-                    </label>
-                    <select
-                      value={txFlow}
-                      onChange={(e) => setTxFlow(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      <option value="inflow">Inflow</option>
-                      <option value="outflow">Outflow</option>
-                      <option value="neutral">Neutral</option>
-                    </select>
-                  </div>
-
-                  {/* Status */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Status
-                    </label>
-                    <select
-                      value={txStatus}
-                      onChange={(e) => setTxStatus(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      {statusOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 2: origin/from / Category / Entity / Amount */}
-                <div className="grid grid-cols-12 gap-3">
-                  {/* Origin/From */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      {t.origin_from}
-                    </label>
-                    <select
-                      value={txFrom}
-                      onChange={(e) => setTxFrom(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      {fromOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Category */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Category
-                    </label>
-                    <select
-                      value={txCategory}
-                      onChange={(e) => setTxCategory(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    >
-                      {categoryOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Entity */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Entity
-                    </label>
-                    <select
-                      value={txEntity}
-                      onChange={(e) => handleEntityChange(e.target.value)}
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
-                    >
-                      {Object.entries(
-                        entityOptions.reduce((acc, opt) => {
-                          const cat = entityMappings[opt] || 'Uncategorized';
-                          if (!acc[cat]) acc[cat] = [];
-                          acc[cat].push(opt);
-                          return acc;
-                        }, {})
-                      ).map(([cat, opts]) => (
-                        <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
-                          {opts.map((opt) => (
-                            <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Amount */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      {t.amount_gold}
-                    </label>
-                    <input
-                      type="number"
-                      value={txAmount}
-                      onChange={(e) => setTxAmount(e.target.value)}
-                      placeholder={t('placeholder.amount')}
-                      required
-                      min="1"
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 3: Value Date / Posting Date */}
-                <div className="grid grid-cols-12 gap-3">
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Value Date
-                    </label>
-                    <input
-                      type="date"
-                      value={txValueDate}
-                      onChange={(e) => setTxValueDate(e.target.value)}
-                      required
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    />
-                  </div>
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                      Posting Date
-                    </label>
-                    <input
-                      type="date"
-                      value={txPostingDate}
-                      onChange={(e) => setTxPostingDate(e.target.value)}
-                      required
-                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 4: Description */}
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                    {t.description}
-                  </label>
-                  <input
-                    type="text"
-                    value={txDescription}
-                    onChange={(e) => setTxDescription(e.target.value)}
-                    placeholder={t('placeholder.notes')}
-                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                  />
-                </div>
-
-                {/* Row 5: Source Account */}
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                    Source Account
-                  </label>
-                  <select
-                    value={txSourceDestBank}
-                    onChange={(e) => setTxSourceDestBank(e.target.value)}
-                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
-                  >
-                    {Object.entries(accountMappings)
-                      .filter(([code]) => code.startsWith('1') || code.startsWith('2'))
-                      .map(([code, name]) => (
-                        <option key={code} value={code}>{code} - {name}</option>
-                      ))
-                    }
-                  </select>
-                </div>
-
-                {/* Row 6: Target Account */}
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-                    Target Account
-                  </label>
-                  <select
-                    value={txTargetAccount}
-                    onChange={(e) => setTxTargetAccount(e.target.value)}
-                    className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
-                  >
-                    {Object.entries(accountMappings).map(([code, name]) => (
-                      <option key={code} value={code}>{code} - {name}</option>
-                    ))}
-                  </select>
-                </div>
-
-              </div>
+              <RegisterTransactionForm
+                txClass={txClass}
+                setTxClass={setTxClass}
+                txSubClass={txSubClass}
+                setTxSubClass={setTxSubClass}
+                txFlow={txFlow}
+                setTxFlow={setTxFlow}
+                txStatus={txStatus}
+                setTxStatus={setTxStatus}
+                txFrom={txFrom}
+                setTxFrom={setTxFrom}
+                txCategory={txCategory}
+                setTxCategory={setTxCategory}
+                txEntity={txEntity}
+                handleEntityChange={handleEntityChange}
+                txAmount={txAmount}
+                setTxAmount={setTxAmount}
+                txValueDate={txValueDate}
+                setTxValueDate={setTxValueDate}
+                txPostingDate={txPostingDate}
+                setTxPostingDate={setTxPostingDate}
+                txDescription={txDescription}
+                setTxDescription={setTxDescription}
+                txSourceDestBank={txSourceDestBank}
+                setTxSourceDestBank={setTxSourceDestBank}
+                txTargetAccount={txTargetAccount}
+                setTxTargetAccount={setTxTargetAccount}
+                classOptions={classOptions}
+                subClassOptions={subClassOptions}
+                statusOptions={statusOptions}
+                fromOptions={fromOptions}
+                categoryOptions={categoryOptions}
+                entityOptions={entityOptions}
+                entityMappings={entityMappings}
+                accountMappings={accountMappings}
+                t={t}
+              />
             </form>
           </div>
         </Modal>
@@ -2833,8 +2527,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   { id: 'overview', label: t.subtab_overview, icon: '📊' },
                   { id: 'income_expense', label: t.subtab_income_expense, icon: '💸' },
                   { id: 'payables_receivables', label: t.subtab_payables_receivables, icon: '📜' },
-                  { id: 'liabilities', label: t.subtab_liabilities, icon: '🏦' },
-                  { id: 'ratios', label: t.subtab_ratios, icon: '⚖️' }
+                  { id: 'liabilities', label: t.subtab_liabilities, icon: '🏦' }
                 ]}
                 isSidebarOpen={isSidebarOpen}
                 setIsSidebarOpen={setIsSidebarOpen}
@@ -2866,31 +2559,38 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   ] : []
                 }
               >
-                {/* SUBTAB: OVERVIEW */}
+                {/* SUBTAB: OVERVIEW & RATIOS */}
                 {dashSubTab === 'overview' && (
+                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
+                    <div className="text-6xl">⚖️</div>
+                    <div className="space-y-1">
+                      <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Financial Ratios</h3>
+                      <p className="text-xs font-serif italic text-[#5d4037]">Under construction by order of the Royal Treasurer.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* SUBTAB: INCOME & EXPENSES */}
+                {dashSubTab === 'income_expense' && (
                   (() => {
                     const financialPositionInsight = dashNetBalance >= 0 
                       ? t('advice_financial_position_positive', { inflow: formatNumberCompact(dashInflow) }) 
                       : t('advice_financial_position_negative', { balance: formatNumberCompact(dashNetBalance) });
 
-                    const maxCategory = dashCategoryData.length > 0 ? dashCategoryData.reduce((prev, current) => (prev.amount > current.amount) ? prev : current) : null;
+                    const maxCategory = dashCategoryData.length > 0 ? dashCategoryData.reduce((prev, current) => (prev.expense > current.expense) ? prev : current) : null;
                     const expensesReportInsight = maxCategory 
-                      ? t('advice_expenses_report', { category: maxCategory.name, amount: formatNumberCompact(-maxCategory.amount) }) 
+                      ? t('advice_expenses_report', { category: maxCategory["Transaction Category"], amount: formatNumberCompact(maxCategory.expense) }) 
                       : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
 
-                    const expenseTransactions = dashboardFilteredTransactions.filter(tx => tx.transaction_nature === 'accrual' && tx.transaction_flow === 'outflow');
+                    const expenseTransactions = dashboardFilteredTransactions.filter(tx => tx.transaction_type === 'Expense');
                     const entityTotals = expenseTransactions.reduce((acc, tx) => {
-                      acc[tx.entity_name] = (acc[tx.entity_name] || 0) + Number(tx.amount);
+                      acc[tx.entity] = (acc[tx.entity] || 0) + Number(tx.amount);
                       return acc;
                     }, {});
                     const maxEntity = Object.keys(entityTotals).reduce((a, b) => entityTotals[a] > entityTotals[b] ? a : b, null);
                     const expensesDetailedInsight = maxEntity 
-                      ? t('advice_expenses_detailed', { entity: maxEntity, amount: formatNumberCompact(-entityTotals[maxEntity]) }) 
+                      ? t('advice_expenses_detailed', { entity: maxEntity, amount: formatNumberCompact(entityTotals[maxEntity]) }) 
                       : t('advice_empty', '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."');
-
-                    const debtEvolutionInsight = dashDebt > 0 
-                      ? t('advice_debt_positive', { debt: formatNumberCompact(-dashDebt) }) 
-                      : t('advice_debt_free', '"My Liege, the realm is free of debt! A golden age of financial independence is upon us."');
 
                     return (
                       <div className="flex flex-col gap-8">
@@ -2924,13 +2624,86 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           </div>
                         </div>
 
-                        {/* Row 4: Debt Evolution */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px]">
-                            <DebtEvolutionChart timePoints={engineData.timeData} t={t} />
+                        {/* Side-by-side evolution */}
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
+                          <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
+                            <span>{t.flow_comparison} ({dashGranularity === 'month' ? t.gran_month : dashGranularity === 'quarter' ? t.gran_quarter : t.gran_year})</span>
+                            <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.revenue_vs_expense}</span>
+                          </h4>
+                          <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
+                            {dashTimeData.length > 0 ? (
+                              dashTimeData.map((tItem) => {
+                                const incWidth = (tItem.classIncome / maxDashTimeVal) * 100;
+                                const expWidth = (tItem.classExpense / maxDashTimeVal) * 100;
+                                const net = tItem.classIncome - tItem.classExpense;
+                                return (
+                                  <div key={tItem.label} className="space-y-2 border-b border-[#8b4513]/5 pb-2">
+                                    <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
+                                      <span>{tItem.label}</span>
+                                      <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                        {t.balance}: {formatNumberCompact(net)}
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {/* Income bar */}
+                                      <div className="space-y-0.5">
+                                        <div className="flex justify-between text-[8px] text-emerald-800 font-bold font-mono">
+                                          <span>{t.income}</span>
+                                          <span>{formatNumberCompact(tItem.classIncome)}</span>
+                                        </div>
+                                        <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
+                                          <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
+                                        </div>
+                                      </div>
+                                      {/* Expense bar */}
+                                      <div className="space-y-0.5">
+                                        <div className="flex justify-between text-[8px] text-rose-800 font-bold font-mono">
+                                          <span>{t.expense}</span>
+                                          <span>{formatNumberCompact(-tItem.classExpense)}</span>
+                                        </div>
+                                        <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
+                                          <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="h-full flex items-center justify-center">
+                                <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_records_active_period}</p>
+                              </div>
+                            )}
                           </div>
-                          <div className="h-[280px]">
-                            <RoyalTreasurerInsights adviceText={debtEvolutionInsight} t={t} />
+                        </div>
+
+                        {/* Cost breakdown by Entity Category */}
+                        <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
+                          <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
+                            <span>{t.expenses_by_entity_category}</span>
+                            <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.spending_distribution}</span>
+                          </h4>
+                          <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
+                            {entityCatExpenses.length > 0 ? (
+                              entityCatExpenses.map((cat) => {
+                                const pctWidth = (cat.amount / maxEntityCatExp) * 100;
+                                return (
+                                  <div key={cat.name} className="space-y-1">
+                                    <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
+                                      <span>🏷️ {cat.name}</span>
+                                      <span className="font-mono text-rose-700">{formatNumberCompact(-cat.amount)}</span>
+                                    </div>
+                                    <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
+                                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pctWidth}%` }} />
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="h-full flex items-center justify-center">
+                                <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_expenses_registered}</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2938,132 +2711,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   })()
                 )}
 
-                {/* SUBTAB: INCOME & EXPENSES */}
-                {dashSubTab === 'income_expense' && (
-                  <div className="space-y-6">
-
-                    {/* Side-by-side evolution */}
-                    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
-                      <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                        <span>{t.flow_comparison} ({dashGranularity === 'month' ? t.gran_month : dashGranularity === 'quarter' ? t.gran_quarter : t.gran_year})</span>
-                        <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.revenue_vs_expense}</span>
-                      </h4>
-                      <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                        {dashTimeData.length > 0 ? (
-                          dashTimeData.map((tItem) => {
-                            const incWidth = (tItem.income / maxDashTimeVal) * 100;
-                            const expWidth = (tItem.expense / maxDashTimeVal) * 100;
-                            const net = tItem.income - tItem.expense;
-                            return (
-                              <div key={tItem.label} className="space-y-2 border-b border-[#8b4513]/5 pb-2">
-                                <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                  <span>{tItem.label}</span>
-                                  <span className={`font-mono ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                    {t.balance}: {formatNumberCompact(net)}
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  {/* Income bar */}
-                                  <div className="space-y-0.5">
-                                    <div className="flex justify-between text-[8px] text-emerald-800 font-bold font-mono">
-                                      <span>{t.income}</span>
-                                      <span>{formatNumberCompact(tItem.income)}</span>
-                                    </div>
-                                    <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                      <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${incWidth}%` }} />
-                                    </div>
-                                  </div>
-                                  {/* Expense bar */}
-                                  <div className="space-y-0.5">
-                                    <div className="flex justify-between text-[8px] text-rose-800 font-bold font-mono">
-                                      <span>{t.expense}</span>
-                                      <span>{formatNumberCompact(-tItem.expense)}</span>
-                                    </div>
-                                    <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                      <div className="h-full bg-rose-600 rounded-full" style={{ width: `${expWidth}%` }} />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div className="h-full flex items-center justify-center">
-                            <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_records_active_period}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Cost breakdown by Entity Category */}
-                    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
-                      <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider border-b border-[#8b4513]/10 pb-1.5 flex justify-between flex-shrink-0">
-                        <span>{t.expenses_by_entity_category}</span>
-                        <span className="text-[8px] font-sans font-medium text-stone-500 normal-case">{t.spending_distribution}</span>
-                      </h4>
-                      <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar-subtle flex-grow mt-3">
-                        {entityCatExpenses.length > 0 ? (
-                          entityCatExpenses.map((cat) => {
-                            const pctWidth = (cat.amount / maxEntityCatExp) * 100;
-                            return (
-                              <div key={cat.name} className="space-y-1">
-                                <div className="flex justify-between font-bold text-[#4b2c20] text-[10px]">
-                                  <span>🏷️ {cat.name}</span>
-                                  <span className="font-mono text-rose-700">{formatNumberCompact(-cat.amount)}</span>
-                                </div>
-                                <div className="w-full bg-[#faf4e5]/80 h-2 rounded-full overflow-hidden border border-[#8b4513]/10">
-                                  <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pctWidth}%` }} />
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div className="h-full flex items-center justify-center">
-                            <p className="text-center text-[10px] text-[#5d4037]/60 italic font-serif">{t.no_expenses_registered}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Royal Income Statement Ledger (P&L) */}
-                    <RoyalIncomeStatement incomeStatement={engineData.incomeStatement} t={t} formatNumberCompact={formatNumberCompact} />
-                  </div>
-                )}
-
-
                 {/* SUBTAB: PAYABLES & RECEIVABLES */}
                 {dashSubTab === 'payables_receivables' && (
                   (() => {
-                    const prKpi = engineData.payablesReceivablesKpis;
-                    
-                    const evolutionDiff = (prKpi?.all_receivables || 0) - (prKpi?.all_payables || 0);
-                    const evolutionAdvice = evolutionDiff >= 0
-                      ? t('advice_pr_evolution_positive', { diff: formatNumberCompact(evolutionDiff) })
-                      : t('advice_pr_evolution_negative', { diff: formatNumberCompact(Math.abs(evolutionDiff)) });
-
-                    const opCatData = engineData.openPayablesByCategory;
-                    const maxCatPayable = opCatData.length > 0 ? opCatData[0] : null;
-                    const categoryAdvice = maxCatPayable
-                      ? t('advice_pr_category_positive', { category: maxCatPayable.name, amount: formatNumberCompact(maxCatPayable.amount) })
-                      : t('advice_pr_category_none');
-
-                    const opEntData = engineData.openPayablesByEntity;
-                    const maxEntPayable = opEntData.length > 0 ? opEntData[0] : null;
-                    const entityAdvice = maxEntPayable
-                      ? t('advice_pr_entity_positive', { entity: maxEntPayable.name, amount: formatNumberCompact(maxEntPayable.amount) })
-                      : t('advice_pr_entity_none');
-
-                    const opMonthData = engineData.openPayablesByMonth;
-                    const totalOpMonths = opMonthData.reduce((sum, item) => sum + item.amount, 0);
-                    const monthAdvice = totalOpMonths > 0
-                      ? t('advice_pr_month_positive')
-                      : t('advice_pr_month_none');
-
-                    const pmData = engineData.paymentMethodsDistribution;
-                    const maxPM = pmData.length > 0 ? pmData[0] : null;
-                    const paymentMethodAdvice = maxPM
-                      ? t('advice_pr_payment_method_positive', { method: maxPM.name, amount: formatNumberCompact(maxPM.amount) })
-                      : t('advice_pr_payment_method_none');
-
                     return (
                       <div className="flex flex-col items-center justify-center p-8 text-center opacity-60">
                         <div className="text-4xl">📜</div>
@@ -3088,10 +2738,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
                     return (
                       <div className="flex flex-col gap-8">
-                        {/* Spline Evolution Chart */}
+                        {/* Debt Evolution Chart */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="h-[280px] flex items-center justify-center border border-[#8b4513]/10 rounded bg-[#faf4e5]/40 text-xs italic font-serif text-[#5d4037]/60">
-                            {t('liabilities_evolution_chart_deprecated', 'Evolution chart is deprecated.')}
+                          <div className="h-[280px]">
+                            <DebtEvolutionChart timePoints={engineData.timeData} t={t} />
                           </div>
                           <div className="h-[280px]">
                             <RoyalTreasurerInsights adviceText={evolutionAdvice} t={t} />
@@ -3121,101 +2771,34 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     );
                   })()
                 )}
-
-                {/* SUBTAB: RATIOS */}
-                {dashSubTab === 'ratios' && (
-                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
-                    <div className="text-6xl">⚖️</div>
-                    <div className="space-y-1">
-                      <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Financial Ratios</h3>
-                      <p className="text-xs font-serif italic text-[#5d4037]">Under construction by order of the Royal Treasurer.</p>
-                    </div>
-                  </div>
-                )}
               </BaseDashboardTab>
             </div>
           </div>
         )}
 
-        {/* Isolated Financial Statements View */}
-        {activeTab === 'financial_statement' && (
-          <div 
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setActiveTab('quests');
-                setIsTreasuryMenuOpen(true);
-              }
-            }}
-            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
-          >
-            <div className="bg-[#f4e4bc] w-full max-w-6xl h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
-              
-              {/* Parchment Texture */}
-              <div 
-                className="absolute inset-0 pointer-events-none opacity-25 mix-blend-multiply"
-                style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')" }}
-              />
-
-              {/* Ornate Corners */}
-              <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-[#8b4513]/30 rounded-tl-lg pointer-events-none" />
-              <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-[#8b4513]/30 rounded-tr-lg pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-[#8b4513]/30 rounded-bl-lg pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-[#8b4513]/30 rounded-br-lg pointer-events-none" />
-
-              {/* Close Button to return to quests */}
-              <button 
-                type="button"
-                onClick={() => {
-                  setActiveTab('quests');
-                  setIsTreasuryMenuOpen(true);
-                }}
-                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] z-[110] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
-                title={t.back_to_map}
-              >
-                <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
-                <span className="text-[#ffd700] text-lg font-black font-sans">✕</span>
-              </button>
-
-              {/* Header Ribbon */}
-              <div className="relative h-16 flex items-center justify-center z-10 pt-2">
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[110%] h-10 bg-gradient-to-r from-[#8b4513] via-[#5d4037] to-[#8b4513] shadow-lg transform -rotate-1 skew-x-12 z-0 border-y-2 border-[#d4af37]" />
-                <h2 className="title-font text-lg sm:text-xl text-[#ffd700] font-bold uppercase tracking-[0.2em] relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                  {t.subtab_financial_statement || 'Financial Statements'}
-                </h2>
-              </div>
-
-              <BaseDashboardTab
-                t={t}
-                dashSubTab="financial_statement"
-                setDashSubTab={() => {}}
-                subTabs={[]}
-                isSidebarOpen={isSidebarOpen}
-                setIsSidebarOpen={setIsSidebarOpen}
-                selectedYears={selectedYears}
-                setSelectedYears={setSelectedYears}
-                uniqueYearsList={uniqueYearsList}
-                selectedQuarters={selectedQuarters}
-                setSelectedQuarters={setSelectedQuarters}
-                selectedMonths={selectedMonths}
-                setSelectedMonths={setSelectedMonths}
-                monthOptions={monthOptions}
-                isFallbackState={isFallbackState}
-                kpis={[]}
-              >
-                <ConsolidatedFinancialStatement
-                  incomeStatement={engineData.incomeStatement}
-                  cashFlowStatement={engineData.cashFlowStatement}
-                  balanceSheet={engineData.balanceSheet}
-                  t={t}
-                  formatNumberCompact={formatNumberCompact}
-                  selectedYears={selectedYears}
-                  selectedQuarters={selectedQuarters}
-                  selectedMonths={selectedMonths}
-                />
-              </BaseDashboardTab>
-            </div>
-          </div>
-        )}
+        <FinancialStatementsModal
+          isOpen={activeTab === 'financial_statement'}
+          onClose={() => {
+            setActiveTab('quests');
+            setIsTreasuryMenuOpen(true);
+          }}
+          t={t}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          selectedYears={selectedYears}
+          setSelectedYears={setSelectedYears}
+          uniqueYearsList={uniqueYearsList}
+          selectedQuarters={selectedQuarters}
+          setSelectedQuarters={setSelectedQuarters}
+          selectedMonths={selectedMonths}
+          setSelectedMonths={setSelectedMonths}
+          monthOptions={monthOptions}
+          isFallbackState={isFallbackState}
+          incomeStatement={engineData.incomeStatement}
+          cashFlowStatement={engineData.cashFlowStatement}
+          balanceSheet={engineData.balanceSheet}
+          formatNumberCompact={formatNumberCompact}
+        />
 
         {/* Transactions View (Financial Ledger) */}
         {activeTab === 'transactions' && (

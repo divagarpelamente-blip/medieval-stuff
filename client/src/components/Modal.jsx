@@ -24,7 +24,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl' }) 
       }}
       className="absolute inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
     >
-      <div className={`bg-[#f4e4bc] w-full ${size} max-h-[74%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
+      <div className={`bg-[#f4e4bc] w-full ${size} max-h-[88%] rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
         
         {/* Parchment Texture */}
         <div 

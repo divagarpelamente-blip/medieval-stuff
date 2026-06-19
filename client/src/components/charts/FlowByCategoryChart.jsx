@@ -10,11 +10,11 @@ export default function FlowByCategoryChart({ dashCategoryData, t }) {
     const x = e.clientX - rect.left + 15;
     const y = e.clientY - rect.top + 15;
     const amount = type === 'income' ? c.income : c.expense;
-    const total = dashCategoryData.reduce((acc, curr) => acc + curr.totalClass, 0);
+    const total = dashCategoryData.reduce((acc, curr) => acc + curr.total, 0);
     const percentage = total > 0 ? (amount / total) * 100 : 0;
     
     setChartTooltip({
-      name: c.name,
+      name: c["Transaction Category"],
       type,
       amount,
       percentage,
@@ -104,7 +104,7 @@ export default function FlowByCategoryChart({ dashCategoryData, t }) {
             const expHeight = expVal * scale;
             
             return (
-              <g key={c.name}>
+              <g key={c["Transaction Category"] || idx}>
                 {c.income > 0 && (
                   <rect
                     x={x - 13}
@@ -139,7 +139,7 @@ export default function FlowByCategoryChart({ dashCategoryData, t }) {
                   textAnchor="middle"
                   className="text-[9px] font-bold fill-[#4b2c20]"
                 >
-                  {c.name}
+                  {c["Transaction Category"]}
                 </text>
               </g>
             );
