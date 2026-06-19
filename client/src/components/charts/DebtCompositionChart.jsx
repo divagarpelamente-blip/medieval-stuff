@@ -32,7 +32,7 @@ export default function DebtCompositionChart({ debtByType = [], t }) {
 
     return (
       <div className="w-full h-full flex items-center justify-center relative">
-        <div className="relative w-32 h-32 flex-shrink-0">
+        <div className="relative w-24 h-24 flex-shrink-0">
           <svg viewBox="0 0 120 120" className="w-full h-full transform -rotate-90 drop-shadow-md">
             <circle cx="60" cy="60" r={R} fill="transparent" stroke="#faf4e5" strokeWidth="16" />
             {data.map((cat, idx) => {
@@ -41,7 +41,7 @@ export default function DebtCompositionChart({ debtByType = [], t }) {
               const strokeDasharray = `${Circumference} ${Circumference}`;
               const rotation = (accumulatedPercent / 100) * 360;
               accumulatedPercent += percent;
-
+ 
               return (
                 <circle
                   key={cat.name}
@@ -62,12 +62,12 @@ export default function DebtCompositionChart({ debtByType = [], t }) {
             })}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-            <span className="font-sans font-bold text-[7px] text-stone-500 uppercase tracking-widest leading-tight">Total</span>
-            <span className="font-mono font-black text-[12px] text-rose-800 leading-none mt-0.5">{totalDebt.toLocaleString()}g</span>
+            <span className="font-sans font-bold text-[6px] text-stone-500 uppercase tracking-widest leading-tight">Total</span>
+            <span className="font-mono font-black text-[10px] text-rose-800 leading-none mt-0.5">{totalDebt.toLocaleString()}g</span>
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto custom-scrollbar-subtle pr-2 space-y-2 mt-4 ml-4 max-h-[120px]">
+        <div className="flex-1 overflow-y-auto custom-scrollbar-subtle pr-2 space-y-1.5 mt-4 ml-4 max-h-[90px]">
           {data.map((cat, idx) => (
             <div key={cat.name} className="flex items-center gap-2 text-[8.5px]">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: colors[idx % colors.length] }}></div>
@@ -78,11 +78,11 @@ export default function DebtCompositionChart({ debtByType = [], t }) {
       </div>
     );
   };
-
+ 
   return (
-    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col h-full relative">
-      <div className="flex justify-center items-center border-b border-[#8b4513]/10 pb-1.5 flex-shrink-0 mb-3 text-center">
-        <h4 className="title-font text-[11px] font-black text-[#4b2c20] uppercase tracking-wider">
+    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-2.5 shadow-sm flex flex-col h-full relative">
+      <div className="flex justify-center items-center border-b border-[#8b4513]/10 pb-1 flex-shrink-0 mb-2 text-center">
+        <h4 className="title-font text-[10px] font-black text-[#4b2c20] uppercase tracking-wider">
           {t('chart_debt_composition', 'Debt Composition by Type')}
         </h4>
       </div>

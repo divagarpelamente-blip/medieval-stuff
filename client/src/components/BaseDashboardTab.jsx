@@ -156,43 +156,43 @@ export default function BaseDashboardTab({
             </div>
           ) : (
             <>
-              {/* Fixed Top 5-Card Summary KPI Row */}
-              {kpis.length > 0 && (
-                <div className="p-5 sm:p-6 pb-2 space-y-1 flex-shrink-0 z-20 bg-[#f4e4bc] border-b border-[#8b4513]/10">
-                  <div className={`grid grid-cols-1 ${{
-                    1: 'sm:grid-cols-1',
-                    2: 'sm:grid-cols-2',
-                    3: 'sm:grid-cols-3',
-                    4: 'sm:grid-cols-4',
-                    5: 'sm:grid-cols-5',
-                    6: 'sm:grid-cols-6',
-                  }[kpis.length] || 'sm:grid-cols-5'} gap-1 sm:gap-1.5`}>
-                    {kpis.map((kpi, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center"
-                      >
-                        <span className="text-[9px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">
-                          {kpi.label}
-                        </span>
-                        <span
-                          className={`title-font text-sm sm:text-base lg:text-lg font-black mt-0.5 font-mono truncate w-full ${
-                            kpi.colorClass || 'text-[#4b2c20]'
-                          }`}
-                        >
-                          {kpi.value}
-                        </span>
-                        <div className="absolute right-1 bottom-1 text-lg opacity-15">
-                          {kpi.icon}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Scrollable Children Content Area */}
-              <div className={`flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-8 ${subTabs.length > 0 ? 'mt-4' : 'mt-1'} h-full`}>
+               {/* Fixed Top 5-Card Summary KPI Row */}
+               {kpis.length > 0 && (
+                 <div className="py-1 px-4 space-y-1 flex-shrink-0 z-20 bg-[#f4e4bc] border-b border-[#8b4513]/10">
+                   <div className={`grid grid-cols-1 ${{
+                     1: 'sm:grid-cols-1',
+                     2: 'sm:grid-cols-2',
+                     3: 'sm:grid-cols-3',
+                     4: 'sm:grid-cols-4',
+                     5: 'sm:grid-cols-5',
+                     6: 'sm:grid-cols-6',
+                   }[kpis.length] || 'sm:grid-cols-5'} gap-1 sm:gap-1.5`}>
+                     {kpis.map((kpi, idx) => (
+                       <div
+                         key={idx}
+                         className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-0.5 sm:p-1 flex flex-col justify-between items-center shadow-sm relative overflow-hidden text-center"
+                       >
+                         <span className="text-[7.5px] font-black uppercase text-stone-500 tracking-wider font-sans font-bold">
+                           {kpi.label}
+                         </span>
+                         <span
+                           className={`title-font text-[10px] sm:text-xs lg:text-sm font-black font-mono truncate w-full ${
+                             kpi.colorClass || 'text-[#4b2c20]'
+                           }`}
+                         >
+                           {kpi.value}
+                         </span>
+                         <div className="absolute right-0.5 bottom-0.5 text-xs opacity-15">
+                           {kpi.icon}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               )}
+ 
+               {/* Scrollable Children Content Area */}
+               <div className={`flex-1 p-2 sm:p-3 overflow-y-auto custom-scrollbar space-y-4 ${subTabs.length > 0 ? 'mt-1' : 'mt-0.5'} h-full`}>
                 {children}
               </div>
             </>

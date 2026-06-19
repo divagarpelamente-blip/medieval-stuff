@@ -837,7 +837,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t.official_ledger_editor}</p>
           </div>
           {(selectedSettingType === 'quickAction' || selectedSettingType === 'allActions') && (
-            <div className="flex items-end gap-2.5">
+            <div className="flex items-center gap-2.5">
               {/* Buttons */}
               <div className="flex gap-1">
                 {selectedQaNames.length > 0 ? (
@@ -846,7 +846,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       <button
                         type="button"
                         onClick={handleSaveQuickAction}
-                        className="w-[28px] h-[28px] bg-emerald-750 hover:bg-emerald-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                        className="w-[28px] h-[28px] bg-emerald-755 hover:bg-emerald-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
                         title={t('save', 'Save')}
                       >
                         💾
@@ -887,7 +887,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     <button
                       type="button"
                       onClick={handleDeleteQuickAction}
-                      className="w-[28px] h-[28px] bg-red-750 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                      className="w-[28px] h-[28px] bg-red-755 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
                       title={t('delete', 'Delete')}
                     >
                       🗑️
@@ -908,112 +908,171 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               </div>
 
               {selectedSettingType === 'quickAction' && (
-                <ManageQuickActionsPanel
-                  qaName={qaName}
-                  setQaName={setQaName}
-                  qaIcon={qaIcon}
-                  setQaIcon={setQaIcon}
-                  qaClass={qaClass}
-                  setQaClass={setQaClass}
-                  qaSubClass={qaSubClass}
-                  setQaSubClass={setQaSubClass}
-                  qaFlow={qaFlow}
-                  setQaFlow={setQaFlow}
-                  qaStatus={qaStatus}
-                  setQaStatus={setQaStatus}
-                  qaFrom={qaFrom}
-                  setQaFrom={setQaFrom}
-                  qaCategory={qaCategory}
-                  setQaCategory={setQaCategory}
-                  qaEntity={qaEntity}
-                  setQaEntity={setQaEntity}
-                  qaAmount={qaAmount}
-                  setQaAmount={setQaAmount}
-                  qaValueDate={qaValueDate}
-                  setQaValueDate={setQaValueDate}
-                  qaDueDate={qaDueDate}
-                  setQaDueDate={setQaDueDate}
-                  qaPostingDate={qaPostingDate}
-                  setQaPostingDate={setQaPostingDate}
-                  qaDescription={qaDescription}
-                  setQaDescription={setQaDescription}
-                  qaSourceDestBank={qaSourceDestBank}
-                  setQaSourceDestBank={setQaSourceDestBank}
-                  qaTargetAccount={qaTargetAccount}
-                  setQaTargetAccount={setQaTargetAccount}
-                  classOptions={classOptions}
-                  subClassOptions={subClassOptions}
-                  statusOptions={statusOptions}
-                  fromOptions={fromOptions}
-                  categoryOptions={categoryOptions}
-                  entityOptions={entityOptions}
-                  entityMappings={entityMappings}
-                  accountMappings={accountMappings}
-                  templates={templates}
-                  selectedQaTemplateName={selectedQaTemplateName}
-                  setSelectedQaTemplateName={setSelectedQaTemplateName}
-                  setSelectedQaNames={setSelectedQaNames}
-                  onSubmit={handleAddOptionSubmit}
-                />
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80">
+                    Choose Quick Action:
+                  </label>
+                  <select
+                    value={selectedQaTemplateName || ''}
+                    onChange={(e) => {
+                      const tplName = e.target.value;
+                      setSelectedQaTemplateName(tplName);
+                      if (tplName) {
+                        const tpl = templates.find((t) => t.name === tplName);
+                        if (tpl) {
+                          setQaName(tpl.name);
+                          setQaIcon(tpl.icon || '⚡');
+                          setQaFrom(tpl.data.from);
+                          setQaClass(tpl.data.transaction_type);
+                          setQaSubClass(tpl.data.transaction_subtype);
+                          setQaEntity(tpl.data.entity);
+                          setQaCategory(tpl.data.transaction_category);
+                          setQaTargetAccount(tpl.data.target_account);
+                          setQaSourceDestBank(tpl.data.source_dest_bank);
+                          setQaFlow(tpl.data.flow);
+                          setQaStatus(tpl.data.payment_status);
+                          setQaDescription(tpl.data.description || '');
+                          setQaAmount(tpl.data.amount || '');
+                          setQaDueDate(tpl.data.due_date || '');
+                          setQaValueDate(tpl.data.value_date || '');
+                          setQaPostingDate(tpl.data.posting_date || '');
+                          setSelectedQaNames([tpl.name]);
+                        }
+                      } else {
+                        setQaName('');
+                        setQaIcon('⚡');
+                        setQaFrom('');
+                        setQaClass('');
+                        setQaSubClass('');
+                        setQaEntity('');
+                        setQaCategory('');
+                        setQaTargetAccount('');
+                        setQaSourceDestBank('');
+                        setQaFlow('');
+                        setQaStatus('');
+                        setQaDescription('');
+                        setQaAmount('');
+                        setQaDueDate('');
+                        setQaValueDate('');
+                        setQaPostingDate('');
+                        setSelectedQaNames([]);
+                      }
+                    }}
+                    className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="">-- Choose Quick Action --</option>
+                    {templates.map((tpl) => (
+                      <option key={tpl.name} value={tpl.name}>
+                        {tpl.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
           )}
         </div>
 
-        {selectedSettingType !== 'quickAction' && selectedSettingType !== 'allActions' && (
-          <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-              <div>
-                <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                  {t.new_value}
-                </label>
-                <input
-                  type="text"
-                  value={newOptionVal}
-                  onChange={(e) => setNewOptionVal(e.target.value)}
-                  placeholder={t('placeholder.item')}
-                  required
-                  className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                />
-              </div>
+        {selectedSettingType === 'quickAction' ? (
+          <ManageQuickActionsPanel
+            qaName={qaName}
+            setQaName={setQaName}
+            qaIcon={qaIcon}
+            setQaIcon={setQaIcon}
+            qaClass={qaClass}
+            setQaClass={setQaClass}
+            qaSubClass={qaSubClass}
+            setQaSubClass={setQaSubClass}
+            qaFlow={qaFlow}
+            setQaFlow={setQaFlow}
+            qaStatus={qaStatus}
+            setQaStatus={setQaStatus}
+            qaFrom={qaFrom}
+            setQaFrom={setQaFrom}
+            qaCategory={qaCategory}
+            setQaCategory={setQaCategory}
+            qaEntity={qaEntity}
+            setQaEntity={setQaEntity}
+            qaAmount={qaAmount}
+            setQaAmount={setQaAmount}
+            qaValueDate={qaValueDate}
+            setQaValueDate={setQaValueDate}
+            qaDueDate={qaDueDate}
+            setQaDueDate={setQaDueDate}
+            qaPostingDate={qaPostingDate}
+            setQaPostingDate={setQaPostingDate}
+            qaDescription={qaDescription}
+            setQaDescription={setQaDescription}
+            qaSourceDestBank={qaSourceDestBank}
+            setQaSourceDestBank={setQaSourceDestBank}
+            qaTargetAccount={qaTargetAccount}
+            setQaTargetAccount={setQaTargetAccount}
+            classOptions={classOptions}
+            subClassOptions={subClassOptions}
+            statusOptions={statusOptions}
+            fromOptions={fromOptions}
+            categoryOptions={categoryOptions}
+            entityOptions={entityOptions}
+            entityMappings={entityMappings}
+            accountMappings={accountMappings}
+            templates={templates}
+            selectedQaTemplateName={selectedQaTemplateName}
+            setSelectedQaTemplateName={setSelectedQaTemplateName}
+            setSelectedQaNames={setSelectedQaNames}
+            onSubmit={handleAddOptionSubmit}
+          />
+        ) : (
+          <>
+            {selectedSettingType !== 'allActions' && (
+              <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                      {t.new_value}
+                    </label>
+                    <input
+                      type="text"
+                      value={newOptionVal}
+                      onChange={(e) => setNewOptionVal(e.target.value)}
+                      placeholder={t('placeholder.item')}
+                      required
+                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
+                    />
+                  </div>
 
-              {showEntityCategorySelector && (
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    {t.default_category}
-                  </label>
-                  <select
-                    value={newEntityCatVal}
-                    onChange={(e) => setNewEntityCatVal(e.target.value)}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    {categoryOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                  {showEntityCategorySelector && (
+                    <div>
+                      <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                        {t.default_category}
+                      </label>
+                      <select
+                        value={newEntityCatVal}
+                        onChange={(e) => setNewEntityCatVal(e.target.value)}
+                        className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                      >
+                        {categoryOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className={`${!showEntityCategorySelector ? 'sm:col-span-2' : ''} flex justify-end`}>
+                    <button
+                      type="submit"
+                      className="px-3 h-[28px] bg-[#8b4513] text-white font-black text-[9px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
+                    >
+                      ➕ {t.add}
+                    </button>
+                  </div>
                 </div>
-              )}
+              </form>
+            )}
 
-              <div className={`${!showEntityCategorySelector ? 'sm:col-span-2' : ''} flex justify-end`}>
-                <button
-                  type="submit"
-                  className="px-3 h-[28px] bg-[#8b4513] text-white font-black text-[9px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
-                >
-                  ➕ {t.add}
-                </button>
-              </div>
-            </div>
-          </form>
-        )}
-
-        {/* List of items */}
-        <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
-          {currentList.length > 0 ? (
-            selectedSettingType === 'quickAction' ? (
-              <div className="p-8 text-center text-xs text-[#5d4037]/75 font-serif italic">
-                Use the form above to add a new quick action or edit an existing one. View all created quick actions under the &quot;All actions&quot; tab.
-              </div>
-            ) : selectedSettingType === 'allActions' ? (
+            {/* List of items */}
+            <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
+              {currentList.length > 0 ? (
+                selectedSettingType === 'allActions' ? (
               <div className="flex flex-col h-full overflow-hidden">
                 {selectedQaNames.length > 0 && (
                   <div className="flex items-center justify-between bg-[#8b4513]/10 border border-[#8b4513]/20 rounded-lg p-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -1120,7 +1179,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             </p>
           )}
         </div>
-      </div>
+      </>
+    )}
+  </div>
     );
   };
 

@@ -196,14 +196,14 @@ export default function TimeEvolutionChart({ timePoints, t }) {
   };
 
   return (
-    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-4 shadow-sm flex flex-col">
-      <div className="flex justify-center items-center border-b border-[#8b4513]/20 pb-2 mb-4 text-center">
+    <div className="bg-[#faf4e5]/60 border border-[#8b4513]/25 rounded-xl p-2.5 shadow-sm flex flex-col h-full">
+      <div className="flex justify-center items-center border-b border-[#8b4513]/20 pb-1 mb-2 text-center">
         <div>
-          <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">Financial Position</h3>
+          <h3 className="title-font text-xs font-black text-[#4b2c20] uppercase">Financial Position</h3>
         </div>
       </div>
       
-      <div className="flex flex-wrap gap-2 mb-3 justify-center">
+      <div className="flex flex-wrap gap-2 mb-1.5 justify-center">
         <label className="flex items-center gap-1 cursor-pointer">
           <input type="checkbox" checked={activeLines.classIncome} onChange={() => toggleLine('classIncome')} className="accent-emerald-700 w-3 h-3" />
           <span className="text-[9px] font-black text-emerald-800 uppercase">Income</span>
@@ -222,7 +222,7 @@ export default function TimeEvolutionChart({ timePoints, t }) {
         </label>
       </div>
 
-      <div className="flex-grow flex items-center justify-center min-h-[180px]">
+      <div className="flex-grow flex items-center justify-center min-h-[135px]">
         {renderChart()}
       </div>
     </div>
