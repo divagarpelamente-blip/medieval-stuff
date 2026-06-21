@@ -135,12 +135,7 @@
         {t.amount_gold}
       </label>
       <input
-        type="number"
-        value={txAmount}
-        onChange={(e) => setTxAmount(e.target.value)}
-        placeholder={t('placeholder.amount')}
-        required
-        min="1"
+        type="number" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} placeholder={typeof t === 'function' ? t('placeholder.amount', 'Amount') : t['placeholder.amount']} required min="0.01" step="0.01"
         className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
       />
     </div>

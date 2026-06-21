@@ -283,7 +283,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
 
     txsUpToTarget.forEach(tx => {
       const amt = Number(tx.amount) || 0;
-      if (tx.transaction_type === 'Asset') {
+      if (tx.transaction_type === 'Assets') {
         const src = tx.source_dest_bank;
         const tgt = tx.target_account;
         if (tx.flow === 'neutral') {
@@ -294,7 +294,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
         } else if (tx.flow === 'outflow') {
           if (src && src in balances) balances[src] -= amt;
         }
-      } else if (tx.transaction_type === 'Debt') {
+      } else if (tx.transaction_type === 'Liabilities') {
         const src = tx.source_dest_bank;
         const tgt = tx.target_account;
         if (tx.flow === 'inflow') {

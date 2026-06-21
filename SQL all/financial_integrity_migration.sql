@@ -23,7 +23,7 @@ ALTER TABLE public.transactions ADD CONSTRAINT check_double_entry_integrity CHEC
   (transaction_type IN ('Income', 'Expense')) OR
   
   -- Allow other types to bypass if they are not core restricted structures
-  (transaction_type NOT IN ('Receivable', 'Payable', 'Income', 'Expense', 'Debt'))
+  (transaction_type NOT IN ('Receivable', 'Payable', 'Income', 'Expense', 'Liabilities'))
 );
 
 COMMENT ON CONSTRAINT check_double_entry_integrity ON public.transactions IS 'Prevents invalid financial combinations in the double-entry accounting matrix.';

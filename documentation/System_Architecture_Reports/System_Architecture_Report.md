@@ -77,17 +77,17 @@ Located in `client/src/store/useKingdomStore.js`, the Zustand store handles:
 
 To ensure custom settings (such as templates, lists, and language preferences) persist across versions, refactoring cycles, and are isolated to specific user roles (e.g. `admin` vs `lord`), the store employs a dual-persistence strategy:
 
-- **Database Synchronization:** Authenticated users' settings are serialized and stored inside the `profiles.settings` JSONB column in Supabase. Any modification immediately updates the database row.
+- **Database Synchronization:** Authenticated users' settings are serialized and stored inside the `profiles.settings` JSONB column in Supabase. Any modification immediately updates the database row. To prevent database-cached legacy templates from overriding the default list, settings loads evaluate the templates array length: if it is under 15, the store discards the legacy list and initializes the complete set of 44 templates.
 - **LocalStorage Fallback:** Settings are also saved under the `eldoria_` prefix in `localStorage` for instant loadtimes and fallback usage for guest sessions:
   - `eldoria_fromOptions`: List of payers/origins.
   - `eldoria_categoryOptions`: High-level category groupings.
   - `eldoria_entityOptions`: Specific commercial entities/destinations.
   - `eldoria_entityMappings`: Key-value map linking entities to parent categories.
-  - `eldoria_templates`: Customizable Quick Action templates.
+  - `eldoria_templates`: Customizable Quick Action templates. If local storage detects a legacy template array (less than 15 templates), it automatically purges the item to load the new 44 templates.
   - `eldoria_language`: Active locale key.
 
 > [!NOTE]
-> Fixed database taxonomy constraints (e.g., `classOptions`, `subClassOptions`, `statusOptions`, `monthOptions`) have been explicitly purged from LocalStorage initialization loops and exist purely as static state configurations to guarantee Engine stability.
+> Fixed database taxonomy constraints (e.g., `classOptions`, `subClassOptions`, `statusOptions`, `monthOptions`) have been explicitly purged from LocalStorage initialization loops and exist purely as static state configurations to guarantee Engine stability. Quick Action templates are split and rendered by Category headers in the UI dropdown selectors (`App.jsx`) using `<optgroup>` elements mapped from the grouped `templatesByCategory` store selector.
 
 ### C. Batch Ledger Selection & Editing Workspace
 
@@ -312,11 +312,19 @@ To streamline the process of entering frequent transactions, the **Register Tran
 
 - **Dynamic Zustand Store Integration**: Instead of being hardcoded locally, Quick Action templates are loaded dynamically from the Zustand store (`templates` state array) and persisted to LocalStorage (`eldoria_templates`), allowing full customization.
 - **Manage Quick Actions Configuration View**: A dedicated **Manage Quick Actions** panel inside the Configuration Panel allows users to view, delete, and add custom Quick Actions:
-  - **Label Changes**: The field labels have been modernized to use `Source account` (replacing "Source Account / Bank") and `Amount` (replacing "Amount (Gold)").
-  - **Layout Refinement**: The read-only `Source Acc. Name` and `Target Acc. Name` fields have been removed to optimize grid space, and the primary selector dropdowns (`Source account` and `Target Account`) automatically expand to occupy `col-span-8` in the 12-column grid.
-  - **Selector Alignment**: The `Choose Quick Action:` dropdown selector is positioned on the rightmost side of the header/title row, to the right of the control buttons.
-  - **Compact Fields View**: All 16 configuration fields are set to compact mode (`isCompact={true}` with input heights of 26px and tighter margins) organized in a strict 7-row responsive grid to guarantee that all fields are fully visible on screen without requiring vertical scrolling.
-  - **Header Action Controls**: The bottom form `EDIT` button has been removed and replaced with a `Save` button (`💾`). All control action buttons (Save `💾`, Delete `🗑️`, Add `➕`) are positioned in the top header workspace to the left of the Choose Quick Action selector, displaying only symbols.
+    - **Label Changes**: The field labels have been modernized to use `Source account` (replacing "Source Account / Bank") and `Amount` (replacing "Amount (Gold)").
+    - **Layout Refinement**: The read-only `Source Acc. Name` and `Target Acc. Name` fields have been removed to optimize grid space, and the primary selector dropdowns (`Source account` and `Target Account`) automatically expand to occupy `col-span-8` in the 12-column grid.
+    - **Selector Alignment & Title**: The title "Choose Quick Action" is positioned directly above the dropdown select list, with the control buttons placed to its immediate left.
+    - **Compact Fields View**: All 16 configuration fields are set to compact mode (`isCompact={true}` with input heights of 26px and tighter margins) organized in a final, strict 7-row responsive grid layout:
+      - **Row 1**: Name (6 columns) | Spacer (3 columns) | Icon (3 columns)
+      - **Row 2**: Type (3 columns) | Subtype (3 columns) | Flow (3 columns) | Status (3 columns)
+      - **Row 3**: Origin/From (3 columns) | Category (3 columns) | Entity (3 columns) | Amount (3 columns)
+      - **Row 4**: Value Date (3 columns) | Due Date (3 columns) | Posting Date (3 columns)
+      - **Row 5**: Description (6 columns)
+      - **Row 6**: Source Account (6 columns)
+      - **Row 7**: Target Account (6 columns)
+      This structure aligns the Name field exactly with Type + Subtype (columns 1 to 6) and positions the Icon field directly above Status (columns 10 to 12).
+    - **Header Action Controls & Reset**: The bottom form `EDIT` button has been replaced with a `Save` button (`💾`). The top header features a New (`➕`) button for total form reset (clearing all inputs to empty strings and resetting dropdowns to `-- Choose [Field Name] --`) and the Save (`💾`) button to commit templates, displaying only symbols. An optional Delete (`🗑️`) button appears when a template is active.
 - **Responsive Layout**: On desktop screens, the Register Transaction modal forms a side-by-side split layout (`flex md:flex-row gap-6`), while on mobile viewports it collapses gracefully above the form as a vertical stacked panel.
 - **Transactional Templates**: Pre-configured templates map the three-axis transactional integrity constraints (Type, Subtype, Flow) onto safe default inputs:
   - **Salary**: Active income, cash receipt.

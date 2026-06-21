@@ -11,10 +11,10 @@ const QuickActionFormFields = ({
   setQaName,
   qaIcon,
   setQaIcon,
-  qaClass,
-  setQaClass,
-  qaSubClass,
-  setQaSubClass,
+  qaType,
+  setQaType,
+  qaSubType,
+  setQaSubType,
   qaFlow,
   setQaFlow,
   qaStatus,
@@ -40,7 +40,7 @@ const QuickActionFormFields = ({
   qaTargetAccount,
   setQaTargetAccount,
   classOptions = [],
-  subClassOptions = [],
+  subTypeOptions = [],
   statusOptions = [],
   fromOptions = [],
   categoryOptions = [],
@@ -49,6 +49,42 @@ const QuickActionFormFields = ({
   accountMappings = {},
   isCompact = false
 }) => {
+  const subtypeToCategoryMap = {
+    "Banks": ["Bank account", "Saving account"],
+    "Investments": ["Investment account"],
+    "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
+    "Other Debts": ["Other Debts"],
+    "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
+    "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
+    "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
+    "Public Transports": ["Public Transports"],
+    "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy", "Other Incomes"],
+    "Education": ["PhD", "Trainings"],
+    "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
+    "Food & Consumables": ["Food", "Drinks", "Supermarket (Other)"],
+    "Tools & Materials": ["Tools", "Other materials"],
+    "Clothing & Shoes": ["Clothing", "Shoes"],
+    "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
+    "Insurances": ["Insurances"],
+    "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"],
+    "Markets & Personal care": [],
+    "Other Consumables": []
+  };
+
+  let filteredCategories = categoryOptions;
+  if (qaSubType) {
+    const allowedCategories = subtypeToCategoryMap[qaSubType] || [];
+    filteredCategories = categoryOptions.filter(opt => allowedCategories.includes(opt));
+  }
+
+  let filteredEntities = entityOptions;
+  if (qaCategory) {
+    filteredEntities = entityOptions.filter(opt => entityMappings[opt] === qaCategory);
+  } else if (qaSubType) {
+    const allowedCategories = subtypeToCategoryMap[qaSubType] || [];
+    filteredEntities = entityOptions.filter(opt => allowedCategories.includes(entityMappings[opt]));
+  }
+
   const rowSpacing = isCompact ? "space-y-1.5" : "space-y-2";
   const gridGap = isCompact ? "gap-1.5" : "gap-2";
   const labelMargin = "mb-0.5";
@@ -70,7 +106,8 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
           />
         </div>
-        <div className="col-span-12 sm:col-span-6">
+        <div className="hidden sm:block sm:col-span-3" />
+        <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Icon</label>
           <input
             type="text"
@@ -88,8 +125,8 @@ const QuickActionFormFields = ({
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Type</label>
           <select
-            value={qaClass}
-            onChange={(e) => setQaClass(e.target.value)}
+            value={qaType}
+            onChange={(e) => setQaType(e.target.value)}
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50`}
           >
             <option value="">-- Choose Type --</option>
@@ -101,12 +138,12 @@ const QuickActionFormFields = ({
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Subtype</label>
           <select
-            value={qaSubClass}
-            onChange={(e) => setQaSubClass(e.target.value)}
+            value={qaSubType}
+            onChange={(e) => setQaSubType(e.target.value)}
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50`}
           >
             <option value="">-- Choose Subtype --</option>
-            {subClassOptions.map((opt) => (
+            {subTypeOptions.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
@@ -162,7 +199,7 @@ const QuickActionFormFields = ({
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50`}
           >
             <option value="">-- Choose Category --</option>
-            {categoryOptions.map((opt) => (
+            {filteredCategories.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
@@ -176,7 +213,7 @@ const QuickActionFormFields = ({
           >
             <option value="">-- Choose Entity --</option>
             {Object.entries(
-              entityOptions.reduce((acc, opt) => {
+              filteredEntities.reduce((acc, opt) => {
                 const cat = entityMappings[opt] || 'Uncategorized';
                 if (!acc[cat]) acc[cat] = [];
                 acc[cat].push(opt);
@@ -194,10 +231,7 @@ const QuickActionFormFields = ({
         <div className="col-span-12 sm:col-span-3">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Amount</label>
           <input
-            type="number"
-            value={qaAmount}
-            onChange={(e) => setQaAmount(e.target.value)}
-            placeholder="Amount"
+            type="number" value={qaAmount} onChange={(e) => setQaAmount(e.target.value)} placeholder="Amount" min="0.01" step="0.01"
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono`}
           />
         </div>
@@ -257,9 +291,8 @@ const QuickActionFormFields = ({
             onChange={(e) => setQaSourceDestBank(e.target.value)}
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
           >
-            <option value="">-- Choose Source --</option>
+            <option value="">-- Choose Source Account --</option>
             {Object.entries(accountMappings)
-              .filter(([code]) => code.startsWith('1') || code.startsWith('2'))
               .map(([code, name]) => (
                 <option key={code} value={code}>{code} - {name}</option>
               ))
@@ -277,7 +310,7 @@ const QuickActionFormFields = ({
             onChange={(e) => setQaTargetAccount(e.target.value)}
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
           >
-            <option value="">-- Choose Target --</option>
+            <option value="">-- Choose Target Account --</option>
             {Object.entries(accountMappings).map(([code, name]) => (
               <option key={code} value={code}>{code} - {name}</option>
             ))}

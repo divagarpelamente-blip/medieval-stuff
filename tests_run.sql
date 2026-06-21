@@ -29,7 +29,7 @@ INSERT INTO public.transactions (
     CURRENT_DATE,
     CURRENT_DATE,
     'Completed',
-    'Asset',
+    'Assets',
     'Transfers',
     'CGD',
     'Banking',

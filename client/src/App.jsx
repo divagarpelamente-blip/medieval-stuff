@@ -25,7 +25,7 @@ import BaseDashboardTab from './components/BaseDashboardTab';
 import RoyalIncomeStatement from './components/RoyalIncomeStatement';
 import TreasuryStatements from './components/TreasuryStatements';
 import ConsolidatedFinancialStatement from './components/ConsolidatedFinancialStatement';
-import { handleExportCSV, handleImportCSV } from './utils/csvHelpers';
+import { handleExportCSV, handleImportCSV, handleExportAllActionsCSV, handleImportQuickActionsCSV } from './utils/csvHelpers';
 import { accountMappings, getAccountName } from './utils/accountMappings';
 import QuickActionFormFields from './components/QuickActionFormFields';
 import EditQuickActionModal from './components/EditQuickActionModal';
@@ -36,11 +36,34 @@ import FinancialStatementsModal from './components/FinancialStatementsModal';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
+const subtypeToCategoryMap = {
+  "Banks": ["Bank account", "Saving account"],
+  "Investments": ["Investment account"],
+  "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
+  "Other Debts": ["Other Debts"],
+  "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
+  "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
+  "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
+  "Public Transports": ["Public Transports"],
+  "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy", "Other Incomes"],
+  "Education": ["PhD", "Trainings"],
+  "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
+  "Food & Consumables": ["Food", "Drinks", "Supermarket (Other)"],
+  "Tools & Materials": ["Tools", "Other materials"],
+  "Clothing & Shoes": ["Clothing", "Shoes"],
+  "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
+  "Insurances": ["Insurances"],
+  "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"],
+  "Markets & Personal care": [],
+  "Other Consumables": []
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('quests');
   const [isMineModalOpen, setIsMineModalOpen] = useState(false);
   const [isNewTxModalOpen, setIsNewTxModalOpen] = useState(false);
   const fileInputRef = useRef(null);
+  const qaFileInputRef = useRef(null);
 
   // Selection & inline editing state for Ledger Transactions
   const [selectedTxIds, setSelectedTxIds] = useState([]);
@@ -169,20 +192,21 @@ function App() {
     }
   };
 
-  const [txClass, setTxClass] = useState('Expense');
+  const [txClass, setTxClass] = useState('');
   const [txAmount, setTxAmount] = useState('');
-  const [txFrom, setTxFrom] = useState('Pedro');
+  const [txFrom, setTxFrom] = useState('');
   const [txValueDate, setTxValueDate] = useState(new Date().toISOString().split('T')[0]);
   const [txPostingDate, setTxPostingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [txStatus, setTxStatus] = useState('Pending');
-  const [txSubClass, setTxSubClass] = useState('Rent');
-  const [txEntity, setTxEntity] = useState('Rent');
-  const [txCategory, setTxCategory] = useState('Housing');
+  const [txDueDate, setTxDueDate] = useState('');
+  const [txStatus, setTxStatus] = useState('');
+  const [txSubClass, setTxSubClass] = useState('');
+  const [txEntity, setTxEntity] = useState('');
+  const [txCategory, setTxCategory] = useState('');
   const [txSubCategory] = useState('');
   const [txDescription, setTxDescription] = useState('');
-  const [txTargetAccount, setTxTargetAccount] = useState('611001');
-  const [txSourceDestBank, setTxSourceDestBank] = useState('111001');
-  const [txFlow, setTxFlow] = useState('outflow');
+  const [txTargetAccount, setTxTargetAccount] = useState('');
+  const [txSourceDestBank, setTxSourceDestBank] = useState('');
+  const [txFlow, setTxFlow] = useState('');
 
   const entityToTargetAccount = {
     "Salary": "711001",
@@ -558,31 +582,31 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
   // Sincronizar estados locais do formulário quando as opções mudarem no store
   useEffect(() => {
-    if (fromOptions && !fromOptions.includes(txFrom)) {
+    if (txFrom !== '' && fromOptions && !fromOptions.includes(txFrom)) {
       setTxFrom(fromOptions[0] || '');
     }
   }, [fromOptions, txFrom]);
 
   useEffect(() => {
-    if (statusOptions && !statusOptions.includes(txStatus)) {
+    if (txStatus !== '' && statusOptions && !statusOptions.includes(txStatus)) {
       setTxStatus(statusOptions[0] || '');
     }
   }, [statusOptions, txStatus]);
 
   useEffect(() => {
-    if (classOptions && !classOptions.includes(txClass)) {
+    if (txClass !== '' && classOptions && !classOptions.includes(txClass)) {
       setTxClass(classOptions[0] || '');
     }
   }, [classOptions, txClass]);
 
   useEffect(() => {
-    if (subClassOptions && !subClassOptions.includes(txSubClass)) {
+    if (txSubClass !== '' && subClassOptions && !subClassOptions.includes(txSubClass)) {
       setTxSubClass(subClassOptions[0] || '');
     }
   }, [subClassOptions, txSubClass]);
 
   useEffect(() => {
-    if (entityOptions && !entityOptions.includes(txEntity)) {
+    if (txEntity !== '' && entityOptions && !entityOptions.includes(txEntity)) {
       const firstEntity = entityOptions[0] || '';
       setTxEntity(firstEntity);
       setTxCategory(entityMappings[firstEntity] || categoryOptions[0] || '');
@@ -590,37 +614,37 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   }, [entityOptions, entityMappings, txEntity, categoryOptions]);
 
   useEffect(() => {
-    if (categoryOptions && !categoryOptions.includes(txCategory)) {
+    if (txCategory !== '' && categoryOptions && !categoryOptions.includes(txCategory)) {
       setTxCategory(categoryOptions[0] || '');
     }
   }, [categoryOptions, txCategory]);
 
   useEffect(() => {
-    if (fromOptions && !fromOptions.includes(qaFrom)) {
+    if (qaFrom !== '' && fromOptions && !fromOptions.includes(qaFrom)) {
       setQaFrom(fromOptions[0] || '');
     }
   }, [fromOptions, qaFrom]);
 
   useEffect(() => {
-    if (statusOptions && !statusOptions.includes(qaStatus)) {
+    if (qaStatus !== '' && statusOptions && !statusOptions.includes(qaStatus)) {
       setQaStatus(statusOptions[0] || '');
     }
   }, [statusOptions, qaStatus]);
 
   useEffect(() => {
-    if (classOptions && !classOptions.includes(qaClass)) {
+    if (qaClass !== '' && classOptions && !classOptions.includes(qaClass)) {
       setQaClass(classOptions[0] || '');
     }
   }, [classOptions, qaClass]);
 
   useEffect(() => {
-    if (subClassOptions && !subClassOptions.includes(qaSubClass)) {
+    if (qaSubClass !== '' && subClassOptions && !subClassOptions.includes(qaSubClass)) {
       setQaSubClass(subClassOptions[0] || '');
     }
   }, [subClassOptions, qaSubClass]);
 
   useEffect(() => {
-    if (entityOptions && !entityOptions.includes(qaEntity)) {
+    if (qaEntity !== '' && entityOptions && !entityOptions.includes(qaEntity)) {
       const firstEntity = entityOptions[0] || '';
       setQaEntity(firstEntity);
       setQaCategory(entityMappings[firstEntity] || categoryOptions[0] || '');
@@ -907,13 +931,35 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     </button>
                   )
                 )}
+                {selectedSettingType === 'allActions' && (
+                  <button
+                    type="button"
+                    onClick={() => handleExportAllActionsCSV(templates, t)}
+                    className="w-[28px] h-[28px] bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
+                    title="Export All Actions to CSV"
+                  >
+                    📤
+                  </button>
+                )}
               </div>
 
               {selectedSettingType === 'quickAction' && (
                 <div className="flex items-center gap-1.5">
-                  <label className="text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80">
-                    Choose Quick Action:
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => qaFileInputRef.current.click()}
+                    className="px-2 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                    title={typeof t === 'function' ? t('import_csv', 'Import CSV') : (t.import_csv || "Import CSV")}
+                  >
+                    <span>📥</span> Import
+                  </button>
+                  <input
+                    type="file"
+                    ref={qaFileInputRef}
+                    onChange={importQuickActionsCSV}
+                    accept=".csv"
+                    className="hidden"
+                  />
                   <select
                     value={selectedQaTemplateName || ''}
                     onChange={(e) => {
@@ -1188,17 +1234,19 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   };
 
   const resetFormState = () => {
-    setTxClass('Income');
+    setTxClass('');
     setTxAmount('');
-    setTxFrom(fromOptions[0] || 'Pedro');
+    setTxFrom('');
     setTxValueDate(new Date().toISOString().split('T')[0]);
     setTxPostingDate(new Date().toISOString().split('T')[0]);
-    setTxStatus(statusOptions[0] || 'Pending');
-    setTxClass(classOptions[0] || 'Income');
-    setTxSubClass(subClassOptions[0] || 'Cash receipt');
-    setTxEntity(entityOptions[0] || 'Salary');
-    setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
+    setTxStatus('');
+    setTxSubClass('');
+    setTxEntity('');
+    setTxCategory('');
     setTxDescription('');
+    setTxTargetAccount('');
+    setTxSourceDestBank('');
+    setTxFlow('');
   };
 
   const handleMineClick = () => {
@@ -1234,6 +1282,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
   const exportCSV = () => handleExportCSV(transactions, t);
   const importCSV = (e) => handleImportCSV(e, { t, fromOptions, registerTransactions, GUEST_PROFILE_ID });
+  const importQuickActionsCSV = (e) => handleImportQuickActionsCSV(e, { t, addOption, templates });
 
   const handleToggleSelectAll = () => {
     if (selectedTxIds.length === transactions.length) {
@@ -1386,12 +1435,36 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (!txAmount || isNaN(txAmount) || Number(txAmount) <= 0) {
-        toast.error(t.err_invalid_amount);
+      if (!txClass) {
+        toast.error("Erro de Validação: Escolha um Tipo.");
+        return;
+      }
+      if (!txSubClass) {
+        toast.error("Erro de Validação: Escolha um Subtipo.");
+        return;
+      }
+      if (!txFlow) {
+        toast.error("Erro de Validação: Escolha um Fluxo.");
+        return;
+      }
+      if (!txStatus) {
+        toast.error("Erro de Validação: Escolha um Status.");
         return;
       }
       if (!txFrom) {
-        toast.error(t.err_invalid_from);
+        toast.error(t.err_invalid_from || "Escolha uma Origem/De.");
+        return;
+      }
+      if (!txCategory) {
+        toast.error("Erro de Validação: Escolha uma Categoria.");
+        return;
+      }
+      if (!txEntity) {
+        toast.error("Erro de Validação: Escolha uma Entidade.");
+        return;
+      }
+      if (!txAmount || isNaN(txAmount) || Number(txAmount) <= 0) {
+        toast.error(t.err_invalid_amount);
         return;
       }
 
@@ -1401,11 +1474,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       const safeSource = txSourceDestBank || '';
 
       if (!accountCodeRegex.test(safeTarget)) {
-        toast.error(`Erro de Validação: Código da Conta de Destino (Target Account: "${safeTarget}") deve ter entre 3 e 6 dígitos.`);
+        toast.error(`Erro de Validação: Código da Conta de Destino (Target Account) deve ter entre 3 e 6 dígitos.`);
         return;
       }
       if (!accountCodeRegex.test(safeSource)) {
-        toast.error(`Erro de Validação: Código da Conta de Origem (Source account: "${safeSource}") deve ter entre 3 e 6 dígitos.`);
+        toast.error(`Erro de Validação: Código da Conta de Origem (Source account) deve ter entre 3 e 6 dígitos.`);
         return;
       }
 
@@ -1435,17 +1508,17 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         );
         setTxAmount('');
         setTxDescription('');
-        setTxFrom(fromOptions[0] || 'Pedro');
-        setTxSubClass(subClassOptions[0] || 'Cash receipt');
-        setTxEntity(entityOptions[0] || 'Salary');
-        setTxCategory(entityMappings[entityOptions[0]] || 'Payroll');
-        setTxTargetAccount('711001');
-        setTxSourceDestBank('111001');
-        setTxFlow('inflow');
+        setTxFrom('');
+        setTxSubClass('');
+        setTxEntity('');
+        setTxCategory('');
+        setTxTargetAccount('');
+        setTxSourceDestBank('');
+        setTxFlow('');
         setTxValueDate(new Date().toISOString().split('T')[0]);
         setTxPostingDate(new Date().toISOString().split('T')[0]);
-        setTxStatus(statusOptions[0] || 'Pending');
-        setTxClass(classOptions[0] || 'Income');
+        setTxStatus('');
+        setTxClass('');
       } else {
         toast.error(t('err_transaction_failed', { error: res.error }));
       }

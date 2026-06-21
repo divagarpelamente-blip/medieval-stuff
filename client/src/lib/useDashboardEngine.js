@@ -10,7 +10,7 @@ const formatNumberCompact = (num) => {
   else if (absNum >= 1.0e9) formattedNum = (absNum / 1.0e9).toFixed(1) + "B";
   else if (absNum >= 1.0e6) formattedNum = (absNum / 1.0e6).toFixed(1) + "M";
   else if (absNum >= 1.0e3) formattedNum = (absNum / 1.0e3).toFixed(1) + "K";
-  
+
   if (num > 0) return `+${formattedNum} / g`;
   return `(${formattedNum}) / g`;
 };
@@ -30,7 +30,7 @@ export function useDashboardEngine(filteredTransactions = []) {
     const safeAllTxs = allTxs || [];
     const safeBalances = accountBalances || [];
     const entityMappings = useKingdomStore.getState().entityMappings || {};
-    
+
     // Status checker for completed cash flows
     const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
 
@@ -89,7 +89,7 @@ export function useDashboardEngine(filteredTransactions = []) {
           balancesByCode[code] = balance;
         }
       });
-      
+
       // Sum totals
       Object.entries(balancesByCode).forEach(([code, balance]) => {
         if (code.startsWith('1')) {
@@ -109,7 +109,7 @@ export function useDashboardEngine(filteredTransactions = []) {
       const plOutflow = safeAllTxs
         .filter(tx => tx.transaction_type === 'Expense' && isCompleted(tx.payment_status))
         .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      
+
       const startingCash = userGold - plInflow + plOutflow;
       balancesByCode['111001'] = startingCash;
 
@@ -123,7 +123,7 @@ export function useDashboardEngine(filteredTransactions = []) {
         } else if (tx.transaction_type === 'Expense') {
           const src = tx.source_dest_bank || '111001';
           if (src in balancesByCode) balancesByCode[src] -= amt;
-        } else if (tx.transaction_type === 'Asset') {
+        } else if (tx.transaction_type === 'Assets') {
           const src = tx.source_dest_bank;
           const tgt = tx.target_account;
           if (tx.flow === 'neutral') {
@@ -134,10 +134,10 @@ export function useDashboardEngine(filteredTransactions = []) {
           } else if (tx.flow === 'outflow') {
             if (src && src in balancesByCode) balancesByCode[src] -= amt;
           }
-        } else if (tx.transaction_type === 'Debt') {
+        } else if (tx.transaction_type === 'Liabilities') {
           const src = tx.source_dest_bank;
           const tgt = tx.target_account;
-          
+
           if (tx.flow === 'inflow') {
             if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
             if (src && src in balancesByCode) balancesByCode[src] += amt;
@@ -166,7 +166,7 @@ export function useDashboardEngine(filteredTransactions = []) {
     // ==============================================================
     // 3. ESTRUTURAÇÃO DE DADOS PARA GRÁFICOS (Sem Asset/Debt no P&L)
     // ==============================================================
-    
+
     // Distribuição por Categorias (Apenas P&L)
     const categoryMap = {};
     plTransactions.forEach(tx => {
@@ -213,7 +213,7 @@ export function useDashboardEngine(filteredTransactions = []) {
         timeMap[dateKey].classIncome += amt;
       } else if (tx.transaction_type === 'Expense') {
         timeMap[dateKey].classExpense += amt;
-      } else if (tx.transaction_type === 'Debt') {
+      } else if (tx.transaction_type === 'Liabilities') {
         if (tx.flow === 'inflow') timeMap[dateKey].debtAccrual += amt;
         else timeMap[dateKey].debtPayment += amt;
       }
@@ -230,8 +230,8 @@ export function useDashboardEngine(filteredTransactions = []) {
       });
 
     // Dívidas por Entidade e Categoria (Apenas Debt Completed)
-    const debtTxs = safeAllTxs.filter(tx => tx.transaction_type === 'Debt');
-    
+    const debtTxs = safeAllTxs.filter(tx => tx.transaction_type === 'Liabilities');
+
     const debtEntMap = {};
     debtTxs.forEach(tx => {
       const ent = tx.entity || 'Other';
@@ -356,9 +356,9 @@ export function useDashboardEngine(filteredTransactions = []) {
     // Métricas de compatibilidade de KPIs de Dívida
     const liabilitiesKpis = {
       total_debt: totalLiabilities,
-      to_be_paid: safeFilteredTxs.filter(tx => tx.transaction_type === 'Debt' && tx.payment_status === 'Pending').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
-      new_liabilities: safeFilteredTxs.filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
-      amortizations: safeFilteredTxs.filter(tx => tx.transaction_type === 'Debt' && tx.flow === 'outflow' && isCompleted(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)
+      to_be_paid: safeFilteredTxs.filter(tx => tx.transaction_type === 'Liabilities' && tx.payment_status === 'Pending').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
+      new_liabilities: safeFilteredTxs.filter(tx => tx.transaction_type === 'Liabilities' && tx.flow === 'inflow').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
+      amortizations: safeFilteredTxs.filter(tx => tx.transaction_type === 'Liabilities' && tx.flow === 'outflow' && isCompleted(tx.payment_status)).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)
     };
 
     return {

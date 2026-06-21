@@ -19,6 +19,8 @@ const RegisterTransactionForm = ({
   setTxAmount,
   txValueDate,
   setTxValueDate,
+  txDueDate,
+  setTxDueDate,
   txPostingDate,
   setTxPostingDate,
   txDescription,
@@ -37,37 +39,75 @@ const RegisterTransactionForm = ({
   accountMappings = {},
   t = (key, fallback) => fallback || key
 }) => {
+  const subtypeToCategoryMap = {
+    "Banks": ["Bank account", "Saving account"],
+    "Investments": ["Investment account"],
+    "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
+    "Other Debts": ["Other Debts"],
+    "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
+    "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
+    "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
+    "Public Transports": ["Public Transports"],
+    "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy", "Other Incomes"],
+    "Education": ["PhD", "Trainings"],
+    "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
+    "Food & Consumables": ["Food", "Drinks", "Supermarket (Other)"],
+    "Tools & Materials": ["Tools", "Other materials"],
+    "Clothing & Shoes": ["Clothing", "Shoes"],
+    "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
+    "Insurances": ["Insurances"],
+    "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"],
+    "Markets & Personal care": [],
+    "Other Consumables": []
+  };
+
+  let filteredCategories = categoryOptions;
+  if (txSubClass) {
+    const allowedCategories = subtypeToCategoryMap[txSubClass] || [];
+    filteredCategories = categoryOptions.filter(opt => allowedCategories.includes(opt));
+  }
+
+  let filteredEntities = entityOptions;
+  if (txCategory) {
+    filteredEntities = entityOptions.filter(opt => entityMappings[opt] === txCategory);
+  } else if (txSubClass) {
+    const allowedCategories = subtypeToCategoryMap[txSubClass] || [];
+    filteredEntities = entityOptions.filter(opt => allowedCategories.includes(entityMappings[opt]));
+  }
+
   return (
     <div className="bg-[#faf4e5]/80 border border-[#8b4513]/30 rounded-xl p-3.5 space-y-3 shadow-sm">
       
-      {/* Row 1: Class (Type) / SubClass / Flow / Status */}
+      {/* Row 1: Type / SubClass / Flow / Status */}
       <div className="grid grid-cols-12 gap-3">
-        {/* Class (Type) */}
+        {/* Type */}
         <div className="col-span-12 sm:col-span-3">
           <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-            Class (Type)
+            Type
           </label>
           <select
             value={txClass}
             onChange={(e) => setTxClass(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
+            <option value="">-- Choose Type --</option>
             {classOptions.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
         </div>
 
-        {/* Subclass */}
+        {/* Subtype */}
         <div className="col-span-12 sm:col-span-3">
           <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
-            Subclass
+            Subtype
           </label>
           <select
             value={txSubClass}
             onChange={(e) => setTxSubClass(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
+            <option value="">-- Choose Subtype --</option>
             {subClassOptions.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
@@ -84,6 +124,7 @@ const RegisterTransactionForm = ({
             onChange={(e) => setTxFlow(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
+            <option value="">-- Choose Flow --</option>
             <option value="inflow">Inflow</option>
             <option value="outflow">Outflow</option>
             <option value="neutral">Neutral</option>
@@ -100,6 +141,7 @@ const RegisterTransactionForm = ({
             onChange={(e) => setTxStatus(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
+            <option value="">-- Choose Status --</option>
             {statusOptions.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
@@ -119,6 +161,7 @@ const RegisterTransactionForm = ({
             onChange={(e) => setTxFrom(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
+            <option value="">-- Choose Origin/From --</option>
             {fromOptions.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
@@ -135,7 +178,8 @@ const RegisterTransactionForm = ({
             onChange={(e) => setTxCategory(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
-            {categoryOptions.map((opt) => (
+            <option value="">-- Choose Category --</option>
+            {filteredCategories.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
@@ -151,8 +195,9 @@ const RegisterTransactionForm = ({
             onChange={(e) => handleEntityChange(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
           >
+            <option value="">-- Choose Entity --</option>
             {Object.entries(
-              entityOptions.reduce((acc, opt) => {
+              filteredEntities.reduce((acc, opt) => {
                 const cat = entityMappings[opt] || 'Uncategorized';
                 if (!acc[cat]) acc[cat] = [];
                 acc[cat].push(opt);
@@ -174,18 +219,13 @@ const RegisterTransactionForm = ({
             {typeof t === 'function' ? t('amount_gold', 'Amount (Gold)') : t.amount_gold}
           </label>
           <input
-            type="number"
-            value={txAmount}
-            onChange={(e) => setTxAmount(e.target.value)}
-            placeholder={typeof t === 'function' ? t('placeholder.amount', 'Amount') : t['placeholder.amount']}
-            required
-            min="1"
+            type="number" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} placeholder={typeof t === 'function' ? t('placeholder.amount', 'Amount') : t['placeholder.amount']} required min="0.01" step="0.01"
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono"
           />
         </div>
       </div>
 
-      {/* Row 3: Value Date / Posting Date */}
+      {/* Row 3: Value Date / Due Date / Posting Date */}
       <div className="grid grid-cols-12 gap-3">
         <div className="col-span-12 sm:col-span-3">
           <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
@@ -196,6 +236,17 @@ const RegisterTransactionForm = ({
             value={txValueDate}
             onChange={(e) => setTxValueDate(e.target.value)}
             required
+            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
+          />
+        </div>
+        <div className="col-span-12 sm:col-span-3">
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1 font-sans">
+            Due Date
+          </label>
+          <input
+            type="date"
+            value={txDueDate}
+            onChange={(e) => setTxDueDate(e.target.value)}
             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-mono"
           />
         </div>
@@ -237,8 +288,8 @@ const RegisterTransactionForm = ({
           onChange={(e) => setTxSourceDestBank(e.target.value)}
           className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
         >
+          <option value="">-- Choose Source Account --</option>
           {Object.entries(accountMappings)
-            .filter(([code]) => code.startsWith('1') || code.startsWith('2'))
             .map(([code, name]) => (
               <option key={code} value={code}>{code} - {name}</option>
             ))
@@ -256,6 +307,7 @@ const RegisterTransactionForm = ({
           onChange={(e) => setTxTargetAccount(e.target.value)}
           className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans"
         >
+          <option value="">-- Choose Target Account --</option>
           {Object.entries(accountMappings).map(([code, name]) => (
             <option key={code} value={code}>{code} - {name}</option>
           ))}
