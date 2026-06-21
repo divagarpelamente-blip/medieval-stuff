@@ -2,6 +2,8 @@ import { toast } from 'react-hot-toast';
 
 export const handleExportCSV = (transactions, t) => {
   const headers = [
+    'id',
+    'profile_id',
     'amount',
     'from',
     'value_date',
@@ -12,9 +14,14 @@ export const handleExportCSV = (transactions, t) => {
     'transaction_subtype',
     'entity',
     'transaction_category',
-    'transaction_nature',
-    'transaction_flow',
-    'description'
+    'target_account',
+    'source_dest_bank',
+    'flow',
+    'description',
+    'month',
+    'year',
+    'quarter',
+    'created_at'
   ];
 
   let csvContent = headers.join(',') + '\n';
@@ -123,25 +130,48 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
         const tx = {};
         headers.forEach((header, idx) => {
           let val = row[idx] ? row[idx].trim() : '';
-          // normalize header keys
-          if (header === 'transaction_type' || header === 'entity class' || header === 'class' || header === 'classe') {
-            tx.transaction_type = val;
-          } else if (header === 'from (origem)' || header === 'from') {
+          const normHeader = header.trim().toLowerCase();
+          
+          if (normHeader === 'id') {
+            tx.id = val || null;
+          } else if (normHeader === 'profile_id') {
+            tx.profile_id = val || null;
+          } else if (normHeader === 'amount' || normHeader === 'ouro' || normHeader === 'coins') {
+            tx.amount = Number(val) || 0;
+          } else if (normHeader === 'from' || normHeader === 'from (origem)' || normHeader === 'origin') {
             tx.from = val;
-          } else if (header === 'transaction_subtype' || header === 'sub classe' || header === 'sub_class' || header === 'sub class') {
-            tx.transaction_subtype = val;
-          } else if (header === 'transaction_category' || header === 'category') {
-            tx.transaction_category = val;
-          } else if (header === 'payment_status' || header === 'status') {
-            tx.payment_status = val;
-          } else if (header === 'ouro' || header === 'coins' || header === 'amount') {
-            tx.amount = Number(val);
-          } else if (header === 'value_date' || header === 'value date' || header === 'date' || header === 'data') {
-            tx.value_date = val;
-          } else if (header === 'posting_date' || header === 'posting date') {
-            tx.posting_date = val;
-          } else if (header === 'due_date' || header === 'due date') {
+          } else if (normHeader === 'value_date' || normHeader === 'value date' || normHeader === 'date' || normHeader === 'data') {
+            tx.value_date = val || null;
+          } else if (normHeader === 'posting_date' || normHeader === 'posting date') {
+            tx.posting_date = val || null;
+          } else if (normHeader === 'due_date' || normHeader === 'due date') {
             tx.due_date = val || null;
+          } else if (normHeader === 'payment_status' || normHeader === 'status') {
+            tx.payment_status = val;
+          } else if (normHeader === 'transaction_type' || normHeader === 'entity class' || normHeader === 'class' || normHeader === 'classe') {
+            tx.transaction_type = val;
+          } else if (normHeader === 'transaction_subtype' || normHeader === 'sub classe' || normHeader === 'sub_class' || normHeader === 'sub class') {
+            tx.transaction_subtype = val;
+          } else if (normHeader === 'entity') {
+            tx.entity = val;
+          } else if (normHeader === 'transaction_category' || normHeader === 'category') {
+            tx.transaction_category = val;
+          } else if (normHeader === 'target_account' || normHeader === 'target account') {
+            tx.target_account = val;
+          } else if (normHeader === 'source_dest_bank' || normHeader === 'source dest bank' || normHeader === 'source_account' || normHeader === 'source account') {
+            tx.source_dest_bank = val;
+          } else if (normHeader === 'flow' || normHeader === 'transaction_flow') {
+            tx.flow = val;
+          } else if (normHeader === 'description') {
+            tx.description = val;
+          } else if (normHeader === 'month') {
+            tx.month = val;
+          } else if (normHeader === 'year') {
+            tx.year = val ? Number(val) : null;
+          } else if (normHeader === 'quarter') {
+            tx.quarter = val;
+          } else if (normHeader === 'created_at' || normHeader === 'created at') {
+            tx.created_at = val || null;
           } else {
             tx[header] = val;
           }
@@ -173,8 +203,8 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
         if (!tx.transaction_nature) {
           tx.transaction_nature = (tx.transaction_subtype && tx.transaction_subtype.toLowerCase().includes('cash')) ? 'cash' : 'accrual';
         }
-        if (!tx.transaction_flow) {
-          tx.transaction_flow = (isIncome || isReceipt) ? 'inflow' : 'outflow';
+        if (!tx.flow) {
+          tx.flow = tx.transaction_flow || ((isIncome || isReceipt) ? 'inflow' : 'outflow');
         }
 
         listToInsert.push(tx);
@@ -205,7 +235,6 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
 export const handleExportAllActionsCSV = (templates, t) => {
   const headers = [
     'name',
-    'icon',
     'type',
     'subtype',
     'flow',
@@ -229,7 +258,6 @@ export const handleExportAllActionsCSV = (templates, t) => {
       const data = tpl.data || {};
       const fields = {
         name: tpl.name,
-        icon: tpl.icon,
         type: data.transaction_type,
         subtype: data.transaction_subtype,
         flow: data.flow,
@@ -343,7 +371,7 @@ export const handleImportQuickActionsCSV = (e, { t, addOption, templates }) => {
 
         const newTemplate = {
           name: nameVal,
-          icon: fields.icon || '⚡',
+          icon: '⚡',
           data: templateData
         };
 
@@ -374,3 +402,170 @@ export const handleImportQuickActionsCSV = (e, { t, addOption, templates }) => {
   };
   reader.readAsText(file);
 };
+
+export const handleExportSettingsCSV = (storeData, getMatrixRows) => {
+  const matrixRows = getMatrixRows() || [];
+
+  let csv = 'subtype,category,entity\n';
+  matrixRows.forEach(row => {
+    csv += `${escapeCsvField(row.subtype)},${escapeCsvField(row.category)},${escapeCsvField(row.entity)}\n`;
+  });
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `categories_matrix_${new Date().toISOString().split('T')[0]}.csv`;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  setTimeout(() => {
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
+
+  toast.success('Categories exported successfully!');
+};
+
+export const handleImportSettingsCSV = (e, { syncSettings }) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    try {
+      const text = event.target.result;
+      const parsedRows = parseCSV(text);
+
+      let matrixRows = [];
+      let isSectionBased = false;
+
+      for (let i = 0; i < parsedRows.length; i++) {
+        if (parsedRows[i][0] && parsedRows[i][0].trim().startsWith('# SECTION:')) {
+          isSectionBased = true;
+          break;
+        }
+      }
+
+      if (isSectionBased) {
+        let inCategoriesSection = false;
+        parsedRows.forEach(row => {
+          if (row.length === 0 || row.every(cell => !cell || cell.trim() === '')) return;
+          const firstVal = row[0].trim();
+          if (firstVal.startsWith('# SECTION:')) {
+            const rawSec = firstVal.replace('# SECTION:', '').trim().toUpperCase();
+            inCategoriesSection = (rawSec === 'CATEGORIES');
+            return;
+          }
+          if (inCategoriesSection) {
+            matrixRows.push(row);
+          }
+        });
+      } else {
+        matrixRows = parsedRows;
+      }
+
+      if (matrixRows.length <= 1) {
+        toast.error('No category mapping found in CSV.');
+        return;
+      }
+
+      const headers = matrixRows[0].map(h => h.trim().toLowerCase());
+      const subtypeIdx = headers.indexOf('subtype');
+      const categoryIdx = headers.indexOf('category');
+      const entityIdx = headers.indexOf('entity');
+
+      if (subtypeIdx === -1 && categoryIdx === -1 && entityIdx === -1) {
+        toast.error('Invalid CSV headers. Must contain subtype, category, or entity.');
+        return;
+      }
+
+      const parsedMatrixRows = [];
+      matrixRows.slice(1).forEach(row => {
+        if (row.length === 0 || row.every(cell => !cell || cell.trim() === '')) return;
+        
+        const subtype = subtypeIdx !== -1 && row[subtypeIdx] ? row[subtypeIdx].trim() : '';
+        const category = categoryIdx !== -1 && row[categoryIdx] ? row[categoryIdx].trim() : '';
+        const entity = entityIdx !== -1 && row[entityIdx] ? row[entityIdx].trim() : '';
+
+        if (subtype || category || entity) {
+          parsedMatrixRows.push({ subtype, category, entity });
+        }
+      });
+
+      if (parsedMatrixRows.length === 0) {
+        toast.error('No valid category mappings found.');
+        return;
+      }
+
+      const newSubClassOptions = new Set();
+      const newCategoryOptions = new Set();
+      const newEntityOptions = new Set();
+      const newEntityMappings = {};
+      const newSubtypeToCategoryMap = {};
+
+      parsedMatrixRows.forEach((row) => {
+        const sub = row.subtype ? row.subtype.trim() : '';
+        const cat = row.category ? row.category.trim() : '';
+        const ent = row.entity ? row.entity.trim() : '';
+
+        if (sub) {
+          newSubClassOptions.add(sub);
+          if (!newSubtypeToCategoryMap[sub]) {
+            newSubtypeToCategoryMap[sub] = [];
+          }
+        }
+
+        if (cat) {
+          newCategoryOptions.add(cat);
+          if (sub) {
+            if (!newSubtypeToCategoryMap[sub].includes(cat)) {
+              newSubtypeToCategoryMap[sub].push(cat);
+            }
+          }
+        }
+
+        if (ent) {
+          newEntityOptions.add(ent);
+          if (cat) {
+            newEntityMappings[ent] = cat;
+          }
+        }
+      });
+
+      newSubClassOptions.forEach(sub => {
+        if (!newSubtypeToCategoryMap[sub]) {
+          newSubtypeToCategoryMap[sub] = [];
+        }
+      });
+
+      const updates = {
+        subClassOptions: Array.from(newSubClassOptions),
+        categoryOptions: Array.from(newCategoryOptions),
+        entityOptions: Array.from(newEntityOptions),
+        entityMappings: newEntityMappings,
+        subtypeToCategoryMap: newSubtypeToCategoryMap
+      };
+
+      await syncSettings(updates);
+      toast.success('Categories configuration updated successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to import CSV configuration.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+};
+
+function escapeCsvField(val) {
+  if (val === null || val === undefined) return '';
+  let stringVal = String(val);
+  if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n')) {
+    stringVal = '"' + stringVal.replace(/"/g, '""') + '"';
+  }
+  return stringVal;
+}
+
+

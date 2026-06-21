@@ -35,24 +35,23 @@ const saveLocal = (key, val) => {
 });
 
 try {
-  const cachedCategories = localStorage.getItem('eldoria_categoryOptions');
-  if (cachedCategories) {
-    const parsed = JSON.parse(cachedCategories);
-    if (parsed.includes('Payroll') || parsed.includes('Burrowed')) {
-      localStorage.removeItem('eldoria_categoryOptions');
-      localStorage.removeItem('eldoria_entityMappings');
-      localStorage.removeItem('eldoria_templates');
-      localStorage.removeItem('eldoria_entityOptions');
-    }
-  }
   const cachedEntities = localStorage.getItem('eldoria_entityOptions');
-  if (cachedEntities) {
-    const parsed = JSON.parse(cachedEntities);
-    if (!parsed.includes('Reni (Burrow)') || !parsed.includes('ENDESA')) {
+  const cachedSubClass = localStorage.getItem('eldoria_subClassOptions');
+  if (cachedEntities || cachedSubClass) {
+    const parsedEnt = cachedEntities ? JSON.parse(cachedEntities) : [];
+    const parsedSub = cachedSubClass ? JSON.parse(cachedSubClass) : [];
+    if (
+      !parsedEnt.includes('CGD Bank Account') ||
+      parsedSub.includes('Salary (payroll)') ||
+      parsedSub.includes('Income • Payroll') ||
+      (parsedSub.length > 0 && !parsedSub.includes('Bank Accounts (Ordem)'))
+    ) {
       localStorage.removeItem('eldoria_entityOptions');
       localStorage.removeItem('eldoria_entityMappings');
       localStorage.removeItem('eldoria_templates');
       localStorage.removeItem('eldoria_categoryOptions');
+      localStorage.removeItem('eldoria_subClassOptions');
+      localStorage.removeItem('eldoria_subtypeToCategoryMap');
     }
   }
 } catch (e) {
@@ -85,6 +84,8 @@ export const useKingdomStore = create((set, get) => ({
         entityOptions: get().entityOptions,
         categoryOptions: get().categoryOptions,
         entityMappings: get().entityMappings,
+        subtypeToCategoryMap: get().subtypeToCategoryMap,
+        subClassOptions: get().subClassOptions,
         language: get().language,
         ...updates
       };
@@ -134,6 +135,27 @@ export const useKingdomStore = create((set, get) => ({
     "Cinema", "Gaming", "Food", "Drinks", "Supermarket (Other)", "Tools", "Other materials",
     "Clothing", "Shoes", "Insurances", "General Taxes", "Tax Fines", "IRS payment", "IRS refund"
   ]),
+  subtypeToCategoryMap: loadLocal('subtypeToCategoryMap', {
+    "Banks": ["Bank account", "Saving account"],
+    "Investments": ["Investment account"],
+    "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
+    "Other Debts": ["Other Debts"],
+    "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
+    "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
+    "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
+    "Public Transports": ["Public Transports"],
+    "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
+    "Markets & Personal care": ["Supermarket (Other)", "Tools", "Other materials"],
+    "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy"],
+    "Education": ["PhD", "Trainings"],
+    "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
+    "Food & Consumables": ["Food", "Drinks"],
+    "Tools & Materials": ["Tools", "Other materials"],
+    "Clothing & Shoes": ["Clothing", "Shoes"],
+    "Insurances": ["Insurances"],
+    "Other Consumables": ["Supermarket (Other)", "Food", "Drinks"],
+    "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"]
+  }),
   entityMappings: loadLocal('entityMappings', {
     "CGD": "Bank account",
     "ActiveBank": "Bank account",
@@ -268,679 +290,7 @@ export const useKingdomStore = create((set, get) => ({
       "source_dest_bank": "111001",
       "flow": "outflow",
       "payment_status": "Completed",
-      "description": "Pay credit card bill"
-    }
-  },
-  {
-    "name": "Amortize Loan",
-    "icon": "📉",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Liabilities",
-      "transaction_subtype": "Personal Debt",
-      "entity": "CGD",
-      "transaction_category": "Loans",
-      "target_account": "211001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Loan amortization"
-    }
-  },
-  {
-    "name": "Burrow cash",
-    "icon": "🪙",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Liabilities",
-      "transaction_subtype": "Other Debts",
-      "entity": "Jota (Marmitas)",
-      "transaction_category": "Burrow",
-      "target_account": "111001",
-      "source_dest_bank": "212001",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "Borrow cash"
-    }
-  },
-  {
-    "name": "Repay Personal Debt",
-    "icon": "🤝",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Liabilities",
-      "transaction_subtype": "Personal Debt",
-      "entity": "Mae (Burrow)",
-      "transaction_category": "Burrow",
-      "target_account": "212002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Repay personal debt"
-    }
-  },
-  {
-    "name": "Rent",
-    "icon": "🏰",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Living & Household",
-      "entity": "Landlord",
-      "transaction_category": "Rent",
-      "target_account": "611001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Rent payment"
-    }
-  },
-  {
-    "name": "Repairs",
-    "icon": "🔧",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Living & Household",
-      "entity": "Repairs",
-      "transaction_category": "Household Utensils",
-      "target_account": "611002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Repairs"
-    }
-  },
-  {
-    "name": "Decorations",
-    "icon": "🎨",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Living & Household",
-      "entity": "Home Decor",
-      "transaction_category": "Household Décor",
-      "target_account": "611003",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Decorations"
-    }
-  },
-  {
-    "name": "Utensils",
-    "icon": "🍽️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Living & Household",
-      "entity": "Kitchen/Home",
-      "transaction_category": "Household Utensils",
-      "target_account": "611004",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Utensils"
-    }
-  },
-  {
-    "name": "Electricity",
-    "icon": "⚡",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Utilities",
-      "entity": "Energy",
-      "transaction_category": "Electricity (house)",
-      "target_account": "621001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Electricity bill"
-    }
-  },
-  {
-    "name": "Gas",
-    "icon": "🔥",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Utilities",
-      "entity": "Gas",
-      "transaction_category": "Gas (house)",
-      "target_account": "621002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Gas bill"
-    }
-  },
-  {
-    "name": "Water",
-    "icon": "💧",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Utilities",
-      "entity": "Water",
-      "transaction_category": "Water (house)",
-      "target_account": "621003",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Water bill"
-    }
-  },
-  {
-    "name": "Communications",
-    "icon": "📞",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Utilities",
-      "entity": "Internet",
-      "transaction_category": "Comunications (house)",
-      "target_account": "621004",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Communications bill"
-    }
-  },
-  {
-    "name": "Gasoline",
-    "icon": "⛽",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Personal Transports",
-      "entity": "Gasoline",
-      "transaction_category": "Vehicle Gasoline",
-      "target_account": "631001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Gasoline"
-    }
-  },
-  {
-    "name": "Repairs/maintenance",
-    "icon": "🛠️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Personal Transports",
-      "entity": "Vehicle repairs",
-      "transaction_category": "Vehicle Repair & Maintenance",
-      "target_account": "642001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Vehicle maintenance"
-    }
-  },
-  {
-    "name": "Parking",
-    "icon": "🅿️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Personal Transports",
-      "entity": "Parking",
-      "transaction_category": "Parking",
-      "target_account": "631003",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Parking fee"
-    }
-  },
-  {
-    "name": "Tolls",
-    "icon": "🛣️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Personal Transports",
-      "entity": "Tolls",
-      "transaction_category": "Tolls",
-      "target_account": "631002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Highway toll"
-    }
-  },
-  {
-    "name": "Taxes (Transport)",
-    "icon": "🏷️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Taxes & State",
-      "entity": "Vehicle Tax",
-      "transaction_category": "General Taxes",
-      "target_account": "681002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Vehicle tax"
-    }
-  },
-  {
-    "name": "Fines (Personal)",
-    "icon": "⚠️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Taxes & State",
-      "entity": "Traffic Fine",
-      "transaction_category": "Vehicle Fines",
-      "target_account": "681002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Traffic fine"
-    }
-  },
-  {
-    "name": "Metro",
-    "icon": "🚇",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Public Transports",
-      "entity": "Public Transit",
-      "transaction_category": "Parking",
-      "target_account": "631003",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Metro public transit"
-    }
-  },
-  {
-    "name": "Bus",
-    "icon": "🚌",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Public Transports",
-      "entity": "Bus",
-      "transaction_category": "Parking",
-      "target_account": "631003",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Bus public transit"
-    }
-  },
-  {
-    "name": "Train",
-    "icon": "🚆",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Public Transports",
-      "entity": "Public Transit",
-      "transaction_category": "Parking",
-      "target_account": "631003",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Train public transit"
-    }
-  },
-  {
-    "name": "Fines (Public)",
-    "icon": "🚨",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Taxes & State",
-      "entity": "Transit Fine",
-      "transaction_category": "Vehicle Fines",
-      "target_account": "681002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Transit fine"
-    }
-  },
-  {
-    "name": "Food & Consumables",
-    "icon": "🍎",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Food & Consumables",
-      "entity": "Supermarket",
-      "transaction_category": "Food",
-      "target_account": "641001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Groceries"
-    }
-  },
-  {
-    "name": "Tools & Materials",
-    "icon": "🔨",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Tools & Materials",
-      "entity": "Tools and Equipment",
-      "transaction_category": "Tools",
-      "target_account": "642001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Hardware tools & materials"
-    }
-  },
-  {
-    "name": "Clothing",
-    "icon": "👕",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Clothing & Shoes",
-      "entity": "Clothing",
-      "transaction_category": "Clothing",
-      "target_account": "643001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Clothing"
-    }
-  },
-  {
-    "name": "Restaurants",
-    "icon": "🍔",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Entertainment",
-      "entity": "Restaurant",
-      "transaction_category": "Restaurants",
-      "target_account": "661001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Dining out at restaurant"
-    }
-  },
-  {
-    "name": "Cinema",
-    "icon": "🎬",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Entertainment",
-      "entity": "Cinema",
-      "transaction_category": "Cinema",
-      "target_account": "662001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Cinema movies"
-    }
-  },
-  {
-    "name": "Bars & Nightlife",
-    "icon": "🍻",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Entertainment",
-      "entity": "Shows",
-      "transaction_category": "Nightlife & Disco",
-      "target_account": "661001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Bars & nightlife drinks"
-    }
-  },
-  {
-    "name": "Pharmacy",
-    "icon": "💊",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Health",
-      "entity": "Medicine",
-      "transaction_category": "Pharmacy",
-      "target_account": "651002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Pharmacy medication"
-    }
-  },
-  {
-    "name": "Hospital",
-    "icon": "🏥",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Health",
-      "entity": "Medical Appointments",
-      "transaction_category": "Hospital",
-      "target_account": "651004",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Medical appointment/hospital"
-    }
-  },
-  {
-    "name": "Exams",
-    "icon": "📝",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Health",
-      "entity": "Medical Exams",
-      "transaction_category": "Doctor session & Medical Exams",
-      "target_account": "651005",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Medical exams/tests"
-    }
-  },
-  {
-    "name": "Haircuts/Grooming",
-    "icon": "✂️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Markets & Personal care",
-      "entity": "Personal Care",
-      "transaction_category": "Supermarket (Other)",
-      "target_account": "643001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Personal care grooming"
-    }
-  },
-  {
-    "name": "Makeups",
-    "icon": "💄",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Markets & Personal care",
-      "entity": "Cosmetics",
-      "transaction_category": "Supermarket (Other)",
-      "target_account": "641001",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Cosmetics/makeups"
-    }
-  },
-  {
-    "name": "Base Salary",
-    "icon": "💰",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Income",
-      "transaction_subtype": "Payroll",
-      "entity": "Salary",
-      "transaction_category": "Salary",
-      "target_account": "711001",
-      "source_dest_bank": "",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "Base salary income"
-    }
-  },
-  {
-    "name": "Meal Allowance",
-    "icon": "🍱",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Income",
-      "transaction_subtype": "Payroll",
-      "entity": "Salary",
-      "transaction_category": "Salary",
-      "target_account": "711002",
-      "source_dest_bank": "",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "Meal allowance subsidies"
-    }
-  },
-  {
-    "name": "Holiday & Xmas Bonus",
-    "icon": "🎁",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Income",
-      "transaction_subtype": "Payroll",
-      "entity": "Bonus",
-      "transaction_category": "Bonus",
-      "target_account": "711003",
-      "source_dest_bank": "",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "Holiday & Christmas bonus"
-    }
-  },
-  {
-    "name": "Consulting/Contracts",
-    "icon": "📈",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Income",
-      "transaction_subtype": "Payroll",
-      "entity": "Freelance",
-      "transaction_category": "Freelancer",
-      "target_account": "712001",
-      "source_dest_bank": "",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "Consulting contract income"
-    }
-  },
-  {
-    "name": "Social Security",
-    "icon": "🛡️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Taxes & State",
-      "entity": "State Tax",
-      "transaction_category": "General Taxes",
-      "target_account": "681002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Social security state tax"
-    }
-  },
-  {
-    "name": "Finance",
-    "icon": "🏢",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Taxes & State",
-      "entity": "Gov Tax",
-      "transaction_category": "General Taxes",
-      "target_account": "681002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Finance government tax"
-    }
-  },
-  {
-    "name": "Other Taxes & State",
-    "icon": "🏛️",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Expense",
-      "transaction_subtype": "Taxes & State",
-      "entity": "Fees/Duties",
-      "transaction_category": "General Taxes",
-      "target_account": "681002",
-      "source_dest_bank": "111001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Other taxes and state duties"
-    }
-  },
-  {
-    "name": "IRS Tax Refund",
-    "icon": "💸",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Income",
-      "transaction_subtype": "Taxes & State",
-      "entity": "Gov Refund",
-      "transaction_category": "IRS refund",
-      "target_account": "731001",
-      "source_dest_bank": "",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "IRS tax refund"
-    }
-  },
-  {
-    "name": "Family Gifts",
-    "icon": "💝",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Income",
-      "transaction_subtype": "Payroll",
-      "entity": "Gift",
-      "transaction_category": "Other Incomes",
-      "target_account": "731002",
-      "source_dest_bank": "",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "Family gifts"
-    }
-  },
-  {
-    "name": "Cashbacks & Rewards",
-    "icon": "🏆",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Income",
-      "transaction_subtype": "Payroll",
-      "entity": "Rewards",
-      "transaction_category": "Other Incomes",
-      "target_account": "731003",
-      "source_dest_bank": "",
-      "flow": "inflow",
-      "payment_status": "Completed",
-      "description": "Cashbacks & rewards"
+      "description": "Credit card payment"
     }
   }
 ]),
@@ -1038,12 +388,61 @@ export const useKingdomStore = create((set, get) => ({
           let entityMaps = s.entityMappings || get().entityMappings;
           let temps = s.templates || get().templates;
           let subClassOpts = s.subClassOptions || get().subClassOptions;
+          let entityOpts = s.entityOptions || get().entityOptions;
+          let subtypeToCategory = s.subtypeToCategoryMap || get().subtypeToCategoryMap;
 
-          if (categoryOpts.includes('Payroll') || categoryOpts.includes('Burrowed')) {
+          const isObsolete = 
+            categoryOpts.includes('Payroll') || 
+            categoryOpts.includes('Burrowed') ||
+            categoryOpts.includes('Income • Payroll') ||
+            categoryOpts.includes('Salary (payroll)') ||
+            categoryOpts.includes('Bank Accounts (Ordem)') ||
+            categoryOpts.includes('Payroll & Active Income') ||
+            subClassOpts.includes('Salary (payroll)') ||
+            subClassOpts.includes('Income • Payroll') ||
+            subClassOpts.includes('Bank Accounts (Ordem)') ||
+            entityMaps['Salary'] === 'Payroll & Active Income' ||
+            Object.values(entityMaps).includes('Income • Payroll') ||
+            Object.values(entityMaps).includes('Salary (payroll)');
+
+          if (isObsolete) {
             categoryOpts = get().categoryOptions;
             entityMaps = get().entityMappings;
-            temps = get().templates;
             subClassOpts = get().subClassOptions;
+            entityOpts = get().entityOptions;
+            subtypeToCategory = get().subtypeToCategoryMap;
+
+            if (Array.isArray(temps)) {
+              temps = temps.map(t => {
+                if (t.data) {
+                  let updatedSubtype = t.data.transaction_subtype;
+                  let updatedCategory = t.data.transaction_category;
+                  if (updatedSubtype === 'Bank Accounts (Ordem)') updatedSubtype = 'Banks';
+                  else if (updatedSubtype === 'Payroll & Active Income') updatedSubtype = 'Payroll';
+                  else if (updatedSubtype === 'Salary (payroll)' || updatedSubtype === 'Income • Payroll') updatedSubtype = 'Payroll';
+
+                  if (updatedCategory === 'Bank Accounts (Ordem)') updatedCategory = 'Bank account';
+                  else if (updatedCategory === 'Payroll & Active Income') updatedCategory = 'Salary';
+                  else if (updatedCategory === 'Salary (payroll)' || updatedCategory === 'Income • Payroll') updatedCategory = 'Salary';
+
+                  return {
+                    ...t,
+                    data: {
+                      ...t.data,
+                      transaction_subtype: updatedSubtype,
+                      transaction_category: updatedCategory
+                    }
+                  };
+                }
+                return t;
+              });
+            }
+
+            localStorage.removeItem('eldoria_entityOptions');
+            localStorage.removeItem('eldoria_entityMappings');
+            localStorage.removeItem('eldoria_categoryOptions');
+            localStorage.removeItem('eldoria_subClassOptions');
+            localStorage.removeItem('eldoria_subtypeToCategoryMap');
             
             supabase
               .from('profiles')
@@ -1053,7 +452,9 @@ export const useKingdomStore = create((set, get) => ({
                   categoryOptions: categoryOpts,
                   entityMappings: entityMaps,
                   templates: temps,
-                  subClassOptions: subClassOpts
+                  subClassOptions: subClassOpts,
+                  entityOptions: entityOpts,
+                  subtypeToCategoryMap: subtypeToCategory
                 }
               })
               .eq('id', userId)
@@ -1063,9 +464,11 @@ export const useKingdomStore = create((set, get) => ({
           set({
             templates: temps,
             fromOptions: s.fromOptions || get().fromOptions,
-            entityOptions: s.entityOptions || get().entityOptions,
+            entityOptions: entityOpts,
             categoryOptions: categoryOpts,
             entityMappings: entityMaps,
+            subtypeToCategoryMap: subtypeToCategory,
+            subClassOptions: subClassOpts,
             language: s.language || get().language
           });
           if (s.language) {
@@ -1265,7 +668,7 @@ export const useKingdomStore = create((set, get) => ({
     const userId = get().user?.id || profileId;
     const tempIds = [];
     const tempTxs = transactionsList.map((tx, idx) => {
-      const tempId = 'temp-batch-' + idx + '-' + Date.now();
+      const tempId = tx.id || 'temp-batch-' + idx + '-' + Date.now();
       tempIds.push(tempId);
       return {
         id: tempId,
@@ -1284,34 +687,46 @@ export const useKingdomStore = create((set, get) => ({
         source_dest_bank: tx.source_dest_bank,
         flow: tx.flow,
         description: tx.description,
-        created_at: new Date().toISOString()
+        created_at: tx.created_at || new Date().toISOString(),
+        month: tx.month || null,
+        year: tx.year || null,
+        quarter: tx.quarter || null
       };
     });
 
     const prevTransactions = get().transactions;
-    set({ transactions: [...tempTxs, ...prevTransactions], isLoading: true });
+    const filteredPrev = prevTransactions.filter(pt => !tempTxs.some(tt => tt.id === pt.id));
+    set({ transactions: [...tempTxs, ...filteredPrev], isLoading: true });
 
     try {
-      const formatted = transactionsList.map((tx) => ({
-        profile_id: userId,
-        transaction_type: tx.transaction_type,
-        amount: Number(tx.amount),
-        value_date: tx.value_date || null,
-        posting_date: tx.posting_date || null,
-        due_date: tx.due_date || null,
-        payment_status: tx.payment_status || 'Completed',
-        transaction_subtype: tx.transaction_subtype,
-        entity: tx.entity,
-        origin: tx.from,
-        target_account: tx.target_account,
-        source_dest_bank: tx.source_dest_bank,
-        flow: tx.flow,
-        description: tx.description
-      }));
+      const formatted = transactionsList.map((tx) => {
+        const item = {
+          profile_id: userId,
+          transaction_type: tx.transaction_type,
+          amount: Number(tx.amount),
+          value_date: tx.value_date || null,
+          posting_date: tx.posting_date || null,
+          due_date: tx.due_date || null,
+          payment_status: tx.payment_status || 'Completed',
+          transaction_subtype: tx.transaction_subtype,
+          entity: tx.entity,
+          origin: tx.from,
+          target_account: tx.target_account,
+          source_dest_bank: tx.source_dest_bank,
+          flow: tx.flow,
+          description: tx.description,
+          month: tx.month || null,
+          year: tx.year || null,
+          quarter: tx.quarter || null
+        };
+        if (tx.id) item.id = tx.id;
+        if (tx.created_at) item.created_at = tx.created_at;
+        return item;
+      });
 
       const { data, error } = await supabase
         .from('transactions')
-        .insert(formatted)
+        .upsert(formatted)
         .select();
 
       if (error) {
@@ -1419,12 +834,61 @@ export const useKingdomStore = create((set, get) => ({
             let entityMaps = s.entityMappings || get().entityMappings;
             let temps = s.templates || get().templates;
             let subClassOpts = s.subClassOptions || get().subClassOptions;
+            let entityOpts = s.entityOptions || get().entityOptions;
+            let subtypeToCategory = s.subtypeToCategoryMap || get().subtypeToCategoryMap;
 
-            if (categoryOpts.includes('Payroll') || categoryOpts.includes('Burrowed')) {
+            const isObsolete = 
+              categoryOpts.includes('Payroll') || 
+              categoryOpts.includes('Burrowed') ||
+              categoryOpts.includes('Income • Payroll') ||
+              categoryOpts.includes('Salary (payroll)') ||
+              categoryOpts.includes('Bank Accounts (Ordem)') ||
+              categoryOpts.includes('Payroll & Active Income') ||
+              subClassOpts.includes('Salary (payroll)') ||
+              subClassOpts.includes('Income • Payroll') ||
+              subClassOpts.includes('Bank Accounts (Ordem)') ||
+              entityMaps['Salary'] === 'Payroll & Active Income' ||
+              Object.values(entityMaps).includes('Income • Payroll') ||
+              Object.values(entityMaps).includes('Salary (payroll)');
+
+            if (isObsolete) {
               categoryOpts = get().categoryOptions;
               entityMaps = get().entityMappings;
-              temps = get().templates;
               subClassOpts = get().subClassOptions;
+              entityOpts = get().entityOptions;
+              subtypeToCategory = get().subtypeToCategoryMap;
+
+              if (Array.isArray(temps)) {
+                temps = temps.map(t => {
+                  if (t.data) {
+                    let updatedSubtype = t.data.transaction_subtype;
+                    let updatedCategory = t.data.transaction_category;
+                    if (updatedSubtype === 'Bank Accounts (Ordem)') updatedSubtype = 'Banks';
+                    else if (updatedSubtype === 'Payroll & Active Income') updatedSubtype = 'Payroll';
+                    else if (updatedSubtype === 'Salary (payroll)' || updatedSubtype === 'Income • Payroll') updatedSubtype = 'Payroll';
+
+                    if (updatedCategory === 'Bank Accounts (Ordem)') updatedCategory = 'Bank account';
+                    else if (updatedCategory === 'Payroll & Active Income') updatedCategory = 'Salary';
+                    else if (updatedCategory === 'Salary (payroll)' || updatedCategory === 'Income • Payroll') updatedCategory = 'Salary';
+
+                    return {
+                      ...t,
+                      data: {
+                        ...t.data,
+                        transaction_subtype: updatedSubtype,
+                        transaction_category: updatedCategory
+                      }
+                    };
+                  }
+                  return t;
+                });
+              }
+
+              localStorage.removeItem('eldoria_entityOptions');
+              localStorage.removeItem('eldoria_entityMappings');
+              localStorage.removeItem('eldoria_categoryOptions');
+              localStorage.removeItem('eldoria_subClassOptions');
+              localStorage.removeItem('eldoria_subtypeToCategoryMap');
               
               supabase
                 .from('profiles')
@@ -1434,7 +898,9 @@ export const useKingdomStore = create((set, get) => ({
                     categoryOptions: categoryOpts,
                     entityMappings: entityMaps,
                     templates: temps,
-                    subClassOptions: subClassOpts
+                    subClassOptions: subClassOpts,
+                    entityOptions: entityOpts,
+                    subtypeToCategoryMap: subtypeToCategory
                   }
                 })
                 .eq('id', session.user.id)
@@ -1444,9 +910,11 @@ export const useKingdomStore = create((set, get) => ({
             set({
               templates: temps,
               fromOptions: s.fromOptions || get().fromOptions,
-              entityOptions: s.entityOptions || get().entityOptions,
+              entityOptions: entityOpts,
               categoryOptions: categoryOpts,
               entityMappings: entityMaps,
+              subtypeToCategoryMap: subtypeToCategory,
+              subClassOptions: subClassOpts,
               language: s.language || get().language
             });
             if (s.language) {

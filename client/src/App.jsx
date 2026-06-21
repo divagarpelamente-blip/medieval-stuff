@@ -25,7 +25,7 @@ import BaseDashboardTab from './components/BaseDashboardTab';
 import RoyalIncomeStatement from './components/RoyalIncomeStatement';
 import TreasuryStatements from './components/TreasuryStatements';
 import ConsolidatedFinancialStatement from './components/ConsolidatedFinancialStatement';
-import { handleExportCSV, handleImportCSV, handleExportAllActionsCSV, handleImportQuickActionsCSV } from './utils/csvHelpers';
+import { handleExportCSV, handleImportCSV, handleExportAllActionsCSV, handleImportQuickActionsCSV, handleExportSettingsCSV, handleImportSettingsCSV } from './utils/csvHelpers';
 import { accountMappings, getAccountName } from './utils/accountMappings';
 import QuickActionFormFields from './components/QuickActionFormFields';
 import EditQuickActionModal from './components/EditQuickActionModal';
@@ -36,27 +36,7 @@ import FinancialStatementsModal from './components/FinancialStatementsModal';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
-const subtypeToCategoryMap = {
-  "Banks": ["Bank account", "Saving account"],
-  "Investments": ["Investment account"],
-  "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
-  "Other Debts": ["Other Debts"],
-  "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
-  "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
-  "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
-  "Public Transports": ["Public Transports"],
-  "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy", "Other Incomes"],
-  "Education": ["PhD", "Trainings"],
-  "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
-  "Food & Consumables": ["Food", "Drinks", "Supermarket (Other)"],
-  "Tools & Materials": ["Tools", "Other materials"],
-  "Clothing & Shoes": ["Clothing", "Shoes"],
-  "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
-  "Insurances": ["Insurances"],
-  "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"],
-  "Markets & Personal care": [],
-  "Other Consumables": []
-};
+
 
 function App() {
   const [activeTab, setActiveTab] = useState('quests');
@@ -64,6 +44,7 @@ function App() {
   const [isNewTxModalOpen, setIsNewTxModalOpen] = useState(false);
   const fileInputRef = useRef(null);
   const qaFileInputRef = useRef(null);
+  const settingsFileInputRef = useRef(null);
 
   // Selection & inline editing state for Ledger Transactions
   const [selectedTxIds, setSelectedTxIds] = useState([]);
@@ -120,6 +101,24 @@ function App() {
   const [qaPostingDate, setQaPostingDate] = useState('');
   const [isEditingQa, setIsEditingQa] = useState(false);
 
+  // Matrix categories states
+  const [selectedMatrixKeys, setSelectedMatrixKeys] = useState([]);
+  const [isMatrixEditingAll, setIsMatrixEditingAll] = useState(false);
+  const [matrixEditingRowKey, setMatrixEditingRowKey] = useState(null);
+  const [matrixEditData, setMatrixEditData] = useState({});
+  const [isAddMatrixModalOpen, setIsAddMatrixModalOpen] = useState(false);
+  const [newMatrixSubtype, setNewMatrixSubtype] = useState('');
+  const [newMatrixCategory, setNewMatrixCategory] = useState('');
+  const [newMatrixEntity, setNewMatrixEntity] = useState('');
+  const [customSubtypeInput, setCustomSubtypeInput] = useState('');
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
+
+  // Sort states
+  const [categoriesSortField, setCategoriesSortField] = useState(null);
+  const [categoriesSortDirection, setCategoriesSortDirection] = useState('asc');
+  const [actionsSortField, setActionsSortField] = useState(null);
+  const [actionsSortDirection, setActionsSortDirection] = useState('asc');
+
   // Bind Zustand options
   const fromOptions = useKingdomStore((state) => state.fromOptions);
   const statusOptions = useKingdomStore((state) => state.statusOptions);
@@ -133,42 +132,43 @@ function App() {
   const addOption = useKingdomStore((state) => state.addOption);
   const editOption = useKingdomStore((state) => state.editOption);
   const deleteOption = useKingdomStore((state) => state.deleteOption);
+  const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap || {});
+  const syncSettings = useKingdomStore((state) => state.syncSettings);
 
   // Form states
   const cascadingConfig = {
     'House & Utilities': {
-      'Rent': { transaction_type: 'Expense', transaction_subtype: 'Rent', transaction_category: 'Housing', target_account: '611001', flow: 'outflow', payment_status: 'Pending' },
-      'Electricity': { transaction_type: 'Expense', transaction_subtype: 'Electricity', transaction_category: 'Housing', target_account: '621001', flow: 'outflow', payment_status: 'Pending' },
-      'Gas': { transaction_type: 'Expense', transaction_subtype: 'Gas', transaction_category: 'Housing', target_account: '621002', flow: 'outflow', payment_status: 'Pending' },
-      'Water': { transaction_type: 'Expense', transaction_subtype: 'Water', transaction_category: 'Housing', target_account: '621003', flow: 'outflow', payment_status: 'Pending' },
-      'Communications': { transaction_type: 'Expense', transaction_subtype: 'Communications', transaction_category: 'Housing', target_account: '621004', flow: 'outflow', payment_status: 'Pending' },
-      'Repairs': { transaction_type: 'Expense', transaction_subtype: 'Repairs', transaction_category: 'Housing', target_account: '611002', flow: 'outflow', payment_status: 'Completed' }
+      'Rent - Oeiras': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Living & Household', target_account: '611001', flow: 'outflow', payment_status: 'Pending' },
+      'Electricity Expense (ENDESA)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '612001', flow: 'outflow', payment_status: 'Pending' },
+      'Gas Expense (DIGAL)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '612002', flow: 'outflow', payment_status: 'Pending' },
+      'Water Expense (SIMAS)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '612003', flow: 'outflow', payment_status: 'Pending' },
+      'Communications Expense (NOS)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '612004', flow: 'outflow', payment_status: 'Pending' },
+      'Household Utensils - Repairs': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Living & Household', target_account: '611004', flow: 'outflow', payment_status: 'Completed' }
     },
     'Transports': {
-      'Gasoline': { transaction_type: 'Expense', transaction_subtype: 'Gasoline', transaction_category: 'Transport', target_account: '631001', flow: 'outflow', payment_status: 'Completed' },
-      'Tolls': { transaction_type: 'Expense', transaction_subtype: 'Tolls', transaction_category: 'Transport', target_account: '631002', flow: 'outflow', payment_status: 'Completed' },
-      'Parking': { transaction_type: 'Expense', transaction_subtype: 'Parking', transaction_category: 'Transport', target_account: '631003', flow: 'outflow', payment_status: 'Completed' }
+      'Vehicle Fuel - Car Gasoline': { transaction_type: 'Expense', transaction_subtype: 'Personal & Public Transports', transaction_category: 'Personal & Public Transports', target_account: '613001', flow: 'outflow', payment_status: 'Completed' },
+      'Tolls Expense': { transaction_type: 'Expense', transaction_subtype: 'Personal & Public Transports', transaction_category: 'Personal & Public Transports', target_account: '613006', flow: 'outflow', payment_status: 'Completed' },
+      'Parking Expense': { transaction_type: 'Expense', transaction_subtype: 'Personal & Public Transports', transaction_category: 'Personal & Public Transports', target_account: '613005', flow: 'outflow', payment_status: 'Completed' }
     },
     'Banking & Liabilities': {
-      'Pay Credit card': { transaction_type: 'Debt', transaction_subtype: 'Amortization', transaction_category: 'Banking', target_account: '221002', flow: 'outflow', payment_status: 'Completed' },
-      'Borrow money': { transaction_type: 'Debt', transaction_subtype: 'New Debt', transaction_category: 'Banking', target_account: '111001', flow: 'inflow', payment_status: 'Completed' },
-      'Amortize Loan': { transaction_type: 'Debt', transaction_subtype: 'Amortization', transaction_category: 'Banking', target_account: '211006', flow: 'outflow', payment_status: 'Completed' },
-      'Transfers Savings': { transaction_type: 'Asset', transaction_subtype: 'Transfers', transaction_category: 'Banking', target_account: '131001', flow: 'neutral', payment_status: 'Completed', entity: 'Savings Account' }
+      'Credit Card Debt Universo': { transaction_type: 'Liabilities', transaction_subtype: 'Credit Card Liabilities (Dívidas dos Cartões)', transaction_category: 'Credit Card Liabilities (Dívidas dos Cartões)', target_account: '213002', flow: 'outflow', payment_status: 'Completed' },
+      'Loans CGD': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Loans / Financiamentos', transaction_category: 'Personal Loans / Financiamentos', target_account: '211001', flow: 'outflow', payment_status: 'Completed' },
+      'Savings Account CGD': { transaction_type: 'Assets', transaction_subtype: 'Savings Accounts', transaction_category: 'Savings Accounts', target_account: '121002', flow: 'neutral', payment_status: 'Completed' }
     },
     'Personal & Lifestyle': {
-      'Restaurant': { transaction_type: 'Expense', transaction_subtype: 'Restaurants', transaction_category: 'Entertainment', target_account: '661', flow: 'outflow', payment_status: 'Completed' },
-      'Cinema': { transaction_type: 'Expense', transaction_subtype: 'Cinema', transaction_category: 'Entertainment', target_account: '662', flow: 'outflow', payment_status: 'Completed' },
-      'Supermarket': { transaction_type: 'Expense', transaction_subtype: 'Supermarket', transaction_category: 'Markets', target_account: '641001', flow: 'outflow', payment_status: 'Completed' },
-      'Clothing': { transaction_type: 'Expense', transaction_subtype: 'Clothing', transaction_category: 'Markets', target_account: '643001', flow: 'outflow', payment_status: 'Completed' }
+      'Entertainment - Restaurants': { transaction_type: 'Expense', transaction_subtype: 'Entertainment', transaction_category: 'Entertainment', target_account: '616001', flow: 'outflow', payment_status: 'Completed' },
+      'Entertainment - Cinema': { transaction_type: 'Expense', transaction_subtype: 'Entertainment', transaction_category: 'Entertainment', target_account: '616003', flow: 'outflow', payment_status: 'Completed' },
+      'Supermarket - Personal Care': { transaction_type: 'Expense', transaction_subtype: 'Food & Consumables', transaction_category: 'Food & Consumables', target_account: '617004', flow: 'outflow', payment_status: 'Completed' },
+      'Clothing Expense': { transaction_type: 'Expense', transaction_subtype: 'Tools, Materials & Clothing', transaction_category: 'Tools, Materials & Clothing', target_account: '618003', flow: 'outflow', payment_status: 'Completed' }
     },
     'Income & Revenue': {
-      'Salary': { transaction_type: 'Income', transaction_subtype: 'Base Salary', transaction_category: 'Payroll', target_account: '711001', flow: 'inflow', payment_status: 'Pending' },
-      'Bonus': { transaction_type: 'Income', transaction_subtype: 'Bonus', transaction_category: 'Payroll', target_account: '711003', flow: 'inflow', payment_status: 'Completed' }
+      'Salary - Base Salary': { transaction_type: 'Income', transaction_subtype: 'Payroll & Active Income', transaction_category: 'Payroll & Active Income', target_account: '711001', flow: 'inflow', payment_status: 'Pending' },
+      'Salary - Bonus': { transaction_type: 'Income', transaction_subtype: 'Payroll & Active Income', transaction_category: 'Payroll & Active Income', target_account: '711002', flow: 'inflow', payment_status: 'Completed' }
     }
   };
 
   const [mainMenu, setMainMenu] = useState('House & Utilities');
-  const [subMenuAction, setSubMenuAction] = useState('Rent');
+  const [subMenuAction, setSubMenuAction] = useState('Rent - Oeiras');
 
   const handleMainMenuChange = (val) => {
     setMainMenu(val);
@@ -207,7 +207,7 @@ function App() {
   const [txTargetAccount, setTxTargetAccount] = useState('');
   const [txSourceDestBank, setTxSourceDestBank] = useState('');
   const [txFlow, setTxFlow] = useState('');
-
+  const [editingTxId, setEditingTxId] = useState(null);
   const entityToTargetAccount = {
     "Salary": "711001",
     "Bonus": "711003",
@@ -234,9 +234,31 @@ function App() {
     "Cofidis": "211006",
     "Jota": "212001",
     "Mae": "212002",
-    "Savings Account": "131001"
-  };
+    "Savings Account": "131001",
 
+    // New Mappings
+    "Reni (Burrow)": "212003",
+    "Pedro (Burrow)": "212004",
+    "Social Security Debt": "231001",
+    "Finances Debt": "231002",
+    "NOS Debt": "231003",
+    "PhD": "671001",
+    "Trainings": "671002",
+    "Psychology": "651006",
+    "Psychiatry": "651007",
+    "Dentist": "651008",
+    "Pharmacy": "651009",
+    "Second Rent (e.g., Portela)": "611005",
+    "Secondary Communications (NOS)": "621005",
+    "Public Transport (Metro/Train)": "632001",
+    "Personal Care & Cosmetics": "644001",
+    "Shoes": "645001",
+    "Nightlife & Disco": "664001",
+    "Gaming": "665001",
+    "Vacation Subsidy": "711004",
+    "Christmas Subsidy": "711005",
+    "Teaching Classes": "712002"
+  };
   // Auto-fill Entity Category when Entity changes
   const handleEntityChange = (entityVal) => {
     setTxEntity(entityVal);
@@ -333,6 +355,91 @@ function App() {
     }
     return rawTemplates;
   }, [rawTemplates, email]);
+
+  // Programmatic cleanup of corrupted import categories and templates data
+  useEffect(() => {
+    const corruptedSubtypes = ['⚡ Pay Utilities', 'Pay Utilities'];
+    const corruptedCategories = ['Expenses • Utilities'];
+    const obsoleteSubclasses = ['Salary (payroll)', 'Income • Payroll'];
+    const obsoleteCategories = ['Income • Payroll', 'Salary (payroll)'];
+
+    let needsSync = false;
+    
+    const uniqueSubClass = Array.from(new Set(subClassOptions));
+    const uniqueCategory = Array.from(new Set(categoryOptions));
+    const uniqueEntity = Array.from(new Set(entityOptions));
+
+    const updatedSubClass = uniqueSubClass.filter(sub => !corruptedSubtypes.includes(sub) && !obsoleteSubclasses.includes(sub));
+    const updatedCategory = uniqueCategory.filter(cat => !corruptedCategories.includes(cat) && !obsoleteCategories.includes(cat));
+    const updatedEntity = uniqueEntity.filter(ent => ent !== 'Salary');
+
+    if (
+      updatedSubClass.length !== subClassOptions.length ||
+      updatedCategory.length !== categoryOptions.length ||
+      updatedEntity.length !== entityOptions.length
+    ) {
+      needsSync = true;
+    }
+
+    const updatedSubtypeMap = { ...subtypeToCategoryMap };
+    corruptedSubtypes.forEach(sub => {
+      if (updatedSubtypeMap[sub]) {
+        delete updatedSubtypeMap[sub];
+        needsSync = true;
+      }
+    });
+    obsoleteSubclasses.forEach(sub => {
+      if (updatedSubtypeMap[sub]) {
+        delete updatedSubtypeMap[sub];
+        needsSync = true;
+      }
+    });
+
+    const updatedEntityMappings = { ...entityMappings };
+    if (updatedEntityMappings['NOS'] === 'Expenses • Utilities') {
+      updatedEntityMappings['NOS'] = 'Communications Expense (NOS)';
+      needsSync = true;
+    }
+    if (updatedEntityMappings['ENDESA'] === 'Expenses • Utilities') {
+      updatedEntityMappings['ENDESA'] = 'Electricity Expense (ENDESA)';
+      needsSync = true;
+    }
+    if (updatedEntityMappings['Salary']) {
+      delete updatedEntityMappings['Salary'];
+      needsSync = true;
+    }
+    Object.entries(updatedEntityMappings).forEach(([ent, cat]) => {
+      if (obsoleteCategories.includes(cat)) {
+        updatedEntityMappings[ent] = 'Payroll & Active Income';
+        needsSync = true;
+      }
+    });
+
+    // Clean up templates
+    const hasCorruptedTemplates = rawTemplates.some(tpl => {
+      const nameLower = tpl.name.toLowerCase();
+      return nameLower === 'pay utilities' || nameLower === '⚡ pay utilities';
+    });
+    let updatedTemplates = rawTemplates;
+    if (hasCorruptedTemplates) {
+      updatedTemplates = rawTemplates.filter(tpl => {
+        const nameLower = tpl.name.toLowerCase();
+        return nameLower !== 'pay utilities' && nameLower !== '⚡ pay utilities';
+      });
+      needsSync = true;
+    }
+
+    if (needsSync) {
+      syncSettings({
+        subClassOptions: updatedSubClass,
+        categoryOptions: updatedCategory,
+        entityOptions: updatedEntity,
+        subtypeToCategoryMap: updatedSubtypeMap,
+        entityMappings: updatedEntityMappings,
+        templates: updatedTemplates
+      });
+    }
+  }, [subClassOptions, categoryOptions, entityOptions, subtypeToCategoryMap, entityMappings, rawTemplates, syncSettings]);
 
   const applyTemplate = (tpl) => {
     setTxClass(tpl.data.transaction_type);
@@ -607,11 +714,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
   useEffect(() => {
     if (txEntity !== '' && entityOptions && !entityOptions.includes(txEntity)) {
-      const firstEntity = entityOptions[0] || '';
-      setTxEntity(firstEntity);
-      setTxCategory(entityMappings[firstEntity] || categoryOptions[0] || '');
+      setTxEntity(entityOptions[0] || '');
     }
-  }, [entityOptions, entityMappings, txEntity, categoryOptions]);
+  }, [entityOptions, txEntity]);
 
   useEffect(() => {
     if (txCategory !== '' && categoryOptions && !categoryOptions.includes(txCategory)) {
@@ -645,11 +750,15 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
   useEffect(() => {
     if (qaEntity !== '' && entityOptions && !entityOptions.includes(qaEntity)) {
-      const firstEntity = entityOptions[0] || '';
-      setQaEntity(firstEntity);
-      setQaCategory(entityMappings[firstEntity] || categoryOptions[0] || '');
+      setQaEntity(entityOptions[0] || '');
     }
-  }, [entityOptions, entityMappings, qaEntity, categoryOptions]);
+  }, [entityOptions, qaEntity]);
+
+  useEffect(() => {
+    if (qaCategory !== '' && categoryOptions && !categoryOptions.includes(qaCategory)) {
+      setQaCategory(categoryOptions[0] || '');
+    }
+  }, [categoryOptions, qaCategory]);
 
   const handleQaEntityChange = (entityVal) => {
     setQaEntity(entityVal);
@@ -731,6 +840,377 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     setQaFlow('');
   };
 
+  const exportSettingsCSV = () => {
+    handleExportSettingsCSV({
+      fromOptions,
+      statusOptions,
+      templates
+    }, getMatrixRows);
+  };
+
+  const importSettingsCSV = (e) => {
+    handleImportSettingsCSV(e, { syncSettings });
+  };
+
+  const getMatrixRows = () => {
+    const rows = [];
+    const coveredEntities = new Set();
+    const coveredCategories = new Set();
+    const coveredSubtypes = new Set();
+
+    entityOptions.forEach((entity) => {
+      if (!entity || coveredEntities.has(entity)) return;
+      const category = entityMappings[entity] || '';
+      let subtype = '';
+      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
+        if (cats && cats.includes(category)) {
+          subtype = sub;
+          break;
+        }
+      }
+      rows.push({
+        key: `${subtype}:::${category}:::${entity}`,
+        subtype,
+        category,
+        entity
+      });
+      coveredEntities.add(entity);
+      if (category) coveredCategories.add(category);
+      if (subtype) coveredSubtypes.add(subtype);
+    });
+
+    categoryOptions.forEach((category) => {
+      if (!category || coveredCategories.has(category)) return;
+      let subtype = '';
+      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
+        if (cats && cats.includes(category)) {
+          subtype = sub;
+          break;
+        }
+      }
+      rows.push({
+        key: `${subtype}:::${category}:::`,
+        subtype,
+        category,
+        entity: ''
+      });
+      coveredCategories.add(category);
+      if (subtype) coveredSubtypes.add(subtype);
+    });
+
+    subClassOptions.forEach((subtype) => {
+      if (!subtype || coveredSubtypes.has(subtype)) return;
+      rows.push({
+        key: `${subtype}::::::`,
+        subtype,
+        category: '',
+        entity: ''
+      });
+      coveredSubtypes.add(subtype);
+    });
+
+    return rows;
+  };
+
+  const handleSaveMatrix = (updatedRows) => {
+    const newSubClassOptions = new Set();
+    const newCategoryOptions = new Set();
+    const newEntityOptions = new Set();
+    const newEntityMappings = {};
+    const newSubtypeToCategoryMap = {};
+
+    const seen = new Set();
+    const uniqueRows = [];
+    updatedRows.forEach((row) => {
+      const key = `${row.subtype || ''}:::${row.category || ''}:::${row.entity || ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueRows.push(row);
+      }
+    });
+
+    uniqueRows.forEach((row) => {
+      const sub = row.subtype ? row.subtype.trim() : '';
+      const cat = row.category ? row.category.trim() : '';
+      const ent = row.entity ? row.entity.trim() : '';
+
+      if (sub) {
+        newSubClassOptions.add(sub);
+        if (!newSubtypeToCategoryMap[sub]) {
+          newSubtypeToCategoryMap[sub] = [];
+        }
+      }
+
+      if (cat) {
+        newCategoryOptions.add(cat);
+        if (sub) {
+          if (!newSubtypeToCategoryMap[sub].includes(cat)) {
+            newSubtypeToCategoryMap[sub].push(cat);
+          }
+        }
+      }
+
+      if (ent) {
+        newEntityOptions.add(ent);
+        if (cat) {
+          newEntityMappings[ent] = cat;
+        }
+      }
+    });
+
+    const defaultSubclasses = ["Banks","Investments","Personal Debt","Other Debts","Living & Household","Utilities","Personal Transports","Public Transports","Health","Markets & Personal care","Payroll","Education","Entertainment","Food & Consumables","Tools & Materials","Clothing & Shoes","Insurances","Other Consumables","Taxes & State"];
+    const deletedSubtypes = new Set();
+    getMatrixRows().forEach(row => {
+      if (!row.category && !row.entity && !uniqueRows.some(ur => ur.subtype === row.subtype)) {
+        deletedSubtypes.add(row.subtype);
+      }
+    });
+
+    subClassOptions.forEach(sub => {
+      const isDefault = defaultSubclasses.includes(sub);
+      const isDeleted = deletedSubtypes.has(sub);
+      const hasRowsLeft = uniqueRows.some(row => row.subtype === sub);
+      
+      if (hasRowsLeft || (isDefault && !isDeleted)) {
+        newSubClassOptions.add(sub);
+        if (!newSubtypeToCategoryMap[sub]) {
+          newSubtypeToCategoryMap[sub] = [];
+        }
+      }
+    });
+
+    syncSettings({
+      subClassOptions: Array.from(newSubClassOptions),
+      categoryOptions: Array.from(newCategoryOptions),
+      entityOptions: Array.from(newEntityOptions),
+      entityMappings: newEntityMappings,
+      subtypeToCategoryMap: newSubtypeToCategoryMap
+    });
+    
+    setIsMatrixEditingAll(false);
+    setMatrixEditingRowKey(null);
+    setMatrixEditData({});
+    toast.success("Categories matrix updated successfully!");
+  };
+
+  const handleDeleteMatrixSelections = () => {
+    const selectedKeys = new Set(selectedMatrixKeys);
+    const updatedRows = getMatrixRows().filter(row => !selectedKeys.has(row.key));
+    handleSaveMatrix(updatedRows);
+    setSelectedMatrixKeys([]);
+  };
+
+  const renderCategoriesMatrixTable = () => {
+    let rows = getMatrixRows();
+    if (categoriesSortField) {
+      rows = [...rows].sort((a, b) => {
+        const valA = (a[categoriesSortField] || '').toLowerCase();
+        const valB = (b[categoriesSortField] || '').toLowerCase();
+        if (valA < valB) return categoriesSortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return categoriesSortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    const isEditingAny = isMatrixEditingAll || matrixEditingRowKey !== null;
+
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        {selectedMatrixKeys.length > 0 && (
+          <div className="flex items-center justify-between bg-[#8b4513]/10 border border-[#8b4513]/20 rounded-lg p-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-150">
+            <span className="text-[9px] font-black uppercase text-[#4b2c20] tracking-wider pl-1">
+              Selected: <span className="font-bold text-amber-900">{selectedMatrixKeys.length}</span>
+            </span>
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-left border-collapse text-[10px] font-sans">
+            <thead>
+              <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                <th className="py-2 px-2 w-8 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedMatrixKeys.length === rows.length && rows.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedMatrixKeys(rows.map(r => r.key));
+                      } else {
+                        setSelectedMatrixKeys([]);
+                      }
+                    }}
+                    className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
+                  />
+                </th>
+                <th
+                  className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                  onClick={() => {
+                    if (categoriesSortField === 'subtype') {
+                      setCategoriesSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setCategoriesSortField('subtype');
+                      setCategoriesSortDirection('asc');
+                    }
+                  }}
+                >
+                  Subtype {categoriesSortField === 'subtype' ? (categoriesSortDirection === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                  onClick={() => {
+                    if (categoriesSortField === 'category') {
+                      setCategoriesSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setCategoriesSortField('category');
+                      setCategoriesSortDirection('asc');
+                    }
+                  }}
+                >
+                  Category {categoriesSortField === 'category' ? (categoriesSortDirection === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                  onClick={() => {
+                    if (categoriesSortField === 'entity') {
+                      setCategoriesSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setCategoriesSortField('entity');
+                      setCategoriesSortDirection('asc');
+                    }
+                  }}
+                >
+                  Entity {categoriesSortField === 'entity' ? (categoriesSortDirection === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th className="py-2 px-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+              {rows.map((row) => {
+                const isChecked = selectedMatrixKeys.includes(row.key);
+                const isInlineEditing = matrixEditingRowKey === row.key;
+                const isEditingRow = isMatrixEditingAll || isInlineEditing;
+
+                const displaySubtype = isEditingRow ? (matrixEditData[row.key]?.subtype ?? row.subtype) : row.subtype;
+                const displayCategory = isEditingRow ? (matrixEditData[row.key]?.category ?? row.category) : row.category;
+                const displayEntity = isEditingRow ? (matrixEditData[row.key]?.entity ?? row.entity) : row.entity;
+
+                const handleFieldChange = (field, val) => {
+                  setMatrixEditData(prev => ({
+                    ...prev,
+                    [row.key]: {
+                      ...(prev[row.key] || { subtype: row.subtype, category: row.category, entity: row.entity }),
+                      [field]: val
+                    }
+                  }));
+                };
+
+                return (
+                  <tr key={row.key} className={`hover:bg-[#8b4513]/5 transition-colors ${isChecked ? 'bg-[#8b4513]/10' : ''}`}>
+                    <td className="py-2 px-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedMatrixKeys(prev => [...prev, row.key]);
+                          } else {
+                            setSelectedMatrixKeys(prev => prev.filter(k => k !== row.key));
+                          }
+                        }}
+                        className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
+                      />
+                    </td>
+                    <td className="py-2 px-2">
+                      {isEditingRow ? (
+                        <input
+                          type="text"
+                          value={displaySubtype}
+                          onChange={(e) => handleFieldChange('subtype', e.target.value)}
+                          className="bg-white border border-[#8b4513]/30 rounded px-1.5 py-0.5 w-full text-[10px] font-bold text-[#4b2c20]"
+                        />
+                      ) : (
+                        row.subtype || <span className="text-[#5d4037]/40 italic font-medium">None</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2">
+                      {isEditingRow ? (
+                        <input
+                          type="text"
+                          value={displayCategory}
+                          onChange={(e) => handleFieldChange('category', e.target.value)}
+                          className="bg-white border border-[#8b4513]/30 rounded px-1.5 py-0.5 w-full text-[10px] font-bold text-[#4b2c20]"
+                        />
+                      ) : (
+                        row.category || <span className="text-[#5d4037]/40 italic font-medium">None</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2">
+                      {isEditingRow ? (
+                        <input
+                          type="text"
+                          value={displayEntity}
+                          onChange={(e) => handleFieldChange('entity', e.target.value)}
+                          className="bg-white border border-[#8b4513]/30 rounded px-1.5 py-0.5 w-full text-[10px] font-bold text-[#4b2c20]"
+                        />
+                      ) : (
+                        row.entity || <span className="text-[#5d4037]/40 italic font-medium">None</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      {isInlineEditing ? (
+                        <div className="flex justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedRows = rows.map(r => r.key === row.key ? {
+                                subtype: matrixEditData[row.key]?.subtype ?? row.subtype,
+                                category: matrixEditData[row.key]?.category ?? row.category,
+                                entity: matrixEditData[row.key]?.entity ?? row.entity
+                              } : r);
+                              handleSaveMatrix(updatedRows);
+                            }}
+                            className="bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded px-1.5 py-0.5 text-[9px] font-bold shadow cursor-pointer"
+                          >
+                            💾 Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMatrixEditingRowKey(null);
+                              setMatrixEditData(prev => {
+                                const copy = { ...prev };
+                                delete copy[row.key];
+                                return copy;
+                              });
+                            }}
+                            className="bg-stone-500 hover:bg-stone-600 text-white rounded px-1.5 py-0.5 text-[9px] font-bold shadow cursor-pointer"
+                          >
+                            ❌ Cancel
+                          </button>
+                        </div>
+                      ) : !isMatrixEditingAll ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMatrixEditingRowKey(row.key);
+                            setMatrixEditData({
+                              [row.key]: { subtype: row.subtype, category: row.category, entity: row.entity }
+                            });
+                          }}
+                          className="text-blue-700 hover:text-blue-900 border border-transparent hover:border-blue-200 hover:bg-blue-50 px-1.5 py-0.5 rounded transition-all text-[9px] font-black cursor-pointer"
+                        >
+                          ✏️ Edit
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const renderSettingsPanel = () => {
     let title = '';
     let currentList = [];
@@ -738,40 +1218,23 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
     switch (selectedSettingType) {
       case 'from':
-        title = t.manage_from;
+        title = 'Origin/From';
         currentList = fromOptions;
         break;
       case 'status':
-        title = t.manage_status;
+        title = 'Status';
         currentList = statusOptions;
         break;
       case 'class':
-        title = t.manage_category;
+        title = 'Categories';
         currentList = classOptions;
         break;
-      case 'subClass':
-        title = t.manage_subcategory;
-        currentList = subClassOptions;
-        break;
-      case 'entity':
-        title = t.manage_entity;
-        currentList = entityOptions;
-        showEntityCategorySelector = true;
-        break;
-      case 'category':
-        title = t.manage_entityCategory;
-        currentList = categoryOptions;
-        break;
-      case 'month':
-        title = t.manage_month;
-        currentList = monthOptions;
-        break;
       case 'quickAction':
-        title = t.manage_quick_actions || 'Manage Quick Actions';
+        title = 'Quick Actions';
         currentList = templates;
         break;
       case 'allActions':
-        title = 'All actions';
+        title = 'All Actions';
         currentList = templates;
         break;
       default:
@@ -836,7 +1299,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         return;
       }
       const val = newOptionVal.trim();
-      if (currentList.includes(val)) {
+      if (currentList.some(item => typeof item === 'string' && item.toLowerCase() === val.toLowerCase())) {
         toast.error(t.err_value_exists);
         return;
       }
@@ -862,11 +1325,111 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">{title}</h3>
             <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t.official_ledger_editor}</p>
           </div>
-          {(selectedSettingType === 'quickAction' || selectedSettingType === 'allActions') && (
+          {(selectedSettingType === 'quickAction' || selectedSettingType === 'allActions' || selectedSettingType === 'class') && (
             <div className="flex items-center gap-2.5">
               {/* Buttons */}
               <div className="flex gap-1">
-                {selectedQaNames.length > 0 ? (
+                {selectedSettingType === 'class' && (
+                  <>
+                    {selectedMatrixKeys.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteMatrixSelections}
+                        className="px-2.5 h-[28px] bg-red-755 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                        title="Delete Selected"
+                      >
+                        🗑️ Delete ({selectedMatrixKeys.length})
+                      </button>
+                    )}
+                    {isMatrixEditingAll ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedRows = getMatrixRows().map(row => ({
+                              subtype: matrixEditData[row.key]?.subtype ?? row.subtype,
+                              category: matrixEditData[row.key]?.category ?? row.category,
+                              entity: matrixEditData[row.key]?.entity ?? row.entity
+                            }));
+                            handleSaveMatrix(updatedRows);
+                          }}
+                          className="px-2.5 h-[28px] bg-emerald-755 hover:bg-emerald-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                          title="Save Changes"
+                        >
+                          💾 Save All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMatrixEditingAll(false);
+                            setMatrixEditData({});
+                          }}
+                          className="px-2.5 h-[28px] bg-stone-500 hover:bg-stone-600 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                          title="Cancel Edit"
+                        >
+                          ❌ Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const initialEditData = {};
+                            getMatrixRows().forEach(row => {
+                              initialEditData[row.key] = { subtype: row.subtype, category: row.category, entity: row.entity };
+                            });
+                            setMatrixEditData(initialEditData);
+                            setIsMatrixEditingAll(true);
+                          }}
+                          className="px-2.5 h-[28px] bg-amber-700 hover:bg-amber-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                          title="Edit All Rows"
+                        >
+                          ✏️ Edit All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewMatrixSubtype('');
+                            setNewMatrixCategory('');
+                            setNewMatrixEntity('');
+                            setCustomSubtypeInput('');
+                            setCustomCategoryInput('');
+                            setIsAddMatrixModalOpen(true);
+                          }}
+                          className="px-2.5 h-[28px] bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                          title="Add New Row"
+                        >
+                          ➕ New
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => settingsFileInputRef.current.click()}
+                      className="px-2.5 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer ml-1"
+                      title="Import Settings CSV"
+                    >
+                      <span>📥</span> Import
+                    </button>
+                    <input
+                      type="file"
+                      ref={settingsFileInputRef}
+                      onChange={importSettingsCSV}
+                      accept=".csv"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={exportSettingsCSV}
+                      className="px-2.5 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                      title="Export Settings CSV"
+                    >
+                      <span>📤</span> Export
+                    </button>
+                  </>
+                )}
+                {selectedSettingType !== 'class' && selectedQaNames.length > 0 ? (
                   <>
                     {selectedSettingType === 'quickAction' && (
                       <button
@@ -932,14 +1495,31 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   )
                 )}
                 {selectedSettingType === 'allActions' && (
-                  <button
-                    type="button"
-                    onClick={() => handleExportAllActionsCSV(templates, t)}
-                    className="w-[28px] h-[28px] bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
-                    title="Export All Actions to CSV"
-                  >
-                    📤
-                  </button>
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <button
+                      type="button"
+                      onClick={() => qaFileInputRef.current.click()}
+                      className="px-2.5 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                      title="Import All Actions CSV"
+                    >
+                      <span>📥</span> Import
+                    </button>
+                    <input
+                      type="file"
+                      ref={qaFileInputRef}
+                      onChange={importQuickActionsCSV}
+                      accept=".csv"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleExportAllActionsCSV(templates, t)}
+                      className="px-2.5 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                      title="Export All Actions to CSV"
+                    >
+                      <span>📤</span> Export
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -1071,7 +1651,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           />
         ) : (
           <>
-            {selectedSettingType !== 'allActions' && (
+            {selectedSettingType !== 'allActions' && selectedSettingType !== 'class' && (
               <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                   <div>
@@ -1119,7 +1699,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
 
             {/* List of items */}
             <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
-              {currentList.length > 0 ? (
+              {selectedSettingType === 'class' ? (
+                renderCategoriesMatrixTable()
+              ) : currentList.length > 0 ? (
                 selectedSettingType === 'allActions' ? (
               <div className="flex flex-col h-full overflow-hidden">
                 {selectedQaNames.length > 0 && (
@@ -1130,64 +1712,170 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </div>
                 )}
                 <div className="flex-1 overflow-y-auto">
-                  <table className="w-full text-left border-collapse text-[10px] font-sans">
-                <thead>
-                  <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                    <th className="py-2 px-2 w-8 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedQaNames.length === currentList.length && currentList.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedQaNames(currentList.map(tpl => tpl.name));
-                          } else {
-                            setSelectedQaNames([]);
-                          }
-                        }}
-                        className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
-                      />
-                    </th>
-                    <th className="py-2 px-2">Action</th>
-                    <th className="py-2 px-2">Type/Subtype</th>
-                    <th className="py-2 px-2">Entity</th>
-                    <th className="py-2 px-2">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                  {currentList.map((tpl) => {
-                    const isChecked = selectedQaNames.includes(tpl.name);
+                  {(() => {
+                    let sortedList = [...currentList];
+                    if (actionsSortField) {
+                      sortedList.sort((a, b) => {
+                        let valA = '';
+                        let valB = '';
+                        if (actionsSortField === 'name') {
+                          valA = t(`tpl_${a.name.toLowerCase().replace(/\s+/g, '_')}`, a.name).toLowerCase();
+                          valB = t(`tpl_${b.name.toLowerCase().replace(/\s+/g, '_')}`, b.name).toLowerCase();
+                        } else if (actionsSortField === 'type') {
+                          valA = `${a.data.transaction_type || ''} • ${a.data.transaction_subtype || ''}`.toLowerCase();
+                          valB = `${b.data.transaction_type || ''} • ${b.data.transaction_subtype || ''}`.toLowerCase();
+                        } else if (actionsSortField === 'entity') {
+                          valA = (a.data.entity || '').toLowerCase();
+                          valB = (b.data.entity || '').toLowerCase();
+                        } else if (actionsSortField === 'flow') {
+                          valA = (a.data.flow || '').toLowerCase();
+                          valB = (b.data.flow || '').toLowerCase();
+                        }
+ 
+                        if (valA < valB) return actionsSortDirection === 'asc' ? -1 : 1;
+                        if (valA > valB) return actionsSortDirection === 'asc' ? 1 : -1;
+                        return 0;
+                      });
+                    }
+ 
                     return (
-                      <tr key={tpl.name} className={`hover:bg-[#8b4513]/5 transition-colors ${isChecked ? 'bg-[#8b4513]/10' : ''}`}>
-                        <td className="py-2 px-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              let updated;
-                              if (e.target.checked) {
-                                updated = [...selectedQaNames, tpl.name];
-                              } else {
-                                updated = selectedQaNames.filter(n => n !== tpl.name);
-                              }
-                              setSelectedQaNames(updated);
-                            }}
-                            className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
-                          />
-                        </td>
-                        <td className="py-2 px-2 font-bold text-[#4b2c20]">
-                          <span className="mr-1.5">{tpl.icon}</span>
-                          {t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}
-                        </td>
-                        <td className="py-2 px-2 text-stone-500 font-medium">
-                          {tpl.data.transaction_type} • {tpl.data.transaction_subtype}
-                        </td>
-                        <td className="py-2 px-2 text-stone-500 font-medium">{tpl.data.entity}</td>
-                        <td className="py-2 px-2 font-mono text-[#4b2c20]">{tpl.data.amount} G</td>
-                      </tr>
+                      <table className="w-full text-left border-collapse text-[10px] font-sans">
+                        <thead>
+                          <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                            <th className="py-2 px-2 w-8 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedQaNames.length === currentList.length && currentList.length > 0}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedQaNames(currentList.map(tpl => tpl.name));
+                                  } else {
+                                    setSelectedQaNames([]);
+                                  }
+                                }}
+                                className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
+                              />
+                            </th>
+                            <th
+                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                              onClick={() => {
+                                if (actionsSortField === 'name') {
+                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setActionsSortField('name');
+                                  setActionsSortDirection('asc');
+                                }
+                              }}
+                            >
+                              Action {actionsSortField === 'name' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
+                            </th>
+                            <th
+                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                              onClick={() => {
+                                if (actionsSortField === 'type') {
+                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setActionsSortField('type');
+                                  setActionsSortDirection('asc');
+                                }
+                              }}
+                            >
+                              Type/Subtype {actionsSortField === 'type' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
+                            </th>
+                            <th
+                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                              onClick={() => {
+                                if (actionsSortField === 'entity') {
+                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setActionsSortField('entity');
+                                  setActionsSortDirection('asc');
+                                }
+                              }}
+                            >
+                              Entity {actionsSortField === 'entity' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
+                            </th>
+                            <th
+                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                              onClick={() => {
+                                if (actionsSortField === 'flow') {
+                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setActionsSortField('flow');
+                                  setActionsSortDirection('asc');
+                                }
+                              }}
+                            >
+                              Flow {actionsSortField === 'flow' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
+                            </th>
+                            <th className="py-2 px-2 text-right">Edit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+                          {sortedList.map((tpl) => {
+                            const isChecked = selectedQaNames.includes(tpl.name);
+                            return (
+                              <tr key={tpl.name} className={`hover:bg-[#8b4513]/5 transition-colors ${isChecked ? 'bg-[#8b4513]/10' : ''}`}>
+                                <td className="py-2 px-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      let updated;
+                                      if (e.target.checked) {
+                                        updated = [...selectedQaNames, tpl.name];
+                                      } else {
+                                        updated = selectedQaNames.filter(n => n !== tpl.name);
+                                      }
+                                      setSelectedQaNames(updated);
+                                    }}
+                                    className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
+                                  />
+                                </td>
+                                <td className="py-2 px-2 font-bold text-[#4b2c20]">
+                                  {t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}
+                                </td>
+                                <td className="py-2 px-2 text-stone-500 font-medium">
+                                  {tpl.data.transaction_type} • {tpl.data.transaction_subtype}
+                                </td>
+                                <td className="py-2 px-2 text-stone-500 font-medium">{tpl.data.entity}</td>
+                                <td className="py-2 px-2 text-stone-500 font-medium">{tpl.data.flow}</td>
+                                <td className="py-2 px-2 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedQaTemplateName(tpl.name);
+                                      setQaName(tpl.name);
+                                      setQaIcon(tpl.icon || '⚡');
+                                      setQaFrom(tpl.data.from || '');
+                                      setQaClass(tpl.data.transaction_type || '');
+                                      setQaSubClass(tpl.data.transaction_subtype || '');
+                                      setQaEntity(tpl.data.entity || '');
+                                      setQaCategory(tpl.data.transaction_category || '');
+                                      setQaTargetAccount(tpl.data.target_account || '');
+                                      setQaSourceDestBank(tpl.data.source_dest_bank || '');
+                                      setQaFlow(tpl.data.flow || '');
+                                      setQaStatus(tpl.data.payment_status || '');
+                                      setQaDescription(tpl.data.description || '');
+                                      setQaAmount(tpl.data.amount || '');
+                                      setQaDueDate(tpl.data.due_date || '');
+                                      setQaValueDate(tpl.data.value_date || '');
+                                      setQaPostingDate(tpl.data.posting_date || '');
+                                      setIsEditingQa(true);
+                                    }}
+                                    className="text-blue-700 hover:text-blue-900 font-bold px-2 py-0.5 rounded border border-transparent hover:border-blue-200 hover:bg-blue-50 transition-all cursor-pointer"
+                                    title="Edit Quick Action"
+                                  >
+                                    ✏️
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     );
-                  })}
-                </tbody>
-              </table>
+                  })()}
                 </div>
               </div>
             ) : (
@@ -1247,6 +1935,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     setTxTargetAccount('');
     setTxSourceDestBank('');
     setTxFlow('');
+    setEditingTxId(null);
   };
 
   const handleMineClick = () => {
@@ -1372,6 +2061,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           target_account: tx.target_account,
           source_dest_bank: tx.source_dest_bank,
           flow: tx.flow,
+          transaction_category: tx.transaction_category,
           transaction_subtype: tx.transaction_subtype,
           entity: tx.entity,
           origin: tx.from,
@@ -1483,6 +2173,54 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       }
 
       const amountNum = Number(txAmount);
+
+      if (editingTxId) {
+        const { error } = await supabase
+          .from('transactions')
+          .upsert([{
+            id: editingTxId,
+            profile_id: user?.id || GUEST_PROFILE_ID,
+            payment_status: txStatus,
+            transaction_type: txClass,
+            target_account: safeTarget,
+            source_dest_bank: safeSource,
+            flow: txFlow,
+            transaction_subtype: txSubClass,
+            entity: txEntity,
+            origin: txFrom,
+            amount: amountNum,
+            description: txDescription || '',
+            value_date: txValueDate,
+            posting_date: txPostingDate,
+            due_date: txDueDate || null,
+            month: new Date(txPostingDate).toLocaleString('default', { month: 'long' }),
+            year: new Date(txPostingDate).getFullYear(),
+            quarter: 'Q' + (Math.floor(new Date(txPostingDate).getMonth() / 3) + 1)
+          }]);
+
+        if (error) throw error;
+        toast.success("Transaction updated successfully!");
+        setIsNewTxModalOpen(false);
+        setEditingTxId(null);
+        setTxAmount('');
+        setTxDescription('');
+        setTxFrom('');
+        setTxSubClass('');
+        setTxEntity('');
+        setTxCategory('');
+        setTxTargetAccount('');
+        setTxSourceDestBank('');
+        setTxFlow('');
+        setTxValueDate(new Date().toISOString().split('T')[0]);
+        setTxPostingDate(new Date().toISOString().split('T')[0]);
+        setTxStatus('');
+        setTxClass('');
+        
+        const activeProfileId = user?.id || GUEST_PROFILE_ID;
+        await fetchKingdomData(activeProfileId);
+        await fetchDashboardData(activeProfileId);
+        return;
+      }
 
       const res = await registerTransaction(user?.id || GUEST_PROFILE_ID, {
         transaction_type: txClass,
@@ -1637,39 +2375,37 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               <div className="p-4 sm:p-6 overflow-hidden flex-grow relative z-10 text-[#2d1b0d] flex gap-4">
                 
                 {/* Left Navigation Menu (Wood buttons) */}
-                <div className="w-[22%] min-w-[115px] max-w-[145px] border-r border-[#8b4513]/25 pr-2 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar-subtle flex-shrink-0">
+                <div className="w-[22%] min-w-[115px] max-w-[145px] border-r border-[#8b4513]/25 pr-2 flex flex-col gap-1.5 flex-shrink-0">
                   <h4 className="text-[8.5px] font-black uppercase text-[#8b4513]/70 tracking-widest mb-1.5 pl-1 title-font">{t.kingdom_lists}</h4>
-                  {[
-                    { id: 'from', label: t.manage_from, icon: '👤' },
-                    { id: 'status', label: t.manage_status, icon: '📊' },
-                    { id: 'class', label: t.manage_category, icon: '📁' },
-                    { id: 'subClass', label: t.manage_subcategory, icon: '📂' },
-                    { id: 'entity', label: t.manage_entity, icon: '🏢' },
-                    { id: 'category', label: t.manage_entityCategory, icon: '🏷️' },
-                    { id: 'month', label: t.manage_month, icon: '📅' },
-                    { id: 'quickAction', label: t.manage_quick_actions || 'Manage Quick Actions', icon: '⚡' },
-                    { id: 'allActions', label: 'All actions', icon: '📋' }
-                  ].map((btn) => {
-                    const isSel = selectedSettingType === btn.id;
-                    return (
-                      <button
-                        key={btn.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedSettingType(btn.id);
-                          setNewOptionVal('');
-                        }}
-                        className={`text-left px-2 py-2 md:py-1.5 rounded-lg font-black text-[8.5px] leading-tight uppercase tracking-wider transition-all border cursor-pointer min-h-[36px] md:min-h-0 flex items-center ${
-                          isSel
-                            ? 'bg-[#8b4513]/20 border-[#8b4513] text-[#4b2c20] shadow-inner font-black scale-[1.02]'
-                            : 'bg-[#faf4e5]/80 border-[#8b4513]/10 text-[#5d4037]/80 hover:bg-[#8b4513]/5 hover:text-[#4b2c20]'
-                        }`}
-                      >
-                        <span className="mr-1 text-[10px] flex-shrink-0">{btn.icon}</span>
-                        <span className="truncate">{btn.label}</span>
-                      </button>
-                    );
-                  })}
+                  <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar-subtle">
+                    {[
+                      { id: 'from', label: 'Origin/From', icon: '👤' },
+                      { id: 'status', label: 'Status', icon: '📊' },
+                      { id: 'class', label: 'Categories', icon: '📁' },
+                      { id: 'quickAction', label: 'Quick Actions', icon: '⚡' },
+                      { id: 'allActions', label: 'All Actions', icon: '📋' }
+                    ].map((btn) => {
+                      const isSel = selectedSettingType === btn.id;
+                      return (
+                        <button
+                          key={btn.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSettingType(btn.id);
+                            setNewOptionVal('');
+                          }}
+                          className={`text-left px-2 py-2 md:py-1.5 rounded-lg font-black text-[8.5px] leading-tight uppercase tracking-wider transition-all border cursor-pointer min-h-[36px] md:min-h-0 flex items-center ${
+                            isSel
+                              ? 'bg-[#8b4513]/20 border-[#8b4513] text-[#4b2c20] shadow-inner font-black scale-[1.02]'
+                              : 'bg-[#faf4e5]/80 border-[#8b4513]/10 text-[#5d4037]/80 hover:bg-[#8b4513]/5 hover:text-[#4b2c20]'
+                          }`}
+                        >
+                          <span className="mr-1 text-[10px] flex-shrink-0">{btn.icon}</span>
+                          <span className="truncate">{btn.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Right Settings Detail Panel */}
@@ -1727,6 +2463,121 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           entityMappings={entityMappings}
           accountMappings={accountMappings}
         />
+        <Modal
+          isOpen={isAddMatrixModalOpen}
+          onClose={() => setIsAddMatrixModalOpen(false)}
+          title="Add New Category/Entity Mapping"
+          {...STANDARD_MODAL_PROPS}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const subtype = newMatrixSubtype === 'NEW_SUBTYPE' ? customSubtypeInput.trim() : newMatrixSubtype;
+              const category = newMatrixCategory === 'NEW_CATEGORY' ? customCategoryInput.trim() : newMatrixCategory;
+              const entity = newMatrixEntity.trim();
+
+              if (!subtype && !category && !entity) {
+                toast.error("At least one field must be filled!");
+                return;
+              }
+
+              const currentRows = getMatrixRows();
+              const isDuplicate = currentRows.some(row => 
+                (row.subtype || '').toLowerCase() === (subtype || '').toLowerCase() &&
+                (row.category || '').toLowerCase() === (category || '').toLowerCase() &&
+                (row.entity || '').toLowerCase() === (entity || '').toLowerCase()
+              );
+              
+              if (isDuplicate) {
+                toast.error("This mapping already exists!");
+                return;
+              }
+
+              const newRow = {
+                subtype,
+                category,
+                entity
+              };
+              handleSaveMatrix([...currentRows, newRow]);
+              setIsAddMatrixModalOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                Subtype
+              </label>
+              <select
+                value={newMatrixSubtype}
+                onChange={(e) => setNewMatrixSubtype(e.target.value)}
+                className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+              >
+                <option value="">-- Select Subtype --</option>
+                {subClassOptions.map((sub) => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+                <option value="NEW_SUBTYPE">+ Add New Subtype...</option>
+              </select>
+              {newMatrixSubtype === 'NEW_SUBTYPE' && (
+                <input
+                  type="text"
+                  placeholder="Enter New Subtype"
+                  value={customSubtypeInput}
+                  onChange={(e) => setCustomSubtypeInput(e.target.value)}
+                  required
+                  className="w-full mt-2 bg-[#faf4e5]/85 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                Category
+              </label>
+              <select
+                value={newMatrixCategory}
+                onChange={(e) => setNewMatrixCategory(e.target.value)}
+                className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-lg h-[38px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+              >
+                <option value="">-- Select Category --</option>
+                {categoryOptions.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="NEW_CATEGORY">+ Add New Category...</option>
+              </select>
+              {newMatrixCategory === 'NEW_CATEGORY' && (
+                <input
+                  type="text"
+                  placeholder="Enter New Category"
+                  value={customCategoryInput}
+                  onChange={(e) => setCustomCategoryInput(e.target.value)}
+                  required
+                  className="w-full mt-2 bg-[#faf4e5]/85 border border-[#8b4513]/25 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                Entity
+              </label>
+              <input
+                type="text"
+                placeholder="Enter Entity Name (Optional)"
+                value={newMatrixEntity}
+                onChange={(e) => setNewMatrixEntity(e.target.value)}
+                className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-2.5 bg-[#8b4513] text-white font-black text-[10px] uppercase tracking-wider rounded-xl hover:scale-[1.01] active:scale-99 transition-all shadow border border-[#d4af37]/25 cursor-pointer"
+            >
+              Add Mapping
+            </button>
+          </form>
+        </Modal>
         {/* Navegação Inferior (Estática) */}
         <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
 
@@ -2563,7 +3414,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     <option value="">-- Choose --</option>
                     {templates.map((tpl, idx) => (
                       <option key={idx} value={tpl.name}>
-                        {tpl.icon} {tpl.name}
+                        {tpl.name}
                       </option>
                     ))}
                   </select>
@@ -3257,14 +4108,16 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                 className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#ffd700] cursor-pointer"
                               />
                             </th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.date')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.class')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">Nature/Flow</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.sub_class')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.type')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.subcategory')}</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Nature/Flow</th>
                             <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">{t.description}</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('edit') || 'Edit'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
@@ -3285,6 +4138,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                         );
                                       }}
                                       className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <input
+                                      type="date"
+                                      value={editingTxs[tx.id]?.posting_date || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'posting_date', e.target.value)}
+                                      className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
                                     />
                                   </td>
                                   <td className="py-2 px-3 whitespace-nowrap">
@@ -3318,24 +4179,16 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     </select>
                                   </td>
                                   <td className="py-2 px-3 whitespace-nowrap">
-                                    <div className="flex flex-col gap-1">
-                                      <select
-                                        value={editingTxs[tx.id]?.transaction_nature || 'cash'}
-                                        onChange={e => handleFieldChange(tx.id, 'transaction_nature', e.target.value)}
-                                        className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                                      >
-                                        <option value="cash">cash</option>
-                                        <option value="accrual">accrual</option>
-                                      </select>
-                                      <select
-                                        value={editingTxs[tx.id]?.transaction_flow || 'inflow'}
-                                        onChange={e => handleFieldChange(tx.id, 'transaction_flow', e.target.value)}
-                                        className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                                      >
-                                        <option value="inflow">inflow</option>
-                                        <option value="outflow">outflow</option>
-                                      </select>
-                                    </div>
+                                    <select
+                                      value={editingTxs[tx.id]?.transaction_category || ''}
+                                      onChange={e => handleFieldChange(tx.id, 'transaction_category', e.target.value)}
+                                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                    >
+                                      <option value="">-</option>
+                                      {categoryOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
                                   </td>
                                   <td className="py-2 px-3 whitespace-nowrap">
                                     <select
@@ -3362,6 +4215,26 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     </select>
                                   </td>
                                   <td className="py-2 px-3 whitespace-nowrap">
+                                    <div className="flex flex-col gap-1">
+                                      <select
+                                        value={editingTxs[tx.id]?.transaction_nature || 'cash'}
+                                        onChange={e => handleFieldChange(tx.id, 'transaction_nature', e.target.value)}
+                                        className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                      >
+                                        <option value="cash">cash</option>
+                                        <option value="accrual">accrual</option>
+                                      </select>
+                                      <select
+                                        value={editingTxs[tx.id]?.transaction_flow || 'inflow'}
+                                        onChange={e => handleFieldChange(tx.id, 'transaction_flow', e.target.value)}
+                                        className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                                      >
+                                        <option value="inflow">inflow</option>
+                                        <option value="outflow">outflow</option>
+                                      </select>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap">
                                     <input
                                       type="number"
                                       value={editingTxs[tx.id]?.amount || 0}
@@ -3369,18 +4242,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                       className="w-20 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-mono text-right"
                                     />
                                   </td>
-                                  <td className="py-2 px-3 whitespace-nowrap font-sans font-bold text-stone-500">
-                                    <input
-                                      type="text"
-                                      value={editingTxs[tx.id]?.description || ''}
-                                      onChange={e => handleFieldChange(tx.id, 'description', e.target.value)}
-                                      className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                                    />
-                                  </td>
+                                  <td className="py-2 px-3 whitespace-nowrap text-right"></td>
                                 </tr>
                               );
                             }
-
+ 
                             return (
                               <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
                                 <td className="py-2 px-3 whitespace-nowrap w-8">
@@ -3398,6 +4264,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
                                   />
                                 </td>
+                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.posting_date || tx.value_date || '-'}</td>
                                 <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
                                 <td className="py-2 px-3 whitespace-nowrap">
                                   <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
@@ -3421,18 +4288,44 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     {tx.transaction_type}
                                   </span>
                                 </td>
+                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{entityMappings[tx.entity] || tx.transaction_category || '-'}</td>
+                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
+                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                                 <td className="py-2 px-3 whitespace-nowrap">
                                   <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase mr-1" title="Target Account">{tx.target_account || '-'}</span>
                                   <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase" title="Source/Dest Bank">{tx.source_dest_bank || '-'}</span>
                                 </td>
-                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
-                                <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                                 <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
                                   tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')
                                 }`}>
                                   {tx.flow === 'inflow' ? '+' : (tx.flow === 'outflow' ? '-' : '')}{Number(tx.amount).toLocaleString()}g
                                 </td>
-                                <td className="py-2 px-3 whitespace-nowrap text-stone-500 max-w-[150px] truncate" title={tx.description || ''}>{tx.description || '-'}</td>
+                                <td className="py-2 px-3 whitespace-nowrap text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setTxClass(tx.transaction_type || '');
+                                      setTxAmount(tx.amount || '');
+                                      setTxFrom(tx.from || '');
+                                      setTxValueDate(tx.value_date || new Date().toISOString().split('T')[0]);
+                                      setTxPostingDate(tx.posting_date || new Date().toISOString().split('T')[0]);
+                                      setTxStatus(tx.payment_status || '');
+                                      setTxSubClass(tx.transaction_subtype || '');
+                                      setTxEntity(tx.entity || '');
+                                      setTxCategory(tx.transaction_category || '');
+                                      setTxDescription(tx.description || '');
+                                      setTxTargetAccount(tx.target_account || '');
+                                      setTxSourceDestBank(tx.source_dest_bank || '');
+                                      setTxFlow(tx.flow || '');
+                                      setEditingTxId(tx.id);
+                                      setIsNewTxModalOpen(true);
+                                    }}
+                                    className="text-[#b8860b] hover:text-[#d4af37] font-black px-2 py-0.5 rounded border border-[#8b4513]/25 hover:bg-[#8b4513]/10 transition-all cursor-pointer"
+                                    title="Edit Transaction"
+                                  >
+                                    ✏️
+                                  </button>
+                                </td>
                               </tr>
                             );
                           })}
@@ -3598,7 +4491,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     <div className="flex gap-1 flex-wrap justify-end">
                                       <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_nature || '-'}</span>
                                       <span className="uppercase text-[8px] bg-[#8b4513]/10 text-stone-600 px-1 rounded">{tx.transaction_flow || '-'}</span>
-                                      <span className="uppercase text-[8px] bg-amber-100 text-amber-800 px-1 rounded border border-amber-200">{tx.transaction_category || '-'}</span>
+                                      <span className="uppercase text-[8px] bg-amber-100 text-amber-800 px-1 rounded border border-amber-200">{entityMappings[tx.entity] || tx.transaction_category || '-'}</span>
                                     </div>
                                   </div>
                                 </>
@@ -3610,7 +4503,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     </>
                   ) : (
                     <p className="text-center py-12 text-xs text-[#5d4037]/60 italic font-serif">
-                      {t.no_options_registered}
+                      {t('no_transactions_registered', 'No transactions registered in this list.')}
                     </p>
                   )}
                 </div>

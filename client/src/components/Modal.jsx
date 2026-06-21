@@ -24,7 +24,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl', al
         }
       }}
       className={`absolute inset-0 bg-black/90 flex ${align} justify-center p-4 backdrop-blur-sm`}
-      style={{ zIndex: Z_LAYERS.OVERLAY }}
+      style={{ zIndex: Z_LAYERS.MODAL_OVERLAY }}
     >
       <div className={`bg-[#f4e4bc] w-full max-h-[88%] ${size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
         

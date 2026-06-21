@@ -5,7 +5,8 @@ export const STANDARD_MODAL_PROPS = {
 
 export const Z_LAYERS = {
   OVERLAY: 100,      // Settings, Dashboard, Transactions View overlays, and Modal backdrop
-  MODAL_CONTENT: 110, // Inner content, close buttons, modal headers
+  MODAL_OVERLAY: 130, // Actual popup modals (register movement modal, etc.)
+  MODAL_CONTENT: 140, // Inner content, close buttons, modal headers
   BOTTOM_NAV: 120    // Bottom Navigation Bar
 };
 

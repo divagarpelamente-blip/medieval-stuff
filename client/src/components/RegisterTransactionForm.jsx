@@ -1,4 +1,5 @@
 import React from 'react';
+import { useKingdomStore } from '../store/useKingdomStore';
 
 const RegisterTransactionForm = ({
   txClass,
@@ -39,7 +40,7 @@ const RegisterTransactionForm = ({
   accountMappings = {},
   t = (key, fallback) => fallback || key
 }) => {
-  const subtypeToCategoryMap = {
+  const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap) || {
     "Banks": ["Bank account", "Saving account"],
     "Investments": ["Investment account"],
     "Personal Debt": ["Loans", "Burrow", "Credit Cards"],

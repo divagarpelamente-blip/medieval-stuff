@@ -5,6 +5,7 @@
 // @antigravity-ignore
 // =====================================================================
 import React from 'react';
+import { useKingdomStore } from '../store/useKingdomStore';
 
 const QuickActionFormFields = ({
   qaName,
@@ -49,7 +50,7 @@ const QuickActionFormFields = ({
   accountMappings = {},
   isCompact = false
 }) => {
-  const subtypeToCategoryMap = {
+  const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap) || {
     "Banks": ["Bank account", "Saving account"],
     "Investments": ["Investment account"],
     "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
@@ -93,27 +94,15 @@ const QuickActionFormFields = ({
 
   return (
     <div className={`${rowSpacing} text-[#4b2c20]`}>
-      {/* Row 1: Name / Icon */}
+      {/* Row 1: Name */}
       <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-6">
+        <div className="col-span-12">
           <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Name</label>
           <input
             type="text"
             value={qaName}
             onChange={(e) => setQaName(e.target.value)}
             placeholder="e.g. Purchase Wood"
-            required
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
-          />
-        </div>
-        <div className="hidden sm:block sm:col-span-3" />
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Icon</label>
-          <input
-            type="text"
-            value={qaIcon}
-            onChange={(e) => setQaIcon(e.target.value)}
-            placeholder="e.g. 🪵"
             required
             className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
           />

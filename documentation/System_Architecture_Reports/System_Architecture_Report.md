@@ -135,7 +135,7 @@ The layout is structured using a mobile-first responsive framework that guarante
 
 ### D. Centralized Z-Index Stacking & Spacing
 To ensure structural integrity and prevent visual layering bugs:
-- **Z-Index Layering**: System z-indexes are centralized in `Z_LAYERS` (`OVERLAY: 100`, `MODAL_CONTENT: 110`, `BOTTOM_NAV: 120`). Elements like overlays, modals, and the bottom nav use inline style property mappings (e.g. `style={{ zIndex: Z_LAYERS.OVERLAY }}`) to prevent layout conflicts.
+- **Z-Index Layering**: System z-indexes are centralized in `Z_LAYERS` (`OVERLAY: 100`, `MODAL_OVERLAY: 130`, `MODAL_CONTENT: 140`, `BOTTOM_NAV: 120`). Elements like overlays, modals, and the bottom nav use inline style property mappings (e.g. `style={{ zIndex: Z_LAYERS.OVERLAY }}` or `style={{ zIndex: Z_LAYERS.MODAL_OVERLAY }}`) to prevent layout conflicts, ensuring that popup modals always appear above the bottom navigation and full-screen overlays (like the General Ledger).
 - **Top Safe-Area Clearance**: The simulated camera notch has been removed, and a top spacing clearance is applied to the main wrapper viewport container via `SAFE_AREAS.TOP_CLEARANCE` (resolving to `"pt-4"` padding) to prevent contents from clipping the top edge on mobile viewports.
 
 ---
@@ -160,7 +160,6 @@ Persistence and trigger logic is strictly bound to the 4-pillar literal string a
                                                     | transaction_type     TEXT (CHECK)  |
                                                     | transaction_subtype  TEXT          |
                                                     | entity               TEXT          |
-                                                    | transaction_category TEXT          |
                                                     | target_account       TEXT          |
                                                     | source_dest_bank     TEXT          |
                                                     | flow                 TEXT (CHECK)  |
@@ -187,9 +186,11 @@ Represents the lord's metadata, configurations, and statistics.
 
 Contains the detailed financial ledger records natively utilizing a modern `snake_case` schema.
 
+> [!NOTE]
+> `transaction_category` is **not** a database column. To optimize database storage and keep mapping layouts highly flexible, category values are derived dynamically on the client side based on entity mappings (e.g. `entityMappings[tx.entity] || tx.transaction_category || '-'`).
+
 - `transaction_type` (`TEXT` - e.g. `'Income'`, `'Expense'`, `'Asset'`, `'Debt'`)
 - `transaction_subtype` (`TEXT` - e.g. `'Base Salary'`, `'Cash payment'`)
-- `transaction_category` (`TEXT` - High-level grouping, e.g. `'Payroll'`, `'Housing'`)
 - `target_account` (`TEXT` - Destination Chart of Accounts code, e.g. `'711001'`)
 - `source_dest_bank` (`TEXT` - Origin Chart of Accounts code, e.g. `'111001'`)
 - `flow` (`TEXT` - Check: `'inflow'`, `'outflow'`, or `'neutral'`)
