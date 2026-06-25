@@ -99,6 +99,26 @@ To facilitate mass updates to the treasury books without page navigation or mult
 4. **Trigger-Driven Balance Synchronizations**: Following a successful batch update, the client triggers `fetchKingdomData` and `fetchDashboardData` to pull the new trigger-recalculated Gold/XP balances and refresh the analytics engine.
 5. **Rollback & State Discard**: Cancel actions clear the selection array and discard the `editingTxs` sandbox object, leaving store state intact.
 
+### D. Chart of Accounts (COA) & Account Mappings
+
+Eldoria maintains a structured Chart of Accounts (COA) configuration in `client/src/utils/accountMappings.js` to categorize all assets, liabilities, expenses, and income systematically:
+
+- **Asset Accounts (1xxxx)**: Active bank accounts (e.g., `'111001'` CGD, `'111003'` ActiveBank), investments (`'121001'` CGD, `'121004'` WizInk Card), and savings (`'131001'` Pedro 0%).
+- **Liability Accounts (2xxxx)**: Commercial loans (`'211001'` CGD, `'211006'` Cofidis), personal loans/burrows (`'212001'` Jota, `'212002'` Mae), and credit card lines (`'221001'` CGD).
+- **Other Debts (23xxx)**: Specialized liabilities including Social Security (`'231001'`), Finances (`'231002'`), and Communications (`'231003'`).
+- **Expense Accounts (6xxxx)**: Categorized operating and administrative costs, ranging from rent (`'611001'`), utilities (`'621001'`), transports (`'631001'`), supermarket (`'641001'`), entertainment (`'661001'`), and education (`'671001'`) to financial expenses (`'681001'`).
+- **Income Accounts (7xxxx)**: Categorized revenue channels, including base salary (`'711001'`), subsidies (`'711002'`), contract services (`'712001'`), dividends (`'721001'`), and refunds/gifts (`'731001'`).
+
+The helper function `getAccountName(code)` is exported to translate numeric COA strings into human-readable titles, falling back to a generic title if the code is unrecognized.
+
+### E. CSV Data Migration & Configuration Sync
+
+To facilitate data portability and easy management of kingdom accounts, `client/src/utils/csvHelpers.js` provides utility functions for parsing, exporting, and importing configurations:
+
+1. **Transaction Ledger Import/Export (`handleExportCSV` / `handleImportCSV`)**: Exports all transaction records to CSV with UTF-8 BOM compatibility. Imports parse rows using custom CSV string splitting (handling commas, newlines, and escaping double quotes). Missing dates default to the current system date, while the transaction nature (`cash` vs `accrual`) and flow directions are resolved dynamically if omitted.
+2. **Quick Actions Templates Sync (`handleExportAllActionsCSV` / `handleImportQuickActionsCSV`)**: Exports the customized templates in bulk and parses imported CSV action items, mapping them back to database fields and syncing the updated action lists in the store.
+3. **Categories Configuration Sync (`handleExportSettingsCSV` / `handleImportSettingsCSV`)**: Serializes the `subtype`, `category`, and `entity` mapping configuration. When imported, it updates the `subClassOptions`, `categoryOptions`, `entityOptions`, `entityMappings`, and `subtypeToCategoryMap` states in Zustand and saves them back to the database profile.
+
 ---
 
 ## 3. Localization Architecture (i18next & English-First Structure)
@@ -137,6 +157,17 @@ The layout is structured using a mobile-first responsive framework that guarante
 To ensure structural integrity and prevent visual layering bugs:
 - **Z-Index Layering**: System z-indexes are centralized in `Z_LAYERS` (`OVERLAY: 100`, `MODAL_OVERLAY: 130`, `MODAL_CONTENT: 140`, `BOTTOM_NAV: 120`). Elements like overlays, modals, and the bottom nav use inline style property mappings (e.g. `style={{ zIndex: Z_LAYERS.OVERLAY }}` or `style={{ zIndex: Z_LAYERS.MODAL_OVERLAY }}`) to prevent layout conflicts, ensuring that popup modals always appear above the bottom navigation and full-screen overlays (like the General Ledger).
 - **Top Safe-Area Clearance**: The simulated camera notch has been removed, and a top spacing clearance is applied to the main wrapper viewport container via `SAFE_AREAS.TOP_CLEARANCE` (resolving to `"pt-4"` padding) to prevent contents from clipping the top edge on mobile viewports.
+
+### E. The Ornate Modal Component Visual System
+
+The global `Modal.jsx` component provides a cohesive, themed container for in-game dialogs (such as the Mine Ledger and Quick Action configurations) using traditional design elements:
+
+- **Theme & Texture Backdrop**: Combines a warm parchment-style container backdrop (`bg-[#f4e4bc]`) with a textured overlay pattern (`paper-fibers.png`) at 25% opacity to evoke a historical feel.
+- **Ornate Wood Framing**: Structured with a thick, simulated wood border (`border-[8px] border-[#5d4037]`) and dark outer shadowing, complete with decorative corner markers (`border-[#8b4513]/30`).
+- **Wax Seal Close Trigger**: Includes a deep crimson button (`bg-[#8b0000]`) mimicking a royal wax seal with a golden inner pulse indicator, which fires the `onClose` callback when clicked.
+- **Ornate Header Ribbon**: Titles are rendered inside a dark brown, skewed banner gradient adorned with golden border lines (`border-[#d4af37]`) and centered, gold-tinted title text.
+- **Escape Key Interception**: Includes a lifecycle `useEffect` hook registering a keyboard listener that intercepts `'Escape'` key downs to gracefully exit the active modal.
+- **Click-to-Dismiss Backdrop**: The outer overlay container listens to click events, dismissing the modal if the backdrop itself is clicked.
 
 ---
 

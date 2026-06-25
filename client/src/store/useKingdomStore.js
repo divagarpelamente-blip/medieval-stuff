@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import i18n from '../i18n';
+import { toast } from 'react-hot-toast';
 
 const loadLocal = (key, defaultVal) => {
   try {
@@ -70,6 +71,8 @@ export const useKingdomStore = create((set, get) => ({
   language: loadLocal('language', 'en'),
   user: null,
   role: 'lord',
+  mineLevel: 1,
+  lastCollectionTime: null,
 
   syncSettings: async (updates) => {
     set(updates);
@@ -254,8 +257,8 @@ export const useKingdomStore = create((set, get) => ({
       "transaction_subtype": "Banks",
       "entity": "CGD",
       "transaction_category": "Bank account",
-      "target_account": "131001",
-      "source_dest_bank": "111001",
+      "target_account": "10102001",
+      "source_dest_bank": "10101001",
       "flow": "neutral",
       "payment_status": "Completed",
       "description": "Internal transfer"
@@ -271,7 +274,7 @@ export const useKingdomStore = create((set, get) => ({
       "entity": "Credit Card Universo",
       "transaction_category": "Credit Cards",
       "target_account": "",
-      "source_dest_bank": "221002",
+      "source_dest_bank": "20103002",
       "flow": "outflow",
       "payment_status": "Completed",
       "description": "Credit card purchase"
@@ -286,8 +289,8 @@ export const useKingdomStore = create((set, get) => ({
       "transaction_subtype": "Personal Debt",
       "entity": "WizInk",
       "transaction_category": "Credit Cards",
-      "target_account": "221004",
-      "source_dest_bank": "111001",
+      "target_account": "20103004",
+      "source_dest_bank": "10101001",
       "flow": "outflow",
       "payment_status": "Completed",
       "description": "Credit card payment"
@@ -378,9 +381,34 @@ export const useKingdomStore = create((set, get) => ({
         set({
           email: data.email || 'guest@medieval.stuff',
           gold: data.gold ? Number(data.gold) : 0,
+          gems: data.gems !== undefined ? Number(data.gems) : 100,
           level: data.level || 1,
           xp: data.xp || 0,
         });
+
+        // Fetch gold mine building data
+        const { data: mineData, error: mineError } = await supabase
+          .from('buildings')
+          .select('*')
+          .eq('profile_id', userId)
+          .eq('building_type', 'gold_mine')
+          .maybeSingle();
+
+        if (mineError) {
+          console.error('Error fetching gold mine:', mineError);
+        }
+
+        if (mineData) {
+          set({
+            mineLevel: mineData.level,
+            lastCollectionTime: mineData.last_collection
+          });
+        } else {
+          set({
+            mineLevel: 1,
+            lastCollectionTime: new Date().toISOString()
+          });
+        }
 
         if (data.settings) {
           const s = data.settings;
@@ -517,7 +545,7 @@ export const useKingdomStore = create((set, get) => ({
         }, 0);
       
       const startingGold = 0;
-      const calculatedGold = Math.max(0, startingGold + netCash);
+      const calculatedGold = Math.floor(Math.max(0, startingGold + netCash));
 
       // If calculatedGold is different from state gold, sync it to state and database
       if (calculatedGold !== get().gold) {
@@ -635,19 +663,21 @@ export const useKingdomStore = create((set, get) => ({
         }));
       }
 
+      const finalGold = Math.floor(newGold);
+      const finalXp = Math.floor(newXp);
       // Update profiles directly in database to ensure sync even if trigger is missing
       await supabase
         .from('profiles')
         .update({
-          gold: newGold,
-          xp: newXp,
+          gold: finalGold,
+          xp: finalXp,
           level: newLevel
         })
         .eq('id', userId);
 
       set({
-        gold: newGold,
-        xp: newXp,
+        gold: finalGold,
+        xp: finalXp,
         level: newLevel
       });
 
@@ -949,11 +979,90 @@ export const useKingdomStore = create((set, get) => ({
     i18n.changeLanguage(lang);
   },
 
+  collectPassiveGold: async () => {
+    const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
+    set({ isLoading: true });
+    try {
+      const { data, error } = await supabase.rpc('collect_passive_gold', {
+        p_profile_id: userId
+      });
+      if (error) throw error;
+
+      const goldCollected = Number(data) || 0;
+      if (goldCollected > 0) {
+        toast.success(`Claimed ${goldCollected} Gold and gained ${goldCollected * 2} XP!`);
+      } else {
+        toast.error("Not enough passive gold accumulated yet!");
+      }
+      await get().fetchKingdomData(userId);
+      return goldCollected;
+    } catch (err) {
+      console.error('Error claiming passive gold:', err);
+      toast.error('Failed to claim passive gold.');
+      return 0;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  upgradeMine: async () => {
+    const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
+    const currentLevel = get().mineLevel;
+    const goldCost = 100 * currentLevel;
+    const gemCost = 5 * currentLevel;
+
+    if (get().gold < goldCost) {
+      toast.error(`Not enough gold! Need ${goldCost} gold.`);
+      return false;
+    }
+    if (get().gems < gemCost) {
+      toast.error(`Not enough gems! Need ${gemCost} gems.`);
+      return false;
+    }
+
+    set({ isLoading: true });
+    try {
+      const { error: buildingError } = await supabase
+        .from('buildings')
+        .upsert({
+          profile_id: userId,
+          building_type: 'gold_mine',
+          level: currentLevel + 1,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'profile_id,building_type' });
+
+      if (buildingError) throw buildingError;
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          gold: get().gold - goldCost,
+          gems: get().gems - gemCost,
+          xp: get().xp + 50
+        })
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      toast.success(`Gold Mine upgraded to Level ${currentLevel + 1}!`);
+      await get().fetchKingdomData(userId);
+      return true;
+    } catch (err) {
+      console.error('Error upgrading mine:', err);
+      toast.error('Failed to upgrade Gold Mine.');
+      return false;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   resetStore: () => set({
     gold: 0,
     gems: 100,
     xp: 0,
     level: 1,
+    mineLevel: 1,
+    lastCollectionTime: null,
     email: 'lord.eldoria@kingdom.gov',
     transactions: [],
     accountBalances: [],

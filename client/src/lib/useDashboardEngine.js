@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
 import { accountMappings } from '../utils/accountMappings';
 
-const formatNumberCompact = (num) => {
+export const formatNumberCompact = (num) => {
   if (!num) return '0 / g';
   const absNum = Math.abs(num);
   let formattedNum = absNum.toLocaleString(undefined, { maximumFractionDigits: 1 });
@@ -94,7 +94,7 @@ export function useDashboardEngine(filteredTransactions = []) {
       Object.entries(balancesByCode).forEach(([code, balance]) => {
         if (code.startsWith('1')) {
           totalAssets += balance;
-          if (code === '111001') {
+          if (code === '10101001') {
             netVaultCash = balance;
           }
         } else if (code.startsWith('2')) {
@@ -111,17 +111,17 @@ export function useDashboardEngine(filteredTransactions = []) {
         .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
       const startingCash = userGold - plInflow + plOutflow;
-      balancesByCode['111001'] = startingCash;
+      balancesByCode['10101001'] = startingCash;
 
       safeAllTxs.forEach(tx => {
         if (!isCompleted(tx.payment_status)) return;
         const amt = Number(tx.amount) || 0;
 
         if (tx.transaction_type === 'Income') {
-          const src = tx.source_dest_bank || '111001';
+          const src = tx.source_dest_bank || '10101001';
           if (src in balancesByCode) balancesByCode[src] += amt;
         } else if (tx.transaction_type === 'Expense') {
-          const src = tx.source_dest_bank || '111001';
+          const src = tx.source_dest_bank || '10101001';
           if (src in balancesByCode) balancesByCode[src] -= amt;
         } else if (tx.transaction_type === 'Assets') {
           const src = tx.source_dest_bank;
@@ -149,7 +149,7 @@ export function useDashboardEngine(filteredTransactions = []) {
       });
 
       // Sum totals
-      netVaultCash = balancesByCode['111001'];
+      netVaultCash = balancesByCode['10101001'];
       totalAssets = 0;
       totalLiabilities = 0;
       Object.entries(balancesByCode).forEach(([code, balance]) => {
