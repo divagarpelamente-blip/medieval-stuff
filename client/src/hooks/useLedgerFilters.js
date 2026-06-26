@@ -5,15 +5,16 @@ import { useKingdomStore } from '../store/useKingdomStore';
 export function useLedgerFilters() {
   const transactions = useKingdomStore((state) => state.transactions);
 
+  const entityMappings = useKingdomStore((state) => state.entityMappings);
+
   // Transactions Page Filters state
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
   const [filterYear, setFilterYear] = useState('All');
   const [filterMonth, setFilterMonth] = useState('All');
-  const [filterQuarter, setFilterQuarter] = useState('All');
   const [filterFrom, setFilterFrom] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterClass, setFilterClass] = useState('All');
-  const [filterSubClass, setFilterSubClass] = useState('All');
+  const [filterCategory, setFilterCategory] = useState('All');
   const [filterEntity, setFilterEntity] = useState('All');
 
   // Unified Sidebar Filter state
@@ -57,11 +58,10 @@ export function useLedgerFilters() {
   const filteredTransactions = transactions.filter((tx) => {
     if (filterYear !== 'All' && String(tx.year) !== filterYear) return false;
     if (filterMonth !== 'All' && tx.month !== filterMonth) return false;
-    if (filterQuarter !== 'All' && tx.quarter !== filterQuarter) return false;
     if (filterFrom !== 'All' && tx.from !== filterFrom) return false;
     if (filterStatus !== 'All' && tx.payment_status !== filterStatus) return false;
     if (filterClass !== 'All' && tx.transaction_type !== filterClass) return false;
-    if (filterSubClass !== 'All' && tx.transaction_subtype !== filterSubClass) return false;
+    if (filterCategory !== 'All' && (entityMappings[tx.entity] || tx.transaction_category) !== filterCategory) return false;
     if (filterEntity !== 'All' && tx.entity !== filterEntity) return false;
     return true;
   }).sort((a, b) => {
@@ -105,11 +105,10 @@ export function useLedgerFilters() {
   const resetFilters = () => {
     setFilterYear('All');
     setFilterMonth('All');
-    setFilterQuarter('All');
     setFilterFrom('All');
     setFilterStatus('All');
     setFilterClass('All');
-    setFilterSubClass('All');
+    setFilterCategory('All');
     setFilterEntity('All');
   };
 
@@ -117,11 +116,10 @@ export function useLedgerFilters() {
     isFiltersExpanded, setIsFiltersExpanded,
     filterYear, setFilterYear,
     filterMonth, setFilterMonth,
-    filterQuarter, setFilterQuarter,
     filterFrom, setFilterFrom,
     filterStatus, setFilterStatus,
     filterClass, setFilterClass,
-    filterSubClass, setFilterSubClass,
+    filterCategory, setFilterCategory,
     filterEntity, setFilterEntity,
     selectedYears, setSelectedYears,
     hasInitializedYears, setHasInitializedYears,

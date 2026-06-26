@@ -1,6 +1,36 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 
 export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
+  const [sortField, setSortField] = useState('total'); // 'entity' or 'total'
+  const [sortDirection, setSortDirection] = useState('desc');
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedEntities = useMemo(() => {
+    return [...entityVolumes].sort((a, b) => {
+      let valA, valB;
+      if (sortField === 'entity') {
+        valA = a.name || '';
+        valB = b.name || '';
+      } else {
+        valA = a.totalClass || 0;
+        valB = b.totalClass || 0;
+      }
+
+      if (typeof valA === 'string') {
+        return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      } else {
+        return sortDirection === 'asc' ? valA - valB : valB - valA;
+      }
+    });
+  }, [entityVolumes, sortField, sortDirection]);
 
   const renderChart = () => {
     if (entityVolumes.length === 0) {
@@ -73,19 +103,30 @@ export default function TopEntitiesChart({ entityVolumes, percentUsed, t }) {
           <table className="w-full text-left border-collapse text-[8.5px] font-sans">
             <thead>
               <tr className="border-b border-[#8b4513]/10 text-[#4b2c20] font-black uppercase tracking-wider">
-                <th className="py-1">{t('entidade_header', 'Entity')}</th>
-                <th className="py-1 text-right">{t('total_header', 'Total')}</th>
+                <th 
+                  className="py-1 cursor-pointer hover:bg-[#8b4513]/10 select-none"
+                  onClick={() => handleSort('entity')}
+                >
+                  {t('entidade_header', 'Entity')} {sortField === 'entity' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th 
+                  className="py-1 text-right cursor-pointer hover:bg-[#8b4513]/10 select-none"
+                  onClick={() => handleSort('total')}
+                >
+                  {t('total_header', 'Total')} {sortField === 'total' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                </th>
                 <th className="py-1 text-right">%</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#8b4513]/5 text-stone-700 font-bold">
-              {entityVolumes.map((ent, idx) => {
+              {sortedEntities.map((ent) => {
+                const idx = entityVolumes.findIndex(item => item.name === ent.name);
                 const totalVal = ent.totalClass;
                 const percent = totalVal > 0 ? (totalVal / topEntitiesTotalVolume) * 100 : 0;
                 return (
                   <tr key={ent.name} className="hover:bg-[#8b4513]/5">
                     <td className="py-1 flex items-center gap-1 font-bold text-[#4b2c20] truncate max-w-[80px]">
-                      <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: colors[idx % colors.length] }} />
+                      <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: colors[idx !== -1 ? idx : 0 % colors.length] }} />
                       {ent.name}
                     </td>
                     <td className="py-1 text-right font-mono font-black">{totalVal.toLocaleString()}g</td>

@@ -219,6 +219,7 @@ export const en = {
   debt: "Debt",
   "ledger.headers.from": "From",
   "ledger.headers.date": "Date",
+  "ledger.headers.due_date": "Due Date",
   "ledger.headers.month": "Month",
   "ledger.headers.year": "Year",
   "ledger.headers.quarter": "Quarter",

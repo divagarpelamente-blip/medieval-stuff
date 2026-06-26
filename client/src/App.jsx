@@ -66,6 +66,7 @@ function App() {
   // Sort states
   const [actionsSortField, setActionsSortField] = useState(null);
   const [actionsSortDirection, setActionsSortDirection] = useState('asc');
+  const [settingsSortDirection, setSettingsSortDirection] = useState('asc');
 
 
   // Bind Zustand options & actions
@@ -111,11 +112,10 @@ function App() {
     isFiltersExpanded, setIsFiltersExpanded,
     filterYear, setFilterYear,
     filterMonth, setFilterMonth,
-    filterQuarter, setFilterQuarter,
     filterFrom, setFilterFrom,
     filterStatus, setFilterStatus,
     filterClass, setFilterClass,
-    filterSubClass, setFilterSubClass,
+    filterCategory, setFilterCategory,
     filterEntity, setFilterEntity,
     selectedYears, setSelectedYears,
     hasInitializedYears, setHasInitializedYears,
@@ -186,6 +186,35 @@ function App() {
     handleAddQuickAction,
     loadTemplateIntoForm
   } = useQuickActionForm();
+
+  // Quick Actions filtering states in the register transaction modal
+  const [qaSubtypeFilter, setQaSubtypeFilter] = useState('All');
+  const [qaCategoryFilter, setQaCategoryFilter] = useState('All');
+
+  const handleQaSubtypeFilterChange = (subtype) => {
+    setQaSubtypeFilter(subtype);
+    if (subtype !== 'All') {
+      const allowed = subtypeToCategoryMap[subtype] || [];
+      if (qaCategoryFilter !== 'All' && !allowed.includes(qaCategoryFilter)) {
+        setQaCategoryFilter('All');
+      }
+    }
+  };
+
+  const qaCategoryOptions = useMemo(() => {
+    if (qaSubtypeFilter === 'All') {
+      return categoryOptions;
+    }
+    return subtypeToCategoryMap[qaSubtypeFilter] || [];
+  }, [categoryOptions, qaSubtypeFilter, subtypeToCategoryMap]);
+
+  const filteredTemplates = useMemo(() => {
+    return templates.filter(tpl => {
+      if (qaSubtypeFilter !== 'All' && tpl.data.transaction_subtype !== qaSubtypeFilter) return false;
+      if (qaCategoryFilter !== 'All' && tpl.data.transaction_category !== qaCategoryFilter) return false;
+      return true;
+    });
+  }, [templates, qaSubtypeFilter, qaCategoryFilter]);
 
   // Reset filter initialization on email change
   useEffect(() => {
@@ -1330,35 +1359,47 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 </div>
               </div>
             ) : (
-              <table className="w-full text-left border-collapse text-[10px] font-sans">
-                <thead>
-                  <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                    <th className="py-2 px-3">{t.value}</th>
-                    {selectedSettingType === 'entity' && <th className="py-2 px-3">{t.default_category}</th>}
-                    <th className="py-2 px-3 text-right">{t.actions}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                  {currentList.map((val) => (
-                    <tr key={val} className="hover:bg-[#8b4513]/5 transition-colors">
-                      <td className="py-2 px-3 font-bold text-[#4b2c20]">{val}</td>
-                      {selectedSettingType === 'entity' && (
-                        <td className="py-2 px-3 text-stone-500 font-medium">{entityMappings[val] || '-'}</td>
-                      )}
-                      <td className="py-2 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOption(val)}
-                          className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
-                          title={t.eliminate}
+              (() => {
+                const sortedCurrentList = [...currentList].sort((a, b) => {
+                  return settingsSortDirection === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+                });
+                return (
+                  <table className="w-full text-left border-collapse text-[10px] font-sans">
+                    <thead>
+                      <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                        <th 
+                          className="py-2 px-3 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                          onClick={() => setSettingsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
                         >
-                          ❌ {t.eliminate}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          {t.value} {settingsSortDirection === 'asc' ? '▲' : '▼'}
+                        </th>
+                        {selectedSettingType === 'entity' && <th className="py-2 px-3">{t.default_category}</th>}
+                        <th className="py-2 px-3 text-right">{t.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+                      {sortedCurrentList.map((val) => (
+                        <tr key={val} className="hover:bg-[#8b4513]/5 transition-colors">
+                          <td className="py-2 px-3 font-bold text-[#4b2c20]">{val}</td>
+                          {selectedSettingType === 'entity' && (
+                            <td className="py-2 px-3 text-stone-500 font-medium">{entityMappings[val] || '-'}</td>
+                          )}
+                          <td className="py-2 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOption(val)}
+                              className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
+                              title={t.eliminate}
+                            >
+                              ❌ {t.eliminate}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()
             )
           ) : (
             <p className="text-center py-8 text-xs text-[#5d4037]/60 italic font-serif">
@@ -1634,28 +1675,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           size="max-w-lg"
         >
           <div className="flex flex-col gap-3.5 max-w-md mx-auto w-full">
-            {/* Register Transaction (Top) */}
-            <button
-              type="button"
-              onClick={() => {
-                handleNewTxClick();
-                setIsTreasuryMenuOpen(false);
-              }}
-              className="group relative flex items-center gap-3.5 p-3 rounded-xl border-2 border-[#8b4513]/30 bg-[#faf4e5]/80 hover:bg-[#8b4513] text-[#4b2c20] hover:text-[#ffd700] hover:border-[#ffd700]/50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm text-left cursor-pointer"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#8b4513]/10 group-hover:bg-white/10 flex items-center justify-center text-xl border border-[#8b4513]/25 group-hover:border-white/20 flex-shrink-0">
-                ➕
-              </div>
-              <div className="flex-grow min-w-0">
-                <h3 className="font-serif font-black text-xs uppercase tracking-wide leading-tight">
-                  {t('menu_register_transaction', 'Register Transaction')}
-                </h3>
-                <p className="text-[9px] opacity-80 font-serif italic mt-0.5 leading-tight">
-                  {t('menu_register_transaction_desc', 'Record a new gold coin movement, income, expense, payable, receivable or debt.')}
-                </p>
-              </div>
-            </button>
-
             {/* Treasury Dashboard (Middle - Merged Option) */}
             <button
               type="button"
@@ -2182,9 +2201,9 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           <div className="w-full h-full overflow-y-auto custom-scrollbar-subtle pr-1">
             {/* Main Form Area */}
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="flex items-center justify-end gap-3 border-b border-[#8b4513]/20 pb-2.5 mb-2.5">
+              <div className="flex items-end gap-3 border-b border-[#8b4513]/20 pb-2.5 mb-2.5 w-full">
                 {/* Save Button Symbol */}
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center flex-shrink-0">
                   <span className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 text-center font-sans">
                     Save
                   </span>
@@ -2198,45 +2217,82 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                   </button>
                 </div>
 
-                {/* Quick Actions Dropdown */}
-                <div className="flex flex-col items-center">
-                  <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 text-center font-sans">
-                    Quick Actions
-                  </label>
-                  <select
-                    onChange={(e) => {
-                      const tplName = e.target.value;
-                      if (tplName) {
-                        const tpl = templates.find(t => t.name === tplName);
-                        if (tpl) applyTemplate(tpl);
-                      }
-                    }}
-                    value=""
-                    className="bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans cursor-pointer"
-                  >
-                    <option value="" disabled hidden>-- Select --</option>
-                    <option value="">-- Choose --</option>
-                    {templates.map((tpl, idx) => (
-                      <option key={idx} value={tpl.name}>
-                        {tpl.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Dropdowns Grid (width adjusted to window size, Quick Actions is double width) */}
+                <div className="grid grid-cols-5 gap-3 flex-grow">
+                  {/* QA Filter Subtype */}
+                  <div className="flex flex-col col-span-1">
+                    <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 font-sans">
+                      {t.subcategory || 'Subtype'}
+                    </label>
+                    <select
+                      value={qaSubtypeFilter}
+                      onChange={(e) => handleQaSubtypeFilterChange(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans cursor-pointer"
+                    >
+                      <option value="All">All Subtypes</option>
+                      {subClassOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                {/* All Actions Dropdown (Placeholder) */}
-                <div className="flex flex-col items-center">
-                  <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 text-center font-sans">
-                    All Actions
-                  </label>
-                  <select
-                    disabled
-                    value=""
-                    className="bg-[#faf4e5]/50 border border-[#8b4513]/20 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none font-sans"
-                  >
-                    <option value="" disabled hidden>-- Select --</option>
-                    <option value="">-- All Actions --</option>
-                  </select>
+                  {/* QA Filter Category */}
+                  <div className="flex flex-col col-span-1">
+                    <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 font-sans">
+                      {t.category_label || 'Category'}
+                    </label>
+                    <select
+                      value={qaCategoryFilter}
+                      onChange={(e) => setQaCategoryFilter(e.target.value)}
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans cursor-pointer"
+                    >
+                      <option value="All">All Categories</option>
+                      {qaCategoryOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Quick Actions Dropdown (Double Width) */}
+                  <div className="flex flex-col col-span-2">
+                    <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 font-sans">
+                      Quick Actions
+                    </label>
+                    <select
+                      onChange={(e) => {
+                        const tplName = e.target.value;
+                        if (tplName) {
+                          const tpl = templates.find(t => t.name === tplName);
+                          if (tpl) applyTemplate(tpl);
+                        }
+                      }}
+                      value=""
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/25 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 font-sans cursor-pointer"
+                    >
+                      <option value="" disabled hidden>-- Select --</option>
+                      <option value="">-- Choose --</option>
+                      {filteredTemplates.map((tpl, idx) => (
+                        <option key={idx} value={tpl.name}>
+                          {tpl.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* All Actions Dropdown */}
+                  <div className="flex flex-col col-span-1">
+                    <label className="block text-[8px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-0.5 font-sans">
+                      All Actions
+                    </label>
+                    <select
+                      disabled
+                      value=""
+                      className="w-full bg-[#faf4e5]/50 border border-[#8b4513]/20 rounded-md h-[28px] px-2 text-[10px] font-bold text-[#4b2c20]/60 cursor-not-allowed focus:outline-none font-sans"
+                    >
+                      <option value="" disabled hidden>-- Select --</option>
+                      <option value="">-- All Actions --</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -2259,6 +2315,8 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 setTxAmount={setTxAmount}
                 txValueDate={txValueDate}
                 setTxValueDate={setTxValueDate}
+                txDueDate={txDueDate}
+                setTxDueDate={setTxDueDate}
                 txPostingDate={txPostingDate}
                 setTxPostingDate={setTxPostingDate}
                 txDescription={txDescription}
@@ -2634,25 +2692,27 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             setFilterYear={setFilterYear}
             filterMonth={filterMonth}
             setFilterMonth={setFilterMonth}
-            filterQuarter={filterQuarter}
-            setFilterQuarter={setFilterQuarter}
             filterFrom={filterFrom}
             setFilterFrom={setFilterFrom}
             filterStatus={filterStatus}
             setFilterStatus={setFilterStatus}
             filterClass={filterClass}
             setFilterClass={setFilterClass}
-            filterSubClass={filterSubClass}
-            setFilterSubClass={setFilterSubClass}
+            filterCategory={filterCategory}
+            setFilterCategory={setFilterCategory}
             filterEntity={filterEntity}
             setFilterEntity={setFilterEntity}
             isFiltersExpanded={isFiltersExpanded}
             setIsFiltersExpanded={setIsFiltersExpanded}
             uniqueYears={uniqueYears}
             filteredTransactions={filteredTransactions}
-            onEditTransaction={startEdit}
+            onEditTransaction={(tx) => {
+              startEdit(tx);
+              setIsNewTxModalOpen(true);
+            }}
             exportCSV={exportCSV}
             importCSV={importCSV}
+            onNewTransaction={handleNewTxClick}
           />
         )}
       </div>

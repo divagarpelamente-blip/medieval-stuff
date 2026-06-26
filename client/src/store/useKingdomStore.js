@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import i18n from '../i18n';
 import { toast } from 'react-hot-toast';
+import { defaultAccountMappings, setDynamicAccountMappings } from '../utils/accountMappings';
 
 const loadLocal = (key, defaultVal) => {
   try {
@@ -59,7 +60,11 @@ try {
   // Ignore
 }
 
+const initialAccountMappings = loadLocal('accountMappings', defaultAccountMappings);
+setDynamicAccountMappings(initialAccountMappings);
+
 export const useKingdomStore = create((set, get) => ({
+  accountMappings: initialAccountMappings,
   gold: 0,
   gems: 100,
   xp: 0,
@@ -78,6 +83,9 @@ export const useKingdomStore = create((set, get) => ({
     set(updates);
     Object.entries(updates).forEach(([key, val]) => {
       saveLocal(key, val);
+      if (key === 'accountMappings') {
+        setDynamicAccountMappings(val);
+      }
     });
     const userId = get().user?.id;
     if (userId) {
@@ -89,6 +97,7 @@ export const useKingdomStore = create((set, get) => ({
         entityMappings: get().entityMappings,
         subtypeToCategoryMap: get().subtypeToCategoryMap,
         subClassOptions: get().subClassOptions,
+        accountMappings: get().accountMappings,
         language: get().language,
         ...updates
       };
@@ -107,141 +116,141 @@ export const useKingdomStore = create((set, get) => ({
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
   statusOptions: ['Pending', 'Completed'],
   classOptions: ['Income', 'Expense', 'Assets', 'Liabilities'],
-  subClassOptions: ["Banks","Investments","Personal Debt","Other Debts","Living & Household","Utilities","Personal Transports","Public Transports","Health","Markets & Personal care","Payroll","Education","Entertainment","Food & Consumables","Tools & Materials","Clothing & Shoes","Insurances","Other Consumables","Taxes & State"],
+  subClassOptions: ["Banks", "Personal Debt", "Other Debts", "Living & Household", "Personal Transports", "Public Transports", "Other Transports", "Markets & Consumables", "Health", "Entertainment", "Education", "Insurances", "Taxes & State", "Financial Expenses", "Payroll", "Other Income", "Financial Income"],
   entityOptions: loadLocal('entityOptions', [
-    'CGD', 'ActiveBank', 'Inter(Brasil)', 'Savings (Pedro) 0%', 'Universo', 'Cofidis', 'Inter',
-    'Jota (Marmitas)', 'Mae (Burrow)', 'Reni (Burrow)', 'Pedro (Burrow)', 'Social Security',
-    'Finances', 'NOS', 'Home Decor', 'Repairs', 'Kitchen/Home', 'Oeiras', 'Portela',
-    'ENDESA', 'SIMAS', 'DIGAL', 'Car Gasoline', 'Motorcycle Gasoline',
-    'Car Repair & Maintenance', 'Motorcycle Repair & Maintenance', 'Parking', 'Tolls',
-    'Traffic Fine', 'Transport Insurance', 'Bus', 'Metro', 'Train',
-    'Psicologist 1', 'Psicologist 2', 'Psichiatry 1', 'Psichiatry 2',
-    'Public', 'CUF', 'Lusiadas', 'Luz', 'Doctor session & Medical Exams',
-    'Beatriz', 'Dentist 2', 'Pharmacy Oeiras', 'Pharmacy Portela',
-    'Salary', 'Bonus', 'Vacation subsidy', 'Christmas subsidy', 'Teaching classes',
-    'Freelance', 'Consultancy', 'Gift', 'Rewards', 'PhD', 'Trainings',
-    'Restaurants', 'Nightlife & Disco', 'Cinema', 'Gaming', 'Supermarket',
-    'Refrigerantes', 'Alcoholic', 'Personal Care', 'Cosmetics', 'Tools and Equipment',
-    'Other materials', 'Clothing', 'Shoes', 'Car', 'motorcycle', 'house', 'Equipment',
-    'IMI', 'State Tax', 'Gov Tax', 'Fees/Duties', 'Vehicle Tax', 'Transit Fine',
-    'Gov payment', 'Gov refund'
+    'CGD', 'Universo', 'Active Bank', 'Inter Bank', 'Wizink', 'Cofidis', 'Other Loans', 'Jota', 'Mae', 'Reni', 'Pedro', 'Other Burrow',
+    'Social Security', 'Finances', 'NOS',
+    'Oeiras', 'Oeiras Utensils', 'Oeiras Decoration', 'Other Household', 'Portela',
+    'DIGAL', 'SIMAS', 'Other Utilities',
+    'Motorcycle', 'Car', 'Via Verde', 'Parking',
+    'Public Transport (Metro/Train/Bus)', 'Uber / Chauffeur', 'Taxis',
+    'Food', 'Pet Food', 'Food (work lunch)', 'Soda Drinks', 'Alcoholic Drinks', 'Cleaning Products', 'Personal Hygiene', 'Cosmetics',
+    'Tools', 'Clothing', 'Shoes', 'Other Market consumables',
+    'Public Hospital', 'Private Hospital', 'Medical Sessions & Exams', 'Active Psicologia Coimbra', 'Psicologist 2', 'Marco (Jota Mateus)', 'Marco Consultas (private)', 'Dentist Beatriz', 'Dentist 2', 'Farmacia Oeiras', 'Farmacia Portela',
+    'Restaurant dinner', 'Cinema', 'Streaming', 'Nightlife & Disco', 'Gaming',
+    'PhD', 'Trainings',
+    'Health Insurance', 'Life insurance',
+    'Mobility (IUC)', 'IRS', 'Interest', 'Fines',
+    'Base Salary', 'Consulting / Contract Services', 'Teaching Classes', 'Bonus (Scorecard)',
+    'Vacation Subsidy', 'Christmas Subsidy',
+    'Family Gifts', 'Cashbacks & Rewards',
+    'Mobility', 'Justice',
+    'CGD Credit Cards', 'Universo Credit Cards', 'Active Bank Credit Cards', 'Inter Bank Credit Cards'
   ]),
   categoryOptions: loadLocal('categoryOptions', [
-    "Bank account", "Saving account", "Investment account", "Loans", "Burrow", "Credit Cards",
-    "Other Debts", "Household Décor", "Household Utensils", "Rent", "Electricity (house)",
-    "Water (house)", "Gas (house)", "Comunications (house)", "Vehicle Gasoline",
-    "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills",
-    "Public Transports", "Psicology session", "Psichiatry session", "Hospital",
-    "Doctor session & Medical Exams", "Dentist", "Pharmacy", "Salary", "Bonus",
-    "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer",
-    "Consultancy", "Other Incomes", "PhD", "Trainings", "Restaurants", "Nightlife & Disco",
-    "Cinema", "Gaming", "Food", "Drinks", "Supermarket (Other)", "Tools", "Other materials",
-    "Clothing", "Shoes", "Insurances", "General Taxes", "Tax Fines", "IRS payment", "IRS refund"
+    "Bank account", "Savings account", "Investments account",
+    "Loans & Burrow", "Credit Cards", "Other Debts",
+    "Household", "Utilities", "Gasoline", "Tolls", "Parking", "Repairs",
+    "Public Transports", "Other Transports",
+    "Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables",
+    "Health", "Entertainment", "Education", "Insurances", "Taxes",
+    "Interest paid", "Fines",
+    "Salary", "Payroll Subsidies", "Other Incomes", "Interest"
   ]),
   subtypeToCategoryMap: loadLocal('subtypeToCategoryMap', {
-    "Banks": ["Bank account", "Saving account"],
-    "Investments": ["Investment account"],
-    "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
+    "Banks": ["Bank account", "Savings account", "Investments account"],
+    "Personal Debt": ["Loans & Burrow", "Credit Cards"],
     "Other Debts": ["Other Debts"],
-    "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
-    "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
-    "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
+    "Living & Household": ["Household", "Utilities"],
+    "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
     "Public Transports": ["Public Transports"],
-    "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
-    "Markets & Personal care": ["Supermarket (Other)", "Tools", "Other materials"],
-    "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy"],
-    "Education": ["PhD", "Trainings"],
-    "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
-    "Food & Consumables": ["Food", "Drinks"],
-    "Tools & Materials": ["Tools", "Other materials"],
-    "Clothing & Shoes": ["Clothing", "Shoes"],
+    "Other Transports": ["Other Transports"],
+    "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
+    "Health": ["Health"],
+    "Entertainment": ["Entertainment"],
+    "Education": ["Education"],
     "Insurances": ["Insurances"],
-    "Other Consumables": ["Supermarket (Other)", "Food", "Drinks"],
-    "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"]
+    "Taxes & State": ["Taxes", "Interest"],
+    "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
+    "Payroll": ["Salary", "Payroll Subsidies"],
+    "Other Income": ["Other Incomes"],
+    "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
   }),
   entityMappings: loadLocal('entityMappings', {
     "CGD": "Bank account",
-    "ActiveBank": "Bank account",
-    "Inter(Brasil)": "Bank account",
-    "Savings (Pedro) 0%": "Saving account",
-    "Universo": "Credit Cards",
-    "Cofidis": "Loans",
-    "Inter": "Saving account",
-    "Jota (Marmitas)": "Burrow",
-    "Mae (Burrow)": "Burrow",
-    "Reni (Burrow)": "Burrow",
-    "Pedro (Burrow)": "Burrow",
-    "Social Security": "Other Debts",
-    "Finances": "Other Debts",
-    "Home Decor": "Household Décor",
-    "Repairs": "Household Utensils",
-    "Kitchen/Home": "Household Utensils",
-    "Oeiras": "Rent",
-    "Portela": "Rent",
-    "ENDESA": "Electricity (house)",
-    "SIMAS": "Water (house)",
-    "DIGAL": "Gas (house)",
-    "NOS": "Comunications (house)",
-    "Car Gasoline": "Vehicle Gasoline",
-    "Motorcycle Gasoline": "Vehicle Gasoline",
-    "Car Repair & Maintenance": "Vehicle Repair & Maintenance",
-    "Motorcycle Repair & Maintenance": "Vehicle Repair & Maintenance",
+    "Universo": "Bank account",
+    "Active Bank": "Bank account",
+    "Inter Bank": "Bank account",
+    "Wizink": "Investments account",
+    "Cofidis": "Loans & Burrow",
+    "Other Loans": "Loans & Burrow",
+    "Jota": "Loans & Burrow",
+    "Mae": "Loans & Burrow",
+    "Reni": "Loans & Burrow",
+    "Pedro": "Loans & Burrow",
+    "Other Burrow": "Loans & Burrow",
+    "Social Security": "Taxes",
+    "Finances": "Taxes",
+    "NOS": "Utilities",
+    "Oeiras": "Household",
+    "Oeiras Utensils": "Household",
+    "Oeiras Decoration": "Household",
+    "Other Household": "Household",
+    "Portela": "Household",
+    "DIGAL": "Utilities",
+    "SIMAS": "Utilities",
+    "Other Utilities": "Utilities",
+    "Motorcycle": "Gasoline",
+    "Car": "Gasoline",
+    "Via Verde": "Tolls",
     "Parking": "Parking",
-    "Tolls": "Tolls",
-    "Traffic Fine": "Vehicle Fines",
-    "Transport Insurance": "Vehicle Bills",
-    "Bus": "Public Transports",
-    "Metro": "Public Transports",
-    "Train": "Public Transports",
-    "Psicologist 1": "Psicology session",
-    "Psicologist 2": "Psicology session",
-    "Psichiatry 1": "Psichiatry session",
-    "Psichiatry 2": "Psichiatry session",
-    "Public": "Hospital",
-    "CUF": "Hospital",
-    "Lusiadas": "Hospital",
-    "Luz": "Hospital",
-    "Doctor session & Medical Exams": "Doctor session & Medical Exams",
-    "Beatriz": "Dentist",
-    "Dentist 2": "Dentist",
-    "Pharmacy Oeiras": "Pharmacy",
-    "Pharmacy Portela": "Pharmacy",
-    "Salary": "Salary",
-    "Bonus": "Bonus",
-    "Vacation subsidy": "Vacation subsidy",
-    "Christmas subsidy": "Christmas subsidy",
-    "Teaching classes": "Teaching classes",
-    "Freelance": "Freelancer",
-    "Consultancy": "Consultancy",
-    "Gift": "Other Incomes",
-    "Rewards": "Other Incomes",
-    "PhD": "PhD",
-    "Trainings": "Trainings",
-    "Restaurants": "Restaurants",
-    "Nightlife & Disco": "Nightlife & Disco",
-    "Cinema": "Cinema",
-    "Gaming": "Gaming",
-    "Supermarket": "Food",
-    "Refrigerantes": "Drinks",
-    "Alcoholic": "Drinks",
-    "Personal Care": "Supermarket (Other)",
-    "Cosmetics": "Supermarket (Other)",
-    "Tools and Equipment": "Tools",
-    "Other materials": "Other materials",
-    "Clothing": "Clothing",
-    "Shoes": "Shoes",
-    "Car": "Insurances",
-    "motorcycle": "Insurances",
-    "house": "Insurances",
-    "Equipment": "Insurances",
-    "IMI": "General Taxes",
-    "State Tax": "General Taxes",
-    "Gov Tax": "General Taxes",
-    "Fees/Duties": "General Taxes",
-    "Vehicle Tax": "General Taxes",
-    "Transit Fine": "Tax Fines",
-    "Gov payment": "IRS payment",
-    "Gov refund": "IRS refund"
+    "Public Transport (Metro/Train/Bus)": "Public Transports",
+    "Uber / Chauffeur": "Other Transports",
+    "Taxis": "Other Transports",
+    "Food": "Markets & Groceries",
+    "Pet Food": "Markets & Groceries",
+    "Food (work lunch)": "Markets & Groceries",
+    "Soda Drinks": "Markets & Groceries",
+    "Alcoholic Drinks": "Markets & Groceries",
+    "Cleaning Products": "Markets & Groceries",
+    "Personal Hygiene": "Markets & Groceries",
+    "Cosmetics": "Markets & Groceries",
+    "Tools": "Markets and Tools",
+    "Clothing": "Markets and Clothing",
+    "Shoes": "Markets and Clothing",
+    "Other Market consumables": "Other Market consumables",
+    "Public Hospital": "Health",
+    "Private Hospital": "Health",
+    "Medical Sessions & Exams": "Health",
+    "Active Psicologia Coimbra": "Health",
+    "Psicologist 2": "Health",
+    "Marco (Jota Mateus)": "Health",
+    "Marco Consultas (private)": "Health",
+    "Dentist Beatriz": "Health",
+    "Dentist 2": "Health",
+    "Farmacia Oeiras": "Health",
+    "Farmacia Portela": "Health",
+    "Restaurant dinner": "Entertainment",
+    "Cinema": "Entertainment",
+    "Streaming": "Entertainment",
+    "Nightlife & Disco": "Entertainment",
+    "Gaming": "Entertainment",
+    "PhD": "Education",
+    "Trainings": "Education",
+    "Health Insurance": "Insurances",
+    "Life insurance": "Insurances",
+    "Mobility (IUC)": "Taxes",
+    "IRS": "Taxes",
+    "Interest": "Interest",
+    "Fines": "Fines",
+    "Loans Cofidis": "Loans & Burrow",
+    "Loans CGD": "Loans & Burrow",
+    "Borrow Jota": "Loans & Burrow",
+    "Borrow Mum": "Loans & Burrow",
+    "Base Salary": "Salary",
+    "Consulting / Contract Services": "Salary",
+    "Teaching Classes": "Salary",
+    "Bonus (Scorecard)": "Salary",
+    "Vacation Subsidy": "Payroll Subsidies",
+    "Christmas Subsidy": "Payroll Subsidies",
+    "Family Gifts": "Other Incomes",
+    "Cashbacks & Rewards": "Other Incomes",
+    "Mobility": "Taxes",
+    "Justice": "Taxes",
+    "CGD Credit Cards": "Credit Cards",
+    "Universo Credit Cards": "Credit Cards",
+    "Active Bank Credit Cards": "Credit Cards",
+    "Inter Bank Credit Cards": "Credit Cards"
   }),
   monthOptions: [
     'January', 'February', 'March', 'April', 'May', 'June', 
@@ -271,7 +280,7 @@ export const useKingdomStore = create((set, get) => ({
       "from": "Pedro",
       "transaction_type": "Liabilities",
       "transaction_subtype": "Personal Debt",
-      "entity": "Credit Card Universo",
+      "entity": "Universo",
       "transaction_category": "Credit Cards",
       "target_account": "",
       "source_dest_bank": "20103002",
@@ -287,9 +296,9 @@ export const useKingdomStore = create((set, get) => ({
       "from": "Pedro",
       "transaction_type": "Liabilities",
       "transaction_subtype": "Personal Debt",
-      "entity": "WizInk",
+      "entity": "Wizink",
       "transaction_category": "Credit Cards",
-      "target_account": "20103004",
+      "target_account": "20103005",
       "source_dest_bank": "10101001",
       "flow": "outflow",
       "payment_status": "Completed",
@@ -418,7 +427,6 @@ export const useKingdomStore = create((set, get) => ({
           let subClassOpts = s.subClassOptions || get().subClassOptions;
           let entityOpts = s.entityOptions || get().entityOptions;
           let subtypeToCategory = s.subtypeToCategoryMap || get().subtypeToCategoryMap;
-
           const isObsolete = 
             categoryOpts.includes('Payroll') || 
             categoryOpts.includes('Burrowed') ||
@@ -426,12 +434,30 @@ export const useKingdomStore = create((set, get) => ({
             categoryOpts.includes('Salary (payroll)') ||
             categoryOpts.includes('Bank Accounts (Ordem)') ||
             categoryOpts.includes('Payroll & Active Income') ||
+            categoryOpts.includes('Saving account') ||
+            categoryOpts.includes('Loans & Burrow income') ||
+            categoryOpts.includes('Health expenses') ||
+            categoryOpts.includes('Insurance paid') ||
+            categoryOpts.includes('Insurance received') ||
+            categoryOpts.includes('Taxes paid') ||
+            categoryOpts.includes('Taxes received') ||
+            categoryOpts.includes('Interest received') ||
+            categoryOpts.includes('Entertainment expenses') ||
+            categoryOpts.includes('Fines expenses') ||
+            categoryOpts.includes('Fines refunds') ||
+            categoryOpts.includes('Loans & Burrow expenses') ||
             subClassOpts.includes('Salary (payroll)') ||
             subClassOpts.includes('Income • Payroll') ||
             subClassOpts.includes('Bank Accounts (Ordem)') ||
+            subClassOpts.includes('Investments') ||
+            subClassOpts.includes('Utilities') ||
+            subClassOpts.includes('Markets & Personal care') ||
             entityMaps['Salary'] === 'Payroll & Active Income' ||
             Object.values(entityMaps).includes('Income • Payroll') ||
-            Object.values(entityMaps).includes('Salary (payroll)');
+            Object.values(entityMaps).includes('Salary (payroll)') ||
+            entityOpts.includes('CGD Bank') ||
+            entityOpts.includes('Active Bank Savings') ||
+            !entityOpts.includes('CGD');
 
           if (isObsolete) {
             categoryOpts = get().categoryOptions;
@@ -489,6 +515,9 @@ export const useKingdomStore = create((set, get) => ({
               .then();
           }
 
+          const accMaps = s.accountMappings || get().accountMappings;
+          setDynamicAccountMappings(accMaps);
+
           set({
             templates: temps,
             fromOptions: s.fromOptions || get().fromOptions,
@@ -497,6 +526,7 @@ export const useKingdomStore = create((set, get) => ({
             entityMappings: entityMaps,
             subtypeToCategoryMap: subtypeToCategory,
             subClassOptions: subClassOpts,
+            accountMappings: accMaps,
             language: s.language || get().language
           });
           if (s.language) {

@@ -161,7 +161,7 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
           } else if (normHeader === 'source_dest_bank' || normHeader === 'source dest bank' || normHeader === 'source_account' || normHeader === 'source account') {
             tx.source_dest_bank = val;
           } else if (normHeader === 'flow' || normHeader === 'transaction_flow') {
-            tx.flow = val;
+            tx.flow = val ? val.trim().toLowerCase() : '';
           } else if (normHeader === 'description') {
             tx.description = val;
           } else if (normHeader === 'month') {
@@ -204,7 +204,9 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
           tx.transaction_nature = (tx.transaction_subtype && tx.transaction_subtype.toLowerCase().includes('cash')) ? 'cash' : 'accrual';
         }
         if (!tx.flow) {
-          tx.flow = tx.transaction_flow || ((isIncome || isReceipt) ? 'inflow' : 'outflow');
+          tx.flow = tx.transaction_flow ? tx.transaction_flow.trim().toLowerCase() : ((isIncome || isReceipt) ? 'inflow' : 'outflow');
+        } else {
+          tx.flow = tx.flow.trim().toLowerCase();
         }
 
         listToInsert.push(tx);
@@ -360,7 +362,7 @@ export const handleImportQuickActionsCSV = (e, { t, addOption, templates }) => {
           transaction_category: fields.category || '',
           target_account: fields.target_account || '',
           source_dest_bank: fields.source_account || '',
-          flow: fields.flow || '',
+          flow: fields.flow ? fields.flow.trim().toLowerCase() : '',
           payment_status: fields.status || '',
           description: fields.description || '',
           amount: fields.amount || '',

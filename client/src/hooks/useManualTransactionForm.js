@@ -53,86 +53,122 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   // Cascading Configuration (exactly as defined in App.jsx)
   const cascadingConfig = {
     'House & Utilities': {
-      'Rent - Oeiras': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Living & Household', target_account: '60101001', flow: 'outflow', payment_status: 'Pending' },
-      'Electricity Expense (ENDESA)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '60102001', flow: 'outflow', payment_status: 'Pending' },
-      'Gas Expense (DIGAL)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '60102002', flow: 'outflow', payment_status: 'Pending' },
-      'Water Expense (SIMAS)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '60102003', flow: 'outflow', payment_status: 'Pending' },
-      'Communications Expense (NOS)': { transaction_type: 'Expense', transaction_subtype: 'Utilities', transaction_category: 'Utilities', target_account: '60102004', flow: 'outflow', payment_status: 'Pending' },
-      'Household Utensils - Repairs': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Living & Household', target_account: '60101002', flow: 'outflow', payment_status: 'Completed' }
+      'Oeiras': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Household', target_account: '60101001', flow: 'outflow', payment_status: 'Pending' },
+      'DIGAL': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Utilities', target_account: '60102001', flow: 'outflow', payment_status: 'Pending' },
+      'SIMAS': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Utilities', target_account: '60102002', flow: 'outflow', payment_status: 'Pending' },
+      'NOS': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Utilities', target_account: '60102003', flow: 'outflow', payment_status: 'Pending' },
+      'Other Utilities': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Utilities', target_account: '60102004', flow: 'outflow', payment_status: 'Pending' },
+      'Oeiras Utensils': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Household', target_account: '60101002', flow: 'outflow', payment_status: 'Completed' }
     },
     'Transports': {
-      'Vehicle Fuel - Car Gasoline': { transaction_type: 'Expense', transaction_subtype: 'Personal & Public Transports', transaction_category: 'Personal & Public Transports', target_account: '60201002', flow: 'outflow', payment_status: 'Completed' },
-      'Tolls Expense': { transaction_type: 'Expense', transaction_subtype: 'Personal & Public Transports', transaction_category: 'Personal & Public Transports', target_account: '60202001', flow: 'outflow', payment_status: 'Completed' },
-      'Parking Expense': { transaction_type: 'Expense', transaction_subtype: 'Personal & Public Transports', transaction_category: 'Personal & Public Transports', target_account: '60203001', flow: 'outflow', payment_status: 'Completed' }
+      'Car': { transaction_type: 'Expense', transaction_subtype: 'Personal Transports', transaction_category: 'Gasoline', target_account: '60201002', flow: 'outflow', payment_status: 'Completed' },
+      'Via Verde': { transaction_type: 'Expense', transaction_subtype: 'Personal Transports', transaction_category: 'Tolls', target_account: '60202001', flow: 'outflow', payment_status: 'Completed' },
+      'Parking': { transaction_type: 'Expense', transaction_subtype: 'Personal Transports', transaction_category: 'Parking', target_account: '60203001', flow: 'outflow', payment_status: 'Completed' }
     },
     'Banking & Liabilities': {
-      'Credit Card Debt Universo': { transaction_type: 'Liabilities', transaction_subtype: 'Credit Card Liabilities (Dívidas dos Cartões)', transaction_category: 'Credit Card Liabilities (Dívidas dos Cartões)', target_account: '20103002', flow: 'outflow', payment_status: 'Completed' },
-      'Loans CGD': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Loans / Financiamentos', transaction_category: 'Personal Loans / Financiamentos', target_account: '20101001', flow: 'outflow', payment_status: 'Completed' },
-      'Savings Account CGD': { transaction_type: 'Assets', transaction_subtype: 'Savings Accounts', transaction_category: 'Savings Accounts', target_account: '10102002', flow: 'neutral', payment_status: 'Completed' }
+      'Universo': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Debt', transaction_category: 'Credit Cards', target_account: '20103002', flow: 'outflow', payment_status: 'Completed' },
+      'CGD': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Debt', transaction_category: 'Loans & Burrow', target_account: '20101001', flow: 'outflow', payment_status: 'Completed' },
+      'Active Bank': { transaction_type: 'Assets', transaction_subtype: 'Banks', transaction_category: 'Savings account', target_account: '10102002', flow: 'neutral', payment_status: 'Completed' }
     },
     'Personal & Lifestyle': {
-      'Entertainment - Restaurants': { transaction_type: 'Expense', transaction_subtype: 'Entertainment', transaction_category: 'Entertainment', target_account: '60701001', flow: 'outflow', payment_status: 'Completed' },
-      'Entertainment - Cinema': { transaction_type: 'Expense', transaction_subtype: 'Entertainment', transaction_category: 'Entertainment', target_account: '60701002', flow: 'outflow', payment_status: 'Completed' },
-      'Supermarket - Personal Care': { transaction_type: 'Expense', transaction_subtype: 'Food & Consumables', transaction_category: 'Food & Consumables', target_account: '60501006', flow: 'outflow', payment_status: 'Completed' },
-      'Clothing Expense': { transaction_type: 'Expense', transaction_subtype: 'Tools, Materials & Clothing', transaction_category: 'Tools, Materials & Clothing', target_account: '60503001', flow: 'outflow', payment_status: 'Completed' }
+      'Restaurant dinner': { transaction_type: 'Expense', transaction_subtype: 'Entertainment', transaction_category: 'Entertainment', target_account: '60701001', flow: 'outflow', payment_status: 'Completed' },
+      'Cinema': { transaction_type: 'Expense', transaction_subtype: 'Entertainment', transaction_category: 'Entertainment', target_account: '60701002', flow: 'outflow', payment_status: 'Completed' },
+      'Personal Hygiene': { transaction_type: 'Expense', transaction_subtype: 'Markets & Consumables', transaction_category: 'Markets & Groceries', target_account: '60501007', flow: 'outflow', payment_status: 'Completed' },
+      'Clothing': { transaction_type: 'Expense', transaction_subtype: 'Markets & Consumables', transaction_category: 'Markets and Clothing', target_account: '60503001', flow: 'outflow', payment_status: 'Completed' }
     },
     'Income & Revenue': {
-      'Salary - Base Salary': { transaction_type: 'Income', transaction_subtype: 'Payroll & Active Income', transaction_category: 'Payroll & Active Income', target_account: '70101001', flow: 'inflow', payment_status: 'Pending' },
-      'Salary - Bonus': { transaction_type: 'Income', transaction_subtype: 'Payroll & Active Income', transaction_category: 'Payroll & Active Income', target_account: '70101004', flow: 'inflow', payment_status: 'Completed' }
+      'Base Salary': { transaction_type: 'Income', transaction_subtype: 'Payroll', transaction_category: 'Salary', target_account: '70101001', flow: 'inflow', payment_status: 'Pending' },
+      'Bonus (Scorecard)': { transaction_type: 'Income', transaction_subtype: 'Payroll', transaction_category: 'Salary', target_account: '70101004', flow: 'inflow', payment_status: 'Completed' }
     }
   };
 
   const [mainMenu, setMainMenu] = useState('House & Utilities');
-  const [subMenuAction, setSubMenuAction] = useState('Rent - Oeiras');
+  const [subMenuAction, setSubMenuAction] = useState('Oeiras');
 
   const entityToTargetAccount = {
-    "Salary": "70101001",
-    "Bonus": "70101004",
-    "Rent": "60101001",
-    "Repairs": "60204001",
-    "Decorations": "60101003",
-    "Utensils": "60101002",
-    "Electricity": "60102001",
-    "Gas": "60102002",
-    "Water": "60102003",
-    "Communications": "60102004",
-    "Gasoline": "60201001",
-    "Supermarket": "60501001",
-    "Tools and Equipment": "60502001",
-    "Clothing": "60503001",
-    "Restaurant": "60701001",
-    "Cinema": "60701002",
-    "Streaming": "60701003",
+    // Assets (1xxxxxxx)
     "CGD": "10101001",
-    "Universo": "20103002",
-    "ActiveBank": "10101003",
-    "WizInk": "10103004",
-    "Inter(Brasil)": "10101004",
-    "Cofidis": "20101006",
+    "Universo": "10101002",
+    "Active Bank": "10101003",
+    "Inter Bank": "10101004",
+    "Wizink": "10103004",
+
+    // Liabilities (2xxxxxxx)
+    "Other Loans": "20101007",
     "Jota": "20102001",
     "Mae": "20102002",
-    "Savings Account": "10102001",
-    "Reni (Burrow)": "20102003",
-    "Pedro (Burrow)": "20102004",
-    "Social Security Debt": "20201001",
-    "Finances Debt": "20201002",
-    "NOS Debt": "20201003",
-    "PhD": "60801001",
-    "Trainings": "60801002",
-    "Psychology": "60601004",
-    "Psychiatry": "60601005",
-    "Dentist": "60601006",
-    "Pharmacy": "60601007",
-    "Second Rent (e.g., Portela)": "60101001",
-    "Secondary Communications (NOS)": "60102005",
-    "Public Transport (Metro/Train)": "60301001",
-    "Personal Care & Cosmetics": "60501006",
+    "Reni": "20102003",
+    "Pedro": "20102004",
+    "Other Burrow": "20102005",
+    "Social Security": "20201001",
+    "Finances": "20201002",
+    "NOS": "20201003",
+
+    // Expenses (6xxxxxxx)
+    "Oeiras": "60101001",
+    "Oeiras Utensils": "60101002",
+    "Oeiras Decoration": "60101003",
+    "Other Household": "60101004",
+    "Portela": "60101005",
+    "DIGAL": "60102001",
+    "SIMAS": "60102002",
+    "Other Utilities": "60102004",
+    "Motorcycle": "60201001",
+    "Car": "60201002",
+    "Via Verde": "60202001",
+    "Parking": "60203001",
+    "Public Transport (Metro/Train/Bus)": "60301001",
+    "Uber / Chauffeur": "60401001",
+    "Taxis": "60401002",
+    "Food": "60501001",
+    "Pet Food": "60501002",
+    "Food (work lunch)": "60501003",
+    "Soda Drinks": "60501004",
+    "Alcoholic Drinks": "60501005",
+    "Cleaning Products": "60501006",
+    "Personal Hygiene": "60501007",
+    "Cosmetics": "60501008",
+    "Tools": "60502001",
+    "Clothing": "60503001",
     "Shoes": "60503002",
+    "Other Market consumables": "60504001",
+    "Public Hospital": "60601001",
+    "Private Hospital": "60601002",
+    "Medical Sessions & Exams": "60601003",
+    "Active Psicologia Coimbra": "60601004",
+    "Psicologist 2": "60601005",
+    "Marco (Jota Mateus)": "60601006",
+    "Marco Consultas (private)": "60601007",
+    "Dentist Beatriz": "60601008",
+    "Dentist 2": "60601009",
+    "Farmacia Oeiras": "60601010",
+    "Farmacia Portela": "60601011",
+    "Restaurant dinner": "60701001",
+    "Cinema": "60701002",
+    "Streaming": "60701003",
     "Nightlife & Disco": "60701004",
     "Gaming": "60701005",
+    "PhD": "60801001",
+    "Trainings": "60801002",
+    "Health Insurance": "60901001",
+    "Life insurance": "60901004",
+    "Mobility (IUC)": "61001001",
+    "IRS": "61001005",
+    "Interest": "61101001",
+    "Fines": "61102001",
+    "Cofidis": "61103003",
+
+    // Income (7xxxxxxx)
+    "Base Salary": "70101001",
+    "Consulting / Contract Services": "70101002",
+    "Teaching Classes": "70101003",
+    "Bonus (Scorecard)": "70101004",
     "Vacation Subsidy": "70102001",
     "Christmas Subsidy": "70102002",
-    "Teaching Classes": "70101003"
+    "Family Gifts": "70201001",
+    "Cashbacks & Rewards": "70201002",
+    "Mobility": "70401002",
+    "Justice": "70401005"
   };
 
   // Sync selectors defaults when store changes
@@ -207,7 +243,131 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     if (mapped) {
       setTxCategory(mapped);
     }
-    const defaultTarget = entityToTargetAccount[entityVal];
+    
+    // Resolve dynamic target account conflicts based on selected transaction metadata
+    let defaultTarget = entityToTargetAccount[entityVal];
+    
+    if (entityVal === 'CGD') {
+      if (txClass === 'Assets') {
+        if (txCategory === 'Savings account') defaultTarget = '10102001';
+        else if (txCategory === 'Investments account') defaultTarget = '10103001';
+        else defaultTarget = '10101001';
+      } else if (txClass === 'Liabilities') {
+        if (txCategory === 'Credit Cards') defaultTarget = '20103001';
+        else defaultTarget = '20101001';
+      } else if (txClass === 'Expense') {
+        if (txCategory === 'Credit Cards') defaultTarget = '61104001';
+        else defaultTarget = '61103001';
+      } else if (txClass === 'Income') {
+        if (txCategory === 'Credit Cards') defaultTarget = '70504001';
+        else defaultTarget = '70503001';
+      }
+    } else if (entityVal === 'Universo') {
+      if (txClass === 'Assets') {
+        if (txCategory === 'Investments account') defaultTarget = '10103002';
+        else defaultTarget = '10101002';
+      } else if (txClass === 'Liabilities') {
+        if (txCategory === 'Credit Cards') defaultTarget = '20103002';
+        else defaultTarget = '20101002';
+      } else if (txClass === 'Expense') {
+        if (txCategory === 'Credit Cards') defaultTarget = '61104002';
+        else defaultTarget = '61103002';
+      } else if (txClass === 'Income') {
+        if (txCategory === 'Credit Cards') defaultTarget = '70504002';
+        else defaultTarget = '70503002';
+      }
+    } else if (entityVal === 'Active Bank') {
+      if (txClass === 'Assets') {
+        if (txCategory === 'Savings account') defaultTarget = '10102002';
+        else if (txCategory === 'Investments account') defaultTarget = '10103003';
+        else defaultTarget = '10101003';
+      } else if (txClass === 'Liabilities') {
+        if (txCategory === 'Credit Cards') defaultTarget = '20103003';
+        else defaultTarget = '20101003';
+      } else if (txClass === 'Expense') {
+        defaultTarget = '61104003';
+      } else if (txClass === 'Income') {
+        defaultTarget = '70504003';
+      }
+    } else if (entityVal === 'Inter Bank') {
+      if (txClass === 'Assets') {
+        if (txCategory === 'Savings account') defaultTarget = '10102003';
+        else if (txCategory === 'Investments account') defaultTarget = '10103005';
+        else defaultTarget = '10101004';
+      } else if (txClass === 'Liabilities') {
+        if (txCategory === 'Credit Cards') defaultTarget = '20103004';
+        else defaultTarget = '20101004';
+      } else if (txClass === 'Expense') {
+        defaultTarget = '61104004';
+      } else if (txClass === 'Income') {
+        defaultTarget = '70504004';
+      }
+    } else if (entityVal === 'Wizink') {
+      if (txClass === 'Assets') {
+        defaultTarget = '10103004';
+      } else if (txClass === 'Liabilities') {
+        if (txCategory === 'Credit Cards') defaultTarget = '20103005';
+        else defaultTarget = '20101005';
+      }
+    } else if (entityVal === 'Cofidis') {
+      if (txClass === 'Liabilities') defaultTarget = '20101006';
+      else if (txClass === 'Expense') defaultTarget = '61103003';
+      else if (txClass === 'Income') defaultTarget = '70503003';
+    } else if (entityVal === 'Jota') {
+      if (txClass === 'Liabilities') defaultTarget = '20102001';
+      else if (txClass === 'Expense') defaultTarget = '61103004';
+      else if (txClass === 'Income') defaultTarget = '70503004';
+    } else if (entityVal === 'Mae') {
+      if (txClass === 'Liabilities') defaultTarget = '20102002';
+      else if (txClass === 'Expense') defaultTarget = '61103005';
+      else if (txClass === 'Income') defaultTarget = '70503005';
+    } else if (entityVal === 'Social Security') {
+      if (txClass === 'Liabilities') defaultTarget = '20201001';
+      else if (txClass === 'Expense') defaultTarget = '61001003';
+      else if (txClass === 'Income') defaultTarget = '70401004';
+    } else if (entityVal === 'Finances') {
+      if (txClass === 'Liabilities') defaultTarget = '20201002';
+      else if (txClass === 'Expense') defaultTarget = '61001002';
+      else if (txClass === 'Income') defaultTarget = '70401003';
+    } else if (entityVal === 'NOS') {
+      if (txClass === 'Liabilities') defaultTarget = '20201003';
+      else if (txClass === 'Expense') defaultTarget = '60102003';
+    } else if (entityVal === 'Justice') {
+      if (txClass === 'Expense') defaultTarget = '61001004';
+      else if (txClass === 'Income') defaultTarget = '70401005';
+    } else if (entityVal === 'IRS') {
+      if (txClass === 'Expense') defaultTarget = '61001005';
+      else if (txClass === 'Income') defaultTarget = '70401001';
+    } else if (entityVal === 'Car') {
+      if (txClass === 'Expense') {
+        if (txCategory === 'Repairs') defaultTarget = '60204002';
+        else if (txCategory === 'Insurances') defaultTarget = '60901002';
+        else defaultTarget = '60201002';
+      } else if (txClass === 'Income') {
+        defaultTarget = '70301002';
+      }
+    } else if (entityVal === 'Motorcycle') {
+      if (txClass === 'Expense') {
+        if (txCategory === 'Repairs') defaultTarget = '60204001';
+        else if (txCategory === 'Insurances') defaultTarget = '60901003';
+        else defaultTarget = '60201001';
+      } else if (txClass === 'Income') {
+        defaultTarget = '70301003';
+      }
+    } else if (entityVal === 'Health Insurance') {
+      if (txClass === 'Expense') defaultTarget = '60901001';
+      else if (txClass === 'Income') defaultTarget = '70301001';
+    } else if (entityVal === 'Life insurance') {
+      if (txClass === 'Expense') defaultTarget = '60901004';
+      else if (txClass === 'Income') defaultTarget = '70301004';
+    } else if (entityVal === 'Interest') {
+      if (txClass === 'Expense') defaultTarget = '61101001';
+      else if (txClass === 'Income') defaultTarget = '70501001';
+    } else if (entityVal === 'Fines') {
+      if (txClass === 'Expense') defaultTarget = '61102001';
+      else if (txClass === 'Income') defaultTarget = '70502001';
+    }
+    
     if (defaultTarget) {
       setTxTargetAccount(defaultTarget);
     }
@@ -272,7 +432,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     setTxStatus(tx.payment_status || '');
     setTxSubClass(tx.transaction_subtype || '');
     setTxEntity(tx.entity || '');
-    setTxCategory(tx.transaction_category || '');
+    setTxCategory(tx.transaction_category || entityMappings[tx.entity] || '');
     setTxDescription(tx.description || '');
     setTxTargetAccount(tx.target_account || '');
     setTxSourceDestBank(tx.source_dest_bank || '');
@@ -373,6 +533,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
         from: txFrom,
         value_date: txValueDate,
         posting_date: txPostingDate,
+        due_date: txDueDate || null,
         payment_status: txStatus,
         transaction_subtype: txSubClass,
         entity: txEntity,

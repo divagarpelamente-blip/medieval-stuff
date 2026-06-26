@@ -1,8 +1,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
-import { Z_LAYERS } from '../constants/UI_UX';
+import { Z_LAYERS, STANDARD_MODAL_PROPS } from '../constants/UI_UX';
+import { useKingdomStore } from '../store/useKingdomStore';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -28,16 +29,14 @@ export default function GoldMineLedger({
   setFilterYear,
   filterMonth,
   setFilterMonth,
-  filterQuarter,
-  setFilterQuarter,
   filterFrom,
   setFilterFrom,
   filterStatus,
   setFilterStatus,
   filterClass,
   setFilterClass,
-  filterSubClass,
-  setFilterSubClass,
+  filterCategory,
+  setFilterCategory,
   filterEntity,
   setFilterEntity,
   isFiltersExpanded,
@@ -46,15 +45,79 @@ export default function GoldMineLedger({
   filteredTransactions,
   onEditTransaction,
   exportCSV,
-  importCSV
+  importCSV,
+  onNewTransaction
 }) {
   const [selectedTxIds, setSelectedTxIds] = useState([]);
   const [editingTxs, setEditingTxs] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const fileInputRef = useRef(null);
 
+  const [sortField, setSortField] = useState('date');
+  const [sortDirection, setSortDirection] = useState('desc');
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedTransactions = useMemo(() => {
+    return [...filteredTransactions].sort((a, b) => {
+      let valA, valB;
+      if (sortField === 'status') {
+        valA = a.payment_status || '';
+        valB = b.payment_status || '';
+      } else if (sortField === 'date') {
+        valA = a.posting_date || a.value_date || a.created_at || '';
+        valB = b.posting_date || b.value_date || b.created_at || '';
+      } else if (sortField === 'due_date') {
+        valA = a.due_date || '';
+        valB = b.due_date || '';
+      } else if (sortField === 'from') {
+        valA = a.from || a.origin || '';
+        valB = b.from || b.origin || '';
+      } else if (sortField === 'type') {
+        valA = a.transaction_type || '';
+        valB = b.transaction_type || '';
+      } else if (sortField === 'category') {
+        valA = entityMappings[a.entity] || a.transaction_category || '';
+        valB = entityMappings[b.entity] || b.transaction_category || '';
+      } else if (sortField === 'entity') {
+        valA = a.entity || '';
+        valB = b.entity || '';
+      } else if (sortField === 'amount') {
+        valA = Number(a.amount) || 0;
+        valB = Number(b.amount) || 0;
+      } else {
+        return 0;
+      }
+
+      if (typeof valA === 'string') {
+        return sortDirection === 'asc'
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      } else {
+        return sortDirection === 'asc'
+          ? valA - valB
+          : valB - valA;
+      }
+    });
+  }, [filteredTransactions, sortField, sortDirection, entityMappings]);
+
   const handleStartEditing = () => {
     if (selectedTxIds.length === 0) return;
+    if (selectedTxIds.length === 1) {
+      const tx = transactions.find((t) => t.id === selectedTxIds[0]);
+      if (tx) {
+        onEditTransaction(tx);
+        setSelectedTxIds([]);
+        return;
+      }
+    }
     const initial = {};
     selectedTxIds.forEach((id) => {
       const tx = transactions.find((t) => t.id === id);
@@ -104,7 +167,6 @@ export default function GoldMineLedger({
           target_account: tx.target_account,
           source_dest_bank: tx.source_dest_bank,
           flow: tx.flow,
-          transaction_category: tx.transaction_category,
           transaction_subtype: tx.transaction_subtype,
           entity: tx.entity,
           origin: tx.from,
@@ -163,6 +225,54 @@ export default function GoldMineLedger({
     }
   };
 
+  const handleDuplicateSelectedTransactions = async () => {
+    if (selectedTxIds.length === 0) return;
+
+    const toastId = toast.loading(t('duplicating_ledger') || 'Duplicating ledger entries...');
+    try {
+      const activeProfileId = user?.id || GUEST_PROFILE_ID;
+      const txsToDuplicate = selectedTxIds.map(id => {
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return null;
+        
+        return {
+          transaction_type: tx.transaction_type,
+          amount: Number(tx.amount),
+          value_date: tx.value_date || null,
+          posting_date: tx.posting_date || null,
+          due_date: tx.due_date || null,
+          payment_status: tx.payment_status || 'Completed',
+          transaction_subtype: tx.transaction_subtype,
+          entity: tx.entity,
+          from: tx.from || tx.origin,
+          target_account: tx.target_account,
+          source_dest_bank: tx.source_dest_bank,
+          flow: tx.flow,
+          description: tx.description ? `${tx.description} (Copy)` : 'Copy'
+        };
+      }).filter(Boolean);
+
+      if (txsToDuplicate.length === 0) {
+        throw new Error('No valid transactions to duplicate.');
+      }
+
+      const registerTransactions = useKingdomStore.getState().registerTransactions;
+      const res = await registerTransactions(activeProfileId, txsToDuplicate);
+
+      if (res && res.success) {
+        toast.success(t('success_duplicated_transactions') || 'Selected transactions duplicated successfully!', { id: toastId });
+        setSelectedTxIds([]);
+        await fetchKingdomData(activeProfileId);
+        await fetchDashboardData(activeProfileId);
+      } else {
+        throw new Error(res?.error || 'Unknown error');
+      }
+    } catch (err) {
+      console.error('Error duplicating transactions:', err);
+      toast.error(`${t('err_duplicate_failed') || 'Duplicate failed'}: ${err.message || err}`, { id: toastId });
+    }
+  };
+
   return (
     <div 
       onClick={(e) => {
@@ -171,10 +281,10 @@ export default function GoldMineLedger({
           setIsTreasuryMenuOpen(true);
         }
       }}
-      className="absolute inset-0 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      className={`absolute inset-0 flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
       style={{ zIndex: Z_LAYERS.OVERLAY }}
     >
-      <div className="bg-[#f4e4bc] w-full max-w-7xl rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
         
         {/* Parchment Texture */}
         <div 
@@ -226,10 +336,10 @@ export default function GoldMineLedger({
                     <>
                       <button
                         type="button"
-                        onClick={handleStartEditing}
+                        onClick={handleDuplicateSelectedTransactions}
                         className="px-3 py-1.5 bg-[#b8860b] border-2 border-[#d4af37]/30 text-white font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer animate-in fade-in zoom-in duration-150"
                       >
-                        <span>✏️</span> {t('edit') || 'Edit'}
+                        <span>📋</span> {t('duplicate') || 'Duplicate'}
                       </button>
                       <button
                         type="button"
@@ -259,6 +369,14 @@ export default function GoldMineLedger({
                   )}
                 </>
               )}
+              <button
+                type="button"
+                onClick={onNewTransaction}
+                className="px-3 py-1.5 bg-[#8b4513] border-2 border-[#d4af37]/30 text-[#ffd700] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                title={t.register_movement}
+              >
+                <span>➕</span> {t.register_movement}
+              </button>
               <button
                 type="button"
                 onClick={exportCSV}
@@ -301,13 +419,12 @@ export default function GoldMineLedger({
                 <button
                   type="button"
                   onClick={() => {
+                    setFilterStatus('All');
                     setFilterYear('All');
                     setFilterMonth('All');
-                    setFilterQuarter('All');
                     setFilterFrom('All');
-                    setFilterStatus('All');
                     setFilterClass('All');
-                    setFilterSubClass('All');
+                    setFilterCategory('All');
                     setFilterEntity('All');
                     toast.success(t.filters_cleared);
                   }}
@@ -318,6 +435,19 @@ export default function GoldMineLedger({
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+                {/* Status */}
+                <div>
+                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.status}</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
+                  >
+                    <option value="All">{t.all_types || 'All Statuses'}</option>
+                    {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
                 {/* Year */}
                 <div>
                   <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.year_label}</label>
@@ -344,22 +474,6 @@ export default function GoldMineLedger({
                   </select>
                 </div>
 
-                {/* Quarter */}
-                <div>
-                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.quarter_label}</label>
-                  <select
-                    value={filterQuarter}
-                    onChange={(e) => setFilterQuarter(e.target.value)}
-                    className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
-                  >
-                    <option value="All">{t.all_quarters}</option>
-                    <option value="Q1">Q1</option>
-                    <option value="Q2">Q2</option>
-                    <option value="Q3">Q3</option>
-                    <option value="Q4">Q4</option>
-                  </select>
-                </div>
-
                 {/* From */}
                 <div>
                   <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.origin_from}</label>
@@ -373,42 +487,29 @@ export default function GoldMineLedger({
                   </select>
                 </div>
 
-                {/* Status */}
+                {/* Type */}
                 <div>
-                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.status}</label>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
-                  >
-                    <option value="All">{t.all_types || 'All Statuses'}</option>
-                    {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-
-                {/* Class */}
-                <div>
-                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.class}</label>
+                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.type || 'Type'}</label>
                   <select
                     value={filterClass}
                     onChange={(e) => setFilterClass(e.target.value)}
                     className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                   >
-                    <option value="All">{t.all_types || 'All Classes'}</option>
+                    <option value="All">{t.all_types || 'All Types'}</option>
                     {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
 
-                {/* Sub Class */}
+                {/* Category */}
                 <div>
-                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.sub_class}</label>
+                  <label className="block text-[8px] font-black uppercase text-[#5d4037]/75 mb-0.5 font-sans">{t.category_label || 'Category'}</label>
                   <select
-                    value={filterSubClass}
-                    onChange={(e) => setFilterSubClass(e.target.value)}
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
                     className="w-full bg-[#faf4e5] border border-[#8b4513]/25 rounded px-1.5 py-1 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]"
                   >
-                    <option value="All">{t.all_types || 'All Sub Classes'}</option>
-                    {subClassOptions.map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                    <option value="All">{t.all_categories || 'All Categories'}</option>
+                    {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
 
@@ -450,20 +551,59 @@ export default function GoldMineLedger({
                           className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#ffd700] cursor-pointer"
                         />
                       </th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.date')}</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.from')}</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.status')}</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.type')}</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.category')}</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.subcategory')}</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.headers.entity')}</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap">Nature/Flow</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('ledger.headers.amount')}</th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('status')}
+                      >
+                        {t('ledger.headers.status')} {sortField === 'status' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('date')}
+                      >
+                        {t('ledger.headers.date')} {sortField === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('due_date')}
+                      >
+                        {t('ledger.headers.due_date') || 'Due Date'} {sortField === 'due_date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('from')}
+                      >
+                        {t('ledger.headers.from')} {sortField === 'from' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('type')}
+                      >
+                        {t('ledger.headers.type')} {sortField === 'type' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('category')}
+                      >
+                        {t('ledger.headers.category')} {sortField === 'category' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('entity')}
+                      >
+                        {t('ledger.headers.entity')} {sortField === 'entity' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th 
+                        className="py-2.5 px-3 whitespace-nowrap text-right cursor-pointer hover:bg-[#70300d] select-none transition-colors"
+                        onClick={() => handleSort('amount')}
+                      >
+                        {t('ledger.headers.amount')} {sortField === 'amount' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                      </th>
                       <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('edit') || 'Edit'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                    {filteredTransactions.map((tx) => {
+                    {sortedTransactions.map((tx) => {
                       const isTxEditing = isEditing && selectedTxIds.includes(tx.id);
                       if (isTxEditing) {
                         return (
@@ -483,10 +623,29 @@ export default function GoldMineLedger({
                               />
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap">
+                              <select
+                                value={editingTxs[tx.id]?.payment_status || 'Completed'}
+                                onChange={e => handleFieldChange(tx.id, 'payment_status', e.target.value)}
+                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                              >
+                                {['Completed', 'Pending', 'Overdue', 'Paid on Time', 'Paid Late', 'Open', 'Paid'].map(opt => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap">
                               <input
                                 type="date"
                                 value={editingTxs[tx.id]?.posting_date || ''}
                                 onChange={e => handleFieldChange(tx.id, 'posting_date', e.target.value)}
+                                className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+                              />
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              <input
+                                type="date"
+                                value={editingTxs[tx.id]?.due_date || ''}
+                                onChange={e => handleFieldChange(tx.id, 'due_date', e.target.value)}
                                 className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
                               />
                             </td>
@@ -497,17 +656,6 @@ export default function GoldMineLedger({
                                 onChange={e => handleFieldChange(tx.id, 'from', e.target.value)}
                                 className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
                               />
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <select
-                                value={editingTxs[tx.id]?.payment_status || 'Completed'}
-                                onChange={e => handleFieldChange(tx.id, 'payment_status', e.target.value)}
-                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              >
-                                {['Completed', 'Pending', 'Overdue', 'Paid on Time', 'Paid Late', 'Open', 'Paid'].map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <select
@@ -534,18 +682,6 @@ export default function GoldMineLedger({
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <select
-                                value={editingTxs[tx.id]?.transaction_subtype || ''}
-                                onChange={e => handleFieldChange(tx.id, 'transaction_subtype', e.target.value)}
-                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              >
-                                <option value="">-</option>
-                                {subClassOptions.map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <select
                                 value={editingTxs[tx.id]?.entity || ''}
                                 onChange={e => handleFieldChange(tx.id, 'entity', e.target.value)}
                                 className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
@@ -555,26 +691,6 @@ export default function GoldMineLedger({
                                   <option key={opt} value={opt}>{opt}</option>
                                 ))}
                               </select>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <div className="flex flex-col gap-1">
-                                <select
-                                  value={editingTxs[tx.id]?.transaction_nature || 'cash'}
-                                  onChange={e => handleFieldChange(tx.id, 'transaction_nature', e.target.value)}
-                                  className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                                >
-                                  <option value="cash">cash</option>
-                                  <option value="accrual">accrual</option>
-                                </select>
-                                <select
-                                  value={editingTxs[tx.id]?.transaction_flow || 'inflow'}
-                                  onChange={e => handleFieldChange(tx.id, 'transaction_flow', e.target.value)}
-                                  className="bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[8px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                                >
-                                  <option value="inflow">inflow</option>
-                                  <option value="outflow">outflow</option>
-                                </select>
-                              </div>
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap">
                               <input
@@ -606,8 +722,6 @@ export default function GoldMineLedger({
                               className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
                             />
                           </td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.posting_date || tx.value_date || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
                           <td className="py-2 px-3 whitespace-nowrap">
                             <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                               tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
@@ -619,6 +733,9 @@ export default function GoldMineLedger({
                               {tx.payment_status || 'Completed'}
                             </span>
                           </td>
+                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.posting_date || tx.value_date || '-'}</td>
+                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.due_date || '-'}</td>
+                          <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
                           <td className="py-2 px-3 whitespace-nowrap">
                             <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                               tx.flow === 'inflow' 
@@ -631,12 +748,7 @@ export default function GoldMineLedger({
                             </span>
                           </td>
                           <td className="py-2 px-3 whitespace-nowrap text-stone-600">{entityMappings[tx.entity] || tx.transaction_category || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_subtype || '-'}</td>
                           <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap">
-                            <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase mr-1" title="Target Account">{tx.target_account || '-'}</span>
-                            <span className="text-[9px] font-mono text-stone-500 font-bold bg-[#8b4513]/10 px-1.5 py-0.5 rounded uppercase" title="Source/Dest Bank">{tx.source_dest_bank || '-'}</span>
-                          </td>
                           <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
                             tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')
                           }`}>
