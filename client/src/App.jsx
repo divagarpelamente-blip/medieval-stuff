@@ -26,7 +26,7 @@ import RoyalIncomeStatement from './components/RoyalIncomeStatement';
 import TreasuryStatements from './components/TreasuryStatements';
 import ConsolidatedFinancialStatement from './components/ConsolidatedFinancialStatement';
 import { handleExportCSV, handleImportCSV, handleExportAllActionsCSV, handleImportQuickActionsCSV, handleExportSettingsCSV, handleImportSettingsCSV } from './utils/csvHelpers';
-import { accountMappings, getAccountName } from './utils/accountMappings';
+import { getAccountName } from './utils/accountMappings';
 import QuickActionFormFields from './components/QuickActionFormFields';
 import EditQuickActionModal from './components/EditQuickActionModal';
 import ManageQuickActionsPanel from './components/ManageQuickActionsPanel';
@@ -36,6 +36,7 @@ import { useManualTransactionForm } from './hooks/useManualTransactionForm';
 import { useQuickActionForm } from './hooks/useQuickActionForm';
 import { useLedgerFilters } from './hooks/useLedgerFilters';
 import CategoryMatrixEditor from './components/CategoryMatrixEditor';
+import COAEditor from './components/COAEditor';
 import GoldMineLedger from './components/GoldMineLedger';
 
 
@@ -99,6 +100,7 @@ function App() {
   const transactions = useKingdomStore((state) => state.transactions);
   const isLoading = useKingdomStore((state) => state.isLoading);
   const rawTemplates = useKingdomStore((state) => state.templates);
+  const accountMappings = useKingdomStore((state) => state.accountMappings);
   
   const fetchKingdomData = useKingdomStore((state) => state.fetchKingdomData);
   const fetchDashboardData = useKingdomStore((state) => state.fetchDashboardData);
@@ -775,6 +777,16 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   };
 
   const renderSettingsPanel = () => {
+    if (selectedSettingType === 'coa') {
+      return (
+        <COAEditor
+          t={t}
+          accountMappings={accountMappings}
+          syncSettings={syncSettings}
+        />
+      );
+    }
+
     if (selectedSettingType === 'class') {
       return (
         <CategoryMatrixEditor
@@ -1570,6 +1582,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       { id: 'from', label: 'Origin/From', icon: '👤' },
                       { id: 'status', label: 'Status', icon: '📊' },
                       { id: 'class', label: 'Categories', icon: '📁' },
+                      { id: 'coa', label: 'Chart of Accounts', icon: '📖' },
                       { id: 'quickAction', label: 'Quick Actions', icon: '⚡' },
                       { id: 'allActions', label: 'All Actions', icon: '📋' }
                     ].map((btn) => {
