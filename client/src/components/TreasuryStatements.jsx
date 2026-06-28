@@ -2,23 +2,16 @@ import React, { useState } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
 import { accountMappings } from '../utils/accountMappings';
 
-const LEVEL_NAMES = {
-  // Level 1
-  '1': 'Assets (Resources Owned)',
-  '2': 'Liabilities (Obligations Owed)',
-  // Level 2
-  '11': 'Cash & Cash Equivalents',
-  '12': 'Investments',
-  '13': 'Savings Accounts',
-  '21': 'Loans & Debts',
-  '22': 'Credit Cards',
-  // Level 3
-  '111': 'Bank Vaults',
-  '121': 'Investment Apps',
-  '131': 'Savings Vaults',
-  '211': 'Long-term Loans',
-  '212': 'Personal Debts',
-  '221': 'Credit Card Details'
+// 1. Parsing Helper
+const parseAccountName = (code, fullName) => {
+  let remaining = fullName;
+  if (remaining.startsWith(code)) {
+    remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+  }
+  const parts = remaining.split(/\s*-\s*/);
+  const subtype = parts[0] || 'Other';
+  const entity = parts.slice(1).join(' - ') || 'Other';
+  return { subtype, entity };
 };
 
 const monthNames = [
@@ -49,7 +42,17 @@ const isBeforeOrInYear = (txYear, targetYear) => {
 export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t, formatNumberCompact, show = 'all', selectedYears = [], selectedQuarters = [], selectedMonths = [] }) {
   const allTxs = useKingdomStore(state => state.transactions) || [];
   const userGold = useKingdomStore(state => state.gold) || 0;
-  
+  const subtypeToCategoryMap = useKingdomStore(state => state.subtypeToCategoryMap) || {};
+  const subtypeTypes = useKingdomStore(state => state.subtypeTypes) || {};
+
+  // 2. Inverted Subtype Map to look up Group from Subtype
+  const subtypeToGroup = {};
+  Object.entries(subtypeToCategoryMap).forEach(([group, subtypes]) => {
+    subtypes.forEach(sub => {
+      subtypeToGroup[sub] = group;
+    });
+  });
+
   // Comparison Mode State
   const [compareMode, setCompareMode] = useState('M'); // 'M', 'Q', 'Y'
 
@@ -59,82 +62,129 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   // Expanded nodes state
   const [expandedNodes, setExpandedNodes] = useState({
     '1': true,
-    '11': true,
-    '12': true,
-    '13': true,
-    '111': true,
-    '121': true,
-    '131': true,
-    '2': true,
-    '21': true,
-    '22': true,
-    '211': true,
-    '212': true,
-    '221': true
+    '2': true
   });
+
+  const isNodeExpanded = (code) => {
+    return expandedNodes[code] !== false;
+  };
 
   const toggleNode = (code) => {
     setExpandedNodes(prev => ({
       ...prev,
-      [code]: !prev[code]
+      [code]: isNodeExpanded(code) ? false : true
     }));
   };
 
   const expandToLevel = (targetLevel) => {
     const nextExpanded = {};
-    Object.keys(LEVEL_NAMES).forEach(code => {
-      // code.length is the level: '1' -> 1, '11' -> 2, '111' -> 3
-      nextExpanded[code] = code.length < targetLevel;
-    });
+    const traverse = (nodeCode, level) => {
+      nextExpanded[nodeCode] = level < targetLevel;
+      const node = { ...assetNodes[nodeCode], ...liabilityNodes[nodeCode] };
+      if (node && node.children) {
+        node.children.forEach(child => traverse(child, level + 1));
+      }
+    };
+    traverse('1', 1);
+    traverse('2', 1);
     setExpandedNodes(nextExpanded);
+  };
+
+  const TYPE_SUBTYPES = {
+    '1': [],
+    '2': [],
+    '6': [],
+    '7': []
+  };
+
+  Object.keys(subtypeToCategoryMap).forEach(st => {
+    const types = subtypeTypes[st] || [];
+    if (types.length > 0) {
+      types.forEach(t => {
+        if (TYPE_SUBTYPES[t]) {
+          TYPE_SUBTYPES[t].push(st);
+        }
+      });
+    } else {
+      const defaults = {
+        'Banks': '1', 'Fixed Assets': '1',
+        'Personal Debt': '2', 'Other Debts': '2',
+        'Living & Household': '6', 'Personal Transports': '6', 'Public Transports': '6', 'Other Transports': '6',
+        'Markets & Consumables': '6', 'Health': '6', 'Entertainment': '6', 'Education': '6',
+        'Insurances': '6', 'Taxes & State': '6', 'Financial Expenses': '6',
+        'Payroll': '7', 'Other Income': '7', 'Financial Income': '7'
+      };
+      const t = defaults[st] || '6';
+      if (TYPE_SUBTYPES[t]) {
+        TYPE_SUBTYPES[t].push(st);
+      }
+    }
+  });
+
+  const findSubtype = (code, category) => {
+    const typeDigit = code[0];
+    const allowed = TYPE_SUBTYPES[typeDigit] || [];
+    for (const st of allowed) {
+      const cats = subtypeToCategoryMap[st] || [];
+      if (cats.includes(category)) {
+        return st;
+      }
+    }
+    return 'Other';
   };
 
   const buildHierarchy = (flatList, rootCode) => {
     const nodes = {};
+    const rootName = rootCode === '1' ? 'Assets' : 'Liabilities';
     
     // Initialize root node
     nodes[rootCode] = {
       code: rootCode,
-      name: LEVEL_NAMES[rootCode] || (rootCode === '1' ? 'Assets' : 'Liabilities'),
+      name: rootName,
       level: 1,
       balance: 0,
       children: []
     };
 
-    // Process each leaf item (Level 4)
+    // Process each leaf item
     if (flatList) {
       flatList.forEach(item => {
         const code = item.code;
         const balance = Number(item.balance) || 0;
 
-        const lvl2Code = code.slice(0, 2);
-        const lvl3Code = code.slice(0, 3);
+        // Parse subtype from account name (this is the category)
+        const parsed = parseAccountName(code, item.name);
+        const category = parsed.subtype;
+        const subtype = findSubtype(code, category);
 
-        // Ensure Level 2 exists
-        if (!nodes[lvl2Code]) {
-          nodes[lvl2Code] = {
-            code: lvl2Code,
-            name: LEVEL_NAMES[lvl2Code] || `Level 2 (${lvl2Code})`,
+        const subtypeCode = `${rootCode}_st_${subtype}`;
+        const categoryCode = `${rootCode}_cat_${category}`;
+
+        // Ensure Level 2 (Subtype) exists
+        if (!nodes[subtypeCode]) {
+          nodes[subtypeCode] = {
+            code: subtypeCode,
+            name: subtype,
             level: 2,
             balance: 0,
             children: []
           };
-          nodes[rootCode].children.push(lvl2Code);
+          nodes[rootCode].children.push(subtypeCode);
         }
 
-        // Ensure Level 3 exists
-        if (!nodes[lvl3Code]) {
-          nodes[lvl3Code] = {
-            code: lvl3Code,
-            name: LEVEL_NAMES[lvl3Code] || `Level 3 (${lvl3Code})`,
+        // Ensure Level 3 (Category) exists under this Subtype
+        if (!nodes[categoryCode]) {
+          nodes[categoryCode] = {
+            code: categoryCode,
+            name: category,
             level: 3,
             balance: 0,
             children: []
           };
-          nodes[lvl2Code].children.push(lvl3Code);
+          nodes[subtypeCode].children.push(categoryCode);
         }
 
-        // Add Level 4 leaf
+        // Add Level 4 (Account Name) node under this Category
         nodes[code] = {
           code,
           name: item.name,
@@ -142,7 +192,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
           balance,
           children: []
         };
-        nodes[lvl3Code].children.push(code);
+        nodes[categoryCode].children.push(code);
       });
     }
 
@@ -150,7 +200,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
     const computeBalance = (nodeCode) => {
       const node = nodes[nodeCode];
       if (!node) return 0;
-      if (node.level === 4) {
+      if (node.children.length === 0) {
         return node.balance;
       }
       let sum = 0;
@@ -176,7 +226,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
       
       list.push(node);
       
-      const isExpanded = expandedNodes[nodeCode];
+      const isExpanded = isNodeExpanded(nodeCode);
       if (isExpanded && node.children.length > 0) {
         node.children.sort().forEach(childCode => {
           traverse(childCode);
@@ -381,12 +431,12 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
     
     return list.map((node) => {
       const hasChildren = node.children.length > 0;
-      const isExpanded = !!expandedNodes[node.code];
+      const isExpanded = isNodeExpanded(node.code);
       const indentClass = 
-        node.level === 1 ? 'pl-0 font-black text-[#4b2c20] text-[10px] uppercase' :
-        node.level === 2 ? 'pl-3 font-bold text-[#8b4513] text-[10px]' :
-        node.level === 3 ? 'pl-6 font-semibold text-[#5d4037] text-[9.5px]' :
-        'pl-9 font-medium text-[#5d4037]/85 text-[9px] italic';
+        node.level === 1 ? 'pl-0 font-black text-[#4b2c20] text-[9.5px] uppercase' :
+        node.level === 2 ? 'pl-3 font-bold text-[#8b4513] text-[9.5px]' :
+        node.level === 3 ? 'pl-6 font-semibold text-[#5d4037] text-[9px]' :
+        'pl-9 font-medium text-[#5d4037]/85 text-[8.5px] italic';
 
       const icon = node.level === 1 ? '👑' : node.level === 2 ? '📁' : node.level === 3 ? '📂' : '📄';
 
@@ -399,8 +449,8 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
           key={node.code} 
           className={`flex justify-between items-center py-1 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors duration-150 ${node.level === 1 ? 'bg-[#8b4513]/5 mt-2 rounded px-1' : ''}`}
         >
-          {/* Left Side (50% Width) - Name and Sidebar Value */}
-          <div className="w-[50%] flex justify-between items-center pr-4">
+          {/* Left Side (53% Width) - Name and Sidebar Value */}
+          <div className="w-[53%] flex justify-between items-center pr-2">
             <div className={`flex items-center gap-1.5 ${indentClass}`}>
               <span>{icon}</span>
               <span>{node.name}</span>
@@ -414,16 +464,16 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                 </button>
               )}
             </div>
-            <span className={`font-mono font-bold ${node.code.startsWith('1') ? 'text-emerald-700' : 'text-rose-700'} text-[10px]`}>
+            <span className={`font-mono font-bold ${node.code.startsWith('1') ? 'text-emerald-700' : 'text-rose-700'} text-[9px]`}>
               {formatNumberCompact(node.balance)}
             </span>
           </div>
 
-          {/* Right Side (50% Width) - Comparative Columns */}
-          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
-            <span className={`w-[65px] ${node.code.startsWith('1') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
-            <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
-            <span className={`w-[70px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+          {/* Right Side (47% Width) - Comparative Columns */}
+          <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+            <span className={`w-[75px] ${node.code.startsWith('1') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
+            <span className="w-[75px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
+            <span className={`w-[80px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
             </span>
           </div>
@@ -448,26 +498,30 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                 key={lvl}
                 type="button"
                 onClick={() => expandToLevel(lvl)}
-                className="w-6 h-6 rounded border border-[#8b4513]/25 bg-[#faf4e5]/80 hover:bg-[#8b4513]/10 text-[#8b4513] font-bold flex items-center justify-center cursor-pointer text-[10px]"
+                className="w-5 h-5 rounded bg-[#8b4513]/10 text-[#8b4513] font-bold text-[9px] hover:bg-[#8b4513] hover:text-white transition-colors cursor-pointer"
               >
-                {lvl}*
+                {lvl}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setExpandedNodes({})}
+              className="w-5 h-5 rounded bg-[#8b4513]/10 text-[#8b4513] font-bold text-[9px] hover:bg-[#8b4513] hover:text-white transition-colors cursor-pointer flex items-center justify-center"
+              title="Collapse All"
+            >
+              Ø
+            </button>
           </div>
         )}
-        {hasLevelSelect && <span className="h-4 w-px bg-[#8b4513]/20"></span>}
-        <button
-          type="button"
-          onClick={() => setHideZero(!hideZero)}
-          className={`w-6 h-6 rounded border font-bold flex items-center justify-center cursor-pointer text-[10px] ${
-            hideZero
-              ? 'bg-rose-700 border-rose-700 text-[#faf4e5] shadow-sm font-sans'
-              : 'border-[#8b4513]/25 bg-[#faf4e5]/80 text-[#8b4513] hover:bg-[#8b4513]/10'
-          }`}
-          title="Hide Zero Balances"
-        >
-          Ø
-        </button>
+        <label className="flex items-center gap-1 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={hideZero}
+            onChange={(e) => setHideZero(e.target.checked)}
+            className="rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513] w-3 h-3 cursor-pointer"
+          />
+          <span className="text-[9px] text-[#5d4037]/80 font-bold uppercase tracking-wider">Hide Zero Balances</span>
+        </label>
       </div>
     );
   };
@@ -499,17 +553,17 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   // Unified Columns Header Row
   const renderUnifiedHeader = () => {
     return (
-      <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[9px] uppercase tracking-wider mb-2">
-        {/* Left Side Header (50%) */}
-        <div className="w-[50%] flex justify-between pr-4">
+      <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[8.5px] uppercase tracking-wider mb-2">
+        {/* Left Side Header (53%) */}
+        <div className="w-[53%] flex justify-between pr-2">
           <span></span>
           <span></span>
         </div>
-        {/* Right Side Header (50%) */}
-        <div className="w-[50%] flex justify-end gap-4 text-right">
-          <span className="w-[65px]">{col1Header}</span>
-          <span className="w-[65px]">{col2Header}</span>
-          <span className="w-[70px]">Difference</span>
+        {/* Right Side Header (47%) */}
+        <div className="w-[47%] flex justify-end gap-3 text-right">
+          <span className="w-[75px]">{col1Header}</span>
+          <span className="w-[75px]">{col2Header}</span>
+          <span className="w-[80px]">Difference</span>
         </div>
       </div>
     );
@@ -531,40 +585,40 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
           <div className="space-y-6">
             {/* Assets Section */}
             <div className="space-y-3">
-              <div className="space-y-1 text-[10px]">
+              <div className="space-y-1 text-[9.5px]">
                 {renderStatementRows(assetNodes, '1')}
               </div>
             </div>
 
             {/* Liabilities Section */}
             <div className="space-y-3">
-              <div className="space-y-1 text-[10px]">
+              <div className="space-y-1 text-[9.5px]">
                 {renderStatementRows(liabilityNodes, '2')}
               </div>
             </div>
 
             {/* Equity Section Summary */}
             <div className="flex justify-between items-center bg-[#f4e4bc]/50 border border-[#8b4513]/15 rounded-lg p-2 mt-2">
-              {/* Left Side (50% Width) - Name and Sidebar Value */}
-              <div className="w-[50%] flex justify-between items-center pr-4">
-                <div className="pl-0 font-black text-[#4b2c20] text-[10px] uppercase flex items-center gap-1.5">
+              {/* Left Side (53% Width) - Name and Sidebar Value */}
+              <div className="w-[53%] flex justify-between items-center pr-2">
+                <div className="pl-0 font-black text-[#4b2c20] text-[9.5px] uppercase flex items-center gap-1.5">
                   <span>🛡️</span>
                   <span>{t('accumulated_wealth', 'Accumulated Wealth (Net Equity)')}</span>
                 </div>
-                <span className={`font-mono font-bold ${bsEquity.accumulatedWealth >= 0 ? 'text-emerald-700' : 'text-rose-700'} text-[10px]`}>
-                  {bsEquity.formattedTotal || '0 / g'}
+                <span className={`font-mono font-bold ${bsEquity.accumulatedWealth >= 0 ? 'text-emerald-700' : 'text-rose-700'} text-[9.5px]`}>
+                  {formatNumberCompact(bsEquity.accumulatedWealth)}
                 </span>
               </div>
 
-              {/* Right Side (50% Width) - Comparative Columns */}
-              <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
-                <span className={`w-[65px] ${sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              {/* Right Side (47% Width) - Comparative Columns */}
+              <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+                <span className={`w-[75px] ${sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                   {formatNumberCompact(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances))}
                 </span>
-                <span className="w-[65px] text-[#5d4037]/70">
+                <span className="w-[75px] text-[#5d4037]/70">
                   {formatNumberCompact(sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances))}
                 </span>
-                <span className={`w-[70px] ${(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances)) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                <span className={`w-[80px] ${(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances)) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                   {((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances))) > 0 ? '+' : ''}
                   {formatNumberCompact((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances)))}
                 </span>
@@ -591,7 +645,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
               <h5 className="title-font text-[9px] font-black text-[#8b4513]/95 uppercase tracking-wider border-b border-[#8b4513]/5 pb-1">
                 ⚙️ {t('operating_activities', 'Operating Activities')}
               </h5>
-              <div className="space-y-1.5 text-[9px] mt-2">
+              <div className="space-y-1.5 text-[8.5px] mt-2">
                 {cashFlowStatement?.operating && cashFlowStatement.operating.length > 0 ? (
                   cashFlowStatement.operating
                     .filter(item => !hideZero || item.amount !== 0)
@@ -601,14 +655,14 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                       const diff = cur - prev;
                       return (
                         <div key={idx} className="flex justify-between items-center py-0.5 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors">
-                          <div className="w-[50%] flex justify-between pr-4">
+                          <div className="w-[53%] flex justify-between pr-2">
                             <span className="font-bold text-[#5d4037]">{item.name}</span>
-                            <span className={`font-mono font-bold ${item.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{item.formatted}</span>
+                            <span className={`font-mono font-bold ${item.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(item.amount)}</span>
                           </div>
-                          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9px] text-right font-bold">
-                            <span className="w-[65px] text-rose-700">{formatNumberCompact(cur)}</span>
-                            <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(prev)}</span>
-                            <span className={`w-[70px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+                            <span className="w-[75px] text-rose-700">{formatNumberCompact(cur)}</span>
+                            <span className="w-[75px] text-[#5d4037]/70">{formatNumberCompact(prev)}</span>
+                            <span className={`w-[80px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                               {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
                             </span>
                           </div>
@@ -620,15 +674,15 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                     {t('no_operating_flows', 'No operating cash flows.')}
                   </div>
                 )}
-                <div className="flex justify-between items-center text-[9.5px] font-bold text-[#4b2c20] pt-1.5 border-t border-[#8b4513]/10 mt-1">
-                  <div className="w-[50%] flex justify-between pr-4">
+                <div className="flex justify-between items-center text-[9px] font-bold text-[#4b2c20] pt-1.5 border-t border-[#8b4513]/10 mt-1">
+                  <div className="w-[53%] flex justify-between pr-2">
                     <span>{t('net_operating', 'Net Operating')}</span>
-                    <span className={`font-mono ${cashFlowStatement?.netOperating >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{cashFlowStatement?.formattedOperating}</span>
+                    <span className={`font-mono ${cashFlowStatement?.netOperating >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(cashFlowStatement?.netOperating)}</span>
                   </div>
-                  <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-black">
-                    <span className="w-[65px] text-rose-700">{formatNumberCompact(currentCashFlow.netOperating)}</span>
-                    <span className="w-[65px] text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netOperating)}</span>
-                    <span className={`w-[70px] ${currentCashFlow.netOperating - previousCashFlow.netOperating >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  <div className="w-[47%] flex justify-end gap-3 font-mono text-[9px] text-right font-black">
+                    <span className="w-[75px] text-rose-700">{formatNumberCompact(currentCashFlow.netOperating)}</span>
+                    <span className="w-[75px] text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netOperating)}</span>
+                    <span className={`w-[80px] ${currentCashFlow.netOperating - previousCashFlow.netOperating >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                       {formatNumberCompact(currentCashFlow.netOperating - previousCashFlow.netOperating)}
                     </span>
                   </div>
@@ -641,7 +695,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
               <h5 className="title-font text-[9px] font-black text-[#8b4513]/95 uppercase tracking-wider border-b border-[#8b4513]/5 pb-1">
                 🛡️ {t('investing_activities', 'Investing Activities')}
               </h5>
-              <div className="space-y-1.5 text-[9px] mt-2">
+              <div className="space-y-1.5 text-[8.5px] mt-2">
                 {cashFlowStatement?.investing && cashFlowStatement.investing.length > 0 ? (
                   cashFlowStatement.investing
                     .filter(item => !hideZero || item.amount !== 0)
@@ -651,14 +705,14 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                       const diff = cur - prev;
                       return (
                         <div key={idx} className="flex justify-between items-center py-0.5 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors">
-                          <div className="w-[50%] flex justify-between pr-4">
+                          <div className="w-[53%] flex justify-between pr-2">
                             <span className="font-bold text-[#5d4037]">{item.name}</span>
-                            <span className={`font-mono font-bold ${item.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{item.formatted}</span>
+                            <span className={`font-mono font-bold ${item.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(item.amount)}</span>
                           </div>
-                          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9px] text-right font-bold">
-                            <span className="w-[65px] text-emerald-700">{formatNumberCompact(cur)}</span>
-                            <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(prev)}</span>
-                            <span className={`w-[70px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+                            <span className="w-[75px] text-emerald-700">{formatNumberCompact(cur)}</span>
+                            <span className="w-[75px] text-[#5d4037]/70">{formatNumberCompact(prev)}</span>
+                            <span className={`w-[80px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                               {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
                             </span>
                           </div>
@@ -670,15 +724,15 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                     {t('no_investing_flows', 'No investing cash flows.')}
                   </div>
                 )}
-                <div className="flex justify-between items-center text-[9.5px] font-bold text-[#4b2c20] pt-1.5 border-t border-[#8b4513]/10 mt-1">
-                  <div className="w-[50%] flex justify-between pr-4">
+                <div className="flex justify-between items-center text-[9px] font-bold text-[#4b2c20] pt-1.5 border-t border-[#8b4513]/10 mt-1">
+                  <div className="w-[53%] flex justify-between pr-2">
                     <span>{t('net_investing', 'Net Investing')}</span>
-                    <span className={`font-mono ${cashFlowStatement?.netInvesting >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{cashFlowStatement?.formattedInvesting}</span>
+                    <span className={`font-mono ${cashFlowStatement?.netInvesting >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(cashFlowStatement?.netInvesting)}</span>
                   </div>
-                  <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-black">
-                    <span className="w-[65px] text-emerald-700">{formatNumberCompact(currentCashFlow.netInvesting)}</span>
-                    <span className="w-[65px] text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netInvesting)}</span>
-                    <span className={`w-[70px] ${currentCashFlow.netInvesting - previousCashFlow.netInvesting >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  <div className="w-[47%] flex justify-end gap-3 font-mono text-[9px] text-right font-black">
+                    <span className="w-[75px] text-emerald-700">{formatNumberCompact(currentCashFlow.netInvesting)}</span>
+                    <span className="w-[75px] text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netInvesting)}</span>
+                    <span className={`w-[80px] ${currentCashFlow.netInvesting - previousCashFlow.netInvesting >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                       {formatNumberCompact(currentCashFlow.netInvesting - previousCashFlow.netInvesting)}
                     </span>
                   </div>
@@ -691,7 +745,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
               <h5 className="title-font text-[9px] font-black text-[#8b4513]/95 uppercase tracking-wider border-b border-[#8b4513]/5 pb-1">
                 🏦 {t('financing_activities', 'Financing Activities')}
               </h5>
-              <div className="space-y-1.5 text-[9px] mt-2">
+              <div className="space-y-1.5 text-[8.5px] mt-2">
                 {cashFlowStatement?.financing && cashFlowStatement.financing.length > 0 ? (
                   cashFlowStatement.financing
                     .filter(item => !hideZero || item.amount !== 0)
@@ -701,14 +755,14 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                       const diff = cur - prev;
                       return (
                         <div key={idx} className="flex justify-between items-center py-0.5 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors">
-                          <div className="w-[50%] flex justify-between pr-4">
+                          <div className="w-[53%] flex justify-between pr-2">
                             <span className="font-bold text-[#5d4037]">{item.name}</span>
-                            <span className={`font-mono font-bold ${item.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{item.formatted}</span>
+                            <span className={`font-mono font-bold ${item.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(item.amount)}</span>
                           </div>
-                          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9px] text-right font-bold">
-                            <span className="w-[65px] text-emerald-700">{formatNumberCompact(cur)}</span>
-                            <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(prev)}</span>
-                            <span className={`w-[70px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+                            <span className="w-[75px] text-emerald-700">{formatNumberCompact(cur)}</span>
+                            <span className="w-[75px] text-[#5d4037]/70">{formatNumberCompact(prev)}</span>
+                            <span className={`w-[80px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                               {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
                             </span>
                           </div>
@@ -720,15 +774,15 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                     {t('no_financing_flows', 'No financing cash flows.')}
                   </div>
                 )}
-                <div className="flex justify-between items-center text-[9.5px] font-bold text-[#4b2c20] pt-1.5 border-t border-[#8b4513]/10 mt-1">
-                  <div className="w-[50%] flex justify-between pr-4">
+                <div className="flex justify-between items-center text-[9px] font-bold text-[#4b2c20] pt-1.5 border-t border-[#8b4513]/10 mt-1">
+                  <div className="w-[53%] flex justify-between pr-2">
                     <span>{t('net_financing', 'Net Financing')}</span>
-                    <span className={`font-mono ${cashFlowStatement?.netFinancing >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{cashFlowStatement?.formattedFinancing}</span>
+                    <span className={`font-mono ${cashFlowStatement?.netFinancing >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(cashFlowStatement?.netFinancing)}</span>
                   </div>
-                  <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-black">
-                    <span className="w-[65px] text-emerald-700">{formatNumberCompact(currentCashFlow.netFinancing)}</span>
-                    <span className="w-[65px] text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netFinancing)}</span>
-                    <span className={`w-[70px] ${currentCashFlow.netFinancing - previousCashFlow.netFinancing >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  <div className="w-[47%] flex justify-end gap-3 font-mono text-[9px] text-right font-black">
+                    <span className="w-[75px] text-emerald-700">{formatNumberCompact(currentCashFlow.netFinancing)}</span>
+                    <span className="w-[75px] text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netFinancing)}</span>
+                    <span className={`w-[80px] ${currentCashFlow.netFinancing - previousCashFlow.netFinancing >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                       {formatNumberCompact(currentCashFlow.netFinancing - previousCashFlow.netFinancing)}
                     </span>
                   </div>
@@ -737,17 +791,17 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
             </div>
 
             {/* Net Cash Flow Footer */}
-            <div className="flex justify-between items-center bg-[#f4e4bc]/50 border border-[#8b4513]/15 rounded-lg p-2.5 font-serif text-[11px] font-black uppercase text-[#4b2c20] tracking-wide mt-2">
-              <div className="w-[50%] flex justify-between pr-4">
+            <div className="flex justify-between items-center bg-[#f4e4bc]/50 border border-[#8b4513]/15 rounded-lg p-2.5 font-serif text-[10px] font-black uppercase text-[#4b2c20] tracking-wide mt-2">
+              <div className="w-[53%] flex justify-between pr-2">
                 <span>💰 {t('net_cash_flow', 'Net Cash Flow (Periodic Change)')}</span>
                 <span className={`font-mono text-xs ${cashFlowStatement?.netCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {cashFlowStatement?.formattedNet}
+                  {formatNumberCompact(cashFlowStatement?.netCashFlow)}
                 </span>
               </div>
-              <div className="w-[50%] flex justify-end gap-4 font-mono text-[11px] text-right font-black">
-                <span>{formatNumberCompact(currentCashFlow.netCashFlow)}</span>
-                <span className="text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netCashFlow)}</span>
-                <span className={`${currentCashFlow.netCashFlow - previousCashFlow.netCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              <div className="w-[47%] flex justify-end gap-3 font-mono text-[10px] text-right font-black">
+                <span className="w-[75px]">{formatNumberCompact(currentCashFlow.netCashFlow)}</span>
+                <span className="w-[75px] text-[#5d4037]/75">{formatNumberCompact(previousCashFlow.netCashFlow)}</span>
+                <span className={`w-[80px] ${currentCashFlow.netCashFlow - previousCashFlow.netCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                   {formatNumberCompact(currentCashFlow.netCashFlow - previousCashFlow.netCashFlow)}
                 </span>
               </div>

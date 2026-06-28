@@ -19,8 +19,8 @@ ALTER TABLE public.transactions ADD CONSTRAINT check_double_entry_integrity CHEC
   -- Cash amortizations and interest payments are cash outflows
   (transaction_subtype IN ('Amortization', 'Interest') AND transaction_nature = 'cash' AND transaction_flow = 'outflow') OR
   
-  -- Tolerate all Income/Expense records (allowing both cash and accrual natures with inflow/outflow)
-  (transaction_type IN ('Income', 'Expense')) OR
+  -- Tolerate all Income/Expense/Liabilities records (allowing both cash and accrual natures with inflow/outflow)
+  (transaction_type IN ('Income', 'Expense', 'Liabilities')) OR
   
   -- Allow other types to bypass if they are not core restricted structures
   (transaction_type NOT IN ('Receivable', 'Payable', 'Income', 'Expense', 'Liabilities'))

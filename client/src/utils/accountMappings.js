@@ -12,6 +12,7 @@ export const defaultAccountMappings = {
   '10103003': '10103003 - Investments account - Active Bank',
   '10103004': '10103004 - Investments account - Wizink',
   '10103005': '10103005 - Investments account - Inter Bank',
+  '10104001': '10104001 - Fixed Assets - Jota',
 
   // Liability Accounts (2xxxxxxx)
   '20101001': '20101001 - Loans & Burrow - CGD',

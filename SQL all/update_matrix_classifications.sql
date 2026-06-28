@@ -38,8 +38,8 @@ ALTER TABLE public.transactions ADD CONSTRAINT check_double_entry_integrity CHEC
   -- Payables are obligations to others (outflows to be settled)
   (transaction_type = 'Payable' AND flow = 'outflow') OR
   
-  -- Tolerate Income/Expense records
-  (transaction_type IN ('Income', 'Expense')) OR
+  -- Tolerate Income/Expense/Liabilities records
+  (transaction_type IN ('Income', 'Expense', 'Liabilities')) OR
   
   -- Allow other types to bypass if they are not core restricted structures
   (transaction_type NOT IN ('Receivable', 'Payable', 'Income', 'Expense', 'Liabilities'))

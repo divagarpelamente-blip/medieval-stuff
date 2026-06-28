@@ -2,37 +2,16 @@ import React, { useState } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
 import { accountMappings } from '../utils/accountMappings';
 
-const LEVEL_NAMES = {
-  // Level 1
-  '7': 'Revenues (Accrued Inflows)',
-  '6': 'Expenses (Accrued Outflows)',
-  // Level 2
-  '71': 'Earned Income',
-  '72': 'Investment Income',
-  '73': 'Transfers & Refunds',
-  '61': 'Housing & Maintenance',
-  '62': 'Utilities',
-  '63': 'Transportation',
-  '64': 'General Living',
-  '65': 'Healthcare',
-  '66': 'Entertainment',
-  '68': 'Financial',
-  // Level 3
-  '711': 'Salaries & Bonuses',
-  '712': 'Professional Services',
-  '721': 'Portfolio Returns',
-  '731': 'Gifts & Refunds',
-  '611': 'Property Expenses',
-  '621': 'Energy & Water',
-  '631': 'Vehicle Expenses',
-  '641': 'Grocery & Nutrition',
-  '642': 'Tools & Supplies',
-  '643': 'Apparel',
-  '651': 'Health Services',
-  '661': 'Dining',
-  '662': 'Media',
-  '663': 'Subscriptions',
-  '681': 'Fees & Interest'
+// 1. Parsing Helper
+const parseAccountName = (code, fullName) => {
+  let remaining = fullName;
+  if (remaining.startsWith(code)) {
+    remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+  }
+  const parts = remaining.split(/\s*-\s*/);
+  const subtype = parts[0] || 'Other';
+  const entity = parts.slice(1).join(' - ') || 'Other';
+  return { subtype, entity };
 };
 
 const monthNames = [
@@ -42,6 +21,39 @@ const monthNames = [
 
 export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberCompact, selectedYears = [], selectedQuarters = [], selectedMonths = [] }) {
   const allTxs = useKingdomStore(state => state.transactions) || [];
+  const subtypeToCategoryMap = useKingdomStore(state => state.subtypeToCategoryMap) || {};
+  const subtypeTypes = useKingdomStore(state => state.subtypeTypes) || {};
+
+  const TYPE_SUBTYPES = {
+    '1': [],
+    '2': [],
+    '6': [],
+    '7': []
+  };
+
+  Object.keys(subtypeToCategoryMap).forEach(st => {
+    const types = subtypeTypes[st] || [];
+    if (types.length > 0) {
+      types.forEach(t => {
+        if (TYPE_SUBTYPES[t]) {
+          TYPE_SUBTYPES[t].push(st);
+        }
+      });
+    } else {
+      const defaults = {
+        'Banks': '1', 'Fixed Assets': '1',
+        'Personal Debt': '2', 'Other Debts': '2',
+        'Living & Household': '6', 'Personal Transports': '6', 'Public Transports': '6', 'Other Transports': '6',
+        'Markets & Consumables': '6', 'Health': '6', 'Entertainment': '6', 'Education': '6',
+        'Insurances': '6', 'Taxes & State': '6', 'Financial Expenses': '6',
+        'Payroll': '7', 'Other Income': '7', 'Financial Income': '7'
+      };
+      const t = defaults[st] || '6';
+      if (TYPE_SUBTYPES[t]) {
+        TYPE_SUBTYPES[t].push(st);
+      }
+    }
+  });
 
   // Comparison Mode State
   const [compareMode, setCompareMode] = useState('M'); // 'M', 'Q', 'Y'
@@ -52,56 +64,54 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Expanded nodes state
   const [expandedNodes, setExpandedNodes] = useState({
     '7': true,
-    '71': true,
-    '72': true,
-    '73': true,
-    '711': true,
-    '712': true,
-    '721': true,
-    '731': true,
-    '6': true,
-    '61': true,
-    '62': true,
-    '63': true,
-    '64': true,
-    '65': true,
-    '66': true,
-    '68': true,
-    '611': true,
-    '621': true,
-    '631': true,
-    '641': true,
-    '642': true,
-    '643': true,
-    '651': true,
-    '661': true,
-    '662': true,
-    '663': true,
-    '681': true
+    '6': true
   });
+
+  const isNodeExpanded = (code) => {
+    return expandedNodes[code] !== false;
+  };
 
   const toggleNode = (code) => {
     setExpandedNodes(prev => ({
       ...prev,
-      [code]: !prev[code]
+      [code]: isNodeExpanded(code) ? false : true
     }));
   };
 
   const expandToLevel = (targetLevel) => {
     const nextExpanded = {};
-    Object.keys(LEVEL_NAMES).forEach(code => {
-      nextExpanded[code] = code.length < targetLevel;
-    });
+    const traverse = (nodeCode, level) => {
+      nextExpanded[nodeCode] = level < targetLevel;
+      const node = { ...revenueNodes[nodeCode], ...expenseNodes[nodeCode] };
+      if (node && node.children) {
+        node.children.forEach(child => traverse(child, level + 1));
+      }
+    };
+    traverse('7', 1);
+    traverse('6', 1);
     setExpandedNodes(nextExpanded);
+  };
+
+  const findSubtype = (code, category) => {
+    const typeDigit = code[0];
+    const allowed = TYPE_SUBTYPES[typeDigit] || [];
+    for (const st of allowed) {
+      const cats = subtypeToCategoryMap[st] || [];
+      if (cats.includes(category)) {
+        return st;
+      }
+    }
+    return 'Other';
   };
 
   const buildHierarchy = (flatList, rootCode) => {
     const nodes = {};
+    const rootName = rootCode === '7' ? 'Revenues' : 'Expenses';
     
     // Initialize root node
     nodes[rootCode] = {
       code: rootCode,
-      name: LEVEL_NAMES[rootCode] || (rootCode === '7' ? 'Revenues' : 'Expenses'),
+      name: rootName,
       level: 1,
       balance: 0,
       children: []
@@ -112,54 +122,47 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
         const code = item.code;
         const balance = Number(item.balance) || 0;
 
-        const lvl2Code = code.slice(0, 2);
-        const lvl3Code = code.length >= 3 ? code.slice(0, 3) : code;
+        // Parse subtype from account name (this is the category)
+        const parsed = parseAccountName(code, item.name);
+        const category = parsed.subtype;
+        const subtype = findSubtype(code, category);
 
-        // Ensure Level 2 exists
-        if (!nodes[lvl2Code]) {
-          nodes[lvl2Code] = {
-            code: lvl2Code,
-            name: LEVEL_NAMES[lvl2Code] || `Level 2 (${lvl2Code})`,
+        const subtypeCode = `${rootCode}_st_${subtype}`;
+        const categoryCode = `${rootCode}_cat_${category}`;
+
+        // Ensure Level 2 (Subtype) exists
+        if (!nodes[subtypeCode]) {
+          nodes[subtypeCode] = {
+            code: subtypeCode,
+            name: subtype,
             level: 2,
             balance: 0,
             children: []
           };
-          nodes[rootCode].children.push(lvl2Code);
+          nodes[rootCode].children.push(subtypeCode);
         }
 
-        // If leaf item itself is Level 3
-        if (code.length === 3) {
-          nodes[code] = {
-            code,
-            name: item.name,
+        // Ensure Level 3 (Category) exists under this Subtype
+        if (!nodes[categoryCode]) {
+          nodes[categoryCode] = {
+            code: categoryCode,
+            name: category,
             level: 3,
-            balance,
+            balance: 0,
             children: []
           };
-          nodes[lvl2Code].children.push(code);
-        } else {
-          // Ensure Level 3 exists
-          if (!nodes[lvl3Code]) {
-            nodes[lvl3Code] = {
-              code: lvl3Code,
-              name: LEVEL_NAMES[lvl3Code] || `Level 3 (${lvl3Code})`,
-              level: 3,
-              balance: 0,
-              children: []
-            };
-            nodes[lvl2Code].children.push(lvl3Code);
-          }
-
-          // Add Level 4 leaf
-          nodes[code] = {
-            code,
-            name: item.name,
-            level: 4,
-            balance,
-            children: []
-          };
-          nodes[lvl3Code].children.push(code);
+          nodes[subtypeCode].children.push(categoryCode);
         }
+
+        // Add Level 4 (Account Name) node under this Category
+        nodes[code] = {
+          code,
+          name: item.name,
+          level: 4,
+          balance,
+          children: []
+        };
+        nodes[categoryCode].children.push(code);
       });
     }
 
@@ -192,7 +195,7 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
       
       list.push(node);
       
-      const isExpanded = expandedNodes[nodeCode];
+      const isExpanded = isNodeExpanded(nodeCode);
       if (isExpanded && node.children.length > 0) {
         node.children.sort().forEach(childCode => {
           traverse(childCode);
@@ -396,15 +399,15 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Unified Columns Header Row
   const renderUnifiedHeader = () => {
     return (
-      <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[9px] uppercase tracking-wider mb-2">
-        <div className="w-[50%] flex justify-between pr-4">
+      <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[8.5px] uppercase tracking-wider mb-2">
+        <div className="w-[53%] flex justify-between pr-2">
           <span></span>
           <span></span>
         </div>
-        <div className="w-[50%] flex justify-end gap-4 text-right">
-          <span className="w-[65px]">{col1Header}</span>
-          <span className="w-[65px]">{col2Header}</span>
-          <span className="w-[70px]">Difference</span>
+        <div className="w-[47%] flex justify-end gap-3 text-right">
+          <span className="w-[75px]">{col1Header}</span>
+          <span className="w-[75px]">{col2Header}</span>
+          <span className="w-[80px]">Difference</span>
         </div>
       </div>
     );
@@ -416,12 +419,12 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
     
     return list.map((node) => {
       const hasChildren = node.children.length > 0;
-      const isExpanded = !!expandedNodes[node.code];
+      const isExpanded = isNodeExpanded(node.code);
       const indentClass = 
-        node.level === 1 ? 'pl-0 font-black text-[#4b2c20] text-[10px] uppercase' :
-        node.level === 2 ? 'pl-3 font-bold text-[#8b4513] text-[10px]' :
-        node.level === 3 ? 'pl-6 font-semibold text-[#5d4037] text-[9.5px]' :
-        'pl-9 font-medium text-[#5d4037]/85 text-[9px] italic';
+        node.level === 1 ? 'pl-0 font-black text-[#4b2c20] text-[9.5px] uppercase' :
+        node.level === 2 ? 'pl-3 font-bold text-[#8b4513] text-[9.5px]' :
+        node.level === 3 ? 'pl-6 font-semibold text-[#5d4037] text-[9px]' :
+        'pl-9 font-medium text-[#5d4037]/85 text-[8.5px] italic';
 
       const icon = node.level === 1 ? '👑' : node.level === 2 ? '📁' : node.level === 3 ? '📂' : '📄';
 
@@ -434,8 +437,8 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
           key={node.code} 
           className={`flex justify-between items-center py-1 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors duration-150 ${node.level === 1 ? 'bg-[#8b4513]/5 mt-2 rounded px-1' : ''}`}
         >
-          {/* Left Side (50% Width) - Name and Sidebar Value */}
-          <div className="w-[50%] flex justify-between items-center pr-4">
+          {/* Left Side (53% Width) - Name and Sidebar Value */}
+          <div className="w-[53%] flex justify-between items-center pr-2">
             <div className={`flex items-center gap-1.5 ${indentClass}`}>
               <span>{icon}</span>
               <span>{node.name}</span>
@@ -449,16 +452,16 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
                 </button>
               )}
             </div>
-            <span className={`font-mono font-bold ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'} text-[10px]`}>
+            <span className={`font-mono font-bold ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'} text-[9px]`}>
               {formatNumberCompact(node.balance)}
             </span>
           </div>
 
-          {/* Right Side (50% Width) - Comparative Columns */}
-          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
-            <span className={`w-[65px] ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
-            <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
-            <span className={`w-[70px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+          {/* Right Side (47% Width) - Comparative Columns */}
+          <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+            <span className={`w-[75px] ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
+            <span className="w-[75px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
+            <span className={`w-[80px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
             </span>
           </div>

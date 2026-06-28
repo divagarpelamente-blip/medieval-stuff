@@ -87,16 +87,31 @@ const FinancialStatementsModal = ({
           isFallbackState={isFallbackState}
           kpis={[]}
         >
-          <ConsolidatedFinancialStatement
-            incomeStatement={incomeStatement}
-            cashFlowStatement={cashFlowStatement}
-            balanceSheet={balanceSheet}
-            t={t}
-            formatNumberCompact={formatNumberCompact}
-            selectedYears={selectedYears}
-            selectedQuarters={selectedQuarters}
-            selectedMonths={selectedMonths}
-          />
+          {(() => {
+            const formatFinancialNumber = (num) => {
+              if (num === undefined || num === null) return '0.00';
+              const val = Number(num) || 0;
+              const formatted = Math.abs(val).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              }).replace(/,/g, ' ');
+              if (val > 0) return `+${formatted}`;
+              if (val < 0) return `-${formatted}`;
+              return '0.00';
+            };
+            return (
+              <ConsolidatedFinancialStatement
+                incomeStatement={incomeStatement}
+                cashFlowStatement={cashFlowStatement}
+                balanceSheet={balanceSheet}
+                t={t}
+                formatNumberCompact={formatFinancialNumber}
+                selectedYears={selectedYears}
+                selectedQuarters={selectedQuarters}
+                selectedMonths={selectedMonths}
+              />
+            );
+          })()}
         </BaseDashboardTab>
       </div>
     </div>

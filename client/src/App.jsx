@@ -37,6 +37,7 @@ import { useQuickActionForm } from './hooks/useQuickActionForm';
 import { useLedgerFilters } from './hooks/useLedgerFilters';
 import CategoryMatrixEditor from './components/CategoryMatrixEditor';
 import COAEditor from './components/COAEditor';
+import SubtypeCategoryEditor from './components/SubtypeCategoryEditor';
 import GoldMineLedger from './components/GoldMineLedger';
 
 
@@ -84,6 +85,7 @@ function App() {
   const editOption = useKingdomStore((state) => state.editOption);
   const deleteOption = useKingdomStore((state) => state.deleteOption);
   const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap || {});
+  const subtypeTypes = useKingdomStore((state) => state.subtypeTypes || {});
   const syncSettings = useKingdomStore((state) => state.syncSettings);
 
   const email = useKingdomStore((state) => state.email);
@@ -777,11 +779,24 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   };
 
   const renderSettingsPanel = () => {
+    if (selectedSettingType === 'subcategories') {
+      return (
+        <SubtypeCategoryEditor
+          t={t}
+          subtypeToCategoryMap={subtypeToCategoryMap}
+          subtypeTypes={subtypeTypes}
+          syncSettings={syncSettings}
+        />
+      );
+    }
+
     if (selectedSettingType === 'coa') {
       return (
         <COAEditor
           t={t}
           accountMappings={accountMappings}
+          subtypeToCategoryMap={subtypeToCategoryMap}
+          subtypeTypes={subtypeTypes}
           syncSettings={syncSettings}
         />
       );
@@ -1582,6 +1597,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       { id: 'from', label: 'Origin/From', icon: '👤' },
                       { id: 'status', label: 'Status', icon: '📊' },
                       { id: 'class', label: 'Categories', icon: '📁' },
+                      { id: 'subcategories', label: 'Subtypes & Categories', icon: '🏷️' },
                       { id: 'coa', label: 'Chart of Accounts', icon: '📖' },
                       { id: 'quickAction', label: 'Quick Actions', icon: '⚡' },
                       { id: 'allActions', label: 'All Actions', icon: '📋' }
