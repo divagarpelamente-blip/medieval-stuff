@@ -78,12 +78,32 @@ const QuickActionFormFields = ({
     filteredCategories = categoryOptions.filter(opt => allowedCategories.includes(opt));
   }
 
+  const coaMappings = [];
+  Object.entries(accountMappings || {}).forEach(([code, fullName]) => {
+    let remaining = fullName;
+    if (remaining.startsWith(code)) {
+      remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+    }
+    const parts = remaining.split(/\s*-\s*/);
+    const category = parts[0] || '';
+    const entity = parts.slice(1).join(' - ') || '';
+    if (category && entity) {
+      coaMappings.push({ category, entity });
+    }
+  });
+
   let filteredEntities = entityOptions;
   if (qaCategory) {
-    filteredEntities = entityOptions.filter(opt => entityMappings[opt] === qaCategory);
+    filteredEntities = entityOptions.filter(opt => 
+      entityMappings[opt] === qaCategory ||
+      coaMappings.some(m => m.category === qaCategory && m.entity === opt)
+    );
   } else if (qaSubType) {
     const allowedCategories = subtypeToCategoryMap[qaSubType] || [];
-    filteredEntities = entityOptions.filter(opt => allowedCategories.includes(entityMappings[opt]));
+    filteredEntities = entityOptions.filter(opt => 
+      allowedCategories.includes(entityMappings[opt]) ||
+      coaMappings.some(m => allowedCategories.includes(m.category) && m.entity === opt)
+    );
   }
 
   const rowSpacing = isCompact ? "space-y-1.5" : "space-y-2";

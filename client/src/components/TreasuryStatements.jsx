@@ -62,7 +62,8 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   // Expanded nodes state
   const [expandedNodes, setExpandedNodes] = useState({
     '1': true,
-    '2': true
+    '2': true,
+    '3': true
   });
 
   const isNodeExpanded = (code) => {
@@ -80,13 +81,14 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
     const nextExpanded = {};
     const traverse = (nodeCode, level) => {
       nextExpanded[nodeCode] = level < targetLevel;
-      const node = { ...assetNodes[nodeCode], ...liabilityNodes[nodeCode] };
+      const node = { ...assetNodes[nodeCode], ...liabilityNodes[nodeCode], ...allDebtNodes[nodeCode] };
       if (node && node.children) {
         node.children.forEach(child => traverse(child, level + 1));
       }
     };
     traverse('1', 1);
     traverse('2', 1);
+    traverse('3', 1);
     setExpandedNodes(nextExpanded);
   };
 
@@ -364,6 +366,48 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   const previousBalances = getBalancesAtPoint(prevYear, prevQuarter, prevMonth, compareMode);
 
   const sumNodeBalance = (nodeCode, balancesMap) => {
+    if (nodeCode === '1') {
+      let sum = 0;
+      Object.entries(balancesMap).forEach(([code, val]) => {
+        if (code.startsWith('1') && !otherCodes.has(code)) {
+          sum += val;
+        }
+      });
+      return sum;
+    }
+
+    if (nodeCode === '3') {
+      let sum = 0;
+      const getLeaves = (code) => {
+        const node = allDebtNodes[code];
+        if (!node) return;
+        if (node.children.length === 0 && /^\d{8}$/.test(node.code)) {
+          const actualCode = node.code.replace(/^3/, '1');
+          sum += (balancesMap[actualCode] || 0);
+        } else {
+          node.children.forEach(getLeaves);
+        }
+      };
+      getLeaves('3');
+      return sum;
+    }
+
+    if (nodeCode.startsWith('3')) {
+      let sum = 0;
+      const getLeaves = (code) => {
+        const node = allDebtNodes[code];
+        if (!node) return;
+        if (node.children.length === 0 && /^\d{8}$/.test(node.code)) {
+          const actualCode = node.code.replace(/^3/, '1');
+          sum += (balancesMap[actualCode] || 0);
+        } else {
+          node.children.forEach(getLeaves);
+        }
+      };
+      getLeaves(nodeCode);
+      return sum;
+    }
+
     let sum = 0;
     Object.entries(balancesMap).forEach(([code, val]) => {
       if (code.startsWith(nodeCode)) {
@@ -487,6 +531,103 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   const assetNodes = buildHierarchy(bsAssets.list || [], '1');
   const liabilityNodes = buildHierarchy(bsLiabilities.list || [], '2');
 
+  const allDebtNodes = {};
+  allDebtNodes['3'] = {
+    code: '3',
+    name: 'All debt',
+    level: 1,
+    balance: 0,
+    children: []
+  };
+
+  const otherCodes = new Set();
+  const otherNodeKey = Object.keys(assetNodes).find(key => key.endsWith('_st_Other') || assetNodes[key]?.name === 'Other');
+  if (otherNodeKey && assetNodes[otherNodeKey]) {
+    const collectLeafCodes = (key) => {
+      const node = assetNodes[key];
+      if (!node) return;
+      if (node.children.length === 0 && /^\d{8}$/.test(node.code)) {
+        otherCodes.add(node.code);
+      } else {
+        node.children.forEach(collectLeafCodes);
+      }
+    };
+    collectLeafCodes(otherNodeKey);
+
+    // Copy subtree to allDebtNodes starting with '3' prefix
+    const copySubtree = (oldKey, newParentKey) => {
+      const node = assetNodes[oldKey];
+      if (!node) return;
+      
+      const newKey = oldKey.replace(/^1_/, '3_').replace(/^10/, '30');
+      const newChildren = [];
+      
+      allDebtNodes[newKey] = {
+        ...node,
+        code: newKey,
+        children: newChildren
+      };
+      allDebtNodes[newParentKey].children.push(newKey);
+      
+      node.children.forEach(childKey => {
+        copySubtree(childKey, newKey);
+      });
+    };
+    
+    copySubtree(otherNodeKey, '3');
+    
+    // Delete 'Other' from Assets
+    if (assetNodes['1']) {
+      assetNodes['1'].children = assetNodes['1'].children.filter(k => k !== otherNodeKey);
+    }
+    const keysToDelete = [];
+    const collectKeys = (key) => {
+      keysToDelete.push(key);
+      if (assetNodes[key]?.children) {
+        assetNodes[key].children.forEach(collectKeys);
+      }
+    };
+    collectKeys(otherNodeKey);
+    keysToDelete.forEach(k => {
+      delete assetNodes[k];
+    });
+  }
+
+  // Recalculate Assets root balance after deleting the Other subtree
+  const recalcAssetBalance = (nodeCode) => {
+    const node = assetNodes[nodeCode];
+    if (!node) return 0;
+    if (node.children.length === 0) {
+      return node.balance;
+    }
+    let sum = 0;
+    node.children.forEach(childCode => {
+      sum += recalcAssetBalance(childCode);
+    });
+    node.balance = sum;
+    return sum;
+  };
+  if (assetNodes['1']) {
+    recalcAssetBalance('1');
+  }
+
+  // Compute balances bottom-up recursively for allDebtNodes
+  const computeAllDebtBalance = (nodeCode) => {
+    const node = allDebtNodes[nodeCode];
+    if (!node) return 0;
+    if (node.children.length === 0) {
+      return node.balance;
+    }
+    let sum = 0;
+    node.children.forEach(childCode => {
+      sum += computeAllDebtBalance(childCode);
+    });
+    node.balance = sum;
+    return sum;
+  };
+  computeAllDebtBalance('3');
+
+
   // Left Header Controls Render (Levels and Zero Hider)
   const renderLeftHeaderControls = (hasLevelSelect = true) => {
     return (
@@ -597,6 +738,13 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
               </div>
             </div>
 
+            {/* All Debt Section */}
+            <div className="space-y-3">
+              <div className="space-y-1 text-[9.5px]">
+                {renderStatementRows(allDebtNodes, '3')}
+              </div>
+            </div>
+
             {/* Equity Section Summary */}
             <div className="flex justify-between items-center bg-[#f4e4bc]/50 border border-[#8b4513]/15 rounded-lg p-2 mt-2">
               {/* Left Side (53% Width) - Name and Sidebar Value */}
@@ -612,15 +760,15 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
 
               {/* Right Side (47% Width) - Comparative Columns */}
               <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
-                <span className={`w-[75px] ${sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {formatNumberCompact(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances))}
+                <span className={`w-[75px] ${sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {formatNumberCompact(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances))}
                 </span>
                 <span className="w-[75px] text-[#5d4037]/70">
-                  {formatNumberCompact(sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances))}
+                  {formatNumberCompact(sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances))}
                 </span>
-                <span className={`w-[80px] ${(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances)) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances))) > 0 ? '+' : ''}
-                  {formatNumberCompact((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances)))}
+                <span className={`w-[80px] ${(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances)) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances))) > 0 ? '+' : ''}
+                  {formatNumberCompact((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances)))}
                 </span>
               </div>
             </div>

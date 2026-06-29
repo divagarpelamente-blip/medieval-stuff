@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import Modal from './Modal';
 import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
@@ -30,6 +30,14 @@ export default function SubtypeCategoryEditor({
   
   // State for adding a category to the selected subtype
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Keep selectedSubtype synchronized with changes to subtypeToCategoryMap
+  useEffect(() => {
+    const keys = Object.keys(subtypeToCategoryMap);
+    if (keys.length > 0 && (!selectedSubtype || !keys.includes(selectedSubtype))) {
+      setSelectedSubtype(keys[0]);
+    }
+  }, [subtypeToCategoryMap, selectedSubtype]);
 
   // Dynamic Type-to-Subtype mappings constructed from subtypeTypes and current map keys
   const typeSubtypes = {

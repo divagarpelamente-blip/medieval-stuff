@@ -99,17 +99,18 @@ To facilitate mass updates to the treasury books without page navigation or mult
 4. **Trigger-Driven Balance Synchronizations**: Following a successful batch update, the client triggers `fetchKingdomData` and `fetchDashboardData` to pull the new trigger-recalculated Gold/XP balances and refresh the analytics engine.
 5. **Rollback & State Discard**: Cancel actions clear the selection array and discard the `editingTxs` sandbox object, leaving store state intact.
 
-### D. Chart of Accounts (COA) & Account Mappings
+#### D. Chart of Accounts (COA) & Account Mappings & Table Columns
 
-Eldoria maintains a structured Chart of Accounts (COA) configuration in `client/src/utils/accountMappings.js` to categorize all assets, liabilities, expenses, and income systematically:
+Eldoria maintains a structured Chart of Accounts (COA) configuration in `client/src/utils/accountMappings.js` to categorize all assets, liabilities, expenses, and income systematically. 
 
-- **Asset Accounts (1xxxx)**: Active bank accounts (e.g., `'111001'` CGD, `'111003'` ActiveBank), investments (`'121001'` CGD, `'121004'` WizInk Card), and savings (`'131001'` Pedro 0%).
-- **Liability Accounts (2xxxx)**: Commercial loans (`'211001'` CGD, `'211006'` Cofidis), personal loans/burrows (`'212001'` Jota, `'212002'` Mae), and credit card lines (`'221001'` CGD).
-- **Other Debts (23xxx)**: Specialized liabilities including Social Security (`'231001'`), Finances (`'231002'`), and Communications (`'231003'`).
-- **Expense Accounts (6xxxx)**: Categorized operating and administrative costs, ranging from rent (`'611001'`), utilities (`'621001'`), transports (`'631001'`), supermarket (`'641001'`), entertainment (`'661001'`), and education (`'671001'`) to financial expenses (`'681001'`).
-- **Income Accounts (7xxxx)**: Categorized revenue channels, including base salary (`'711001'`), subsidies (`'711002'`), contract services (`'712001'`), dividends (`'721001'`), and refunds/gifts (`'731001'`).
+The General Ledger and Settings tables display five comprehensive columns:
+1. **Code**: The unique numeric account code identifier.
+2. **Type**: The high-level account classification (Assets, Liabilities, Expenses, Revenues).
+3. **Subtype**: The dynamic groupings managed via configuration (e.g. Banks, Payroll, Taxes & State).
+4. **Category**: Sub-groupings within subtypes.
+5. **Account Name / Entity**: The leaf detailing specific bank accounts, vendors, or lines.
 
-The helper function `getAccountName(code)` is exported to translate numeric COA strings into human-readable titles, falling back to a generic title if the code is unrecognized.
+The helper function `getAccountName(code)` translates numeric COA strings into human-readable titles, falling back to a generic title if the code is unrecognized.
 
 ### E. CSV Data Migration & Configuration Sync
 
@@ -118,6 +119,13 @@ To facilitate data portability and easy management of kingdom accounts, `client/
 1. **Transaction Ledger Import/Export (`handleExportCSV` / `handleImportCSV`)**: Exports all transaction records to CSV with UTF-8 BOM compatibility. Imports parse rows using custom CSV string splitting (handling commas, newlines, and escaping double quotes). Missing dates default to the current system date, while the transaction nature (`cash` vs `accrual`) and flow directions are resolved dynamically if omitted.
 2. **Quick Actions Templates Sync (`handleExportAllActionsCSV` / `handleImportQuickActionsCSV`)**: Exports the customized templates in bulk and parses imported CSV action items, mapping them back to database fields and syncing the updated action lists in the store.
 3. **Categories Configuration Sync (`handleExportSettingsCSV` / `handleImportSettingsCSV`)**: Serializes the `subtype`, `category`, and `entity` mapping configuration. When imported, it updates the `subClassOptions`, `categoryOptions`, `entityOptions`, `entityMappings`, and `subtypeToCategoryMap` states in Zustand and saves them back to the database profile.
+
+### F. Subtype Category Editor & Classification Mapping Rules
+
+To support customization of the classification tree:
+- **Settings Category Menu**: Exposes a complete interactive interface under the Settings panel allowing lords to define custom Subtypes, add/remove Categories, and map individual Entities to Categories.
+- **Save Classification Bypass Rules**: When saving transaction entities, the system validates the selected subtype name. If a subtype is custom-saved with an `(income)` suffix (e.g., `Insurances (income)` or `Taxes & State (income)`), the system overrides default type assignments to ensure these transactions are classified as `Income` rather than defaulting to `Expense` or other types.
+
 
 ---
 
@@ -270,14 +278,20 @@ The dashboard uses a dynamic, tab-specific **KPI Summary Row** at the top of the
 4. **Overview & Ratios (`overview`):**
    - The top KPI summary row is hidden, allocating the space entirely to visualization components. This tab provides a high-level visual and analytical overview combining ratios and top indicators. (The separate "Ratios" tab has been retired).
 
-### B. Consolidated Financial Statement Engine
+### B. Consolidated Financial Statement Engine & 4-Level Dynamic Statements Hierarchy
 
-The dashboard engine runs an O(N) single-pass calculation loop to construct the reports:
+The dashboard engine runs an O(N) single-pass calculation loop to construct the reports, building a dynamic four-level hierarchical tree for P&L and Balance Sheets:
 
-1. **Royal Income Statement (Profit & Loss)**: Segments realized revenues vs realized expenses to calculate Net Realized Income, tracking pending items separately for forecasts.
-2. **Treasury Cash Flow Statement**: Classifies Completed Operating (`Expense` outflows) and Financing (`Income` inflows) cash movements.
-3. **Balance Sheet**: Dynamically aggregates historical balances from the `account_balances` table. If the `account_balances` table is empty, a dynamic transaction-based engine calculates the exact balances of all asset and liability accounts by applying historical transactions starting from the profile's initial cash balance to verify:
+1. **Level 1 (Type)**: The root node (`Assets`, `Liabilities`, `Revenues`, `Expenses`) based on the account code prefix.
+2. **Level 2 (Subtype)**: The grouping node (e.g. `Banks`, `Payroll`, `Taxes & State`) mapped dynamically via configuration lookup mappings.
+3. **Level 3 (Category)**: Derived from the account category segment.
+4. **Level 4 (Account Name / Entity)**: The final leaf node depicting individual detail entries.
+
+- **Royal Income Statement (Profit & Loss)**: Segments realized revenues vs realized expenses to calculate Net Realized Income, tracking pending items separately for forecasts.
+- **Treasury Cash Flow Statement**: Classifies Completed Operating (`Expense` outflows) and Financing (`Income` inflows) cash movements.
+- **Balance Sheet**: Dynamically aggregates historical balances from the `account_balances` table. If the `account_balances` table is empty, a dynamic transaction-based engine calculates the exact balances of all asset and liability accounts by applying historical transactions starting from the profile's initial cash balance to verify:
    $$\text{Assets} = \text{Liabilities} + \text{Equity (Net Wealth)}$$
+- **Layout Alignment**: The first column of value values in the statement presentation is shifted slightly to the right to optimize scan readability.
 
 > [!NOTE]
 > Financial Statements (Income Statement, Cash Flow, and Balance Sheet) have been fully modularized and removed from the sub-tabs of the Income & Expenses / Overview & Ratios dashboard, rendering instead in their own isolated modal tab view.
@@ -301,12 +315,13 @@ To assist the Lord of the Realm with decision-making, the dashboard couples ever
    - **Detailed Expenses Advice**: Aggregates filtered expenses by individual entity name to pinpoint the heaviest cash drain, formatting the name and amount into `advice_expenses_detailed`.
    - **Debt Advice**: Reads current liabilities; if debt exists, it displays `advice_debt_positive` with the formatted amount, otherwise it displays `advice_debt_free`.
 
-### E. Compact Currency Formatting Engine (`formatNumberCompact`)
+### E. Financial Statement Currency Formatting
 
-To prevent UI overflows and maintain clean layouts on small viewports, the frontend implements a specialized `formatNumberCompact` formatting function:
+To prevent UI overflows and maintain professional presentation standards, values within the financial statements use the following format:
+- **Standard Formatting**: Values are displayed as positive numbers with 2 decimal places and space-separated thousands (e.g. `1 250.00` or `12 500.50`).
+- **Negative Values**: Wrapped cleanly in parentheses (e.g. `(250.00)`).
+- **Shorthand Suffixes**: Removed for official statement records to preserve reporting accuracy.
 
-- **Value Compaction**: Automatically converts large gold numbers to use standard shorthand suffixes (`K`, `M`, `B`, `T`).
-- **Medieval Accounting Notation**: Positive values are formatted as `+Value / g` and negative values are wrapped in parentheses as `(Value) / g` (e.g. `+1.2K / g` or `(450) / g`), matching historical double-entry record-keeping style.
 
 ---
 

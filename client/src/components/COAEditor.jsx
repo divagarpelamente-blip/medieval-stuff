@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import Modal from './Modal';
 import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
@@ -14,7 +14,12 @@ export default function COAEditor({
   const fileInputRef = useRef(null);
   const [selectedCodes, setSelectedCodes] = useState([]);
   const [editingCode, setEditingCode] = useState(null);
-  const [editingName, setEditingName] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editSubtype, setEditSubtype] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editEntity, setEditEntity] = useState('');
+  const [editCustomSubtype, setEditCustomSubtype] = useState('');
+  const [editCustomCategory, setEditCustomCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Add Modal States
@@ -26,13 +31,24 @@ export default function COAEditor({
   const [selectedType, setSelectedType] = useState('1');
   const [selectedSubtype, setSelectedSubtype] = useState('');
   const [customSubtype, setCustomSubtype] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [customCategory, setCustomCategory] = useState('');
   const [selectedEntity, setSelectedEntity] = useState('');
   const [customEntity, setCustomEntity] = useState('');
   const [manualMode, setManualMode] = useState(false);
+  const [manualAccountCode, setManualAccountCode] = useState('');
+  const [manualAccountName, setManualAccountName] = useState('');
+  const [isCodeDirty, setIsCodeDirty] = useState(false);
+  const [isNameDirty, setIsNameDirty] = useState(false);
 
   // Sort States
   const [sortField, setSortField] = useState('code');
   const [sortDirection, setSortDirection] = useState('asc');
+
+  // Filters
+  const [filterType, setFilterType] = useState('');
+  const [filterSubtype, setFilterSubtype] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
 
   // 1. Parsing Helper
   const parseAccountName = (code, fullName) => {
@@ -118,6 +134,9 @@ export default function COAEditor({
 
   // Filtering
   const filteredRows = allRows.filter(row => {
+    if (filterType && row.type !== filterType) return false;
+    if (filterSubtype && row.subtype !== filterSubtype) return false;
+    if (filterCategory && row.category !== filterCategory) return false;
     const q = searchQuery.toLowerCase();
     return row.code.includes(q) || 
            row.name.toLowerCase().includes(q) || 
@@ -126,6 +145,25 @@ export default function COAEditor({
            row.category.toLowerCase().includes(q) || 
            row.accountName.toLowerCase().includes(q);
   });
+
+  const uniqueTypes = ['Assets', 'Liabilities', 'Expense', 'Income'];
+  const uniqueSubtypes = Array.from(new Set(
+    allRows
+      .filter(r => !filterType || r.type === filterType)
+      .map(r => r.subtype)
+      .filter(Boolean)
+  )).sort();
+
+  const uniqueCategories = Array.from(new Set(
+    allRows
+      .filter(r => {
+        if (filterType && r.type !== filterType) return false;
+        if (filterSubtype && r.subtype !== filterSubtype) return false;
+        return true;
+      })
+      .map(r => r.category)
+      .filter(Boolean)
+  )).sort();
 
   // Sorting
   const sortedRows = [...filteredRows].sort((a, b) => {
@@ -197,42 +235,115 @@ export default function COAEditor({
   };
 
   // Derive lists for selection
-  const subtypesList = Array.from(subtypesByType[selectedType] || []).sort();
+  const subtypesList = Array.from(new Set(TYPE_SUBTYPES[selectedType] || [])).sort();
+  const categoriesList = Array.from(new Set(subtypeToCategoryMap[selectedSubtype] || [])).sort();
   const entitiesList = Array.from(entities).sort();
 
-  // Determine Subtype prefix & name
-  let subtypeName = '';
-  let prefix = '';
-  if (selectedSubtype === 'custom') {
-    subtypeName = customSubtype.trim();
-    prefix = getNextUnusedPrefix(selectedType);
-  } else {
-    subtypeName = selectedSubtype;
-    prefix = subtypePrefixes[selectedSubtype] || `${selectedType}0101`;
-  }
+  const editTypeDigit = editingCode ? editingCode[0] : '1';
+  const editSubtypesList = Array.from(new Set(TYPE_SUBTYPES[editTypeDigit] || [])).sort();
+  const editCategoriesList = Array.from(new Set(subtypeToCategoryMap[editSubtype] || [])).sort();
 
-  // Determine Entity name
-  const entityName = selectedEntity === 'custom' ? customEntity.trim() : selectedEntity;
+  const subtypeVal = selectedSubtype === 'custom' ? customSubtype.trim() : selectedSubtype;
+  const categoryVal = selectedCategory === 'custom' ? customCategory.trim() : selectedCategory;
+  const entityVal = selectedEntity === 'custom' ? customEntity.trim() : selectedEntity;
 
-  // Generate sequence and final code/name
-  let generatedSeq = '001';
-  if (selectedSubtype !== 'custom' && selectedSubtype) {
-    generatedSeq = getNextSequence(prefix);
-  }
+  // Prefix calculation
+  const getDynamicPrefix = (typeDigit, subtype, category) => {
+    let tss = '';
+    const existingSubtypeMatch = Object.entries(accountMappings).find(([code, name]) => {
+      if (code[0] !== typeDigit) return false;
+      const parsed = parseAccountName(code, name);
+      const cat = parsed.subtype;
+      const sub = findSubtype(code, cat);
+      return sub === subtype;
+    });
+
+    if (existingSubtypeMatch) {
+      tss = existingSubtypeMatch[0].substring(0, 3);
+    } else {
+      let ss = 1;
+      while (true) {
+        const candidateTss = `${typeDigit}${String(ss).padStart(2, '0')}`;
+        const exists = Object.keys(accountMappings).some(code => code.startsWith(candidateTss));
+        if (!exists) {
+          tss = candidateTss;
+          break;
+        }
+        ss++;
+      }
+    }
+
+    const existingCategoryMatch = Object.entries(accountMappings).find(([code, name]) => {
+      if (!code.startsWith(tss)) return false;
+      const parsed = parseAccountName(code, name);
+      return parsed.subtype === category;
+    });
+
+    if (existingCategoryMatch) {
+      return existingCategoryMatch[0].substring(0, 5);
+    } else {
+      let ccVal = 1;
+      while (true) {
+        const candidatePrefix = `${tss}${String(ccVal).padStart(2, '0')}`;
+        const exists = Object.keys(accountMappings).some(code => code.startsWith(candidatePrefix));
+        if (!exists) {
+          return candidatePrefix;
+        }
+        ccVal++;
+      }
+    }
+  };
+
+  const prefix = (subtypeVal && categoryVal) ? getDynamicPrefix(selectedType, subtypeVal, categoryVal) : `${selectedType}0101`;
+  const generatedSeq = getNextSequence(prefix);
   const generatedCode = `${prefix}${generatedSeq}`;
-  const generatedName = subtypeName && entityName 
-    ? `${generatedCode} - ${subtypeName} - ${entityName}` 
+  const generatedName = categoryVal && entityVal 
+    ? `${generatedCode} - ${categoryVal} - ${entityVal}` 
     : '';
 
+  useEffect(() => {
+    if (!isCodeDirty) {
+      setManualAccountCode(generatedCode);
+    }
+  }, [generatedCode, isCodeDirty]);
+
+  useEffect(() => {
+    if (!isNameDirty) {
+      setManualAccountName(generatedName);
+    }
+  }, [generatedName, isNameDirty]);
+
   const handleOpenAddModal = () => {
-    const initialType = '1';
+    let initialType = '1';
+    if (filterType) {
+      if (filterType === 'Assets') initialType = '1';
+      else if (filterType === 'Liabilities') initialType = '2';
+      else if (filterType === 'Expense') initialType = '6';
+      else if (filterType === 'Income') initialType = '7';
+    }
     setSelectedType(initialType);
-    const availableSubtypes = Array.from(subtypesByType[initialType] || []).sort();
-    const firstSubtype = availableSubtypes[0] || 'custom';
+
+    const availableSubtypes = Array.from(new Set(TYPE_SUBTYPES[initialType] || [])).sort();
+    let firstSubtype = availableSubtypes[0] || 'custom';
+    if (filterSubtype && availableSubtypes.includes(filterSubtype)) {
+      firstSubtype = filterSubtype;
+    }
     setSelectedSubtype(firstSubtype);
+
+    const availableCategories = Array.from(new Set(subtypeToCategoryMap[firstSubtype] || [])).sort();
+    let firstCategory = availableCategories[0] || 'custom';
+    if (filterCategory && availableCategories.includes(filterCategory)) {
+      firstCategory = filterCategory;
+    }
+    setSelectedCategory(firstCategory);
+
     setSelectedEntity(Array.from(entities).sort()[0] || 'custom');
     setCustomSubtype('');
+    setCustomCategory('');
     setCustomEntity('');
+    
+    setIsCodeDirty(false);
+    setIsNameDirty(false);
     setManualMode(false);
     setNewCode('');
     setNewName('');
@@ -241,9 +352,37 @@ export default function COAEditor({
 
   const handleTypeChange = (type) => {
     setSelectedType(type);
-    const availableSubtypes = Array.from(subtypesByType[type] || []).sort();
+    const availableSubtypes = Array.from(new Set(TYPE_SUBTYPES[type] || [])).sort();
     const firstSubtype = availableSubtypes[0] || 'custom';
     setSelectedSubtype(firstSubtype);
+    
+    const availableCategories = Array.from(new Set(subtypeToCategoryMap[firstSubtype] || [])).sort();
+    const firstCategory = availableCategories[0] || 'custom';
+    setSelectedCategory(firstCategory);
+
+    setIsCodeDirty(false);
+    setIsNameDirty(false);
+  };
+
+  const handleSubtypeChange = (val) => {
+    setSelectedSubtype(val);
+    const availableCategories = Array.from(new Set(subtypeToCategoryMap[val] || [])).sort();
+    const firstCategory = availableCategories[0] || 'custom';
+    setSelectedCategory(firstCategory);
+    setIsCodeDirty(false);
+    setIsNameDirty(false);
+  };
+
+  const handleCategoryChange = (val) => {
+    setSelectedCategory(val);
+    setIsCodeDirty(false);
+    setIsNameDirty(false);
+  };
+
+  const handleEntityChange = (val) => {
+    setSelectedEntity(val);
+    setIsCodeDirty(false);
+    setIsNameDirty(false);
   };
 
   const handleAddAccount = (e) => {
@@ -255,8 +394,8 @@ export default function COAEditor({
       cleanCode = newCode.trim();
       cleanName = newName.trim();
     } else {
-      cleanCode = generatedCode;
-      cleanName = generatedName;
+      cleanCode = manualAccountCode.trim();
+      cleanName = manualAccountName.trim();
     }
 
     if (!/^\d{8}$/.test(cleanCode)) {
@@ -274,40 +413,117 @@ export default function COAEditor({
       return;
     }
 
+    let nextSubtypeToCategoryMap = { ...subtypeToCategoryMap };
+    let nextSubClassOptions = Array.from(new Set(Object.keys(subtypeToCategoryMap)));
+    let nextCategoryOptions = Array.from(new Set(Object.values(subtypeToCategoryMap).flat()));
+    let nextEntityOptions = Array.from(entities);
+
+    if (selectedSubtype === 'custom' && subtypeVal) {
+      if (!nextSubClassOptions.includes(subtypeVal)) {
+        nextSubClassOptions.push(subtypeVal);
+      }
+      if (!nextSubtypeToCategoryMap[subtypeVal]) {
+        nextSubtypeToCategoryMap[subtypeVal] = [];
+      }
+    }
+
+    if (selectedCategory === 'custom' && categoryVal) {
+      if (!nextCategoryOptions.includes(categoryVal)) {
+        nextCategoryOptions.push(categoryVal);
+      }
+      if (subtypeVal) {
+        if (!nextSubtypeToCategoryMap[subtypeVal]) {
+          nextSubtypeToCategoryMap[subtypeVal] = [];
+        }
+        if (!nextSubtypeToCategoryMap[subtypeVal].includes(categoryVal)) {
+          nextSubtypeToCategoryMap[subtypeVal].push(categoryVal);
+        }
+      }
+    }
+
+    if (selectedEntity === 'custom' && entityVal) {
+      if (!nextEntityOptions.includes(entityVal)) {
+        nextEntityOptions.push(entityVal);
+      }
+    }
+
     const updated = {
       ...accountMappings,
       [cleanCode]: cleanName
     };
 
-    syncSettings({ accountMappings: updated });
+    syncSettings({
+      accountMappings: updated,
+      subtypeToCategoryMap: nextSubtypeToCategoryMap,
+      subClassOptions: nextSubClassOptions,
+      categoryOptions: nextCategoryOptions,
+      entityOptions: nextEntityOptions
+    });
+    
     toast.success('Conta adicionada com sucesso!');
     setIsAddModalOpen(false);
   };
 
   const handleStartEdit = (row) => {
     setEditingCode(row.code);
-    setEditingName(row.accountName);
+    setEditSubtype(row.subtype || '');
+    setEditCategory(row.category || '');
+    setEditEntity(row.accountName || '');
+    setEditCustomSubtype('');
+    setEditCustomCategory('');
+    setIsEditModalOpen(true);
   };
 
-  const handleSaveEdit = (code) => {
-    const cleanEntity = editingName.trim();
-    if (!cleanEntity) {
-      toast.error('O nome da conta não pode ser vazio.');
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    const finalSubtype = editSubtype === 'custom' ? editCustomSubtype.trim() : editSubtype;
+    const finalCategory = editCategory === 'custom' ? editCustomCategory.trim() : editCategory;
+    const finalEntity = editEntity.trim();
+
+    if (!finalCategory || !finalEntity) {
+      toast.error('A categoria e a entidade não podem estar vazias.');
       return;
     }
 
-    const row = allRows.find(r => r.code === code);
-    const newFullName = `${code} - ${row.category} - ${cleanEntity}`;
+    const newFullName = `${editingCode} - ${finalCategory} - ${finalEntity}`;
 
     const updated = {
       ...accountMappings,
-      [code]: newFullName
+      [editingCode]: newFullName
     };
 
-    syncSettings({ accountMappings: updated });
+    let nextSubtypeToCategoryMap = { ...subtypeToCategoryMap };
+    let nextSubClassOptions = Array.from(new Set(Object.keys(subtypeToCategoryMap)));
+    let nextCategoryOptions = Array.from(new Set(Object.values(subtypeToCategoryMap).flat()));
+
+    if (editSubtype === 'custom' && editCustomSubtype) {
+      if (!nextSubClassOptions.includes(editCustomSubtype)) {
+        nextSubClassOptions.push(editCustomSubtype);
+      }
+      if (!nextSubtypeToCategoryMap[editCustomSubtype]) {
+        nextSubtypeToCategoryMap[editCustomSubtype] = [];
+      }
+    }
+    const targetSubtype = editSubtype === 'custom' ? editCustomSubtype : editSubtype;
+    if (editCategory === 'custom' && editCustomCategory && targetSubtype) {
+      if (!nextCategoryOptions.includes(editCustomCategory)) {
+        nextCategoryOptions.push(editCustomCategory);
+      }
+      if (!nextSubtypeToCategoryMap[targetSubtype].includes(editCustomCategory)) {
+        nextSubtypeToCategoryMap[targetSubtype].push(editCustomCategory);
+      }
+    }
+
+    syncSettings({
+      accountMappings: updated,
+      subtypeToCategoryMap: nextSubtypeToCategoryMap,
+      subClassOptions: nextSubClassOptions,
+      categoryOptions: nextCategoryOptions
+    });
+
     toast.success('Conta atualizada com sucesso!');
+    setIsEditModalOpen(false);
     setEditingCode(null);
-    setEditingName('');
   };
 
   const handleDeleteAccount = (code) => {
@@ -322,7 +538,7 @@ export default function COAEditor({
   };
 
   const handleDeleteSelections = () => {
-    if (!confirm(`Remover as ${selectedCodes.length} contas selecionadas?`)) {
+    if (!confirm('Remover as contas selecionadas?')) {
       return;
     }
     const updated = { ...accountMappings };
@@ -334,11 +550,38 @@ export default function COAEditor({
     toast.success('Contas selecionadas removidas com sucesso!');
   };
 
+  const handleDuplicateSelections = () => {
+    const updated = { ...accountMappings };
+    let count = 0;
+    selectedCodes.forEach(code => {
+      const name = accountMappings[code];
+      if (!name) return;
+      const prefix = code.substring(0, 5);
+      const parsed = parseAccountName(code, name);
+      // Generate next sequence for this prefix
+      const matchingCodes = Object.keys(updated)
+        .filter(c => c.startsWith(prefix))
+        .map(c => parseInt(c.substring(5), 10))
+        .filter(num => !isNaN(num));
+      const maxSeq = matchingCodes.length > 0 ? Math.max(...matchingCodes) : 0;
+      const nextSeq = String(maxSeq + 1).padStart(3, '0');
+      const newCode = `${prefix}${nextSeq}`;
+      const newName = `${newCode} - ${parsed.subtype} - ${parsed.entity} (Copy)`;
+      updated[newCode] = newName;
+      count++;
+    });
+    if (count > 0) {
+      syncSettings({ accountMappings: updated });
+      setSelectedCodes([]);
+      toast.success(`${count} accounts duplicated successfully!`);
+    }
+  };
+
   // Export COA to CSV
   const handleExportCSV = () => {
     const csvContent = [
       ['Code', 'Account Name'].join(','),
-      ...sortedRows.map(row => {
+      ...allRows.map(row => {
         // Escape quotes
         const safeName = row.name.replace(/"/g, '""');
         return `"${row.code}","${safeName}"`;
@@ -430,13 +673,22 @@ export default function COAEditor({
           />
           <div className="flex gap-1">
             {selectedCodes.length > 0 && (
-              <button
-                type="button"
-                onClick={handleDeleteSelections}
-                className="px-2.5 h-[28px] bg-red-755 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
-              >
-                🗑️ Delete ({selectedCodes.length})
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelections}
+                  className="px-2.5 h-[28px] bg-red-755 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                >
+                  🗑️ Delete Selected
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDuplicateSelections}
+                  className="px-2.5 h-[28px] bg-amber-700 hover:bg-amber-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                >
+                  👥 Duplicate
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -467,6 +719,77 @@ export default function COAEditor({
               📤 Export
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Filters Container */}
+      <div className="grid grid-cols-4 gap-3 mb-4 p-3 bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl flex-shrink-0">
+        <div>
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Type
+          </label>
+          <select
+            value={filterType}
+            onChange={(e) => {
+              setFilterType(e.target.value);
+              setFilterSubtype('');
+              setFilterCategory('');
+            }}
+            className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+          >
+            <option value="">All Types</option>
+            {uniqueTypes.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Subtype
+          </label>
+          <select
+            value={filterSubtype}
+            onChange={(e) => {
+              setFilterSubtype(e.target.value);
+              setFilterCategory('');
+            }}
+            className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+          >
+            <option value="">All Subtypes</option>
+            {uniqueSubtypes.map(st => (
+              <option key={st} value={st}>{st}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Category
+          </label>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+          >
+            <option value="">All Categories</option>
+            {uniqueCategories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Entity
+          </label>
+          <select
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+          >
+            <option value="">All Entities</option>
+            {Array.from(new Set(allRows.map(r => r.accountName).filter(Boolean))).sort().map(ent => (
+              <option key={ent} value={ent}>{ent}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -541,58 +864,26 @@ export default function COAEditor({
                     {row.category}
                   </td>
                   <td className="py-2 px-2 text-[10px]">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        className="bg-white border border-[#8b4513]/30 rounded px-1.5 py-0.5 w-full text-[10px] font-bold text-[#4b2c20]"
-                      />
-                    ) : (
-                      row.accountName
-                    )}
+                    {row.accountName}
                   </td>
                   <td className="py-2 px-2 text-center">
                     <div className="flex justify-center items-center gap-1.5">
-                      {isEditing ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEdit(row.code)}
-                            className="text-emerald-700 hover:text-emerald-900 font-black cursor-pointer hover:scale-110 active:scale-95 transition-all text-xs"
-                            title="Save"
-                          >
-                            💾
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingCode(null)}
-                            className="text-stone-500 hover:text-stone-700 font-black cursor-pointer hover:scale-110 active:scale-95 transition-all text-xs"
-                            title="Cancel"
-                          >
-                            ❌
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(row)}
-                            className="text-amber-700 hover:text-amber-900 font-black cursor-pointer hover:scale-110 active:scale-95 transition-all text-xs"
-                            title="Edit"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteAccount(row.code)}
-                            className="text-red-700 hover:text-red-900 font-black cursor-pointer hover:scale-110 active:scale-95 transition-all text-xs"
-                            title="Delete"
-                          >
-                            🗑️
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(row)}
+                        className="text-amber-700 hover:text-amber-900 font-black cursor-pointer hover:scale-110 active:scale-95 transition-all text-xs"
+                        title="Edit"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAccount(row.code)}
+                        className="text-red-700 hover:text-red-900 font-black cursor-pointer hover:scale-110 active:scale-95 transition-all text-xs"
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -629,27 +920,23 @@ export default function COAEditor({
 
             {!manualMode ? (
               <>
-                {/* 1. Account Type Selection */}
+                {/* 1. Account Type (shows type, no action needed) */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Account Type</label>
-                  <select
-                    value={selectedType}
-                    onChange={(e) => handleTypeChange(e.target.value)}
-                    className="w-full p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
-                  >
-                    <option value="1">Asset (1xxxxxxx)</option>
-                    <option value="2">Liability (2xxxxxxx)</option>
-                    <option value="6">Expense (6xxxxxxx)</option>
-                    <option value="7">Income (7xxxxxxx)</option>
-                  </select>
+                  <div className="w-full p-2 bg-[#8b4513]/5 border border-[#8b4513]/20 rounded-lg text-xs text-[#4b2c20]/80 font-bold select-none">
+                    {selectedType === '1' ? 'Asset (1xxxxxxx)' :
+                     selectedType === '2' ? 'Liability (2xxxxxxx)' :
+                     selectedType === '6' ? 'Expense (6xxxxxxx)' :
+                     selectedType === '7' ? 'Income (7xxxxxxx)' : 'Other'}
+                  </div>
                 </div>
 
-                {/* 2. Subtype Group Selection */}
+                {/* 2. Subtype Selection */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Subtype Group</label>
+                  <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Subtype</label>
                   <select
                     value={selectedSubtype}
-                    onChange={(e) => setSelectedSubtype(e.target.value)}
+                    onChange={(e) => handleSubtypeChange(e.target.value)}
                     className="w-full p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
                   >
                     {subtypesList.map(st => (
@@ -665,21 +952,59 @@ export default function COAEditor({
                     <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">New Subtype Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. Health Insurance, Bank accounts, Food"
+                      placeholder="e.g. Banks, Personal Debt, Entertainment"
                       value={customSubtype}
-                      onChange={(e) => setCustomSubtype(e.target.value)}
+                      onChange={(e) => {
+                        setCustomSubtype(e.target.value);
+                        setIsCodeDirty(false);
+                        setIsNameDirty(false);
+                      }}
                       className="p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20]"
                       required
                     />
                   </div>
                 )}
 
-                {/* 3. Entity / Category Selection */}
+                {/* 3. Category Selection */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Entity / Category Details</label>
+                  <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Category</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    className="w-full p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+                  >
+                    {categoriesList.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="custom">+ Create New Category...</option>
+                  </select>
+                </div>
+
+                {/* Custom Category Input */}
+                {selectedCategory === 'custom' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">New Category Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Savings account, Household, Tolls"
+                      value={customCategory}
+                      onChange={(e) => {
+                        setCustomCategory(e.target.value);
+                        setIsCodeDirty(false);
+                        setIsNameDirty(false);
+                      }}
+                      className="p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20]"
+                      required
+                    />
+                  </div>
+                )}
+
+                {/* 4. Entities Selection */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Entities</label>
                   <select
                     value={selectedEntity}
-                    onChange={(e) => setSelectedEntity(e.target.value)}
+                    onChange={(e) => handleEntityChange(e.target.value)}
                     className="w-full p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
                   >
                     {entitiesList.map(ent => (
@@ -695,36 +1020,47 @@ export default function COAEditor({
                     <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">New Entity Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. Millennium BCP, Mae, Oeiras Utensils"
+                      placeholder="e.g. CGD Bank, Oeiras Rent, Streaming"
                       value={customEntity}
-                      onChange={(e) => setCustomEntity(e.target.value)}
+                      onChange={(e) => {
+                        setCustomEntity(e.target.value);
+                        setIsCodeDirty(false);
+                        setIsNameDirty(false);
+                      }}
                       className="p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20]"
                       required
                     />
                   </div>
                 )}
 
-                {/* 4. Generated Preview Callout */}
-                <div className="p-3 bg-[#8b4513]/5 border border-[#8b4513]/25 rounded-lg flex flex-col gap-1.5 mt-1">
+                {/* 5. Generated Preview Callout */}
+                <div className="p-3 bg-[#8b4513]/5 border border-[#8b4513]/25 rounded-lg flex flex-col gap-2 mt-1">
                   <div className="text-[10px] uppercase tracking-wider text-[#8b4513]/70 font-black">Generated Account Details</div>
                   
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-[#5d4037]/80">Code Prefix:</span>
-                    <span className="font-mono text-[#8b4513] font-black bg-[#8b4513]/10 px-1 rounded">{prefix}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-[#5d4037]/80">Sequence Suffix:</span>
-                    <span className="font-mono text-[#8b4513] font-black bg-[#8b4513]/10 px-1 rounded">{generatedSeq}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] uppercase tracking-wider text-[#5d4037]/80">Account Code (8 digits)</span>
+                    <input
+                      type="text"
+                      value={manualAccountCode}
+                      onChange={(e) => {
+                        setManualAccountCode(e.target.value.replace(/\D/g, '').slice(0, 8));
+                        setIsCodeDirty(true);
+                      }}
+                      className="w-full p-2 bg-white border border-[#8b4513]/20 rounded-lg text-xs font-mono text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+                    />
                   </div>
 
-                  <div className="border-t border-[#8b4513]/10 my-1"></div>
-
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] uppercase tracking-wider text-[#5d4037]/65">Final Account Name</span>
-                    <span className="font-mono text-[11.5px] text-[#4b2c20] font-black select-all break-all bg-white border border-[#8b4513]/15 p-1.5 rounded">
-                      {generatedName || "(Please fill subtype and entity details)"}
-                    </span>
+                  <div className="flex flex-col gap-1 mt-1">
+                    <span className="text-[9px] uppercase tracking-wider text-[#5d4037]/80">Final Account Name</span>
+                    <input
+                      type="text"
+                      value={manualAccountName}
+                      onChange={(e) => {
+                        setManualAccountName(e.target.value);
+                        setIsNameDirty(true);
+                      }}
+                      className="w-full p-2 bg-white border border-[#8b4513]/20 rounded-lg text-xs font-mono text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+                    />
                   </div>
                 </div>
               </>
@@ -769,6 +1105,120 @@ export default function COAEditor({
                 className="px-3.5 py-1.5 bg-[#8b4513] text-white hover:bg-[#8b4513]/90 rounded-lg text-[10px] uppercase tracking-wider cursor-pointer"
               >
                 Add Account
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Edit Account Modal */}
+      {isEditModalOpen && (
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Account"
+          widthClass={STANDARD_MODAL_PROPS.widthClass}
+          heightClass={STANDARD_MODAL_PROPS.heightClass}
+        >
+          <form onSubmit={handleSaveEdit} className="p-4 flex flex-col gap-3.5 text-xs font-bold text-[#4b2c20] max-h-[75vh] overflow-y-auto custom-scrollbar">
+            
+            {/* Account Code (Read Only) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Account Code</label>
+              <div className="w-full p-2 bg-[#8b4513]/5 border border-[#8b4513]/20 rounded-lg text-xs font-mono text-[#4b2c20]/80 font-bold select-none">
+                {editingCode}
+              </div>
+            </div>
+
+            {/* Subtype Selection */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Subtype</label>
+              <select
+                value={editSubtype}
+                onChange={(e) => {
+                  setEditSubtype(e.target.value);
+                  setEditCategory('');
+                }}
+                className="w-full p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+              >
+                {editSubtypesList.map(st => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+                <option value="custom">+ Create New Subtype...</option>
+              </select>
+            </div>
+
+            {/* Custom Subtype Input */}
+            {editSubtype === 'custom' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">New Subtype Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Banks, Personal Debt, Entertainment"
+                  value={editCustomSubtype}
+                  onChange={(e) => setEditCustomSubtype(e.target.value)}
+                  className="p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20]"
+                  required
+                />
+              </div>
+            )}
+
+            {/* Category Selection */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Category</label>
+              <select
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                className="w-full p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+              >
+                {editCategoriesList.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="custom">+ Create New Category...</option>
+              </select>
+            </div>
+
+            {/* Custom Category Input */}
+            {editCategory === 'custom' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">New Category Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Savings account, Household, Tolls"
+                  value={editCustomCategory}
+                  onChange={(e) => setEditCustomCategory(e.target.value)}
+                  className="p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20]"
+                  required
+                />
+              </div>
+            )}
+
+            {/* Entity Input */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wider text-[#5d4037]/80">Entity</label>
+              <input
+                type="text"
+                placeholder="e.g. CGD Bank, Oeiras Rent, Streaming"
+                value={editEntity}
+                onChange={(e) => setEditEntity(e.target.value)}
+                className="p-2 bg-white border border-[#8b4513]/30 rounded-lg text-xs text-[#4b2c20] font-bold focus:outline-none"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-[#8b4513]/15">
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-3.5 py-1.5 bg-stone-200 hover:bg-stone-300 rounded-lg text-[10px] uppercase tracking-wider cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-3.5 py-1.5 bg-[#8b4513] text-white hover:bg-[#8b4513]/90 rounded-lg text-[10px] uppercase tracking-wider cursor-pointer"
+              >
+                Save Changes
               </button>
             </div>
           </form>

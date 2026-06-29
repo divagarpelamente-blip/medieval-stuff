@@ -70,6 +70,21 @@ function App() {
   const [actionsSortDirection, setActionsSortDirection] = useState('asc');
   const [settingsSortDirection, setSettingsSortDirection] = useState('asc');
 
+  // Filters for All Actions
+  const [filterActionType, setFilterActionType] = useState('');
+  const [filterActionSubtype, setFilterActionSubtype] = useState('');
+  const [filterActionCategory, setFilterActionCategory] = useState('');
+  const [filterActionEntity, setFilterActionEntity] = useState('');
+
+  // Pagination for All Actions
+  const [actionsCurrentPage, setActionsCurrentPage] = useState(1);
+  const [manualPageInput, setManualPageInput] = useState('1');
+
+  useEffect(() => {
+    setManualPageInput(String(actionsCurrentPage));
+  }, [actionsCurrentPage]);
+
+
 
   // Bind Zustand options & actions
   const fromOptions = useKingdomStore((state) => state.fromOptions);
@@ -825,6 +840,37 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     let currentList = [];
     let showEntityCategorySelector = false;
 
+    // Derive dynamic filter lists for All Actions
+    const dynamicSubtypes = Array.from(new Set(
+      templates
+        .filter(tpl => !filterActionType || tpl.data?.transaction_type === filterActionType)
+        .map(tpl => tpl.data?.transaction_subtype)
+        .filter(Boolean)
+    )).sort();
+
+    const dynamicCategories = Array.from(new Set(
+      templates
+        .filter(tpl => {
+          if (filterActionType && tpl.data?.transaction_type !== filterActionType) return false;
+          if (filterActionSubtype && tpl.data?.transaction_subtype !== filterActionSubtype) return false;
+          return true;
+        })
+        .map(tpl => tpl.data?.transaction_category)
+        .filter(Boolean)
+    )).sort();
+
+    const dynamicEntities = Array.from(new Set(
+      templates
+        .filter(tpl => {
+          if (filterActionType && tpl.data?.transaction_type !== filterActionType) return false;
+          if (filterActionSubtype && tpl.data?.transaction_subtype !== filterActionSubtype) return false;
+          if (filterActionCategory && tpl.data?.transaction_category !== filterActionCategory) return false;
+          return true;
+        })
+        .map(tpl => tpl.data?.entity)
+        .filter(Boolean)
+    )).sort();
+
     switch (selectedSettingType) {
       case 'from':
         title = 'Origin/From';
@@ -844,7 +890,13 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         break;
       case 'allActions':
         title = 'All Actions';
-        currentList = templates;
+        currentList = templates.filter(tpl => {
+          if (filterActionType && tpl.data?.transaction_type !== filterActionType) return false;
+          if (filterActionSubtype && tpl.data?.transaction_subtype !== filterActionSubtype) return false;
+          if (filterActionCategory && tpl.data?.transaction_category !== filterActionCategory) return false;
+          if (filterActionEntity && tpl.data?.entity !== filterActionEntity) return false;
+          return true;
+        });
         break;
       default:
         break;
@@ -1073,7 +1125,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                           setQaDueDate(tpl.data.due_date || '');
                           setQaValueDate(tpl.data.value_date || '');
                           setQaPostingDate(tpl.data.posting_date || '');
-                          setSelectedQaNames([tpl.name]);
                         }
                       } else {
                         setQaName('');
@@ -1206,18 +1257,95 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               </form>
             )}
 
+            {/* Filter Dropdowns for All Actions */}
+            {selectedSettingType === 'allActions' && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 p-3 bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl">
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Type
+                  </label>
+                  <select
+                    value={filterActionType}
+                    onChange={(e) => {
+                      setFilterActionType(e.target.value);
+                      setActionsCurrentPage(1);
+                      setFilterActionSubtype('');
+                      setFilterActionCategory('');
+                      setFilterActionEntity('');
+                    }}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="">All Types</option>
+                    {classOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Subtype
+                  </label>
+                  <select
+                    value={filterActionSubtype}
+                    onChange={(e) => {
+                      setFilterActionSubtype(e.target.value);
+                      setActionsCurrentPage(1);
+                      setFilterActionCategory('');
+                      setFilterActionEntity('');
+                    }}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="">All Subtypes</option>
+                    {dynamicSubtypes.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={filterActionCategory}
+                    onChange={(e) => {
+                      setFilterActionCategory(e.target.value);
+                      setActionsCurrentPage(1);
+                      setFilterActionEntity('');
+                    }}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="">All Categories</option>
+                    {dynamicCategories.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+                    Entity
+                  </label>
+                  <select
+                    value={filterActionEntity}
+                    onChange={(e) => {
+                      setFilterActionEntity(e.target.value);
+                      setActionsCurrentPage(1);
+                    }}
+                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
+                  >
+                    <option value="">All Entities</option>
+                    {dynamicEntities.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             {/* List of items */}
             <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
               {currentList.length > 0 ? (
                 selectedSettingType === 'allActions' ? (
               <div className="flex flex-col h-full overflow-hidden">
-                {selectedQaNames.length > 0 && (
-                  <div className="flex items-center justify-between bg-[#8b4513]/10 border border-[#8b4513]/20 rounded-lg p-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-150">
-                    <span className="text-[9px] font-black uppercase text-[#4b2c20] tracking-wider pl-1">
-                      Selected: <span className="font-bold text-amber-900">{selectedQaNames.length}</span>
-                    </span>
-                  </div>
-                )}
                 <div className="flex-1 overflow-y-auto">
                   {(() => {
                     let sortedList = [...currentList];
@@ -1234,9 +1362,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         } else if (actionsSortField === 'entity') {
                           valA = (a.data.entity || '').toLowerCase();
                           valB = (b.data.entity || '').toLowerCase();
-                        } else if (actionsSortField === 'flow') {
-                          valA = (a.data.flow || '').toLowerCase();
-                          valB = (b.data.flow || '').toLowerCase();
                         }
  
                         if (valA < valB) return actionsSortDirection === 'asc' ? -1 : 1;
@@ -1245,26 +1370,31 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       });
                     }
  
+                    const itemsPerPage = 10;
+                    const totalPages = Math.ceil(sortedList.length / itemsPerPage) || 1;
+                    const safeCurrentPage = Math.min(Math.max(actionsCurrentPage, 1), totalPages);
+                    const paginatedList = sortedList.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
+
                     return (
-                      <table className="w-full text-left border-collapse text-[10px] font-sans">
-                        <thead>
-                          <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                            <th className="py-2 px-2 w-8 text-center">
+                      <table className="w-full text-left border-collapse text-[9.5px] font-sans">
+                        <thead className="sticky top-0 bg-[#faf4e5] z-10 border-b border-[#8b4513]/25 shadow-sm">
+                          <tr className="text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                            <th className="py-1.5 px-2 w-8 text-center">
                               <input
                                 type="checkbox"
-                                checked={selectedQaNames.length === currentList.length && currentList.length > 0}
+                                checked={paginatedList.length > 0 && paginatedList.every(tpl => selectedQaNames.includes(tpl.name))}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    setSelectedQaNames(currentList.map(tpl => tpl.name));
+                                    setSelectedQaNames(prev => Array.from(new Set([...prev, ...paginatedList.map(tpl => tpl.name)])));
                                   } else {
-                                    setSelectedQaNames([]);
+                                    setSelectedQaNames(prev => prev.filter(name => !paginatedList.some(tpl => tpl.name === name)));
                                   }
                                 }}
                                 className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
                               />
                             </th>
                             <th
-                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                              className="py-1.5 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
                               onClick={() => {
                                 if (actionsSortField === 'name') {
                                   setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1277,7 +1407,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                               Action {actionsSortField === 'name' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
                             </th>
                             <th
-                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                              className="py-1.5 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
                               onClick={() => {
                                 if (actionsSortField === 'type') {
                                   setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1290,7 +1420,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                               Type/Subtype {actionsSortField === 'type' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
                             </th>
                             <th
-                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
+                              className="py-1.5 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
                               onClick={() => {
                                 if (actionsSortField === 'entity') {
                                   setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1302,28 +1432,15 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                             >
                               Entity {actionsSortField === 'entity' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
                             </th>
-                            <th
-                              className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                              onClick={() => {
-                                if (actionsSortField === 'flow') {
-                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                                } else {
-                                  setActionsSortField('flow');
-                                  setActionsSortDirection('asc');
-                                }
-                              }}
-                            >
-                              Flow {actionsSortField === 'flow' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
-                            </th>
-                            <th className="py-2 px-2 text-right">Edit</th>
+                            <th className="py-1.5 px-2 text-right">Edit</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                          {sortedList.map((tpl) => {
+                          {paginatedList.map((tpl) => {
                             const isChecked = selectedQaNames.includes(tpl.name);
                             return (
                               <tr key={tpl.name} className={`hover:bg-[#8b4513]/5 transition-colors ${isChecked ? 'bg-[#8b4513]/10' : ''}`}>
-                                <td className="py-2 px-2 text-center">
+                                <td className="py-1 px-2 text-center">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -1339,15 +1456,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                     className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
                                   />
                                 </td>
-                                <td className="py-2 px-2 font-bold text-[#4b2c20]">
+                                <td className="py-1 px-2 font-bold text-[#4b2c20] text-[9.5px]">
                                   {t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}
                                 </td>
-                                <td className="py-2 px-2 text-stone-500 font-medium">
+                                <td className="py-1 px-2 text-stone-500 font-medium text-[9px]">
                                   {tpl.data.transaction_type} • {tpl.data.transaction_subtype}
                                 </td>
-                                <td className="py-2 px-2 text-stone-500 font-medium">{tpl.data.entity}</td>
-                                <td className="py-2 px-2 text-stone-500 font-medium">{tpl.data.flow}</td>
-                                <td className="py-2 px-2 text-right">
+                                <td className="py-1 px-2 text-stone-500 font-medium text-[9px]">{tpl.data.entity}</td>
+                                <td className="py-1 px-2 text-right">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1370,7 +1486,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                                       setQaPostingDate(tpl.data.posting_date || '');
                                       setIsEditingQa(true);
                                     }}
-                                    className="text-blue-700 hover:text-blue-900 font-bold px-2 py-0.5 rounded border border-transparent hover:border-blue-200 hover:bg-blue-50 transition-all cursor-pointer"
+                                    className="text-blue-700 hover:text-blue-900 font-bold px-1.5 py-0.5 rounded border border-transparent hover:border-blue-200 hover:bg-blue-50 transition-all cursor-pointer text-[10px]"
                                     title="Edit Quick Action"
                                   >
                                     ✏️
@@ -1380,6 +1496,52 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                             );
                           })}
                         </tbody>
+                        <tfoot className="sticky bottom-0 bg-[#faf4e5] z-10 border-t border-[#8b4513]/25 shadow-sm">
+                          <tr>
+                            <td colSpan={5} className="py-1.5 px-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[#4b2c20] text-[9.5px] font-black uppercase font-sans">
+                                <div>
+                                  Page {safeCurrentPage} of {totalPages} ({sortedList.length} total)
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={safeCurrentPage === 1}
+                                    onClick={() => setActionsCurrentPage(safeCurrentPage - 1)}
+                                    className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
+                                  >
+                                    ◀ Prev
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={safeCurrentPage === totalPages}
+                                    onClick={() => setActionsCurrentPage(safeCurrentPage + 1)}
+                                    className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
+                                  >
+                                    Next ▶
+                                  </button>
+                                  <div className="flex items-center gap-1 ml-2">
+                                    <span>Go to:</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={totalPages}
+                                      value={manualPageInput}
+                                      onChange={(e) => {
+                                        setManualPageInput(e.target.value);
+                                        const p = parseInt(e.target.value, 10);
+                                        if (p >= 1 && p <= totalPages) {
+                                          setActionsCurrentPage(p);
+                                        }
+                                      }}
+                                      className="w-10 px-1 py-0.5 bg-white border border-[#8b4513]/30 rounded text-center text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
                     );
                   })()}
