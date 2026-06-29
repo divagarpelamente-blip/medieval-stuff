@@ -14,6 +14,7 @@ export const handleExportCSV = (transactions, t) => {
     'transaction_subtype',
     'entity',
     'transaction_category',
+    'quick_action_name',
     'target_account',
     'source_dest_bank',
     'flow',
@@ -156,6 +157,8 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
             tx.entity = val;
           } else if (normHeader === 'transaction_category' || normHeader === 'category') {
             tx.transaction_category = val;
+          } else if (normHeader === 'quick_action_name' || normHeader === 'quick action name' || normHeader === 'quickactionname') {
+            tx.quick_action_name = val;
           } else if (normHeader === 'target_account' || normHeader === 'target account') {
             tx.target_account = val;
           } else if (normHeader === 'source_dest_bank' || normHeader === 'source dest bank' || normHeader === 'source_account' || normHeader === 'source account') {

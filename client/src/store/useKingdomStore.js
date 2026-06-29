@@ -642,6 +642,7 @@ export const useKingdomStore = create((set, get) => ({
       transaction_subtype: transactionData.transaction_subtype,
       entity: transactionData.entity,
       transaction_category: transactionData.transaction_category,
+      quick_action_name: transactionData.quick_action_name || null,
       target_account: transactionData.target_account,
       source_dest_bank: transactionData.source_dest_bank,
       flow: transactionData.flow,
@@ -700,6 +701,7 @@ export const useKingdomStore = create((set, get) => ({
             payment_status: transactionData.payment_status || 'Completed',
             transaction_subtype: transactionData.transaction_subtype,
             transaction_category: transactionData.transaction_category || null,
+            quick_action_name: transactionData.quick_action_name || null,
             entity: transactionData.entity,
             origin: transactionData.from,
             target_account: transactionData.target_account,
@@ -751,7 +753,6 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Insert multiple transactions to database in a single query, triggering updates, and synchronize state
   registerTransactions: async (profileId, transactionsList) => {
     const userId = get().user?.id || profileId;
     const tempIds = [];
@@ -771,6 +772,7 @@ export const useKingdomStore = create((set, get) => ({
         transaction_subtype: tx.transaction_subtype,
         entity: tx.entity,
         transaction_category: tx.transaction_category,
+        quick_action_name: tx.quick_action_name || null,
         target_account: tx.target_account,
         source_dest_bank: tx.source_dest_bank,
         flow: tx.flow,
@@ -798,6 +800,7 @@ export const useKingdomStore = create((set, get) => ({
           payment_status: tx.payment_status || 'Completed',
           transaction_subtype: tx.transaction_subtype,
           transaction_category: tx.transaction_category || null,
+          quick_action_name: tx.quick_action_name || null,
           entity: tx.entity,
           origin: tx.from,
           target_account: tx.target_account,

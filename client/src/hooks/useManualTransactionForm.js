@@ -49,6 +49,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   const [txSourceDestBank, setTxSourceDestBank] = useState('');
   const [txFlow, setTxFlow] = useState('');
   const [editingTxId, setEditingTxId] = useState(null);
+  const [txQuickActionName, setTxQuickActionName] = useState(null);
 
   // Cascading Configuration (exactly as defined in App.jsx)
   const cascadingConfig = {
@@ -388,6 +389,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     setTxStatus('');
     setTxClass('');
     setTxDueDate('');
+    setTxQuickActionName(null);
   };
 
   const applyTemplate = (tpl) => {
@@ -404,6 +406,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     setTxFlow(tpl.data.flow || 'outflow');
     setTxValueDate(new Date().toISOString().split('T')[0]);
     setTxPostingDate(new Date().toISOString().split('T')[0]);
+    setTxQuickActionName(tpl.name);
 
     let matched = false;
     for (const [main, subActions] of Object.entries(cascadingConfig)) {
@@ -438,6 +441,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     setTxSourceDestBank(tx.source_dest_bank || '');
     setTxFlow(tx.flow || '');
     setEditingTxId(tx.id);
+    setTxQuickActionName(tx.quick_action_name || null);
   };
 
   const handleSubmit = async (e) => {
@@ -512,7 +516,8 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
             due_date: txDueDate || null,
             month: new Date(txPostingDate).toLocaleString('default', { month: 'long' }),
             year: new Date(txPostingDate).getFullYear(),
-            quarter: 'Q' + (Math.floor(new Date(txPostingDate).getMonth() / 3) + 1)
+            quarter: 'Q' + (Math.floor(new Date(txPostingDate).getMonth() / 3) + 1),
+            quick_action_name: txQuickActionName || null
           }]);
 
         if (error) throw error;
@@ -538,6 +543,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
         transaction_subtype: txSubClass,
         entity: txEntity,
         transaction_category: txCategory,
+        quick_action_name: txQuickActionName || null,
         target_account: safeTarget,
         source_dest_bank: safeSource,
         flow: txFlow,
@@ -577,6 +583,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     txSourceDestBank, setTxSourceDestBank,
     txFlow, setTxFlow,
     editingTxId, setEditingTxId,
+    txQuickActionName, setTxQuickActionName,
     mainMenu, setMainMenu,
     subMenuAction, setSubMenuAction,
     cascadingConfig,
