@@ -67,8 +67,259 @@ export default function CategoryMatrixEditor({
   const handleAutoReconcile = () => {
     const currentRows = getMatrixRows();
     let reconciledCount = 0;
-    
-    // Parse the entire COA to easily map entities to derived subtypes/categories
+
+    const isEntityInvalid = (ent) => {
+      const val = (ent || '').trim().toLowerCase();
+      return !val || val === 'none' || val === 'null' || val === 'undefined';
+    };
+
+    const defaultSubtypeToCategoryMap = {
+      "Banks": ["Bank account", "Savings account", "Investments account"],
+      "Fixed Assets": ["Fixed Assets"],
+      "Personal Debt": ["Loans & Burrow", "Credit Cards"],
+      "Other Debts": ["Other Debts"],
+      "Living & Household": ["Household", "Utilities"],
+      "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
+      "Public Transports": ["Public Transports"],
+      "Other Transports": ["Other Transports"],
+      "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
+      "Health": ["Health"],
+      "Entertainment": ["Entertainment"],
+      "Education": ["Education"],
+      "Insurances": ["Insurances"],
+      "Insurances (income)": ["Insurances"],
+      "Taxes & State": ["Taxes", "Interest"],
+      "Taxes & State (income)": ["Taxes", "Interest"],
+      "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
+      "Payroll": ["Salary", "Payroll Subsidies"],
+      "Other Income": ["Other Incomes"],
+      "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
+    };
+
+    const defaultCategoryToSubtype = {};
+    Object.entries(defaultSubtypeToCategoryMap).forEach(([sub, cats]) => {
+      cats.forEach(c => {
+        if (!defaultCategoryToSubtype[c]) {
+          defaultCategoryToSubtype[c] = [];
+        }
+        if (!defaultCategoryToSubtype[c].includes(sub)) {
+          defaultCategoryToSubtype[c].push(sub);
+        }
+      });
+    });
+
+    const defaultAccountMappings = {
+      '10101001': '10101001 - Bank account - CGD',
+      '10101002': '10101002 - Bank account - Universo',
+      '10101003': '10101003 - Bank account - Active Bank',
+      '10101004': '10101004 - Bank account - Inter Bank',
+      '10102001': '10102001 - Savings account - CGD',
+      '10102002': '10102002 - Savings account - Active Bank',
+      '10102003': '10102003 - Savings account - Inter Bank',
+      '10103001': '10103001 - Investments account - CGD',
+      '10103002': '10103002 - Investments account - Universo',
+      '10103003': '10103003 - Investments account - Active Bank',
+      '10103004': '10103004 - Investments account - Wizink',
+      '10103005': '10103005 - Investments account - Inter Bank',
+      '10104001': '10104001 - Fixed Assets - Jota',
+      '20101001': '20101001 - Loans & Burrow - CGD',
+      '20101002': '20101002 - Loans & Burrow - Universo',
+      '20101003': '20101003 - Loans & Burrow - Active Bank',
+      '20101004': '20101004 - Loans & Burrow - Inter Bank',
+      '20101005': '20101005 - Loans & Burrow - Wizink',
+      '20101006': '20101006 - Loans & Burrow - Cofidis',
+      '20101007': '20101007 - Loans & Burrow - Other Loans',
+      '20102001': '20102001 - Loans & Burrow - Jota',
+      '20102002': '20102002 - Loans & Burrow - Mae',
+      '20102003': '20102003 - Loans & Burrow - Reni',
+      '20102004': '20102004 - Loans & Burrow - Pedro',
+      '20102005': '20102005 - Loans & Burrow - Other Burrow',
+      '20103001': '20103001 - Credit Cards - CGD',
+      '20103002': '20103002 - Credit Cards - Universo',
+      '20103003': '20103003 - Credit Cards - Active Bank',
+      '20103004': '20103004 - Credit Cards - Inter Bank',
+      '20103005': '20103005 - Credit Cards - Wizink',
+      '20201001': '20201001 - Other Debts - Social Security',
+      '20201002': '20201002 - Other Debts - Finances',
+      '20201003': '20201003 - Other Debts - NOS',
+      '60101001': '60101001 - Household - Oeiras',
+      '60101002': '60101002 - Household - Oeiras Utensils',
+      '60101003': '60101003 - Household - Oeiras Decoration',
+      '60101004': '60101004 - Household - Other Household',
+      '60101005': '60101005 - Household - Portela',
+      '60102001': '60102001 - Utilities - DIGAL',
+      '60102002': '60102002 - Utilities - SIMAS',
+      '60102003': '60102003 - Utilities - NOS',
+      '60102004': '60102004 - Utilities - Other Utilities',
+      '60201001': '60201001 - Gasoline - Motorcycle',
+      '60201002': '60201002 - Gasoline - Car',
+      '60202001': '60202001 - Tolls - Via Verde',
+      '60203001': '60203001 - Parking - Parking',
+      '60204001': '60204001 - Repairs - Motorcycle',
+      '60204002': '60204002 - Repairs - Car',
+      '60301001': '60301001 - Public Transports - Public Transport (Metro/Train/Bus)',
+      '60401001': '60401001 - Other Transports - Uber / Chauffeur',
+      '60401002': '60401002 - Other Transports - Taxis',
+      '60501001': '60501001 - Markets & Groceries - Food',
+      '60501002': '60501002 - Markets & Groceries - Pet Food',
+      '60501003': '60501003 - Markets & Groceries - Food (work lunch)',
+      '60501004': '60501004 - Markets & Groceries - Soda Drinks',
+      '60501005': '60501005 - Markets & Groceries - Alcoholic Drinks',
+      '60501006': '60501006 - Markets & Groceries - Cleaning Products',
+      '60501007': '60501007 - Markets & Groceries - Personal Hygiene',
+      '60501008': '60501008 - Markets & Groceries - Cosmetics',
+      '60502001': '60502001 - Markets and Tools - Tools',
+      '60503001': '60503001 - Markets and Clothing - Clothing',
+      '60503002': '60503002 - Markets and Clothing - Shoes',
+      '60504001': '60504001 - Other Market consumables - Other Market consumables',
+      '60601001': '60601001 - Health - Public Hospital',
+      '60601002': '60601002 - Health - Private Hospital',
+      '60601003': '60601003 - Health - Medical Sessions & Exams',
+      '60601004': '60601004 - Health - Active Psicologia Coimbra',
+      '60601005': '60601005 - Health - Psicologist 2',
+      '60601006': '60601006 - Health - Marco (Jota Mateus)',
+      '60601007': '60601007 - Health - Marco Consultas (private)',
+      '60601008': '60601008 - Health - Dentist Beatriz',
+      '60601009': '60601009 - Health - Dentist 2',
+      '60601010': '60601010 - Health - Farmacia Oeiras',
+      '60601011': '60601011 - Health - Farmacia Portela',
+      '60701001': '60701001 - Entertainment - Restaurant dinner',
+      '60701002': '60701002 - Entertainment - Cinema',
+      '60701003': '60701003 - Entertainment - Streaming',
+      '60701004': '60701004 - Entertainment - Nightlife & Disco',
+      '60701005': '60701005 - Entertainment - Gaming',
+      '60801001': '60801001 - Education - PhD',
+      '60801002': '60801002 - Education - Trainings',
+      '60901001': '60901001 - Insurances - Health Insurance',
+      '60901002': '60901002 - Insurances - Car',
+      '60901003': '60901003 - Insurances - Motorcycle',
+      '60901004': '60901004 - Insurances - Life insurance',
+      '61001001': '61001001 - Taxes - Mobility (IUC)',
+      '61001002': '61001002 - Taxes - Finances',
+      '61001003': '61001003 - Taxes - Social Security',
+      '61001004': '61001004 - Taxes - Justice',
+      '61001005': '61001005 - Taxes - IRS',
+      '61101001': '61101001 - Interest paid - Interest',
+      '61102001': '61102001 - Fines - Fines',
+      '61103001': '61103001 - Loans & Burrow - CGD',
+      '61103002': '61103002 - Loans & Burrow - Universo',
+      '61103003': '61103003 - Loans & Burrow - Cofidis',
+      '61103004': '61103004 - Loans & Burrow - Jota',
+      '61103005': '61103005 - Loans & Burrow - Mae',
+      '61104001': '61104001 - Credit Cards - CGD',
+      '61104002': '61104002 - Credit Cards - Universo',
+      '61104003': '61104003 - Credit Cards - Active Bank',
+      '61104004': '61104004 - Credit Cards - Inter Bank',
+      '70101001': '70101001 - Salary - Base Salary',
+      '70101002': '70101002 - Salary - Consulting / Contract Services',
+      '70101003': '70101003 - Salary - Teaching Classes',
+      '70101004': '70101004 - Salary - Bonus (Scorecard)',
+      '70201001': '70201001 - Other Incomes - Family Gifts',
+      '70201002': '70201002 - Other Incomes - Cashbacks & Rewards',
+      '70301001': '70301001 - Insurances - Health Insurance',
+      '70301002': '70301002 - Insurances - Car',
+      '70301003': '70301003 - Insurances - Motorcycle',
+      '70301004': '70301004 - Insurances - Life insurance',
+      '70401001': '70401001 - Taxes - IRS',
+      '70401002': '70401002 - Taxes - Mobility (IUC)',
+      '70401003': '70401003 - Taxes - Finances',
+      '70401004': '70401004 - Taxes - Social Security',
+      '70401005': '70401005 - Taxes - Justice',
+      '70401006': '70401006 - Taxes - IRS',
+      '70501001': '70501001 - Interest - Interest',
+      '70502001': '70502001 - Fines - Fines',
+      '70503001': '70503001 - Loans & Burrow - CGD',
+      '70503002': '70503002 - Loans & Burrow - Universo',
+      '70503003': '70503003 - Loans & Burrow - Cofidis',
+      '70503004': '70503004 - Loans & Burrow - Jota',
+      '70503005': '70503005 - Loans & Burrow - Mae',
+      '70504001': '70504001 - Credit Cards - CGD',
+      '70504002': '70504002 - Credit Cards - Universo',
+      '70504003': '70504003 - Credit Cards - Active Bank',
+      '70504004': '70504004 - Credit Cards - Inter Bank'
+    };
+
+    const activeSubtypeToCategoryMap = { ...subtypeToCategoryMap };
+
+    // Auto-heal empty subclasses/subtypes (e.g. Insurances (income))
+    Object.keys(defaultSubtypeToCategoryMap).forEach(sub => {
+      if (!activeSubtypeToCategoryMap[sub] || activeSubtypeToCategoryMap[sub].length === 0) {
+        activeSubtypeToCategoryMap[sub] = [...(defaultSubtypeToCategoryMap[sub] || [])];
+      }
+    });
+
+    const getCategorySubtypes = (cat) => {
+      const subs = [];
+      Object.entries(activeSubtypeToCategoryMap).forEach(([sub, cats]) => {
+        if (cats && cats.includes(cat)) {
+          subs.push(sub);
+        }
+      });
+      if (subs.length > 0) return subs;
+      if (defaultCategoryToSubtype[cat]) {
+        return defaultCategoryToSubtype[cat];
+      }
+      let defaultCat = '';
+      Object.entries(accountMappings || {}).forEach(([code, fullName]) => {
+        let remaining = fullName;
+        if (remaining.startsWith(code)) {
+          remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+        }
+        const parts = remaining.split(/\s*-\s*/);
+        const c = parts[0] || '';
+        if (c.trim().toLowerCase() === cat.trim().toLowerCase()) {
+          const defaultFullName = defaultAccountMappings[code];
+          if (defaultFullName) {
+            let defRemaining = defaultFullName;
+            if (defRemaining.startsWith(code)) {
+              defRemaining = defRemaining.substring(code.length).replace(/^\s*-\s*/, '');
+            }
+            const defParts = defRemaining.split(/\s*-\s*/);
+            defaultCat = defParts[0] || '';
+          }
+        }
+      });
+
+      if (defaultCat && defaultCategoryToSubtype[defaultCat]) {
+        return defaultCategoryToSubtype[defaultCat];
+      }
+      return [];
+    };
+
+    // Heal missing Subtypes for categories in activeSubtypeToCategoryMap
+    currentRows.forEach(row => {
+      if (!row.subtype && row.category) {
+        const subs = getCategorySubtypes(row.category);
+        subs.forEach(s => {
+          if (!activeSubtypeToCategoryMap[s]) {
+            activeSubtypeToCategoryMap[s] = [];
+          }
+          if (!activeSubtypeToCategoryMap[s].includes(row.category)) {
+            activeSubtypeToCategoryMap[s].push(row.category);
+          }
+        });
+      }
+    });
+
+    // Ensure all categories in activeSubtypeToCategoryMap are also in categoryOptions
+    const updatedCategoryOptions = [...(categoryOptions || [])];
+    Object.values(activeSubtypeToCategoryMap).forEach(cats => {
+      if (cats && Array.isArray(cats)) {
+        cats.forEach(c => {
+          if (c && !updatedCategoryOptions.includes(c)) {
+            updatedCategoryOptions.push(c);
+          }
+        });
+      }
+    });
+
+    // Sync healed subcategories map and categoryOptions
+    syncSettings({ 
+      subtypeToCategoryMap: activeSubtypeToCategoryMap,
+      categoryOptions: updatedCategoryOptions
+    });
+
+    // Parse COA
     const coaMatches = {};
     Object.entries(accountMappings).forEach(([code, fullName]) => {
       let remaining = fullName;
@@ -79,47 +330,156 @@ export default function CategoryMatrixEditor({
       const category = parts[0] || '';
       const entity = parts.slice(1).join(' - ') || '';
       
-      if (entity && category) {
-        // Derive subtype by searching subtypeToCategoryMap
-        let subtype = '';
-        for (const [sub, cats] of Object.entries(subtypeToCategoryMap || {})) {
-          if (cats && cats.includes(category)) {
-            subtype = sub;
-            break;
-          }
-        }
-        
-        if (subtype) {
+      if (entity && category && !isEntityInvalid(entity)) {
+        const subs = getCategorySubtypes(category);
+        subs.forEach(subtype => {
           const key = entity.trim().toLowerCase();
           if (!coaMatches[key]) {
             coaMatches[key] = [];
           }
           coaMatches[key].push({ subtype, category });
-        }
+        });
       }
     });
 
-    const updatedRows = currentRows.map(row => {
-      const isRowIncomplete = !row.subtype || !row.category;
-      if (isRowIncomplete && row.entity) {
+    // Phase 1: Reconcile rows with populated Entity but empty Subtype/Category
+    const phase1UpdatedRows = currentRows.map(row => {
+      let subtype = row.subtype;
+      let category = row.category;
+      const isRowIncomplete = !subtype || !category;
+      if (isRowIncomplete && row.entity && !isEntityInvalid(row.entity)) {
         const key = row.entity.trim().toLowerCase();
         const matches = coaMatches[key] || [];
-        
         if (matches.length > 0) {
-          // Reconcile using the matching derived Subtype and Category
-          const { subtype, category } = matches[0];
+          subtype = matches[0].subtype;
+          category = matches[0].category;
           reconciledCount++;
-          return { ...row, subtype, category };
+        } else {
+          // Trace back via defaultAccountMappings fallback
+          Object.entries(defaultAccountMappings).forEach(([code, defaultName]) => {
+            let defRemaining = defaultName;
+            if (defRemaining.startsWith(code)) {
+              defRemaining = defRemaining.substring(code.length).replace(/^\s*-\s*/, '');
+            }
+            const defParts = defRemaining.split(/\s*-\s*/);
+            const defCat = defParts[0] || '';
+            const defEnt = defParts.slice(1).join(' - ') || '';
+            if (defEnt.trim().toLowerCase() === row.entity.trim().toLowerCase() && !isEntityInvalid(defEnt)) {
+              const subs = getCategorySubtypes(defCat);
+              if (subs.length > 0) {
+                subtype = subs[0];
+                category = defCat;
+                reconciledCount++;
+              }
+            }
+          });
         }
       }
-      return row;
+      return { ...row, subtype, category };
     });
 
-    if (reconciledCount > 0) {
-      handleSaveMatrix(updatedRows);
-      toast.success(`Successfully reconciled ${reconciledCount} row(s) automatically!`);
+    // Phase 2: Expand generic rows (missing entity) and clean up
+    const existingSpecificKeys = new Set(
+      phase1UpdatedRows
+        .filter(r => r.subtype && r.category && r.entity && !isEntityInvalid(r.entity))
+        .map(r => `${r.subtype.toLowerCase()}|||${r.category.toLowerCase()}|||${r.entity.toLowerCase()}`)
+    );
+    
+    const newGeneratedRows = [];
+    const keysToRemove = new Set();
+
+    phase1UpdatedRows.forEach(row => {
+      const isGenericRow = row.subtype && row.category && isEntityInvalid(row.entity);
+      if (isGenericRow) {
+        let expandedCount = 0;
+        
+        // Match using active COA
+        Object.entries(accountMappings).forEach(([code, fullName]) => {
+          let remaining = fullName;
+          if (remaining.startsWith(code)) {
+            remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+          }
+          const parts = remaining.split(/\s*-\s*/);
+          const category = parts[0] || '';
+          let entity = parts.slice(1).join(' - ') || '';
+          
+          if (category.trim().toLowerCase() === row.category.trim().toLowerCase()) {
+            // Fallback to default entity if parsed entity is invalid
+            if (isEntityInvalid(entity)) {
+              const defName = defaultAccountMappings[code];
+              if (defName) {
+                let defRemaining = defName;
+                if (defRemaining.startsWith(code)) {
+                  defRemaining = defRemaining.substring(code.length).replace(/^\s*-\s*/, '');
+                }
+                const defParts = defRemaining.split(/\s*-\s*/);
+                const defEnt = defParts.slice(1).join(' - ') || '';
+                if (!isEntityInvalid(defEnt)) {
+                  entity = defEnt;
+                }
+              }
+            }
+
+            if (entity && !isEntityInvalid(entity)) {
+              const specKey = `${row.subtype.toLowerCase()}|||${row.category.toLowerCase()}|||${entity.toLowerCase()}`;
+              if (!existingSpecificKeys.has(specKey)) {
+                existingSpecificKeys.add(specKey);
+                newGeneratedRows.push({
+                  key: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  subtype: row.subtype,
+                  category: row.category,
+                  entity: entity.trim()
+                });
+              }
+              expandedCount++;
+            }
+          }
+        });
+
+        // Fallback match using defaultAccountMappings directly if no expansion occurred
+        if (expandedCount === 0) {
+          Object.entries(defaultAccountMappings).forEach(([code, defaultName]) => {
+            let defRemaining = defaultName;
+            if (defRemaining.startsWith(code)) {
+              defRemaining = defRemaining.substring(code.length).replace(/^\s*-\s*/, '');
+            }
+            const defParts = defRemaining.split(/\s*-\s*/);
+            const defCat = defParts[0] || '';
+            const defEnt = defParts.slice(1).join(' - ') || '';
+            if (defCat.trim().toLowerCase() === row.category.trim().toLowerCase() && !isEntityInvalid(defEnt)) {
+              const specKey = `${row.subtype.toLowerCase()}|||${row.category.toLowerCase()}|||${defEnt.toLowerCase()}`;
+              if (!existingSpecificKeys.has(specKey)) {
+                existingSpecificKeys.add(specKey);
+                newGeneratedRows.push({
+                  key: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  subtype: row.subtype,
+                  category: row.category,
+                  entity: defEnt.trim()
+                });
+              }
+              expandedCount++;
+            }
+          });
+        }
+
+        if (expandedCount > 0) {
+          keysToRemove.add(row.key);
+        }
+      }
+    });
+
+    const finalRows = [
+      ...phase1UpdatedRows.filter(r => !keysToRemove.has(r.key)),
+      ...newGeneratedRows
+    ];
+
+    if (reconciledCount > 0 || newGeneratedRows.length > 0) {
+      handleSaveMatrix(finalRows);
+      toast.success(
+        `Successfully reconciled ${reconciledCount} row(s) and generated ${newGeneratedRows.length} new entity mapping(s)!`
+      );
     } else {
-      toast.error("No incomplete rows could be automatically reconciled from COA.");
+      toast.error("No incomplete or generic rows could be reconciled from COA.");
     }
   };
 

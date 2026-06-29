@@ -662,6 +662,53 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     const coveredCategories = new Set();
     const coveredSubtypes = new Set();
 
+    const isEntityInvalid = (ent) => {
+      const val = (ent || '').trim().toLowerCase();
+      return !val || val === 'none' || val === 'null' || val === 'undefined';
+    };
+
+    // 1. Scan Chart of Accounts (COA) for specific mappings first
+    const coaMappingsList = [];
+    Object.entries(accountMappings || {}).forEach(([code, fullName]) => {
+      let remaining = fullName;
+      if (remaining.startsWith(code)) {
+        remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+      }
+      const parts = remaining.split(/\s*-\s*/);
+      const category = parts[0] || '';
+      const entity = parts.slice(1).join(' - ') || '';
+      
+      if (category && entity && !isEntityInvalid(entity)) {
+        coaMappingsList.push({ category: category.trim(), entity: entity.trim() });
+      }
+    });
+
+    coaMappingsList.forEach(({ category, entity }) => {
+      let subtype = '';
+      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
+        if (cats && cats.includes(category)) {
+          subtype = sub;
+          break;
+        }
+      }
+      
+      const key = `${subtype}:::${category}:::${entity}`;
+      // Prevent duplicates
+      if (!rows.some(r => r.key === key)) {
+        rows.push({
+          key,
+          subtype,
+          category,
+          entity
+        });
+      }
+      
+      coveredEntities.add(entity);
+      coveredCategories.add(category);
+      if (subtype) coveredSubtypes.add(subtype);
+    });
+
+    // 2. Loop over standard entityMappings
     entityOptions.forEach((entity) => {
       if (!entity || coveredEntities.has(entity)) return;
       const category = entityMappings[entity] || '';
@@ -672,17 +719,21 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           break;
         }
       }
-      rows.push({
-        key: `${subtype}:::${category}:::${entity}`,
-        subtype,
-        category,
-        entity
-      });
+      const key = `${subtype}:::${category}:::${entity}`;
+      if (!rows.some(r => r.key === key)) {
+        rows.push({
+          key,
+          subtype,
+          category,
+          entity
+        });
+      }
       coveredEntities.add(entity);
       if (category) coveredCategories.add(category);
       if (subtype) coveredSubtypes.add(subtype);
     });
 
+    // 3. Loop over categoryOptions for remaining uncovered category placeholders
     categoryOptions.forEach((category) => {
       if (!category || coveredCategories.has(category)) return;
       let subtype = '';
@@ -702,6 +753,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
       if (subtype) coveredSubtypes.add(subtype);
     });
 
+    // 4. Loop over subclass options
     subClassOptions.forEach((subtype) => {
       if (!subtype || coveredSubtypes.has(subtype)) return;
       rows.push({
