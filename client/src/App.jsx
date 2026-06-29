@@ -39,6 +39,7 @@ import CategoryMatrixEditor from './components/CategoryMatrixEditor';
 import COAEditor from './components/COAEditor';
 import SubtypeCategoryEditor from './components/SubtypeCategoryEditor';
 import GoldMineLedger from './components/GoldMineLedger';
+import FlatListEditor from './components/FlatListEditor';
 
 
 
@@ -829,6 +830,25 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           syncSettings={syncSettings}
           getMatrixRows={getMatrixRows}
           handleSaveMatrix={handleSaveMatrix}
+          settingsFileInputRef={settingsFileInputRef}
+          importSettingsCSV={importSettingsCSV}
+          exportSettingsCSV={exportSettingsCSV}
+        />
+      );
+    }
+
+    if (selectedSettingType === 'from' || selectedSettingType === 'status') {
+      const type = selectedSettingType;
+      const title = type === 'from' ? 'Origin/From' : 'Status';
+      const list = type === 'from' ? fromOptions : statusOptions;
+      return (
+        <FlatListEditor
+          t={t}
+          title={title}
+          list={list}
+          onAdd={(val) => addOption(type, val)}
+          onEdit={(oldVal, newVal) => editOption(type, oldVal, newVal)}
+          onDelete={(val) => handleDeleteOption(val)}
           settingsFileInputRef={settingsFileInputRef}
           importSettingsCSV={importSettingsCSV}
           exportSettingsCSV={exportSettingsCSV}

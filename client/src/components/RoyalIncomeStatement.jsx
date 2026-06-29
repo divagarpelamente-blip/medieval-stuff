@@ -107,7 +107,7 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   const buildHierarchy = (flatList, rootCode) => {
     const nodes = {};
     const rootName = rootCode === '7' ? 'Revenues' : 'Expenses';
-    
+
     // Initialize root node
     nodes[rootCode] = {
       code: rootCode,
@@ -190,11 +190,11 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
     const traverse = (nodeCode) => {
       const node = nodes[nodeCode];
       if (!node) return;
-      
+
       if (hideZero && node.balance === 0) return;
-      
+
       list.push(node);
-      
+
       const isExpanded = isNodeExpanded(nodeCode);
       if (isExpanded && node.children.length > 0) {
         node.children.sort().forEach(childCode => {
@@ -359,11 +359,10 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
         <button
           type="button"
           onClick={() => setHideZero(!hideZero)}
-          className={`w-6 h-6 rounded border font-bold flex items-center justify-center cursor-pointer text-[10px] ${
-            hideZero
+          className={`w-6 h-6 rounded border font-bold flex items-center justify-center cursor-pointer text-[10px] ${hideZero
               ? 'bg-rose-700 border-rose-700 text-[#faf4e5] shadow-sm font-sans'
               : 'border-[#8b4513]/25 bg-[#faf4e5]/80 text-[#8b4513] hover:bg-[#8b4513]/10'
-          }`}
+            }`}
           title="Hide Zero Balances"
         >
           Ø
@@ -382,8 +381,7 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
             <button
               key={mode}
               onClick={() => setCompareMode(mode)}
-              className={`w-7 h-7 rounded border font-black text-[9.5px] uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 ${
-                isSelected
+              className={`w-7 h-7 rounded border font-black text-[9.5px] uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 ${isSelected
                   ? 'bg-[#8b4513] border-[#8b4513] text-[#ffd700] shadow-sm'
                   : 'bg-[#faf4e5]/80 border-[#8b4513]/20 text-[#5d4037]/80 hover:bg-[#8b4513]/10 hover:text-[#4b2c20]'
                 }`}
@@ -399,15 +397,15 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Unified Columns Header Row
   const renderUnifiedHeader = () => {
     return (
-      <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[8.5px] uppercase tracking-wider mb-2">
-        <div className="w-[53%] flex justify-between pr-2">
+      <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[9px] uppercase tracking-wider mb-2">
+        <div className="w-[50%] flex justify-between pr-4">
           <span></span>
           <span></span>
         </div>
-        <div className="w-[47%] flex justify-end gap-3 text-right">
-          <span className="w-[75px]">{col1Header}</span>
-          <span className="w-[75px]">{col2Header}</span>
-          <span className="w-[80px]">Difference</span>
+        <div className="w-[50%] flex justify-end gap-4 text-right">
+          <span className="w-[65px]">{col1Header}</span>
+          <span className="w-[65px]">{col2Header}</span>
+          <span className="w-[70px]">Difference</span>
         </div>
       </div>
     );
@@ -416,15 +414,15 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Render unified statement rows containing both left-side normal value and right-side comparison columns
   const renderStatementRows = (nodes, rootCode) => {
     const list = getRenderList(nodes, rootCode);
-    
+
     return list.map((node) => {
       const hasChildren = node.children.length > 0;
       const isExpanded = isNodeExpanded(node.code);
-      const indentClass = 
-        node.level === 1 ? 'pl-0 font-black text-[#4b2c20] text-[9.5px] uppercase' :
-        node.level === 2 ? 'pl-3 font-bold text-[#8b4513] text-[9.5px]' :
-        node.level === 3 ? 'pl-6 font-semibold text-[#5d4037] text-[9px]' :
-        'pl-9 font-medium text-[#5d4037]/85 text-[8.5px] italic';
+      const indentClass =
+        node.level === 1 ? 'pl-0 font-black text-[#4b2c20] text-[10px] uppercase' :
+          node.level === 2 ? 'pl-3 font-bold text-[#8b4513] text-[10px]' :
+            node.level === 3 ? 'pl-6 font-semibold text-[#5d4037] text-[9.5px]' :
+              'pl-9 font-medium text-[#5d4037]/85 text-[9px] italic';
 
       const icon = node.level === 1 ? '👑' : node.level === 2 ? '📁' : node.level === 3 ? '📂' : '📄';
 
@@ -433,12 +431,12 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
       const diff = currentVal - previousVal;
 
       return (
-        <div 
-          key={node.code} 
+        <div
+          key={node.code}
           className={`flex justify-between items-center py-1 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors duration-150 ${node.level === 1 ? 'bg-[#8b4513]/5 mt-2 rounded px-1' : ''}`}
         >
-          {/* Left Side (53% Width) - Name and Sidebar Value */}
-          <div className="w-[53%] flex justify-between items-center pr-2">
+          {/* Left Side (50% Width) - Name and Sidebar Value */}
+          <div className="w-[50%] flex justify-between items-center pr-4">
             <div className={`flex items-center gap-1.5 ${indentClass}`}>
               <span>{icon}</span>
               <span>{node.name}</span>
@@ -452,16 +450,16 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
                 </button>
               )}
             </div>
-            <span className={`font-mono font-bold ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'} text-[9px]`}>
+            <span className={`font-mono font-bold ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'} text-[10px]`}>
               {formatNumberCompact(node.balance)}
             </span>
           </div>
 
-          {/* Right Side (47% Width) - Comparative Columns */}
-          <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
-            <span className={`w-[75px] ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
-            <span className="w-[75px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
-            <span className={`w-[80px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+          {/* Right Side (50% Width) - Comparative Columns */}
+          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
+            <span className={`w-[65px] ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
+            <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
+            <span className={`w-[70px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
             </span>
           </div>
@@ -486,7 +484,7 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
       {renderUnifiedHeader()}
 
       <div className="space-y-6">
-        
+
         {/* Revenues Section */}
         <div className="space-y-3">
           <div className="space-y-1 text-[10px]">

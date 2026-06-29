@@ -1,8 +1,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import Modal from './Modal';
 import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
+import { useKingdomStore } from '../store/useKingdomStore';
 
 export default function CategoryMatrixEditor({
   t,
@@ -18,6 +19,10 @@ export default function CategoryMatrixEditor({
   importSettingsCSV,
   exportSettingsCSV
 }) {
+  const subtypeTypes = useKingdomStore(state => state.subtypeTypes) || {};
+  const classOptions = useKingdomStore(state => state.classOptions) || [];
+  const accountMappings = useKingdomStore(state => state.accountMappings) || {};
+
   const [selectedMatrixKeys, setSelectedMatrixKeys] = useState([]);
   const [isAddMatrixModalOpen, setIsAddMatrixModalOpen] = useState(false);
   const [newMatrixSubtype, setNewMatrixSubtype] = useState('');
@@ -39,6 +44,19 @@ export default function CategoryMatrixEditor({
   const [categoriesSortField, setCategoriesSortField] = useState(null);
   const [categoriesSortDirection, setCategoriesSortDirection] = useState('asc');
 
+  // Warning filter state
+  const [showIncompleteActiveOnly, setShowIncompleteActiveOnly] = useState(false);
+
+  // Filter states
+  const [filterMatrixType, setFilterMatrixType] = useState('');
+  const [filterMatrixSubtype, setFilterMatrixSubtype] = useState('');
+  const [filterMatrixCategory, setFilterMatrixCategory] = useState('');
+  const [filterMatrixEntity, setFilterMatrixEntity] = useState('');
+
+  // Pagination states
+  const [matrixCurrentPage, setMatrixCurrentPage] = useState(1);
+  const [manualMatrixPageInput, setManualMatrixPageInput] = useState('1');
+
   const handleDeleteMatrixSelections = () => {
     const selectedKeys = new Set(selectedMatrixKeys);
     const updatedRows = getMatrixRows().filter(row => !selectedKeys.has(row.key));
@@ -46,16 +64,249 @@ export default function CategoryMatrixEditor({
     setSelectedMatrixKeys([]);
   };
 
-  let rows = getMatrixRows();
-  if (categoriesSortField) {
-    rows = [...rows].sort((a, b) => {
-      const valA = (a[categoriesSortField] || '').toLowerCase();
-      const valB = (b[categoriesSortField] || '').toLowerCase();
-      if (valA < valB) return categoriesSortDirection === 'asc' ? -1 : 1;
-      if (valA > valB) return categoriesSortDirection === 'asc' ? 1 : -1;
-      return 0;
+  const handleAutoReconcile = () => {
+    const currentRows = getMatrixRows();
+    let reconciledCount = 0;
+    
+    // Parse the entire COA to easily map entities to derived subtypes/categories
+    const coaMatches = {};
+    Object.entries(accountMappings).forEach(([code, fullName]) => {
+      let remaining = fullName;
+      if (remaining.startsWith(code)) {
+        remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+      }
+      const parts = remaining.split(/\s*-\s*/);
+      const category = parts[0] || '';
+      const entity = parts.slice(1).join(' - ') || '';
+      
+      if (entity && category) {
+        // Derive subtype by searching subtypeToCategoryMap
+        let subtype = '';
+        for (const [sub, cats] of Object.entries(subtypeToCategoryMap || {})) {
+          if (cats && cats.includes(category)) {
+            subtype = sub;
+            break;
+          }
+        }
+        
+        if (subtype) {
+          const key = entity.trim().toLowerCase();
+          if (!coaMatches[key]) {
+            coaMatches[key] = [];
+          }
+          coaMatches[key].push({ subtype, category });
+        }
+      }
     });
-  }
+
+    const updatedRows = currentRows.map(row => {
+      const isRowIncomplete = !row.subtype || !row.category;
+      if (isRowIncomplete && row.entity) {
+        const key = row.entity.trim().toLowerCase();
+        const matches = coaMatches[key] || [];
+        
+        if (matches.length > 0) {
+          // Reconcile using the matching derived Subtype and Category
+          const { subtype, category } = matches[0];
+          reconciledCount++;
+          return { ...row, subtype, category };
+        }
+      }
+      return row;
+    });
+
+    if (reconciledCount > 0) {
+      handleSaveMatrix(updatedRows);
+      toast.success(`Successfully reconciled ${reconciledCount} row(s) automatically!`);
+    } else {
+      toast.error("No incomplete rows could be automatically reconciled from COA.");
+    }
+  };
+
+  const allRows = getMatrixRows();
+
+  // Filter logic
+  const filteredRows = useMemo(() => {
+    return allRows.filter((row) => {
+      if (showIncompleteActiveOnly) {
+        const isIncomplete = !row.subtype || !row.category || !row.entity;
+        if (!isIncomplete) return false;
+      }
+      const types = subtypeTypes[row.subtype] || [];
+      if (filterMatrixType && !types.includes(filterMatrixType)) return false;
+      if (filterMatrixSubtype && row.subtype !== filterMatrixSubtype) return false;
+      if (filterMatrixCategory && row.category !== filterMatrixCategory) return false;
+      if (filterMatrixEntity && row.entity !== filterMatrixEntity) return false;
+      return true;
+    });
+  }, [allRows, filterMatrixType, filterMatrixSubtype, filterMatrixCategory, filterMatrixEntity, subtypeTypes, showIncompleteActiveOnly]);
+
+  // Dynamic filter options
+  const dynamicSubtypes = useMemo(() => {
+    return Array.from(new Set(
+      allRows
+        .filter(row => {
+          const types = subtypeTypes[row.subtype] || [];
+          return !filterMatrixType || types.includes(filterMatrixType);
+        })
+        .map(row => row.subtype)
+        .filter(Boolean)
+    )).sort();
+  }, [allRows, filterMatrixType, subtypeTypes]);
+
+  const dynamicCategories = useMemo(() => {
+    return Array.from(new Set(
+      allRows
+        .filter(row => {
+          const types = subtypeTypes[row.subtype] || [];
+          if (filterMatrixType && !types.includes(filterMatrixType)) return false;
+          if (filterMatrixSubtype && row.subtype !== filterMatrixSubtype) return false;
+          return true;
+        })
+        .map(row => row.category)
+        .filter(Boolean)
+    )).sort();
+  }, [allRows, filterMatrixType, filterMatrixSubtype, subtypeTypes]);
+
+  const dynamicEntities = useMemo(() => {
+    return Array.from(new Set(
+      allRows
+        .filter(row => {
+          const types = subtypeTypes[row.subtype] || [];
+          if (filterMatrixType && !types.includes(filterMatrixType)) return false;
+          if (filterMatrixSubtype && row.subtype !== filterMatrixSubtype) return false;
+          if (filterMatrixCategory && row.category !== filterMatrixCategory) return false;
+          return true;
+        })
+        .map(row => row.entity)
+        .filter(Boolean)
+    )).sort();
+  }, [allRows, filterMatrixType, filterMatrixSubtype, filterMatrixCategory, subtypeTypes]);
+
+  // Sort logic
+  const sortedRows = useMemo(() => {
+    let list = [...filteredRows];
+    if (categoriesSortField) {
+      list.sort((a, b) => {
+        const valA = (a[categoriesSortField] || '').toLowerCase();
+        const valB = (b[categoriesSortField] || '').toLowerCase();
+        if (valA < valB) return categoriesSortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return categoriesSortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return list;
+  }, [filteredRows, categoriesSortField, categoriesSortDirection]);
+
+  // Pagination logic
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(sortedRows.length / itemsPerPage) || 1;
+  const safeCurrentPage = Math.min(Math.max(matrixCurrentPage, 1), totalPages);
+  const paginatedRows = useMemo(() => {
+    return sortedRows.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
+  }, [sortedRows, safeCurrentPage]);
+
+
+  const incompleteEntities = useMemo(() => {
+    return new Set(
+      allRows
+        .filter(r => !r.subtype || !r.category || !r.entity)
+        .map(r => r.entity)
+        .filter(Boolean)
+    );
+  }, [allRows]);
+
+  const matchedCOAAccounts = useMemo(() => {
+    if (!showIncompleteActiveOnly) return [];
+    
+    const list = [];
+    Object.entries(accountMappings).forEach(([code, fullName]) => {
+      let remaining = fullName;
+      if (remaining.startsWith(code)) {
+        remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+      }
+      const parts = remaining.split(/\s*-\s*/);
+      const category = parts[0] || '';
+      const entity = parts.slice(1).join(' - ') || '';
+      
+      if (entity && incompleteEntities.has(entity)) {
+        // Derive Type from code
+        const firstDigit = code.charAt(0);
+        let type = 'Unknown';
+        if (firstDigit === '1') type = 'Assets';
+        else if (firstDigit === '2') type = 'Liabilities';
+        else if (firstDigit === '6') type = 'Expense';
+        else if (firstDigit === '7') type = 'Income';
+        
+        // Derive Subtype by searching subtypeToCategoryMap
+        let subtype = '';
+        for (const [sub, cats] of Object.entries(subtypeToCategoryMap || {})) {
+          if (cats && cats.includes(category)) {
+            subtype = sub;
+            break;
+          }
+        }
+        
+        list.push({
+          code,
+          fullName,
+          category,
+          entity,
+          type,
+          subtype
+        });
+      }
+    });
+    
+    // Sort by entity name
+    list.sort((a, b) => a.entity.localeCompare(b.entity));
+    return list;
+  }, [accountMappings, incompleteEntities, showIncompleteActiveOnly, subtypeToCategoryMap]);
+
+  const modalMatchedCOA = useMemo(() => {
+    if (!editMatrixEntity) return [];
+    const list = [];
+    const targetEntity = editMatrixEntity.trim().toLowerCase();
+    
+    Object.entries(accountMappings).forEach(([code, fullName]) => {
+      let remaining = fullName;
+      if (remaining.startsWith(code)) {
+        remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+      }
+      const parts = remaining.split(/\s*-\s*/);
+      const category = parts[0] || '';
+      const entity = parts.slice(1).join(' - ') || '';
+      
+      if (entity.trim().toLowerCase() === targetEntity) {
+        // Derive Type from code
+        const firstDigit = code.charAt(0);
+        let type = 'Unknown';
+        if (firstDigit === '1') type = 'Assets';
+        else if (firstDigit === '2') type = 'Liabilities';
+        else if (firstDigit === '6') type = 'Expense';
+        else if (firstDigit === '7') type = 'Income';
+        
+        // Derive Subtype by searching subtypeToCategoryMap
+        let subtype = '';
+        for (const [sub, cats] of Object.entries(subtypeToCategoryMap || {})) {
+          if (cats && cats.includes(category)) {
+            subtype = sub;
+            break;
+          }
+        }
+        
+        list.push({
+          code,
+          fullName,
+          category,
+          entity,
+          type,
+          subtype
+        });
+      }
+    });
+    return list;
+  }, [accountMappings, editMatrixEntity, subtypeToCategoryMap]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -71,12 +322,20 @@ export default function CategoryMatrixEditor({
               <button
                 type="button"
                 onClick={handleDeleteMatrixSelections}
-                className="px-2.5 h-[28px] bg-red-755 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
+                className="px-2.5 h-[28px] bg-red-755 hover:bg-red-850 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
                 title="Delete Selected"
               >
                 🗑️ Delete ({selectedMatrixKeys.length})
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleAutoReconcile}
+              className="px-2.5 h-[28px] bg-amber-600 hover:bg-amber-700 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1 mr-1"
+              title="Automatically Reconcile Incomplete Rows from COA"
+            >
+              ⚡ Reconcile
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -119,6 +378,121 @@ export default function CategoryMatrixEditor({
         </div>
       </div>
 
+      {/* Dynamic Filtering Row */}
+      <div className="grid grid-cols-12 gap-3 mb-4 p-3 bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl flex-shrink-0 items-end">
+        <div className="col-span-6 sm:col-span-3">
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Type
+          </label>
+          <select
+            value={filterMatrixType}
+            onChange={(e) => {
+              setFilterMatrixType(e.target.value);
+              setMatrixCurrentPage(1);
+              setFilterMatrixSubtype('');
+              setFilterMatrixCategory('');
+              setFilterMatrixEntity('');
+            }}
+            className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 cursor-pointer"
+          >
+            <option value="">All Types</option>
+            {classOptions.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-6 sm:col-span-3">
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Subtype
+          </label>
+          <select
+            value={filterMatrixSubtype}
+            onChange={(e) => {
+              setFilterMatrixSubtype(e.target.value);
+              setMatrixCurrentPage(1);
+              setFilterMatrixCategory('');
+              setFilterMatrixEntity('');
+            }}
+            className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 cursor-pointer"
+          >
+            <option value="">All Subtypes</option>
+            {dynamicSubtypes.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-6 sm:col-span-3">
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Category
+          </label>
+          <select
+            value={filterMatrixCategory}
+            onChange={(e) => {
+              setFilterMatrixCategory(e.target.value);
+              setMatrixCurrentPage(1);
+              setFilterMatrixEntity('');
+            }}
+            className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 cursor-pointer"
+          >
+            <option value="">All Categories</option>
+            {dynamicCategories.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-6 sm:col-span-2">
+          <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
+            Entity
+          </label>
+          <select
+            value={filterMatrixEntity}
+            onChange={(e) => {
+              setFilterMatrixEntity(e.target.value);
+              setMatrixCurrentPage(1);
+            }}
+            className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50 cursor-pointer"
+          >
+            <option value="">All Entities</option>
+            {dynamicEntities.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-12 sm:col-span-1 flex gap-1 h-[28px] items-center justify-start mb-[1px]">
+          <button
+            type="button"
+            onClick={() => {
+              setFilterMatrixType('');
+              setFilterMatrixSubtype('');
+              setFilterMatrixCategory('');
+              setFilterMatrixEntity('');
+              setMatrixCurrentPage(1);
+              setShowIncompleteActiveOnly(false);
+              toast.success("Filters cleared!");
+            }}
+            className="w-7 h-[26px] bg-[#faf4e5]/90 border border-[#8b4513]/25 hover:bg-[#8b4513]/10 text-stone-700 text-xs flex items-center justify-center rounded-lg cursor-pointer transition-all shadow-sm"
+            title="Clear All Filters"
+          >
+            🧹
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowIncompleteActiveOnly(!showIncompleteActiveOnly);
+              setMatrixCurrentPage(1);
+            }}
+            className={`w-7 h-[26px] border text-xs flex items-center justify-center rounded-lg cursor-pointer transition-all shadow-sm ${
+              showIncompleteActiveOnly
+                ? 'bg-[#8b4513] text-[#ffd700] border-[#d4af37]/40'
+                : 'bg-[#faf4e5]/90 border-[#8b4513]/25 hover:bg-[#8b4513]/10 text-stone-700'
+            }`}
+            title="Show Incomplete Rows & Uncategorized COA"
+          >
+            ⚠️
+          </button>
+        </div>
+      </div>
+
       {/* Selected KPI Label */}
       {selectedMatrixKeys.length > 0 && (
         <div className="flex items-center justify-between bg-[#8b4513]/10 border border-[#8b4513]/20 rounded-lg p-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-150 flex-shrink-0">
@@ -131,17 +505,17 @@ export default function CategoryMatrixEditor({
       {/* Matrix Table */}
       <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
         <table className="w-full text-left border-collapse text-[10px] font-sans">
-          <thead>
-            <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
+          <thead className="sticky top-0 bg-[#faf4e5] z-10 border-b border-[#8b4513]/25 shadow-sm">
+            <tr className="text-[#4b2c20] font-black uppercase tracking-wider title-font">
               <th className="py-2 px-2 w-8 text-center">
                 <input
                   type="checkbox"
-                  checked={selectedMatrixKeys.length === rows.length && rows.length > 0}
+                  checked={paginatedRows.length > 0 && paginatedRows.every(r => selectedMatrixKeys.includes(r.key))}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      setSelectedMatrixKeys(rows.map(r => r.key));
+                      setSelectedMatrixKeys(prev => Array.from(new Set([...prev, ...paginatedRows.map(r => r.key)])));
                     } else {
-                      setSelectedMatrixKeys([]);
+                      setSelectedMatrixKeys(prev => prev.filter(k => !paginatedRows.some(r => r.key === k)));
                     }
                   }}
                   className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
@@ -186,11 +560,11 @@ export default function CategoryMatrixEditor({
               >
                 Entity {categoriesSortField === 'entity' ? (categoriesSortDirection === 'asc' ? '▲' : '▼') : ''}
               </th>
-              <th className="py-2 px-2 text-right">Actions</th>
+              <th className="py-2 px-2 text-right">Edit</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-            {rows.map((row) => {
+            {paginatedRows.map((row) => {
               const isChecked = selectedMatrixKeys.includes(row.key);
               return (
                 <tr key={row.key} className={`hover:bg-[#8b4513]/5 transition-colors ${isChecked ? 'bg-[#8b4513]/10' : ''}`}>
@@ -229,17 +603,65 @@ export default function CategoryMatrixEditor({
                         setEditCustomCategoryInput('');
                         setIsEditMatrixModalOpen(true);
                       }}
-                      className="text-blue-700 hover:text-blue-900 border border-transparent hover:border-blue-200 hover:bg-blue-50 px-1.5 py-0.5 rounded transition-all text-[9px] font-black cursor-pointer"
+                      className="text-blue-700 hover:text-blue-900 border border-transparent hover:border-blue-200 hover:bg-blue-50 px-1.5 py-0.5 rounded transition-all text-[10px] font-bold cursor-pointer"
+                      title="Edit Mapping"
                     >
-                      ✏️ Edit
+                      ✏️
                     </button>
                   </td>
                 </tr>
               );
             })}
           </tbody>
+          <tfoot className="sticky bottom-0 bg-[#faf4e5] z-10 border-t border-[#8b4513]/25 shadow-sm">
+            <tr>
+              <td colSpan={5} className="py-1.5 px-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[#4b2c20] text-[9.5px] font-black uppercase font-sans">
+                  <div>
+                    Page {safeCurrentPage} of {totalPages} ({sortedRows.length} total)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage === 1}
+                      onClick={() => setMatrixCurrentPage(safeCurrentPage - 1)}
+                      className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
+                    >
+                      ◀ Prev
+                    </button>
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage === totalPages}
+                      onClick={() => setMatrixCurrentPage(safeCurrentPage + 1)}
+                      className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
+                    >
+                      Next ▶
+                    </button>
+                    <div className="flex items-center gap-1 ml-2">
+                      <span>Go to:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={manualMatrixPageInput}
+                        onChange={(e) => {
+                          setManualMatrixPageInput(e.target.value);
+                          const p = parseInt(e.target.value, 10);
+                          if (p >= 1 && p <= totalPages) {
+                            setMatrixCurrentPage(p);
+                          }
+                        }}
+                        className="w-10 px-1 py-0.5 bg-white border border-[#8b4513]/30 rounded text-center text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
+
 
       {/* Add Row Modal */}
       <Modal
@@ -469,6 +891,48 @@ export default function CategoryMatrixEditor({
               className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-lg h-[38px] px-3 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
             />
           </div>
+
+          {editMatrixEntity && (
+            <div className="flex flex-col border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 overflow-hidden mt-2">
+              <div className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 p-2 flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase text-[#4b2c20] tracking-wider">
+                  Related COA Accounts ({modalMatchedCOA.length})
+                </span>
+              </div>
+              <div className="max-h-[160px] overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse text-[10px] font-sans">
+                  <thead className="sticky top-0 bg-[#faf4e5] z-10 border-b border-[#8b4513]/25 shadow-sm">
+                    <tr className="text-[#4b2c20] font-black uppercase tracking-wider title-font">
+                      <th className="py-1.5 px-2">Type</th>
+                      <th className="py-1.5 px-2">Subtype</th>
+                      <th className="py-1.5 px-2">Category</th>
+                      <th className="py-1.5 px-2">Entity</th>
+                      <th className="py-1.5 px-2">Account Name</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
+                    {modalMatchedCOA.length > 0 ? (
+                      modalMatchedCOA.map((account, idx) => (
+                        <tr key={idx} className="hover:bg-[#8b4513]/5 transition-colors">
+                          <td className="py-1 px-2">{account.type}</td>
+                          <td className="py-1 px-2">{account.subtype || <span className="text-stone-400 italic">None</span>}</td>
+                          <td className="py-1 px-2">{account.category || <span className="text-stone-400 italic">None</span>}</td>
+                          <td className="py-1 px-2 text-[#8b4513]">{account.entity}</td>
+                          <td className="py-1 px-2 font-medium text-stone-600">{account.fullName}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="py-4 text-center text-stone-400 italic">
+                          No matching accounts found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

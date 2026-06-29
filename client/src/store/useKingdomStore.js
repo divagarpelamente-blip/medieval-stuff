@@ -373,6 +373,27 @@ export const useKingdomStore = create((set, get) => ({
       get().syncSettings({ templates: updated });
       return;
     }
+
+    const key = `${type}Options`;
+    const currentList = get()[key];
+    if (currentList) {
+      const updated = currentList.map(v => v === oldValue ? newValue : v);
+      const updates = { [key]: updated };
+      
+      // If editing an entity name, we also update its entityMapping key
+      if (type === 'entity') {
+        const oldMapping = get().entityMappings[oldValue];
+        if (oldMapping !== undefined) {
+          const newMappings = { ...get().entityMappings };
+          delete newMappings[oldValue];
+          newMappings[newValue] = oldMapping;
+          updates.entityMappings = newMappings;
+        }
+      }
+      
+      get().syncSettings(updates);
+      return;
+    }
   },
 
   deleteOption: (type, value) => {
