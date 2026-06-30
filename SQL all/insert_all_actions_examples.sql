@@ -25,12 +25,12 @@ SELECT
     (tpl->'data'->>'transaction_type')::VARCHAR AS transaction_type,
     CASE 
         WHEN NULLIF(tpl->'data'->>'amount', '') IS NULL OR (tpl->'data'->>'amount')::NUMERIC = 0 
-        THEN 10.00 
-        ELSE (tpl->'data'->>'amount')::NUMERIC 
+        THEN 10.00 * series.n
+        ELSE (tpl->'data'->>'amount')::NUMERIC * series.n
     END AS amount,
-    COALESCE(NULLIF(tpl->'data'->>'value_date', ''), CURRENT_DATE::TEXT)::DATE AS value_date,
-    COALESCE(NULLIF(tpl->'data'->>'posting_date', ''), CURRENT_DATE::TEXT)::DATE AS posting_date,
-    NULLIF(tpl->'data'->>'due_date', '')::DATE AS due_date,
+    (COALESCE(NULLIF(tpl->'data'->>'value_date', ''), CURRENT_DATE::TEXT)::DATE - (series.n - 1) * INTERVAL '15 days')::DATE AS value_date,
+    (COALESCE(NULLIF(tpl->'data'->>'posting_date', ''), CURRENT_DATE::TEXT)::DATE - (series.n - 1) * INTERVAL '15 days')::DATE AS posting_date,
+    (NULLIF(tpl->'data'->>'due_date', '')::DATE - (series.n - 1) * INTERVAL '15 days')::DATE AS due_date,
     COALESCE(NULLIF(tpl->'data'->>'payment_status', ''), 'Completed')::VARCHAR AS payment_status,
     (tpl->'data'->>'transaction_subtype')::VARCHAR AS transaction_subtype,
     (tpl->'data'->>'transaction_category')::VARCHAR AS transaction_category,
@@ -39,10 +39,12 @@ SELECT
     (tpl->'data'->>'target_account')::VARCHAR AS target_account,
     (tpl->'data'->>'source_dest_bank')::VARCHAR AS source_dest_bank,
     (tpl->'data'->>'flow')::VARCHAR AS flow,
-    COALESCE(NULLIF(tpl->'data'->>'description', ''), tpl->>'name')::VARCHAR AS description,
+    (COALESCE(NULLIF(tpl->'data'->>'description', ''), tpl->>'name')::VARCHAR || ' (Ex ' || series.n || ')') AS description,
     (tpl->>'name')::VARCHAR AS quick_action_name
 FROM 
     public.profiles p,
     jsonb_array_elements(p.settings->'templates') AS tpl
+CROSS JOIN
+    generate_series(1, 2) AS series(n)
 WHERE 
     p.settings->'templates' IS NOT NULL;
