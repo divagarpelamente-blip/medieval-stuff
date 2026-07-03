@@ -1,5 +1,51 @@
 import { toast } from 'react-hot-toast';
 
+const normalizeDate = (dateStr) => {
+  if (!dateStr) return null;
+  const clean = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean; // Already YYYY-MM-DD
+  
+  // Try parsing M/D/YYYY or D/M/YYYY or YYYY/MM/DD
+  const parts = clean.split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      const y = parts[0];
+      const m = parts[1].padStart(2, '0');
+      const d = parts[2].padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    
+    // Check if it's D/M/YYYY or M/D/YYYY
+    let first = parts[0];
+    let second = parts[1];
+    let y = parts[2];
+    if (y.length === 2) {
+      y = '20' + y;
+    }
+    
+    // In European/Portuguese locales, CSV dates are D/M/YYYY (e.g. 25/6/2026).
+    // Let's assume D/M/YYYY. If month (second part) > 12, swap them.
+    let d = first;
+    let m = second;
+    if (Number(m) > 12) {
+      d = second;
+      m = first;
+    }
+    
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  
+  // Fallback to standard JS Date parsing
+  try {
+    const d = new Date(clean);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  } catch (e) {}
+  
+  return null;
+};
+
 export const handleExportCSV = (transactions, t) => {
   const headers = [
     'id',
@@ -68,13 +114,29 @@ export const handleExportCSV = (transactions, t) => {
 };
 
 export const parseCSV = (text) => {
+  // Strip BOM if present
+  const cleanText = text.replace(/^\uFEFF/, '');
+
+  // Detect separator: count commas vs semicolons vs tabs in the first line
+  const firstLine = cleanText.split(/\r?\n/)[0] || '';
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const semicolonCount = (firstLine.match(/;/g) || []).length;
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+
+  let separator = ',';
+  if (semicolonCount > commaCount && semicolonCount > tabCount) {
+    separator = ';';
+  } else if (tabCount > commaCount && tabCount > semicolonCount) {
+    separator = '\t';
+  }
+
   const lines = [];
   let row = [""];
   let inQuotes = false;
 
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    const next = text[i + 1];
+  for (let i = 0; i < cleanText.length; i++) {
+    const c = cleanText[i];
+    const next = cleanText[i + 1];
 
     if (c === '"') {
       if (inQuotes && next === '"') {
@@ -83,7 +145,7 @@ export const parseCSV = (text) => {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (c === ',' && !inQuotes) {
+    } else if (c === separator && !inQuotes) {
       row.push("");
     } else if ((c === '\r' || c === '\n') && !inQuotes) {
       if (c === '\r' && next === '\n') {
@@ -138,15 +200,25 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
           } else if (normHeader === 'profile_id') {
             tx.profile_id = val || null;
           } else if (normHeader === 'amount' || normHeader === 'ouro' || normHeader === 'coins') {
-            tx.amount = Number(val) || 0;
+            let cleanAmt = val.trim().replace(/\s/g, '');
+            if (cleanAmt.includes(',') && cleanAmt.includes('.')) {
+              if (cleanAmt.lastIndexOf(',') > cleanAmt.lastIndexOf('.')) {
+                cleanAmt = cleanAmt.replace(/\./g, '').replace(/,/g, '.');
+              } else {
+                cleanAmt = cleanAmt.replace(/,/g, '');
+              }
+            } else if (cleanAmt.includes(',')) {
+              cleanAmt = cleanAmt.replace(/,/g, '.');
+            }
+            tx.amount = Number(cleanAmt) || 0;
           } else if (normHeader === 'from' || normHeader === 'from (origem)' || normHeader === 'origin') {
             tx.from = val;
           } else if (normHeader === 'value_date' || normHeader === 'value date' || normHeader === 'date' || normHeader === 'data') {
-            tx.value_date = val || null;
+            tx.value_date = normalizeDate(val);
           } else if (normHeader === 'posting_date' || normHeader === 'posting date') {
-            tx.posting_date = val || null;
+            tx.posting_date = normalizeDate(val);
           } else if (normHeader === 'due_date' || normHeader === 'due date') {
-            tx.due_date = val || null;
+            tx.due_date = normalizeDate(val);
           } else if (normHeader === 'payment_status' || normHeader === 'status') {
             tx.payment_status = val;
           } else if (normHeader === 'transaction_type' || normHeader === 'entity class' || normHeader === 'class' || normHeader === 'classe') {
@@ -179,6 +251,13 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
             tx[header] = val;
           }
         });
+
+        // Skip blank/empty rows containing only delimiters (e.g. ,,,,,,,,,,,,,,)
+        const isRowEmpty = Object.keys(tx).every(key => {
+          if (key === 'id' || key === 'profile_id' || key === 'created_at') return true;
+          return !tx[key];
+        });
+        if (isRowEmpty) continue;
 
         // Validation
         if (!tx.transaction_type || !['Income', 'Expense', 'Assets', 'Liabilities'].includes(tx.transaction_type)) {

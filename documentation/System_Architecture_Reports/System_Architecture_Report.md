@@ -6,7 +6,7 @@ This document provides a comprehensive technical audit and specification of the 
 
 ## 1. High-Level Architecture & System Flow
 
-Eldoria operates on a modern **BaaS (Backend-as-a-Service)** architecture, pairing a reactive React + Vite frontend with a Supabase PostgreSQL database for persistent data storage, real-time trigger updates, and user session statistics.
+Eldoria operates on a modern **BaaS (Backend-as-a-Service)** architecture, pairing a reactive React + Vite frontend with a Supabase PostgreSQL database for persistent data storage, real-time trigger updates, and user session statistics. To support hosting inside subdirectories, sandbox platforms, and container systems (such as the DBAR platform), the Vite build configuration is locked to a relative base path (`base: './'`) to prevent absolute script/stylesheet mapping failures.
 
 ```mermaid
 graph TD
@@ -126,6 +126,15 @@ To support customization of the classification tree:
 - **Settings Category Menu**: Exposes a complete interactive interface under the Settings panel allowing lords to define custom Subtypes, add/remove Categories, and map individual Entities to Categories.
 - **Save Classification Bypass Rules**: When saving transaction entities, the system validates the selected subtype name. If a subtype is custom-saved with an `(income)` suffix (e.g., `Insurances (income)` or `Taxes & State (income)`), the system overrides default type assignments to ensure these transactions are classified as `Income` rather than defaulting to `Expense` or other types.
 
+### G. Categories Matrix Smart Auto-Reconciliation & Self-Healing
+
+The Categories Matrix layout supports a fully consolidated **⚡ Reconcile** action that cleanses all structural warnings (`None` values) across the entire grid:
+
+1. **Cross-Schema Coverage Resolution**: The row generator (`getMatrixRows`) scans both the flat `entityMappings` registry and the structured Chart of Accounts (`accountMappings`). This resolves flat-schema duplicate limitations, allowing a single entity (such as `CGD`) to be mapped simultaneously to multiple categories (`Bank account` and `Credit Cards`) without generating redundant warning placeholders.
+2. **Self-Healing Subclasses**: Detects subclasses that contain zero associated categories (e.g. `Insurances (income)`) and dynamically restores default category options (`Insurances`), registering them in the global `categoryOptions` state list.
+3. **Trace-Back Subtype Recovery**: Scans missing subtypes (e.g., `None - Fixed Debts - Jota`) and traces them back to the system default subclasses by locating matching account codes inside `defaultAccountMappings`.
+4. **Smart Expansion & Cleanup**: Automatically expands generic category-only mappings into specific entity-bound rows using COA assets. Once successfully expanded, the original generic row is permanently removed from the matrix.
+5. **Strict Entity Sanitization**: Features an `isEntityInvalid` checker that rejects invalid strings (`None`, `null`, `undefined`, or empty fields) from generating redundant matrix rows, avoiding infinite reconciliation loops.
 
 ---
 

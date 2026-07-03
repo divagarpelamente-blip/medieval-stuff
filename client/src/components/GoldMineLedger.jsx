@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 import { Z_LAYERS, STANDARD_MODAL_PROPS } from '../constants/UI_UX';
 import { useKingdomStore } from '../store/useKingdomStore';
+import TableSortHeader from './shared/TableSortHeader';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -551,54 +552,70 @@ export default function GoldMineLedger({
                           className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#ffd700] cursor-pointer"
                         />
                       </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('status')}
-                      >
-                        {t('ledger.headers.status')} {sortField === 'status' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('date')}
-                      >
-                        {t('ledger.headers.date')} {sortField === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('due_date')}
-                      >
-                        {t('ledger.headers.due_date') || 'Due Date'} {sortField === 'due_date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('from')}
-                      >
-                        {t('ledger.headers.from')} {sortField === 'from' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('type')}
-                      >
-                        {t('ledger.headers.type')} {sortField === 'type' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('category')}
-                      >
-                        {t('ledger.headers.category')} {sortField === 'category' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('entity')}
-                      >
-                        {t('ledger.headers.entity')} {sortField === 'entity' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
-                      <th 
-                        className="py-2.5 px-3 whitespace-nowrap text-right cursor-pointer hover:bg-[#70300d] select-none transition-colors"
-                        onClick={() => handleSort('amount')}
-                      >
-                        {t('ledger.headers.amount')} {sortField === 'amount' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
-                      </th>
+                      <TableSortHeader
+                        label={t('ledger.headers.status')}
+                        field="status"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
+                      />
+                      <TableSortHeader
+                        label={t('ledger.headers.date')}
+                        field="date"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
+                      />
+                      <TableSortHeader
+                        label={t('ledger.headers.due_date') || 'Due Date'}
+                        field="due_date"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
+                      />
+                      <TableSortHeader
+                        label={t('ledger.headers.from')}
+                        field="from"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
+                      />
+                      <TableSortHeader
+                        label={t('ledger.headers.type')}
+                        field="type"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
+                      />
+                      <TableSortHeader
+                        label={t('ledger.headers.category')}
+                        field="category"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
+                      />
+                      <TableSortHeader
+                        label={t('ledger.headers.entity')}
+                        field="entity"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
+                      />
+                      <TableSortHeader
+                        label={t('ledger.headers.amount')}
+                        field="amount"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2.5 px-3 whitespace-nowrap text-right hover:bg-[#70300d]"
+                      />
                       <th className="py-2.5 px-3 whitespace-nowrap text-right">{t('edit') || 'Edit'}</th>
                     </tr>
                   </thead>

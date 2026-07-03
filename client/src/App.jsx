@@ -40,6 +40,7 @@ import COAEditor from './components/COAEditor';
 import SubtypeCategoryEditor from './components/SubtypeCategoryEditor';
 import GoldMineLedger from './components/GoldMineLedger';
 import FlatListEditor from './components/FlatListEditor';
+import AllActionsEditor from './components/AllActionsEditor';
 
 
 
@@ -92,8 +93,8 @@ function App() {
   const statusOptions = useKingdomStore((state) => state.statusOptions);
   const classOptions = useKingdomStore((state) => state.classOptions);
   const subClassOptions = useKingdomStore((state) => state.subClassOptions);
-  const entityOptions = useKingdomStore((state) => state.entityOptions);
-  const categoryOptions = useKingdomStore((state) => state.categoryOptions);
+  const staticEntityOptions = useKingdomStore((state) => state.entityOptions) || [];
+  const staticCategoryOptions = useKingdomStore((state) => state.categoryOptions) || [];
   const entityMappings = useKingdomStore((state) => state.entityMappings);
   const monthOptions = useKingdomStore((state) => state.monthOptions);
 
@@ -126,6 +127,42 @@ function App() {
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
   const deleteTransactions = useKingdomStore((state) => state.deleteTransactions);
   const initAuth = useKingdomStore((state) => state.initAuth);
+
+  const coaSubtypesAndEntities = useMemo(() => {
+    const subtypes = new Set();
+    const entities = new Set();
+    Object.entries(accountMappings || {}).forEach(([code, fullName]) => {
+      let remaining = fullName;
+      if (remaining.startsWith(code)) {
+        remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+      }
+      const parts = remaining.split(/\s*-\s*/);
+      if (parts[0]) subtypes.add(parts[0]);
+      if (parts[1]) entities.add(parts.slice(1).join(' - '));
+    });
+    return { subtypes: Array.from(subtypes), entities: Array.from(entities) };
+  }, [accountMappings]);
+
+  const categoryOptions = useMemo(() => {
+    const cats = new Set([
+      ...staticCategoryOptions,
+      ...coaSubtypesAndEntities.subtypes,
+      ...Object.values(entityMappings || {}),
+      ...transactions.map(tx => tx.transaction_category),
+      ...transactions.map(tx => entityMappings[tx.entity])
+    ]);
+    return Array.from(cats).filter(Boolean).sort();
+  }, [staticCategoryOptions, coaSubtypesAndEntities.subtypes, entityMappings, transactions]);
+
+  const entityOptions = useMemo(() => {
+    const ents = new Set([
+      ...staticEntityOptions,
+      ...coaSubtypesAndEntities.entities,
+      ...Object.keys(entityMappings || {}),
+      ...transactions.map(tx => tx.entity)
+    ]);
+    return Array.from(ents).filter(Boolean).sort();
+  }, [staticEntityOptions, coaSubtypesAndEntities.entities, entityMappings, transactions]);
 
   // Invoke extracted Custom Hooks
   const {
@@ -904,6 +941,41 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           settingsFileInputRef={settingsFileInputRef}
           importSettingsCSV={importSettingsCSV}
           exportSettingsCSV={exportSettingsCSV}
+        />
+      );
+    }
+    if (selectedSettingType === 'allActions') {
+      return (
+        <AllActionsEditor
+          t={t}
+          templates={templates}
+          selectedQaNames={selectedQaNames}
+          setSelectedQaNames={setSelectedQaNames}
+          onEditQuickAction={(tpl) => {
+            setSelectedQaTemplateName(tpl.name);
+            setQaName(tpl.name);
+            setQaIcon(tpl.icon || '⚡');
+            setQaFrom(tpl.data.from || '');
+            setQaClass(tpl.data.transaction_type || '');
+            setQaSubClass(tpl.data.transaction_subtype || '');
+            setQaEntity(tpl.data.entity || '');
+            setQaCategory(tpl.data.transaction_category || '');
+            setQaTargetAccount(tpl.data.target_account || '');
+            setQaSourceDestBank(tpl.data.source_dest_bank || '');
+            setQaFlow(tpl.data.flow || '');
+            setQaStatus(tpl.data.payment_status || '');
+            setQaDescription(tpl.data.description || '');
+            setQaAmount(tpl.data.amount || '');
+            setQaDueDate(tpl.data.due_date || '');
+            setQaValueDate(tpl.data.value_date || '');
+            setQaPostingDate(tpl.data.posting_date || '');
+            setIsEditingQa(true);
+            setSelectedSettingType('quickAction');
+          }}
+          handleDeleteQuickAction={handleDeleteQuickAction}
+          qaFileInputRef={qaFileInputRef}
+          importQuickActionsCSV={importQuickActionsCSV}
+          handleExportAllActionsCSV={handleExportAllActionsCSV}
         />
       );
     }

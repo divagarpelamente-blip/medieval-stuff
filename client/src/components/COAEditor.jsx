@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import Modal from './Modal';
 import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
 import { parseCSV } from '../utils/csvHelpers';
+import TableSortHeader from './shared/TableSortHeader';
+import TablePagination from './shared/TablePagination';
+import BulkActionBar from './shared/BulkActionBar';
 
 export default function COAEditor({
   t,
@@ -49,6 +52,14 @@ export default function COAEditor({
   const [filterType, setFilterType] = useState('');
   const [filterSubtype, setFilterSubtype] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [manualPageInput, setManualPageInput] = useState('1');
+
+  useEffect(() => {
+    setManualPageInput(String(currentPage));
+  }, [currentPage]);
 
   // 1. Parsing Helper
   const parseAccountName = (code, fullName) => {
@@ -166,13 +177,23 @@ export default function COAEditor({
   )).sort();
 
   // Sorting
-  const sortedRows = [...filteredRows].sort((a, b) => {
-    const valA = a[sortField] || '';
-    const valB = b[sortField] || '';
-    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+  const sortedRows = useMemo(() => {
+    return [...filteredRows].sort((a, b) => {
+      const valA = a[sortField] || '';
+      const valB = b[sortField] || '';
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredRows, sortField, sortDirection]);
+
+  // Pagination logic
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(sortedRows.length / itemsPerPage) || 1;
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginatedRows = useMemo(() => {
+    return sortedRows.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
+  }, [sortedRows, safeCurrentPage]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -672,24 +693,6 @@ export default function COAEditor({
             className="px-2 py-1 bg-white border border-[#8b4513]/30 rounded-lg text-[10px] font-bold text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513] w-[150px]"
           />
           <div className="flex gap-1">
-            {selectedCodes.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleDeleteSelections}
-                  className="px-2.5 h-[28px] bg-red-755 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
-                >
-                  🗑️ Delete Selected
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDuplicateSelections}
-                  className="px-2.5 h-[28px] bg-amber-700 hover:bg-amber-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
-                >
-                  👥 Duplicate
-                </button>
-              </>
-            )}
             <button
               type="button"
               onClick={handleOpenAddModal}
@@ -734,6 +737,7 @@ export default function COAEditor({
               setFilterType(e.target.value);
               setFilterSubtype('');
               setFilterCategory('');
+              setCurrentPage(1);
             }}
             className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
@@ -752,6 +756,7 @@ export default function COAEditor({
             onChange={(e) => {
               setFilterSubtype(e.target.value);
               setFilterCategory('');
+              setCurrentPage(1);
             }}
             className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
@@ -767,7 +772,10 @@ export default function COAEditor({
           </label>
           <select
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
+            onChange={(e) => {
+              setFilterCategory(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
             <option value="">All Categories</option>
@@ -782,7 +790,10 @@ export default function COAEditor({
           </label>
           <select
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full bg-white border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
           >
             <option value="">All Entities</option>
@@ -793,6 +804,14 @@ export default function COAEditor({
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedCodes.length}
+        label="Selected Accounts"
+        onDelete={handleDeleteSelections}
+        deleteLabel="Delete Selected"
+      />
+
       {/* Main table container */}
       <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
         <table className="w-full text-left border-collapse text-[10px] font-sans">
@@ -801,10 +820,10 @@ export default function COAEditor({
               <th className="py-2 px-2 w-8 text-center">
                 <input
                   type="checkbox"
-                  checked={selectedCodes.length === sortedRows.length && sortedRows.length > 0}
+                  checked={paginatedRows.length > 0 && paginatedRows.every(r => selectedCodes.includes(r.code))}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      setSelectedCodes(sortedRows.map(r => r.code));
+                      setSelectedCodes(paginatedRows.map(r => r.code));
                     } else {
                       setSelectedCodes([]);
                     }
@@ -812,26 +831,51 @@ export default function COAEditor({
                   className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
                 />
               </th>
-              <th className="py-2 px-2 cursor-pointer w-20 hover:bg-[#8b4513]/5" onClick={() => handleSort('code')}>
-                Code {sortField === 'code' && (sortDirection === 'asc' ? '▲' : '▼')}
-              </th>
-              <th className="py-2 px-2 cursor-pointer w-20 hover:bg-[#8b4513]/5" onClick={() => handleSort('type')}>
-                Type {sortField === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
-              </th>
-              <th className="py-2 px-2 cursor-pointer w-28 hover:bg-[#8b4513]/5" onClick={() => handleSort('subtype')}>
-                Subtype {sortField === 'subtype' && (sortDirection === 'asc' ? '▲' : '▼')}
-              </th>
-              <th className="py-2 px-2 cursor-pointer w-28 hover:bg-[#8b4513]/5" onClick={() => handleSort('category')}>
-                Category {sortField === 'category' && (sortDirection === 'asc' ? '▲' : '▼')}
-              </th>
-              <th className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/5" onClick={() => handleSort('accountName')}>
-                Account Name {sortField === 'accountName' && (sortDirection === 'asc' ? '▲' : '▼')}
-              </th>
+              <TableSortHeader
+                label="Code"
+                field="code"
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                className="py-2 px-2 w-20 text-left"
+              />
+              <TableSortHeader
+                label="Type"
+                field="type"
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                className="py-2 px-2 w-20 text-left"
+              />
+              <TableSortHeader
+                label="Subtype"
+                field="subtype"
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                className="py-2 px-2 w-28 text-left"
+              />
+              <TableSortHeader
+                label="Category"
+                field="category"
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                className="py-2 px-2 w-28 text-left"
+              />
+              <TableSortHeader
+                label="Account Name"
+                field="accountName"
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                className="py-2 px-2 text-left"
+              />
               <th className="py-2 px-2 w-20 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-            {sortedRows.map((row) => {
+            {paginatedRows.map((row) => {
               const isChecked = selectedCodes.includes(row.code);
               const isEditing = editingCode === row.code;
 
@@ -890,6 +934,15 @@ export default function COAEditor({
               );
             })}
           </tbody>
+          <TablePagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            totalItems={sortedRows.length}
+            onPageChange={setCurrentPage}
+            manualPageInput={manualPageInput}
+            onManualPageInputChange={setManualPageInput}
+            colSpan={7}
+          />
         </table>
       </div>
 

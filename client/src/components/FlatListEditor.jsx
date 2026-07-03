@@ -3,6 +3,9 @@ import { useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import Modal from './Modal';
 import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
+import TableSortHeader from './shared/TableSortHeader';
+import TablePagination from './shared/TablePagination';
+import BulkActionBar from './shared/BulkActionBar';
 
 export default function FlatListEditor({
   t,
@@ -77,16 +80,7 @@ export default function FlatListEditor({
         </div>
         <div className="flex items-center gap-2.5">
           <div className="flex gap-1">
-            {selectedItems.length > 0 && (
-              <button
-                type="button"
-                onClick={handleDeleteSelections}
-                className="px-2.5 h-[28px] bg-red-700 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-black text-[9px] uppercase tracking-wider gap-1"
-                title="Delete Selected"
-              >
-                🗑️ Delete ({selectedItems.length})
-              </button>
-            )}
+
             <button
               type="button"
               onClick={() => {
@@ -142,14 +136,13 @@ export default function FlatListEditor({
         />
       </div>
 
-      {/* Selected KPI Label */}
-      {selectedItems.length > 0 && (
-        <div className="flex items-center justify-between bg-[#8b4513]/10 border border-[#8b4513]/20 rounded-lg p-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-150 flex-shrink-0">
-          <span className="text-[9px] font-black uppercase text-[#4b2c20] tracking-wider pl-1">
-            Selected: <span className="font-bold text-amber-900">{selectedItems.length}</span>
-          </span>
-        </div>
-      )}
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedItems.length}
+        label="Selected"
+        onDelete={handleDeleteSelections}
+        deleteLabel="Delete Selected"
+      />
 
       {/* Table */}
       <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
@@ -170,12 +163,14 @@ export default function FlatListEditor({
                   className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
                 />
               </th>
-              <th
-                className="py-2 px-3 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-              >
-                Value {sortDirection === 'asc' ? '▲' : '▼'}
-              </th>
+              <TableSortHeader
+                label="Value"
+                field="value"
+                sortField="value"
+                sortDirection={sortDirection}
+                onSort={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className="py-2 px-3 text-left"
+              />
               <th className="py-2 px-3 text-right">Edit</th>
             </tr>
           </thead>
@@ -217,52 +212,15 @@ export default function FlatListEditor({
               );
             })}
           </tbody>
-          <tfoot className="sticky bottom-0 bg-[#faf4e5] z-10 border-t border-[#8b4513]/25 shadow-sm">
-            <tr>
-              <td colSpan={3} className="py-1.5 px-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[#4b2c20] text-[9.5px] font-black uppercase font-sans">
-                  <div>
-                    Page {safeCurrentPage} of {totalPages} ({sortedList.length} total)
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={safeCurrentPage === 1}
-                      onClick={() => setCurrentPage(safeCurrentPage - 1)}
-                      className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
-                    >
-                      ◀ Prev
-                    </button>
-                    <button
-                      type="button"
-                      disabled={safeCurrentPage === totalPages}
-                      onClick={() => setCurrentPage(safeCurrentPage + 1)}
-                      className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
-                    >
-                      Next ▶
-                    </button>
-                    <div className="flex items-center gap-1 ml-2">
-                      <span>Go to:</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={totalPages}
-                        value={manualPageInput}
-                        onChange={(e) => {
-                          setManualPageInput(e.target.value);
-                          const p = parseInt(e.target.value, 10);
-                          if (p >= 1 && p <= totalPages) {
-                            setCurrentPage(p);
-                          }
-                        }}
-                        className="w-10 px-1 py-0.5 bg-white border border-[#8b4513]/30 rounded text-center text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tfoot>
+          <TablePagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            totalItems={sortedList.length}
+            onPageChange={setCurrentPage}
+            manualPageInput={manualPageInput}
+            onManualPageInputChange={setManualPageInput}
+            colSpan={3}
+          />
         </table>
       </div>
 

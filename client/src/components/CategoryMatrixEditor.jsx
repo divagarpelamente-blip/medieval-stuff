@@ -4,6 +4,9 @@ import { toast } from 'react-hot-toast';
 import Modal from './Modal';
 import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
 import { useKingdomStore } from '../store/useKingdomStore';
+import TableSortHeader from './shared/TableSortHeader';
+import TablePagination from './shared/TablePagination';
+import BulkActionBar from './shared/BulkActionBar';
 
 export default function CategoryMatrixEditor({
   t,
@@ -853,14 +856,12 @@ export default function CategoryMatrixEditor({
         </div>
       </div>
 
-      {/* Selected KPI Label */}
-      {selectedMatrixKeys.length > 0 && (
-        <div className="flex items-center justify-between bg-[#8b4513]/10 border border-[#8b4513]/20 rounded-lg p-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-150 flex-shrink-0">
-          <span className="text-[9px] font-black uppercase text-[#4b2c20] tracking-wider pl-1">
-            Selected: <span className="font-bold text-amber-900">{selectedMatrixKeys.length}</span>
-          </span>
-        </div>
-      )}
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedMatrixKeys.length}
+        label="Selected"
+        className="mb-2"
+      />
 
       {/* Matrix Table */}
       <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
@@ -881,45 +882,51 @@ export default function CategoryMatrixEditor({
                   className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
                 />
               </th>
-              <th
-                className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                onClick={() => {
-                  if (categoriesSortField === 'subtype') {
+              <TableSortHeader
+                label="Subtype"
+                field="subtype"
+                sortField={categoriesSortField}
+                sortDirection={categoriesSortDirection}
+                onSort={(field) => {
+                  if (categoriesSortField === field) {
                     setCategoriesSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
                   } else {
-                    setCategoriesSortField('subtype');
+                    setCategoriesSortField(field);
                     setCategoriesSortDirection('asc');
                   }
                 }}
-              >
-                Subtype {categoriesSortField === 'subtype' ? (categoriesSortDirection === 'asc' ? '▲' : '▼') : ''}
-              </th>
-              <th
-                className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                onClick={() => {
-                  if (categoriesSortField === 'category') {
+                className="py-2 px-2"
+              />
+              <TableSortHeader
+                label="Category"
+                field="category"
+                sortField={categoriesSortField}
+                sortDirection={categoriesSortDirection}
+                onSort={(field) => {
+                  if (categoriesSortField === field) {
                     setCategoriesSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
                   } else {
-                    setCategoriesSortField('category');
+                    setCategoriesSortField(field);
                     setCategoriesSortDirection('asc');
                   }
                 }}
-              >
-                Category {categoriesSortField === 'category' ? (categoriesSortDirection === 'asc' ? '▲' : '▼') : ''}
-              </th>
-              <th
-                className="py-2 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                onClick={() => {
-                  if (categoriesSortField === 'entity') {
+                className="py-2 px-2"
+              />
+              <TableSortHeader
+                label="Entity"
+                field="entity"
+                sortField={categoriesSortField}
+                sortDirection={categoriesSortDirection}
+                onSort={(field) => {
+                  if (categoriesSortField === field) {
                     setCategoriesSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
                   } else {
-                    setCategoriesSortField('entity');
+                    setCategoriesSortField(field);
                     setCategoriesSortDirection('asc');
                   }
                 }}
-              >
-                Entity {categoriesSortField === 'entity' ? (categoriesSortDirection === 'asc' ? '▲' : '▼') : ''}
-              </th>
+                className="py-2 px-2"
+              />
               <th className="py-2 px-2 text-right">Edit</th>
             </tr>
           </thead>
@@ -973,52 +980,15 @@ export default function CategoryMatrixEditor({
               );
             })}
           </tbody>
-          <tfoot className="sticky bottom-0 bg-[#faf4e5] z-10 border-t border-[#8b4513]/25 shadow-sm">
-            <tr>
-              <td colSpan={5} className="py-1.5 px-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[#4b2c20] text-[9.5px] font-black uppercase font-sans">
-                  <div>
-                    Page {safeCurrentPage} of {totalPages} ({sortedRows.length} total)
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={safeCurrentPage === 1}
-                      onClick={() => setMatrixCurrentPage(safeCurrentPage - 1)}
-                      className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
-                    >
-                      ◀ Prev
-                    </button>
-                    <button
-                      type="button"
-                      disabled={safeCurrentPage === totalPages}
-                      onClick={() => setMatrixCurrentPage(safeCurrentPage + 1)}
-                      className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
-                    >
-                      Next ▶
-                    </button>
-                    <div className="flex items-center gap-1 ml-2">
-                      <span>Go to:</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={totalPages}
-                        value={manualMatrixPageInput}
-                        onChange={(e) => {
-                          setManualMatrixPageInput(e.target.value);
-                          const p = parseInt(e.target.value, 10);
-                          if (p >= 1 && p <= totalPages) {
-                            setMatrixCurrentPage(p);
-                          }
-                        }}
-                        className="w-10 px-1 py-0.5 bg-white border border-[#8b4513]/30 rounded text-center text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tfoot>
+          <TablePagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            totalItems={sortedRows.length}
+            onPageChange={setMatrixCurrentPage}
+            manualPageInput={manualMatrixPageInput}
+            onManualPageInputChange={setManualMatrixPageInput}
+            colSpan={5}
+          />
         </table>
       </div>
 
