@@ -62,9 +62,33 @@ const RegisterTransactionForm = ({
     "Other Consumables": []
   };
 
+  const defaultSubtypeToCategoryMap = {
+    "Banks": ["Bank account", "Savings account", "Investments account"],
+    "Fixed Assets": ["Fixed Assets"],
+    "Personal Debt": ["Loans & Burrow", "Credit Cards"],
+    "Other Debts": ["Other Debts"],
+    "Living & Household": ["Household", "Utilities"],
+    "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
+    "Public Transports": ["Public Transports"],
+    "Other Transports": ["Other Transports"],
+    "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
+    "Health": ["Health"],
+    "Entertainment": ["Entertainment"],
+    "Education": ["Education"],
+    "Insurances": ["Insurances"],
+    "Taxes & State": ["Taxes", "Interest"],
+    "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
+    "Payroll": ["Salary", "Payroll Subsidies"],
+    "Other Income": ["Other Incomes"],
+    "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
+  };
+
   let filteredCategories = categoryOptions;
   if (txSubClass) {
-    const allowedCategories = subtypeToCategoryMap[txSubClass] || [];
+    const allowedCategories = Array.from(new Set([
+      ...(subtypeToCategoryMap[txSubClass] || []),
+      ...(defaultSubtypeToCategoryMap[txSubClass] || [])
+    ]));
     filteredCategories = categoryOptions.filter(opt => allowedCategories.includes(opt));
   }
 

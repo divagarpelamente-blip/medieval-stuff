@@ -1,4 +1,4 @@
-import { Compass, Trophy, BookOpen, LayoutDashboard, Settings } from 'lucide-react';
+import { Compass, Trophy, BookOpen, LayoutDashboard, Settings, BarChart3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Z_LAYERS } from '../constants/UI_UX';
 
@@ -9,6 +9,7 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
     { id: 'quests', label: t('quests'), icon: Compass },
     { id: 'achievements', label: t('achievements'), icon: Trophy },
     { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { id: 'statistics', label: t('menu_statistics', 'Statistics'), icon: BarChart3 },
     { id: 'settings', label: t('settings'), icon: Settings },
   ];
 
@@ -17,7 +18,7 @@ const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id || (item.id === 'dashboard' && (activeTab === 'financial_statement' || activeTab === 'transactions'));
-        const isSupported = item.id === 'quests' || item.id === 'settings' || item.id === 'dashboard';
+        const isSupported = item.id === 'quests' || item.id === 'settings' || item.id === 'dashboard' || item.id === 'statistics';
 
         return (
           <button 

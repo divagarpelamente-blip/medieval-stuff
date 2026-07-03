@@ -41,7 +41,7 @@ import SubtypeCategoryEditor from './components/SubtypeCategoryEditor';
 import GoldMineLedger from './components/GoldMineLedger';
 import FlatListEditor from './components/FlatListEditor';
 import AllActionsEditor from './components/AllActionsEditor';
-
+import StatisticsWindow from './components/StatisticsWindow';
 
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
@@ -593,6 +593,12 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Escape') {
+        // Let active modals handle Escape natively if present
+        const overlays = document.querySelectorAll('.modal-overlay');
+        if (overlays.length > 0) {
+          return;
+        }
+
         if (isNewTxModalOpen) {
           setIsNewTxModalOpen(false);
           setIsTreasuryMenuOpen(true);
@@ -810,7 +816,29 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     const newCategoryOptions = new Set();
     const newEntityOptions = new Set();
     const newEntityMappings = {};
-    const newSubtypeToCategoryMap = {};
+    const defaultSubtypeMap = {
+      "Banks": ["Bank account", "Savings account", "Investments account"],
+      "Fixed Assets": ["Fixed Assets"],
+      "Personal Debt": ["Loans & Burrow", "Credit Cards"],
+      "Other Debts": ["Other Debts"],
+      "Living & Household": ["Household", "Utilities"],
+      "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
+      "Public Transports": ["Public Transports"],
+      "Other Transports": ["Other Transports"],
+      "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
+      "Health": ["Health"],
+      "Entertainment": ["Entertainment"],
+      "Education": ["Education"],
+      "Insurances": ["Insurances"],
+      "Insurances (income)": ["Insurances"],
+      "Taxes & State": ["Taxes", "Interest"],
+      "Taxes & State (income)": ["Taxes", "Interest"],
+      "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
+      "Payroll": ["Salary", "Payroll Subsidies"],
+      "Other Income": ["Other Incomes"],
+      "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
+    };
+    const newSubtypeToCategoryMap = JSON.parse(JSON.stringify(defaultSubtypeMap));
 
     const seen = new Set();
     const uniqueRows = [];
@@ -3002,6 +3030,28 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           cashFlowStatement={engineData.cashFlowStatement}
           balanceSheet={engineData.balanceSheet}
           formatNumberCompact={formatNumberCompact}
+        />
+
+        <StatisticsWindow
+          isOpen={activeTab === 'statistics'}
+          onClose={() => {
+            setActiveTab('quests');
+          }}
+          t={t}
+          transactions={transactions}
+          fromOptions={fromOptions}
+          accountMappings={accountMappings}
+          currentGold={gold}
+          onEditTransaction={(tx) => {
+            startEdit(tx);
+            setIsNewTxModalOpen(true);
+          }}
+          onDeleteTransaction={(id) => {
+            deleteTransactions([id]);
+          }}
+          onGoToLedger={() => {
+            setActiveTab('transactions');
+          }}
         />
 
         {activeTab === 'transactions' && (
