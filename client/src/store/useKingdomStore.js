@@ -78,6 +78,27 @@ export const useKingdomStore = create((set, get) => ({
   role: 'lord',
   mineLevel: 1,
   lastCollectionTime: null,
+  expenseVarianceData: {
+    current_period_expenses: 0,
+    previous_period_expenses: 0,
+    absolute_variance: 0,
+    percentage_variance: 0
+  },
+  savingsRateData: {
+    total_income: 0,
+    total_expenses: 0,
+    savings_rate_percentage: 0
+  },
+  runwayData: {
+    liquid_cash: 0,
+    monthly_burn_rate: 0,
+    runway_months: 0
+  },
+  dtiData: {
+    total_amortization: 0,
+    total_income: 0,
+    dti_percentage: 0
+  },
 
   syncSettings: async (updates) => {
     set(updates);
@@ -663,6 +684,94 @@ export const useKingdomStore = create((set, get) => ({
       console.error('Failed to fetch dashboard data:', err);
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  // Fetch expense variance using database RPC
+  fetchExpenseVariance: async (years = [], quarters = [], months = []) => {
+    const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
+    try {
+      const { data, error } = await supabase.rpc('calculate_expense_variance', {
+        p_profile_id: userId,
+        p_years: years,
+        p_quarters: quarters,
+        p_months: months
+      });
+      if (error) {
+        console.error('Error calling calculate_expense_variance RPC:', error);
+        return;
+      }
+      if (data && data[0]) {
+        set({ expenseVarianceData: data[0] });
+      }
+    } catch (err) {
+      console.error('Failed to execute calculate_expense_variance RPC:', err);
+    }
+  },
+
+  // Fetch savings rate using database RPC
+  fetchSavingsRate: async (years = [], quarters = [], months = []) => {
+    const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
+    try {
+      const { data, error } = await supabase.rpc('calculate_savings_rate', {
+        p_profile_id: userId,
+        p_years: years,
+        p_quarters: quarters,
+        p_months: months
+      });
+      if (error) {
+        console.error('Error calling calculate_savings_rate RPC:', error);
+        return;
+      }
+      if (data && data[0]) {
+        set({ savingsRateData: data[0] });
+      }
+    } catch (err) {
+      console.error('Failed to execute calculate_savings_rate RPC:', err);
+    }
+  },
+
+  // Fetch runway metrics using database RPC
+  fetchRunwayData: async (years = [], quarters = [], months = []) => {
+    const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
+    try {
+      const { data, error } = await supabase.rpc('calculate_kingdom_runway', {
+        p_profile_id: userId,
+        p_years: years,
+        p_quarters: quarters,
+        p_months: months
+      });
+      if (error) {
+        console.error('Error calling calculate_kingdom_runway RPC:', error);
+        return;
+      }
+      if (data && data[0]) {
+        set({ runwayData: data[0] });
+      }
+    } catch (err) {
+      console.error('Failed to execute calculate_kingdom_runway RPC:', err);
+    }
+  },
+
+  // Fetch DTI ratio metrics using database RPC
+  fetchDtiData: async (years = [], quarters = [], months = []) => {
+    const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
+    try {
+      const { data, error } = await supabase.rpc('calculate_dti_ratio', {
+        p_profile_id: userId,
+        p_years: years,
+        p_quarters: quarters,
+        p_months: months
+      });
+      if (error) {
+        console.error('Error calling calculate_dti_ratio RPC:', error);
+        return;
+      }
+      if (data && data[0]) {
+        set({ dtiData: data[0] });
+      }
+    } catch (err) {
+      console.error('Failed to execute calculate_dti_ratio RPC:', err);
     }
   },
   

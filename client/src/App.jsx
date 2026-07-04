@@ -132,6 +132,12 @@ function App() {
   const registerTransactions = useKingdomStore((state) => state.registerTransactions);
   const deleteTransactions = useKingdomStore((state) => state.deleteTransactions);
   const initAuth = useKingdomStore((state) => state.initAuth);
+  const fetchExpenseVariance = useKingdomStore((state) => state.fetchExpenseVariance);
+  const expenseVarianceData = useKingdomStore((state) => state.expenseVarianceData);
+  const fetchSavingsRate = useKingdomStore((state) => state.fetchSavingsRate);
+  const savingsRateData = useKingdomStore((state) => state.savingsRateData);
+  const fetchRunwayData = useKingdomStore((state) => state.fetchRunwayData);
+  const runwayData = useKingdomStore((state) => state.runwayData);
 
   const coaSubtypesAndEntities = useMemo(() => {
     const subtypes = new Set();
@@ -609,6 +615,14 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const totalOverdueExpensesCount = pendingExpenseList.filter(tx => tx.payment_status === 'Overdue').length;
   const overdueRate = totalPendingExpensesCount > 0 ? (totalOverdueExpensesCount / totalPendingExpensesCount) * 100 : 0;
 
+
+  // Fetch expense variance, savings rate, and runway data from Supabase RPC whenever dashboard date filters change
+  useEffect(() => {
+    const userId = user?.id || GUEST_PROFILE_ID;
+    fetchExpenseVariance(selectedYears, selectedQuarters, selectedMonths);
+    fetchSavingsRate(selectedYears, selectedQuarters, selectedMonths);
+    fetchRunwayData(selectedYears, selectedQuarters, selectedMonths);
+  }, [user?.id, selectedYears, selectedQuarters, selectedMonths, fetchExpenseVariance, fetchSavingsRate, fetchRunwayData]);
 
   // Initialize auth state and listen for session transitions
   useEffect(() => {
@@ -1945,11 +1959,171 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
               >
                 {/* SUBTAB: OVERVIEW & RATIOS */}
                 {dashSubTab === 'overview' && (
-                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
-                    <div className="text-6xl">⚖️</div>
-                    <div className="space-y-1">
-                      <h3 className="title-font text-xl font-black text-[#4b2c20] uppercase tracking-widest">Financial Ratios</h3>
-                      <p className="text-xs font-serif italic text-[#5d4037]">Under construction by order of the Royal Treasurer.</p>
+                  <div className="w-full max-w-4xl mx-auto py-2">
+                    <div className="bg-[#faf4e5]/90 border-2 border-[#8b4513]/30 rounded-xl p-5 shadow-inner">
+                      <h3 className="font-serif font-black text-sm text-[#4b2c20] uppercase tracking-wider mb-4 border-b border-[#8b4513]/25 pb-2 flex items-center gap-2">
+                        ⚖️ {t('metrics.overview_ratios', 'Overview & Ratios')}
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {/* Expense Variance Card */}
+                        <div className="bg-[#faf4e5] border border-[#8b4513]/25 rounded-lg p-4 shadow-sm flex flex-col justify-between relative overflow-hidden text-left">
+                          {/* Decorative subtle shield/scroll icon */}
+                          <div className="absolute right-3 top-3 text-[#8b4513]/10 text-5xl pointer-events-none font-serif">
+                            🛡️
+                          </div>
+                          
+                          <div>
+                            <span className="block text-[9px] font-black uppercase text-[#5d4037]/70 tracking-wider font-sans mb-1">
+                              {t('metrics.expense_variance', 'Expense Variance (PoP)')}
+                            </span>
+                            <div className="flex items-baseline gap-2 mt-1">
+                              <span className="text-2xl font-mono font-black text-[#4b2c20]">
+                                {Number(expenseVarianceData?.current_period_expenses || 0).toLocaleString()}g
+                              </span>
+                              <span className="text-[10px] text-[#5d4037]/60 font-serif italic">
+                                {t('metrics.current_period', 'Current Period')}
+                              </span>
+                            </div>
+                            
+                            <div className="text-[10px] text-[#5d4037]/75 font-bold font-sans mt-3 space-y-1">
+                              <div>
+                                {t('metrics.previous_period', 'Previous Period')}:{' '}
+                                <span className="font-mono text-[#4b2c20]">
+                                  {Number(expenseVarianceData?.previous_period_expenses || 0).toLocaleString()}g
+                                </span>
+                              </div>
+                              <div>
+                                {t('metrics.absolute_variance', 'Absolute Change')}:{' '}
+                                <span className={`font-mono ${expenseVarianceData?.absolute_variance > 0 ? 'text-rose-700' : expenseVarianceData?.absolute_variance < 0 ? 'text-emerald-700' : 'text-stone-500'}`}>
+                                  {expenseVarianceData?.absolute_variance > 0 ? '+' : ''}
+                                  {Number(expenseVarianceData?.absolute_variance || 0).toLocaleString()}g
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-[#8b4513]/15 flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase text-[#8b4513] tracking-widest font-sans">
+                              {t('metrics.variance_percentage', 'Growth / Reduction')}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
+                              expenseVarianceData?.percentage_variance > 0 
+                                ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                : expenseVarianceData?.percentage_variance < 0
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-stone-50 text-stone-600 border-stone-200'
+                            }`}>
+                              {expenseVarianceData?.percentage_variance > 0 ? '▲' : expenseVarianceData?.percentage_variance < 0 ? '▼' : '•'}{' '}
+                              {Math.abs(Number(expenseVarianceData?.percentage_variance || 0))}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Savings Rate Card */}
+                        <div className="bg-[#faf4e5] border border-[#8b4513]/25 rounded-lg p-4 shadow-sm flex flex-col justify-between relative overflow-hidden text-left">
+                          {/* Decorative subtle piggy bank or scroll icon */}
+                          <div className="absolute right-3 top-3 text-[#8b4513]/10 text-5xl pointer-events-none font-serif">
+                            💰
+                          </div>
+                          
+                          <div>
+                            <span className="block text-[9px] font-black uppercase text-[#5d4037]/70 tracking-wider font-sans mb-1">
+                              {t('metrics.savings_rate', 'Savings Rate')}
+                            </span>
+                            <div className="flex items-baseline gap-2 mt-1">
+                              <span className={`text-2xl font-mono font-black ${savingsRateData?.savings_rate_percentage >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {savingsRateData?.savings_rate_percentage > 0 ? '+' : ''}
+                                {Number(savingsRateData?.savings_rate_percentage || 0).toFixed(2)}%
+                              </span>
+                            </div>
+                            
+                            <div className="text-[10px] text-[#5d4037]/75 font-bold font-sans mt-3 space-y-1">
+                              <div>
+                                {t('metrics.total_income', 'Total Income')}:{' '}
+                                <span className="font-mono text-[#4b2c20]">
+                                  {Number(savingsRateData?.total_income || 0).toLocaleString()}g
+                                </span>
+                              </div>
+                              <div>
+                                {t('metrics.total_expenses', 'Total Expenses')}:{' '}
+                                <span className="font-mono text-[#4b2c20]">
+                                  {Number(savingsRateData?.total_expenses || 0).toLocaleString()}g
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-[#8b4513]/15 flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase text-[#8b4513] tracking-widest font-sans">
+                              {t('metrics.savings_status', 'Treasury Health')}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${
+                              savingsRateData?.savings_rate_percentage >= 20 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : savingsRateData?.savings_rate_percentage >= 0
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}>
+                              {savingsRateData?.savings_rate_percentage >= 20 
+                                ? t('metrics.healthy', 'Healthy') 
+                                : savingsRateData?.savings_rate_percentage >= 0 
+                                  ? t('metrics.caution', 'Caution') 
+                                  : t('metrics.deficit', 'Deficit')}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Burn Rate & Runway Card */}
+                        <div className="bg-[#faf4e5] border border-[#8b4513]/25 rounded-lg p-4 shadow-sm flex flex-col justify-between relative overflow-hidden text-left">
+                          {/* Decorative subtle hour glass / fire icon */}
+                          <div className="absolute right-3 top-3 text-[#8b4513]/10 text-5xl pointer-events-none font-serif">
+                            ⏳
+                          </div>
+                          
+                          <div>
+                            <span className="block text-[9px] font-black uppercase text-[#5d4037]/70 tracking-wider font-sans mb-1">
+                              {t('metrics.runway', 'Kingdom Runway')}
+                            </span>
+                            <div className="flex flex-col gap-1 mt-1">
+                              <span className="text-xs font-serif font-black text-rose-700">
+                                🔥 {Number(runwayData?.monthly_burn_rate || 0).toLocaleString()}g / mo
+                              </span>
+                              <span className={`text-2xl font-mono font-black ${runwayData?.runway_months >= 6 ? 'text-emerald-700' : runwayData?.runway_months >= 3 ? 'text-amber-700' : 'text-rose-700'}`}>
+                                ⏳ {runwayData?.runway_months === 99.0 ? '> 99' : runwayData?.runway_months || 0} {t('metrics.months', 'Months')}
+                              </span>
+                            </div>
+                            
+                            <div className="text-[10px] text-[#5d4037]/75 font-bold font-sans mt-3 space-y-1">
+                              <div>
+                                {t('metrics.liquid_cash', 'Liquid Cash')}:{' '}
+                                <span className="font-mono text-[#4b2c20]">
+                                  {Number(runwayData?.liquid_cash || 0).toLocaleString()}g
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-[#8b4513]/15 flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase text-[#8b4513] tracking-widest font-sans">
+                              {t('metrics.runway_status', 'Survival Outlook')}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${
+                              runwayData?.runway_months >= 6 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : runwayData?.runway_months >= 3
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}>
+                              {runwayData?.runway_months >= 6 
+                                ? t('metrics.secure', 'Secure') 
+                                : runwayData?.runway_months >= 3 
+                                  ? t('metrics.caution', 'Caution') 
+                                  : t('metrics.critical', 'Critical')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
