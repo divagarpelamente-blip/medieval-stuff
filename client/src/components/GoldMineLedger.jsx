@@ -1,5 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, memo, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 import { Z_LAYERS, STANDARD_MODAL_PROPS } from '../constants/UI_UX';
@@ -9,6 +8,163 @@ import TableSortHeader from './shared/TableSortHeader';
 import { accountMappings } from '../utils/accountMappings';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
+
+const TransactionRow = memo(({
+  tx,
+  isTxEditing,
+  isSelected,
+  editingTx,
+  classOptions,
+  categoryOptions,
+  entityOptions,
+  entityMappings,
+  onEditTransaction,
+  onToggleSelect,
+  onFieldChange,
+  isEditing,
+  t
+}) => {
+  if (isTxEditing) {
+    return (
+      <tr className="hover:bg-[#8b4513]/5 transition-colors bg-[#faf4e5]/80">
+        <td className="py-2 px-3 whitespace-nowrap w-8">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(tx.id)}
+            className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
+          />
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap">
+          <select
+            value={editingTx?.payment_status || 'Completed'}
+            onChange={e => onFieldChange(tx.id, 'payment_status', e.target.value)}
+            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+          >
+            {['Completed', 'Pending', 'Overdue', 'Paid on Time', 'Paid Late', 'Open', 'Paid'].map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap">
+          <input
+            type="date"
+            value={editingTx?.posting_date || ''}
+            onChange={e => onFieldChange(tx.id, 'posting_date', e.target.value)}
+            className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+          />
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap">
+          <input
+            type="text"
+            value={editingTx?.from || ''}
+            onChange={e => onFieldChange(tx.id, 'from', e.target.value)}
+            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+          />
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap">
+          <select
+            value={editingTx?.transaction_type || 'Income'}
+            onChange={e => onFieldChange(tx.id, 'transaction_type', e.target.value)}
+            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+          >
+            {classOptions.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap">
+          <select
+            value={editingTx?.transaction_category || ''}
+            onChange={e => onFieldChange(tx.id, 'transaction_category', e.target.value)}
+            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+          >
+            <option value="">-</option>
+            {categoryOptions.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap">
+          <select
+            value={editingTx?.entity || ''}
+            onChange={e => onFieldChange(tx.id, 'entity', e.target.value)}
+            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
+          >
+            <option value="">-</option>
+            {entityOptions.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap">
+          <input
+            type="number"
+            value={editingTx?.amount || 0}
+            onChange={e => onFieldChange(tx.id, 'amount', e.target.value)}
+            className="w-20 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-mono text-right"
+          />
+        </td>
+        <td className="py-2 px-3 whitespace-nowrap text-right"></td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="hover:bg-[#8b4513]/5 transition-colors">
+      <td className="py-2 px-3 whitespace-nowrap w-8">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(tx.id)}
+          disabled={isEditing && !isSelected}
+          className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
+        />
+      </td>
+      <td className="py-2 px-3 whitespace-nowrap">
+        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+          tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+          tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+          tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+          tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
+          'bg-stone-100 text-stone-800 border border-stone-200'
+        }`}>
+          {tx.payment_status || 'Completed'}
+        </span>
+      </td>
+      <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.posting_date || tx.value_date || '-'}</td>
+      <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
+      <td className="py-2 px-3 whitespace-nowrap">
+        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+          tx.flow === 'inflow' 
+            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+            : tx.flow === 'outflow'
+              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+              : 'bg-stone-100 text-stone-800 border border-stone-200'
+        }`}>
+          {tx.transaction_type}
+        </span>
+      </td>
+      <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_category || entityMappings[tx.entity] || '-'}</td>
+      <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
+      <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
+        tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')
+      }`}>
+        {tx.flow === 'inflow' ? '+' : (tx.flow === 'outflow' ? '-' : '')}{Number(tx.amount).toLocaleString()}g
+      </td>
+      <td className="py-2 px-3 whitespace-nowrap text-right">
+        <button
+          type="button"
+          onClick={() => onEditTransaction(tx)}
+          className="text-[#b8860b] hover:text-[#d4af37] font-black px-2 py-0.5 rounded border border-[#8b4513]/25 hover:bg-[#8b4513]/10 transition-all cursor-pointer"
+          title="Edit Transaction"
+        >
+          ✏️
+        </button>
+      </td>
+    </tr>
+  );
+});
 
 export default function GoldMineLedger({
   t,
@@ -147,7 +303,7 @@ export default function GoldMineLedger({
     setEditingTxs({});
   };
 
-  const handleFieldChange = (txId, field, value) => {
+  const handleFieldChange = useCallback((txId, field, value) => {
     setEditingTxs(prev => {
       const updatedTx = { ...prev[txId], [field]: value };
       if (field === 'entity' && entityMappings[value]) {
@@ -158,7 +314,15 @@ export default function GoldMineLedger({
         [txId]: updatedTx
       };
     });
-  };
+  }, [entityMappings]);
+
+  const handleToggleSelect = useCallback((txId) => {
+    setSelectedTxIds(prev =>
+      prev.includes(txId)
+        ? prev.filter(id => id !== txId)
+        : [...prev, txId]
+    );
+  }, []);
 
   const handleSaveEdits = async () => {
     const toastId = toast.loading(t('saving_ledger') || 'Saving ledger changes...');
@@ -649,161 +813,24 @@ export default function GoldMineLedger({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                    {sortedTransactions.map((tx) => {
-                      const isTxEditing = isEditing && selectedTxIds.includes(tx.id);
-                      if (isTxEditing) {
-                        return (
-                          <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors bg-[#faf4e5]/80">
-                            <td className="py-2 px-3 whitespace-nowrap w-8">
-                              <input
-                                type="checkbox"
-                                checked={selectedTxIds.includes(tx.id)}
-                                onChange={() => {
-                                  setSelectedTxIds(prev => 
-                                    prev.includes(tx.id) 
-                                      ? prev.filter(id => id !== tx.id) 
-                                      : [...prev, tx.id]
-                                  );
-                                }}
-                                className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
-                              />
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <select
-                                value={editingTxs[tx.id]?.payment_status || 'Completed'}
-                                onChange={e => handleFieldChange(tx.id, 'payment_status', e.target.value)}
-                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              >
-                                {['Completed', 'Pending', 'Overdue', 'Paid on Time', 'Paid Late', 'Open', 'Paid'].map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <input
-                                type="date"
-                                value={editingTxs[tx.id]?.posting_date || ''}
-                                onChange={e => handleFieldChange(tx.id, 'posting_date', e.target.value)}
-                                className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              />
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <input
-                                type="text"
-                                value={editingTxs[tx.id]?.from || ''}
-                                onChange={e => handleFieldChange(tx.id, 'from', e.target.value)}
-                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              />
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <select
-                                value={editingTxs[tx.id]?.transaction_type || 'Income'}
-                                onChange={e => handleFieldChange(tx.id, 'transaction_type', e.target.value)}
-                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              >
-                                {classOptions.map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <select
-                                value={editingTxs[tx.id]?.transaction_category || ''}
-                                onChange={e => handleFieldChange(tx.id, 'transaction_category', e.target.value)}
-                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              >
-                                <option value="">-</option>
-                                {categoryOptions.map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <select
-                                value={editingTxs[tx.id]?.entity || ''}
-                                onChange={e => handleFieldChange(tx.id, 'entity', e.target.value)}
-                                className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              >
-                                <option value="">-</option>
-                                {entityOptions.map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <input
-                                type="number"
-                                value={editingTxs[tx.id]?.amount || 0}
-                                onChange={e => handleFieldChange(tx.id, 'amount', e.target.value)}
-                                className="w-20 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-mono text-right"
-                              />
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap text-right"></td>
-                          </tr>
-                        );
-                      }
-
-                      return (
-                        <tr key={tx.id} className="hover:bg-[#8b4513]/5 transition-colors">
-                          <td className="py-2 px-3 whitespace-nowrap w-8">
-                            <input
-                              type="checkbox"
-                              checked={selectedTxIds.includes(tx.id)}
-                              onChange={() => {
-                                setSelectedTxIds(prev => 
-                                  prev.includes(tx.id) 
-                                    ? prev.filter(id => id !== tx.id) 
-                                    : [...prev, tx.id]
-                                );
-                              }}
-                              disabled={isEditing && !selectedTxIds.includes(tx.id)}
-                              className="w-3.5 h-3.5 rounded border border-[#8b4513]/30 accent-[#8b4513] cursor-pointer"
-                            />
-                          </td>
-                          <td className="py-2 px-3 whitespace-nowrap">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                              tx.payment_status === 'Completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                              tx.payment_status === 'Paid on Time' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
-                              tx.payment_status === 'Pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                              tx.payment_status === 'Overdue' ? 'bg-red-100 text-red-800 border border-red-200' :
-                              'bg-stone-100 text-stone-800 border border-stone-200'
-                            }`}>
-                              {tx.payment_status || 'Completed'}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.posting_date || tx.value_date || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                              tx.flow === 'inflow' 
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                : tx.flow === 'outflow'
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  : 'bg-stone-100 text-stone-800 border border-stone-200'
-                            }`}>
-                              {tx.transaction_type}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_category || entityMappings[tx.entity] || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
-                          <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
-                            tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')
-                          }`}>
-                            {tx.flow === 'inflow' ? '+' : (tx.flow === 'outflow' ? '-' : '')}{Number(tx.amount).toLocaleString()}g
-                          </td>
-                          <td className="py-2 px-3 whitespace-nowrap text-right">
-                            <button
-                              type="button"
-                              onClick={() => onEditTransaction(tx)}
-                              className="text-[#b8860b] hover:text-[#d4af37] font-black px-2 py-0.5 rounded border border-[#8b4513]/25 hover:bg-[#8b4513]/10 transition-all cursor-pointer"
-                              title="Edit Transaction"
-                            >
-                              ✏️
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {sortedTransactions.map((tx) => (
+                      <TransactionRow
+                        key={tx.id}
+                        tx={tx}
+                        isTxEditing={isEditing && selectedTxIds.includes(tx.id)}
+                        isSelected={selectedTxIds.includes(tx.id)}
+                        editingTx={editingTxs[tx.id]}
+                        classOptions={classOptions}
+                        categoryOptions={categoryOptions}
+                        entityOptions={entityOptions}
+                        entityMappings={entityMappings}
+                        onEditTransaction={onEditTransaction}
+                        onToggleSelect={handleToggleSelect}
+                        onFieldChange={handleFieldChange}
+                        isEditing={isEditing}
+                        t={t}
+                      />
+                    ))}
                   </tbody>
                 </table>
               </>
