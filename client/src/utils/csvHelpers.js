@@ -196,11 +196,17 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
           const normHeader = header.trim().toLowerCase();
           
           if (normHeader === 'id') {
-            tx.id = val || null;
+            // Ignore ID from CSV to ensure every imported row is treated as a new unique transaction
+            tx.id = null;
           } else if (normHeader === 'profile_id') {
             tx.profile_id = val || null;
           } else if (normHeader === 'amount' || normHeader === 'ouro' || normHeader === 'coins') {
             let cleanAmt = val.trim().replace(/\s/g, '');
+            let isNegative = false;
+            if (cleanAmt.startsWith('(') && cleanAmt.endsWith(')')) {
+              isNegative = true;
+              cleanAmt = cleanAmt.slice(1, -1);
+            }
             if (cleanAmt.includes(',') && cleanAmt.includes('.')) {
               if (cleanAmt.lastIndexOf(',') > cleanAmt.lastIndexOf('.')) {
                 cleanAmt = cleanAmt.replace(/\./g, '').replace(/,/g, '.');
@@ -210,7 +216,13 @@ export const handleImportCSV = (e, { t, fromOptions, registerTransactions, GUEST
             } else if (cleanAmt.includes(',')) {
               cleanAmt = cleanAmt.replace(/,/g, '.');
             }
-            tx.amount = Number(cleanAmt) || 0;
+            let parsedNum = Number(cleanAmt) || 0;
+            if (parsedNum < 0 || isNegative) {
+              tx.amount = Math.abs(parsedNum);
+              tx.flow = 'outflow';
+            } else {
+              tx.amount = parsedNum;
+            }
           } else if (normHeader === 'from' || normHeader === 'from (origem)' || normHeader === 'origin') {
             tx.from = val;
           } else if (normHeader === 'value_date' || normHeader === 'value date' || normHeader === 'date' || normHeader === 'data') {

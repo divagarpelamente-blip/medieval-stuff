@@ -21,7 +21,39 @@ const monthNames = [
 
 export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberCompact, selectedYears = [], selectedQuarters = [], selectedMonths = [] }) {
   const allTxs = useKingdomStore(state => state.transactions) || [];
-  const subtypeToCategoryMap = useKingdomStore(state => state.subtypeToCategoryMap) || {};
+  const storeSubtypeToCategoryMap = useKingdomStore(state => state.subtypeToCategoryMap) || {};
+  const defaultSubtypeToCategoryMap = {
+    "Banks": ["Bank account", "Savings account", "Investments account"],
+    "Fixed Assets": ["Fixed Assets"],
+    "Personal Debt": ["Loans & Burrow", "Credit Cards"],
+    "Other Debts": ["Other Debts"],
+    "Living & Household": ["Household", "Utilities"],
+    "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
+    "Public Transports": ["Public Transports"],
+    "Other Transports": ["Other Transports"],
+    "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
+    "Health": ["Health"],
+    "Entertainment": ["Entertainment"],
+    "Education": ["Education"],
+    "Insurances": ["Insurances"],
+    "Taxes & State": ["Taxes", "Interest"],
+    "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
+    "Payroll": ["Salary", "Payroll Subsidies"],
+    "Other Income": ["Other Incomes"],
+    "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
+  };
+  const subtypeToCategoryMap = {};
+  const allSubtypes = new Set([
+    ...Object.keys(defaultSubtypeToCategoryMap),
+    ...Object.keys(storeSubtypeToCategoryMap)
+  ]);
+  allSubtypes.forEach(sub => {
+    subtypeToCategoryMap[sub] = Array.from(new Set([
+      ...(storeSubtypeToCategoryMap[sub] || []),
+      ...(defaultSubtypeToCategoryMap[sub] || [])
+    ]));
+  });
+
   const subtypeTypes = useKingdomStore(state => state.subtypeTypes) || {};
 
   const TYPE_SUBTYPES = {
@@ -64,7 +96,8 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Expanded nodes state
   const [expandedNodes, setExpandedNodes] = useState({
     '7': true,
-    '6': true
+    '6': true,
+    '8': true
   });
 
   const isNodeExpanded = (code) => {
@@ -82,13 +115,14 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
     const nextExpanded = {};
     const traverse = (nodeCode, level) => {
       nextExpanded[nodeCode] = level < targetLevel;
-      const node = { ...revenueNodes[nodeCode], ...expenseNodes[nodeCode] };
+      const node = { ...revenueNodes[nodeCode], ...expenseNodes[nodeCode], ...debtManagementNodes[nodeCode] };
       if (node && node.children) {
         node.children.forEach(child => traverse(child, level + 1));
       }
     };
-    traverse('7', 1);
+    traverse('8', 1);
     traverse('6', 1);
+    traverse('7', 1);
     setExpandedNodes(nextExpanded);
   };
 
@@ -106,7 +140,10 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
 
   const buildHierarchy = (flatList, rootCode) => {
     const nodes = {};
-    const rootName = rootCode === '7' ? 'Revenues' : 'Expenses';
+    const rootName = 
+      rootCode === '7' ? 'Revenues' : 
+      rootCode === '8' ? 'Debt Expenditure' : 
+      'Expenses';
 
     // Initialize root node
     nodes[rootCode] = {
@@ -206,11 +243,32 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
     return list;
   };
 
-  // Determine current active filter values based on today's calendar date
+  // Determine current active filter values based on selected filters or today's calendar date
   const today = new Date();
-  const activeYear = String(today.getFullYear());
-  const activeMonth = monthNames[today.getMonth()];
-  const activeQuarter = 'Q' + (Math.floor(today.getMonth() / 3) + 1);
+  const activeYear = selectedYears.length > 0 ? String(selectedYears[0]) : String(today.getFullYear());
+  const activeMonth = selectedMonths.length > 0 ? selectedMonths[0] : monthNames[today.getMonth()];
+  const activeQuarter = selectedQuarters.length > 0 ? selectedQuarters[0] : 'Q' + (Math.floor(today.getMonth() / 3) + 1);
+
+  // Period helpers (aligned with Balance Sheet)
+  const isBeforeOrInMonth = (txYear, txMonth, targetYear, targetMonth) => {
+    const ty = Number(targetYear);
+    const my = Number(txYear);
+    if (my < ty) return true;
+    if (my > ty) return false;
+    return monthNames.indexOf(txMonth) <= monthNames.indexOf(targetMonth);
+  };
+
+  const isBeforeOrInQuarter = (txYear, txQuarter, targetYear, targetQuarter) => {
+    const ty = Number(targetYear);
+    const my = Number(txYear);
+    if (my < ty) return true;
+    if (my > ty) return false;
+    return txQuarter <= targetQuarter;
+  };
+
+  const isBeforeOrInYear = (txYear, targetYear) => {
+    return Number(txYear) <= Number(targetYear);
+  };
 
   // Calculate previous period details
   const getPreviousPeriod = (year, quarter, month, type) => {
@@ -259,26 +317,30 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Helper to filter completed transactions in a specific period
   const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
 
-  const getPLBalances = (years, quarters, months, isExactSinglePeriod = false, exactYear = '', exactQuarter = '', exactMonth = '', type = 'M') => {
+  const getPLBalances = (targetYear, targetQuarter, targetMonth, type, mode = 'exact') => {
     const filterTx = (tx) => {
       if (!isCompleted(tx.payment_status)) return false;
+      if (tx.flow === 'neutral') return false;
       const txYear = String(tx.year || new Date(tx.posting_date).getFullYear());
       const txMonth = tx.month || new Date(tx.posting_date).toLocaleString('default', { month: 'long' });
       const txQuarter = tx.quarter || 'Q' + (Math.floor(new Date(tx.posting_date).getMonth() / 3) + 1);
 
-      if (isExactSinglePeriod) {
+      if (mode === 'exact') {
         if (type === 'M') {
-          return txYear === String(exactYear) && txMonth === exactMonth;
+          return txYear === String(targetYear) && txMonth === targetMonth;
         } else if (type === 'Q') {
-          return txYear === String(exactYear) && txQuarter === exactQuarter;
+          return txYear === String(targetYear) && txQuarter === targetQuarter;
         } else {
-          return txYear === String(exactYear);
+          return txYear === String(targetYear);
         }
       } else {
-        const matchYear = years.length === 0 || years.includes(txYear);
-        const matchQuarter = quarters.length === 0 || quarters.includes(txQuarter);
-        const matchMonth = months.length === 0 || months.includes(txMonth);
-        return matchYear && matchQuarter && matchMonth;
+        if (type === 'M') {
+          return isBeforeOrInMonth(txYear, txMonth, targetYear, targetMonth);
+        } else if (type === 'Q') {
+          return isBeforeOrInQuarter(txYear, txQuarter, targetYear, targetQuarter);
+        } else {
+          return isBeforeOrInYear(txYear, targetYear);
+        }
       }
     };
 
@@ -301,11 +363,70 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
     return balances;
   };
 
-  const selectedBalances = getPLBalances(selectedYears, selectedQuarters, selectedMonths, false);
-  const currentBalances = getPLBalances([], [], [], true, activeYear, activeQuarter, activeMonth, compareMode);
-  const previousBalances = getPLBalances([], [], [], true, prevYear, prevQuarter, prevMonth, compareMode);
+  const getDebtManagementForPeriod = (targetYear, targetQuarter, targetMonth, type, mode = 'exact') => {
+    const filterTx = (tx) => {
+      if (!isCompleted(tx.payment_status)) return false;
+      if (tx.flow === 'neutral') return false;
+      const txYear = String(tx.year || new Date(tx.posting_date).getFullYear());
+      const txMonth = tx.month || new Date(tx.posting_date).toLocaleString('default', { month: 'long' });
+      const txQuarter = tx.quarter || 'Q' + (Math.floor(new Date(tx.posting_date).getMonth() / 3) + 1);
+
+      if (mode === 'exact') {
+        if (type === 'M') return txYear === String(targetYear) && txMonth === targetMonth;
+        if (type === 'Q') return txYear === String(targetYear) && txQuarter === targetQuarter;
+        return txYear === String(targetYear);
+      } else {
+        if (type === 'M') return isBeforeOrInMonth(txYear, txMonth, targetYear, targetMonth);
+        if (type === 'Q') return isBeforeOrInQuarter(txYear, txQuarter, targetYear, targetQuarter);
+        return isBeforeOrInYear(txYear, targetYear);
+      }
+    };
+
+    const txs = allTxs.filter(filterTx);
+    let newDebt = 0;
+    let amortization = 0;
+
+    txs.forEach(tx => {
+      const src = tx.source_dest_bank || '';
+      const tgt = tx.target_account || '';
+      const isLiabAccount = src.startsWith('2') || tgt.startsWith('2');
+
+      if (isLiabAccount) {
+        const amt = Number(tx.amount) || 0;
+        if (tx.flow === 'inflow') {
+          newDebt += amt;
+        } else if (tx.flow === 'outflow') {
+          amortization += amt;
+        }
+      }
+    });
+
+    return { newDebt, amortization };
+  };
+
+  const currentDebt = getDebtManagementForPeriod(activeYear, activeQuarter, activeMonth, compareMode, 'exact');
+  const previousDebt = getDebtManagementForPeriod(prevYear, prevQuarter, prevMonth, compareMode, 'exact');
+  const accumulatedDebt = getDebtManagementForPeriod(activeYear, activeQuarter, activeMonth, compareMode, 'accumulated');
+
+  const currentBalances = getPLBalances(activeYear, activeQuarter, activeMonth, compareMode, 'exact');
+  const previousBalances = getPLBalances(prevYear, prevQuarter, prevMonth, compareMode, 'exact');
+  const accumulatedBalances = getPLBalances(activeYear, activeQuarter, activeMonth, compareMode, 'accumulated');
 
   const sumNodeBalance = (nodeCode, balancesMap) => {
+    let debtData = accumulatedDebt;
+    if (balancesMap === currentBalances) debtData = currentDebt;
+    if (balancesMap === previousBalances) debtData = previousDebt;
+
+    if (nodeCode === '8') {
+      return debtData.amortization - debtData.newDebt;
+    }
+    if (nodeCode === '8_new_debt') {
+      return debtData.newDebt;
+    }
+    if (nodeCode === '8_amortization') {
+      return debtData.amortization;
+    }
+
     let sum = 0;
     Object.entries(balancesMap).forEach(([code, val]) => {
       if (code.startsWith(nodeCode)) {
@@ -318,7 +439,7 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Build tree nodes
   const flatRevenues = [];
   const flatExpenses = [];
-  Object.entries(selectedBalances).forEach(([code, bal]) => {
+  Object.entries(accumulatedBalances).forEach(([code, bal]) => {
     if (code.startsWith('7')) {
       flatRevenues.push({
         code,
@@ -336,6 +457,31 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
 
   const revenueNodes = buildHierarchy(flatRevenues, '7');
   const expenseNodes = buildHierarchy(flatExpenses, '6');
+
+  // Manually construct Debt Overview nodes
+  const debtManagementNodes = {
+    '8': {
+      code: '8',
+      name: 'Debt Overview',
+      level: 1,
+      balance: accumulatedDebt.amortization - accumulatedDebt.newDebt,
+      children: ['8_new_debt', '8_amortization']
+    },
+    '8_new_debt': {
+      code: '8_new_debt',
+      name: 'New debt',
+      level: 2,
+      balance: accumulatedDebt.newDebt,
+      children: []
+    },
+    '8_amortization': {
+      code: '8_amortization',
+      name: 'Amortization',
+      level: 2,
+      balance: accumulatedDebt.amortization,
+      children: []
+    }
+  };
 
   // Left Header Controls Render (Levels and Zero Hider)
   const renderLeftHeaderControls = (hasLevelSelect = true) => {
@@ -398,14 +544,14 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   const renderUnifiedHeader = () => {
     return (
       <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[9px] uppercase tracking-wider mb-2">
-        <div className="w-[50%] flex justify-between pr-4">
-          <span></span>
-          <span></span>
+        <div className="w-[38%] flex justify-between pr-4">
+          <span>Name</span>
         </div>
-        <div className="w-[50%] flex justify-end gap-4 text-right">
+        <div className="w-[62%] flex justify-end gap-4 text-right">
           <span className="w-[65px]">{col1Header}</span>
           <span className="w-[65px]">{col2Header}</span>
           <span className="w-[70px]">Difference</span>
+          <span className="w-[75px]">Accumulated</span>
         </div>
       </div>
     );
@@ -414,6 +560,39 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
   // Render unified statement rows containing both left-side normal value and right-side comparison columns
   const renderStatementRows = (nodes, rootCode) => {
     const list = getRenderList(nodes, rootCode);
+
+    const formatCustomValue = (code, val) => {
+      const num = Number(val) || 0;
+      const absFormatted = Math.abs(num).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).replace(/,/g, ' ');
+
+      if (code === '8' || code === '8_new_debt' || code === '8_amortization') {
+        if (num === 0) return '0.00';
+        if (code === '8_new_debt') {
+          return `(${absFormatted})`;
+        } else if (code === '8_amortization') {
+          return `+ ${absFormatted}`;
+        } else {
+          return num < 0 ? `(${absFormatted})` : `+ ${absFormatted}`;
+        }
+      }
+      return formatNumberCompact(val);
+    };
+
+    const formatCustomDiff = (code, val) => {
+      if (code === '8' || code === '8_new_debt' || code === '8_amortization') {
+        const num = Number(val) || 0;
+        const absFormatted = Math.abs(num).toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).replace(/,/g, ' ');
+        if (num === 0) return '0.00';
+        return num < 0 ? `(${absFormatted})` : `+ ${absFormatted}`;
+      }
+      return val > 0 ? `+${formatNumberCompact(val).replace('+', '')}` : formatNumberCompact(val);
+    };
 
     return list.map((node) => {
       const hasChildren = node.children.length > 0;
@@ -430,13 +609,15 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
       const previousVal = sumNodeBalance(node.code, previousBalances);
       const diff = currentVal - previousVal;
 
+      const isGreen = node.code.startsWith('7') || node.code === '8_amortization' || (node.code === '8' && sumNodeBalance('8', currentBalances) >= 0);
+
       return (
         <div
           key={node.code}
           className={`flex justify-between items-center py-1 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors duration-150 ${node.level === 1 ? 'bg-[#8b4513]/5 mt-2 rounded px-1' : ''}`}
         >
-          {/* Left Side (50% Width) - Name and Sidebar Value */}
-          <div className="w-[50%] flex justify-between items-center pr-4">
+          {/* Left Side (38% Width) - Name only */}
+          <div className="w-[38%] flex justify-between items-center pr-4">
             <div className={`flex items-center gap-1.5 ${indentClass}`}>
               <span>{icon}</span>
               <span>{node.name}</span>
@@ -450,27 +631,25 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
                 </button>
               )}
             </div>
-            <span className={`font-mono font-bold ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'} text-[10px]`}>
-              {formatNumberCompact(node.balance)}
-            </span>
           </div>
 
-          {/* Right Side (50% Width) - Comparative Columns */}
-          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
-            <span className={`w-[65px] ${node.code.startsWith('7') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
-            <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
+          {/* Right Side (62% Width) - Comparative Columns + Accumulated */}
+          <div className="w-[62%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
+            <span className={`w-[65px] ${isGreen ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCustomValue(node.code, currentVal)}</span>
+            <span className="w-[65px] text-[#5d4037]/70">{formatCustomValue(node.code, previousVal)}</span>
             <span className={`w-[70px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
+              {formatCustomDiff(node.code, diff)}
             </span>
+            <span className={`w-[75px] ${isGreen ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCustomValue(node.code, node.balance)}</span>
           </div>
         </div>
       );
     });
   };
 
-  const selNet = sumNodeBalance('7', selectedBalances) - sumNodeBalance('6', selectedBalances);
-  const curNet = sumNodeBalance('7', currentBalances) - sumNodeBalance('6', currentBalances);
-  const prevNet = sumNodeBalance('7', previousBalances) - sumNodeBalance('6', previousBalances);
+  const selNet = sumNodeBalance('7', accumulatedBalances) - sumNodeBalance('6', accumulatedBalances) + sumNodeBalance('8', accumulatedBalances);
+  const curNet = sumNodeBalance('7', currentBalances) - sumNodeBalance('6', currentBalances) + sumNodeBalance('8', currentBalances);
+  const prevNet = sumNodeBalance('7', previousBalances) - sumNodeBalance('6', previousBalances) + sumNodeBalance('8', previousBalances);
   const diffNet = curNet - prevNet;
 
   return (
@@ -485,10 +664,10 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
 
       <div className="space-y-6">
 
-        {/* Revenues Section */}
+        {/* Debt Overview Section */}
         <div className="space-y-3">
           <div className="space-y-1 text-[10px]">
-            {renderStatementRows(revenueNodes, '7')}
+            {renderStatementRows(debtManagementNodes, '8')}
           </div>
         </div>
 
@@ -499,26 +678,31 @@ export default function RoyalIncomeStatement({ incomeStatement, t, formatNumberC
           </div>
         </div>
 
+        {/* Revenues Section */}
+        <div className="space-y-3">
+          <div className="space-y-1 text-[10px]">
+            {renderStatementRows(revenueNodes, '7')}
+          </div>
+        </div>
+
         {/* Net Summary Footer */}
         <div className="flex justify-between items-center bg-[#f4e4bc]/50 border border-[#8b4513]/15 rounded-lg p-2 mt-2">
-          {/* Left Side (50% Width) - Name and Sidebar Value */}
-          <div className="w-[50%] flex justify-between items-center pr-4">
+          {/* Left Side (38% Width) - Name only */}
+          <div className="w-[38%] flex justify-between items-center pr-4">
             <div className="pl-0 font-black text-[#4b2c20] text-[10px] uppercase flex items-center gap-1.5">
               <span>🛡️</span>
               <span>{t('net_accrued_income', 'Net Accrued Income')}</span>
             </div>
-            <span className={`font-mono font-bold ${selNet >= 0 ? 'text-emerald-700' : 'text-rose-700'} text-[10px]`}>
-              {formatNumberCompact(selNet)}
-            </span>
           </div>
 
-          {/* Right Side (50% Width) - Comparative Columns */}
-          <div className="w-[50%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
+          {/* Right Side (62% Width) - Comparative Columns + Accumulated */}
+          <div className="w-[62%] flex justify-end gap-4 font-mono text-[9.5px] text-right font-bold">
             <span className={`w-[65px] ${curNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(curNet)}</span>
             <span className="w-[65px] text-[#5d4037]/70">{formatNumberCompact(prevNet)}</span>
             <span className={`w-[70px] ${diffNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               {diffNet > 0 ? `+${formatNumberCompact(diffNet).replace('+', '')}` : formatNumberCompact(diffNet)}
             </span>
+            <span className={`w-[75px] ${selNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(selNet)}</span>
           </div>
         </div>
 

@@ -69,6 +69,7 @@ export default function StatisticsWindow({
   };
 
   const prevPeriod = useMemo(() => getPrevMonthAndYear(activeMonth, activeYear), [activeMonth, activeYear]);
+  const prevPrevPeriod = useMemo(() => getPrevMonthAndYear(prevPeriod.month, prevPeriod.year), [prevPeriod]);
 
   // Math engines for Cash / Debt / Expenses / Income
   const stats = useMemo(() => {
@@ -91,11 +92,33 @@ export default function StatisticsWindow({
 
     // 3. Set starting cash for primary account (10101001)
     const plInflow = transactions
-      .filter(tx => tx.transaction_type === 'Income' && tx.payment_status === 'Completed')
+      .filter(tx => {
+        if (tx.payment_status !== 'Completed') return false;
+        if (tx.transaction_type === 'Income') return true;
+        if (tx.transaction_type === 'Assets' || tx.transaction_type === 'Liabilities') {
+          return tx.flow === 'inflow' && (
+            (tx.source_dest_bank && (tx.source_dest_bank.startsWith('10101') || tx.source_dest_bank.startsWith('10102'))) ||
+            (tx.target_account && (tx.target_account.startsWith('10101') || tx.target_account.startsWith('10102')))
+          );
+        }
+        return false;
+      })
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
     const plOutflow = transactions
-      .filter(tx => tx.transaction_type === 'Expense' && tx.payment_status === 'Completed')
+      .filter(tx => {
+        if (tx.payment_status !== 'Completed') return false;
+        if (tx.transaction_type === 'Expense') return true;
+        if (tx.transaction_type === 'Assets' || tx.transaction_type === 'Liabilities') {
+          return tx.flow === 'outflow' && (
+            (tx.source_dest_bank && (tx.source_dest_bank.startsWith('10101') || tx.source_dest_bank.startsWith('10102'))) ||
+            (tx.target_account && (tx.target_account.startsWith('10101') || tx.target_account.startsWith('10102')))
+          );
+        }
+        return false;
+      })
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
     const startingCash = currentGold - plInflow + plOutflow;
     balances['10101001'] = startingCash;
 
@@ -109,7 +132,8 @@ export default function StatisticsWindow({
       return false;
     };
 
-    // We want to capture balances at end of Last Month and Current Month
+    // We want to capture balances at end of Prev Prev Month, Last Month and Current Month
+    const balancesPrevPrev = { ...balances };
     const balancesPrev = { ...balances };
     const balancesCurr = { ...balances };
 
@@ -148,6 +172,10 @@ export default function StatisticsWindow({
         }
       };
 
+      // Apply to prev prev period balances if the tx date is on/before prev prev period
+      if (isBeforeOrOn(tx, prevPrevPeriod.year, prevPrevPeriod.month)) {
+        applyTx(balancesPrevPrev);
+      }
       // Apply to prev period balances if the tx date is on/before prev period
       if (isBeforeOrOn(tx, prevPeriod.year, prevPeriod.month)) {
         applyTx(balancesPrev);
@@ -174,10 +202,14 @@ export default function StatisticsWindow({
     };
 
     const getCoAMetrics = (prefix) => {
-      const curr = sumCoA(balancesCurr, prefix);
-      const prev = sumCoA(balancesPrev, prefix);
+      const currAccum = sumCoA(balancesCurr, prefix);
+      const prevAccum = sumCoA(balancesPrev, prefix);
+      const prevPrevAccum = sumCoA(balancesPrevPrev, prefix);
+
+      const curr = currAccum - prevAccum; // Monthly net change for current month
+      const prev = prevAccum - prevPrevAccum; // Monthly net change for previous month
       const diff = curr - prev;
-      const accum = curr; // Accumulated balance is the balance at the end of the current period
+      const accum = currAccum; // Accumulated balance at the end of the current period
 
       // Filter sets
       const currTxs = transactions.filter(tx => filterTx(tx, activeYear, activeMonth, selectedFrom));

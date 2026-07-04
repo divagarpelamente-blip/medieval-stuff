@@ -16,6 +16,12 @@ export function useLedgerFilters() {
   const [filterClass, setFilterClass] = useState('All');
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterEntity, setFilterEntity] = useState('All');
+  const [filterAccountCode, setFilterAccountCode] = useState('All');
+  const [filterAccountLabel, setFilterAccountLabel] = useState('');
+  const [filterBeforeOrInPeriod, setFilterBeforeOrInPeriod] = useState(false);
+  const [filterBeforeOrInYear, setFilterBeforeOrInYear] = useState('');
+  const [filterBeforeOrInMonth, setFilterBeforeOrInMonth] = useState('');
+  const [filterBeforeOrInQuarter, setFilterBeforeOrInQuarter] = useState('');
 
   // Unified Sidebar Filter state
   const [selectedYears, setSelectedYears] = useState([]);
@@ -54,14 +60,59 @@ export function useLedgerFilters() {
     new Set(transactions.map((tx) => tx.year).filter(Boolean))
   ).sort((a, b) => b - a);
 
+  // Period helper functions
+  const isBeforeOrInMonth = (txYear, txMonth, targetYear, targetMonth) => {
+    const ty = Number(targetYear);
+    const my = Number(txYear);
+    if (my < ty) return true;
+    if (my > ty) return false;
+    const allMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return allMonths.indexOf(txMonth) <= allMonths.indexOf(targetMonth);
+  };
+
+  const isBeforeOrInQuarter = (txYear, txQuarter, targetYear, targetQuarter) => {
+    const ty = Number(targetYear);
+    const my = Number(txYear);
+    if (my < ty) return true;
+    if (my > ty) return false;
+    return txQuarter <= targetQuarter;
+  };
+
+  const isBeforeOrInYear = (txYear, targetYear) => {
+    return Number(txYear) <= Number(targetYear);
+  };
+
   // Compute filtered transactions for ledger (ordered recent to oldest)
   const filteredTransactions = transactions.filter((tx) => {
-    if (filterYear !== 'All' && String(tx.year) !== filterYear) return false;
-    if (filterMonth !== 'All' && tx.month !== filterMonth) return false;
+    if (filterAccountCode !== 'All') {
+      const allowedCodes = filterAccountCode.split(',');
+      const src = tx.source_dest_bank || '';
+      const tgt = tx.target_account || '';
+      const matches = allowedCodes.some(code => src.startsWith(code) || tgt.startsWith(code));
+      if (!matches) return false;
+    }
+
+    if (filterBeforeOrInPeriod) {
+      const txYear = String(tx.year || new Date(tx.posting_date).getFullYear());
+      const txMonth = tx.month || new Date(tx.posting_date).toLocaleString('default', { month: 'long' });
+      const txQuarter = tx.quarter || 'Q' + (Math.floor(new Date(tx.posting_date).getMonth() / 3) + 1);
+
+      if (filterBeforeOrInMonth) {
+        if (!isBeforeOrInMonth(txYear, txMonth, filterBeforeOrInYear, filterBeforeOrInMonth)) return false;
+      } else if (filterBeforeOrInQuarter) {
+        if (!isBeforeOrInQuarter(txYear, txQuarter, filterBeforeOrInYear, filterBeforeOrInQuarter)) return false;
+      } else {
+        if (!isBeforeOrInYear(txYear, filterBeforeOrInYear)) return false;
+      }
+    } else {
+      if (filterYear !== 'All' && String(tx.year) !== filterYear) return false;
+      if (filterMonth !== 'All' && tx.month !== filterMonth) return false;
+    }
+
     if (filterFrom !== 'All' && tx.from !== filterFrom) return false;
     if (filterStatus !== 'All' && tx.payment_status !== filterStatus) return false;
     if (filterClass !== 'All' && tx.transaction_type !== filterClass) return false;
-    if (filterCategory !== 'All' && (entityMappings[tx.entity] || tx.transaction_category) !== filterCategory) return false;
+    if (filterCategory !== 'All' && (tx.transaction_category || entityMappings[tx.entity]) !== filterCategory) return false;
     if (filterEntity !== 'All' && tx.entity !== filterEntity) return false;
     return true;
   }).sort((a, b) => {
@@ -110,6 +161,11 @@ export function useLedgerFilters() {
     setFilterClass('All');
     setFilterCategory('All');
     setFilterEntity('All');
+    setFilterAccountCode('All');
+    setFilterBeforeOrInPeriod(false);
+    setFilterBeforeOrInYear('');
+    setFilterBeforeOrInMonth('');
+    setFilterBeforeOrInQuarter('');
   };
 
   return {
@@ -121,6 +177,12 @@ export function useLedgerFilters() {
     filterClass, setFilterClass,
     filterCategory, setFilterCategory,
     filterEntity, setFilterEntity,
+    filterAccountCode, setFilterAccountCode,
+    filterAccountLabel, setFilterAccountLabel,
+    filterBeforeOrInPeriod, setFilterBeforeOrInPeriod,
+    filterBeforeOrInYear, setFilterBeforeOrInYear,
+    filterBeforeOrInMonth, setFilterBeforeOrInMonth,
+    filterBeforeOrInQuarter, setFilterBeforeOrInQuarter,
     selectedYears, setSelectedYears,
     hasInitializedYears, setHasInitializedYears,
     selectedQuarters, setSelectedQuarters,

@@ -41,6 +41,7 @@ import SubtypeCategoryEditor from './components/SubtypeCategoryEditor';
 import GoldMineLedger from './components/GoldMineLedger';
 import FlatListEditor from './components/FlatListEditor';
 import AllActionsEditor from './components/AllActionsEditor';
+import InitialBalancesEditor from './components/InitialBalancesEditor';
 import StatisticsWindow from './components/StatisticsWindow';
 
 
@@ -174,6 +175,12 @@ function App() {
     filterClass, setFilterClass,
     filterCategory, setFilterCategory,
     filterEntity, setFilterEntity,
+    filterAccountCode, setFilterAccountCode,
+    filterAccountLabel, setFilterAccountLabel,
+    filterBeforeOrInPeriod, setFilterBeforeOrInPeriod,
+    filterBeforeOrInYear, setFilterBeforeOrInYear,
+    filterBeforeOrInMonth, setFilterBeforeOrInMonth,
+    filterBeforeOrInQuarter, setFilterBeforeOrInQuarter,
     selectedYears, setSelectedYears,
     hasInitializedYears, setHasInitializedYears,
     selectedQuarters, setSelectedQuarters,
@@ -214,6 +221,24 @@ function App() {
     handleSubmit,
     resetFormState
   } = useManualTransactionForm(setIsNewTxModalOpen);
+
+  const handleViewInLedger = (accountsList, nodeName) => {
+    setActiveTab('transactions');
+    setFilterAccountCode(accountsList.join(','));
+    setFilterAccountLabel(nodeName || '');
+    setFilterBeforeOrInPeriod(true);
+    setFilterBeforeOrInYear(selectedYears.length > 0 ? String(selectedYears[0]) : String(new Date().getFullYear()));
+    if (selectedMonths.length > 0) {
+      setFilterBeforeOrInMonth(selectedMonths[0]);
+      setFilterBeforeOrInQuarter('');
+    } else if (selectedQuarters.length > 0) {
+      setFilterBeforeOrInMonth('');
+      setFilterBeforeOrInQuarter(selectedQuarters[0]);
+    } else {
+      setFilterBeforeOrInMonth('');
+      setFilterBeforeOrInQuarter('');
+    }
+  };
 
   const {
     qaName, setQaName,
@@ -912,6 +937,15 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   };
 
   const renderSettingsPanel = () => {
+    if (selectedSettingType === 'initialBalances') {
+      return (
+        <InitialBalancesEditor
+          t={t}
+          accountMappings={accountMappings}
+        />
+      );
+    }
+
     if (selectedSettingType === 'subcategories') {
       return (
         <SubtypeCategoryEditor
@@ -1807,7 +1841,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     }
   };
 
-  const exportCSV = () => handleExportCSV(transactions, t);
+  const exportCSV = () => handleExportCSV(filteredTransactions, t);
   const importCSV = (e) => handleImportCSV(e, { t, fromOptions, registerTransactions, GUEST_PROFILE_ID });
   const importQuickActionsCSV = (e) => handleImportQuickActionsCSV(e, { t, addOption, templates });
 
@@ -1933,6 +1967,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                       { id: 'class', label: 'Categories', icon: '📁' },
                       { id: 'subcategories', label: 'Subtypes & Categories', icon: '🏷️' },
                       { id: 'coa', label: 'Chart of Accounts', icon: '📖' },
+                      { id: 'initialBalances', label: 'Initial Balances', icon: '⚖️' },
                       { id: 'quickAction', label: 'Quick Actions', icon: '⚡' },
                       { id: 'allActions', label: 'All Actions', icon: '📋' }
                     ].map((btn) => {
@@ -3030,6 +3065,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
           cashFlowStatement={engineData.cashFlowStatement}
           balanceSheet={engineData.balanceSheet}
           formatNumberCompact={formatNumberCompact}
+          onViewInLedger={handleViewInLedger}
         />
 
         <StatisticsWindow
@@ -3087,6 +3123,15 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
             setFilterCategory={setFilterCategory}
             filterEntity={filterEntity}
             setFilterEntity={setFilterEntity}
+            filterAccountCode={filterAccountCode}
+            setFilterAccountCode={setFilterAccountCode}
+            filterAccountLabel={filterAccountLabel}
+            setFilterAccountLabel={setFilterAccountLabel}
+            filterBeforeOrInPeriod={filterBeforeOrInPeriod}
+            setFilterBeforeOrInPeriod={setFilterBeforeOrInPeriod}
+            filterBeforeOrInYear={filterBeforeOrInYear}
+            filterBeforeOrInMonth={filterBeforeOrInMonth}
+            filterBeforeOrInQuarter={filterBeforeOrInQuarter}
             isFiltersExpanded={isFiltersExpanded}
             setIsFiltersExpanded={setIsFiltersExpanded}
             uniqueYears={uniqueYears}

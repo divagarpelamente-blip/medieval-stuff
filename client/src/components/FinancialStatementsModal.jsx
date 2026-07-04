@@ -21,7 +21,8 @@ const FinancialStatementsModal = ({
   incomeStatement,
   cashFlowStatement,
   balanceSheet,
-  formatNumberCompact
+  formatNumberCompact,
+  onViewInLedger
 }) => {
   if (!isOpen) return null;
 
@@ -109,6 +110,7 @@ const FinancialStatementsModal = ({
                 selectedYears={selectedYears}
                 selectedQuarters={selectedQuarters}
                 selectedMonths={selectedMonths}
+                onViewInLedger={onViewInLedger}
               />
             );
           })()}

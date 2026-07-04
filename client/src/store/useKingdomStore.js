@@ -595,7 +595,7 @@ export const useKingdomStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const [transactionsRes, balancesRes] = await Promise.all([
-        supabase.from('transactions').select('*').eq('profile_id', userId).order('created_at', { ascending: false }).limit(200),
+        supabase.from('transactions').select('*').eq('profile_id', userId).order('created_at', { ascending: false }).limit(10000),
         supabase.from('account_balances').select('*').eq('profile_id', userId)
       ]);
 
@@ -613,17 +613,37 @@ export const useKingdomStore = create((set, get) => ({
         .filter(t => isCompleted(t.payment_status))
         .reduce((sum, t) => {
           const amt = Number(t.amount) || 0;
-          if (t.transaction_type === 'Income') return sum + amt;
-          if (t.transaction_type === 'Expense') return sum - amt;
+          if (t.transaction_type === 'Income') {
+            const src = t.source_dest_bank || '10101001';
+            if (src.startsWith('10101') || src.startsWith('10102')) return sum + amt;
+          }
+          if (t.transaction_type === 'Expense') {
+            const src = t.source_dest_bank || '10101001';
+            if (src.startsWith('10101') || src.startsWith('10102')) return sum - amt;
+          }
           if (t.transaction_type === 'Assets' || t.transaction_type === 'Liabilities') {
-            if (t.flow === 'inflow') return sum + amt;
-            if (t.flow === 'outflow') return sum - amt;
+            const src = t.source_dest_bank;
+            const tgt = t.target_account;
+            let effect = 0;
+            if (t.flow === 'neutral') {
+              if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
+              if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+            } else if (t.flow === 'inflow') {
+              if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect += amt;
+              if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect -= amt;
+            } else if (t.flow === 'outflow') {
+              if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
+              if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+            }
+            return sum + effect;
           }
           return sum;
         }, 0);
       
-      const startingGold = 0;
-      const calculatedGold = Math.floor(Math.max(0, startingGold + netCash));
+      const startingGold = (balancesRes.data || [])
+        .filter(b => b.account_code && (b.account_code.startsWith('10101') || b.account_code.startsWith('10102')))
+        .reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
+      const calculatedGold = Math.floor(startingGold + netCash);
 
       // If calculatedGold is different from state gold, sync it to state and database
       if (calculatedGold !== get().gold) {
@@ -641,6 +661,49 @@ export const useKingdomStore = create((set, get) => ({
       });
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  
+  // Update or insert a static account balance and refresh store data
+  updateAccountBalance: async (profileId, accountCode, balanceAmount) => {
+    const userId = get().user?.id || profileId;
+    set({ isLoading: true });
+    try {
+      const { data: existing, error: checkError } = await supabase
+        .from('account_balances')
+        .select('*')
+        .eq('profile_id', userId)
+        .eq('account_code', accountCode)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      let res;
+      if (existing) {
+        res = await supabase
+          .from('account_balances')
+          .update({ balance: Number(balanceAmount) })
+          .eq('profile_id', userId)
+          .eq('account_code', accountCode);
+      } else {
+        res = await supabase
+          .from('account_balances')
+          .insert({
+            profile_id: userId,
+            account_code: accountCode,
+            balance: Number(balanceAmount)
+          });
+      }
+
+      if (res.error) throw res.error;
+
+      await get().fetchDashboardData(userId);
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating account balance:', err);
+      return { success: false, error: err.message || err };
     } finally {
       set({ isLoading: false });
     }
@@ -680,16 +743,27 @@ export const useKingdomStore = create((set, get) => ({
     if (isCompletedStatus) {
       const amt = Number(transactionData.amount) || 0;
       if (transactionData.transaction_type === 'Income') {
-        newGold += amt;
+        const src = transactionData.source_dest_bank || '10101001';
+        if (src.startsWith('10101') || src.startsWith('10102')) newGold += amt;
         earnedXp = amt * 2;
       } else if (transactionData.transaction_type === 'Expense') {
-        newGold = Math.max(0, newGold - amt);
-      } else if (transactionData.transaction_type === 'Assets') {
-        if (transactionData.flow === 'inflow') newGold += amt;
-        else if (transactionData.flow === 'outflow') newGold = Math.max(0, newGold - amt);
-      } else if (transactionData.transaction_type === 'Liabilities') {
-        if (transactionData.flow === 'inflow') newGold += amt;
-        else if (transactionData.flow === 'outflow') newGold = Math.max(0, newGold - amt);
+        const src = transactionData.source_dest_bank || '10101001';
+        if (src.startsWith('10101') || src.startsWith('10102')) newGold -= amt;
+      } else if (transactionData.transaction_type === 'Assets' || transactionData.transaction_type === 'Liabilities') {
+        const src = transactionData.source_dest_bank;
+        const tgt = transactionData.target_account;
+        let effect = 0;
+        if (transactionData.flow === 'neutral') {
+          if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
+          if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+        } else if (transactionData.flow === 'inflow') {
+          if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect += amt;
+          if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect -= amt;
+        } else if (transactionData.flow === 'outflow') {
+          if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
+          if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+        }
+        newGold += effect;
       }
     }
 

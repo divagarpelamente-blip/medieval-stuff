@@ -81,85 +81,55 @@ export function useDashboardEngine(filteredTransactions = []) {
     let totalLiabilities = 0;
     let netVaultCash = userGold;
 
-    if (safeBalances.length > 0) {
-      safeBalances.forEach(row => {
-        const balance = Number(row.balance) || 0;
-        const code = row.account_code || '';
-        if (code in balancesByCode) {
-          balancesByCode[code] = balance;
+    // DYNAMIC TRANSACTIONS-BASED CALCULATION (Always runs to ensure the Balance Sheet picks up the ledger)
+    accountBalances.forEach(b => {
+      if (b.account_code && b.account_code in balancesByCode) {
+        balancesByCode[b.account_code] = Number(b.balance) || 0;
+      }
+    });
+
+    netVaultCash = balancesByCode['10101001'] || 0;
+
+    safeAllTxs.forEach(tx => {
+      if (!isCompleted(tx.payment_status)) return;
+      const amt = Number(tx.amount) || 0;
+
+      if (tx.transaction_type === 'Income') {
+        const src = tx.source_dest_bank || '10101001';
+        if (src in balancesByCode) balancesByCode[src] += amt;
+      } else if (tx.transaction_type === 'Expense') {
+        const src = tx.source_dest_bank || '10101001';
+        if (src in balancesByCode) balancesByCode[src] -= amt;
+      } else if (tx.transaction_type === 'Assets' || tx.transaction_type === 'Liabilities') {
+        const src = tx.source_dest_bank;
+        const tgt = tx.target_account;
+        if (tx.flow === 'neutral') {
+          if (src && src in balancesByCode) balancesByCode[src] -= amt;
+          if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
+        } else if (tx.flow === 'inflow') {
+          if (src && src in balancesByCode) balancesByCode[src] += amt;
+          if (tgt && tgt in balancesByCode) balancesByCode[tgt] -= amt;
+        } else if (tx.flow === 'outflow') {
+          if (src && src in balancesByCode) balancesByCode[src] -= amt;
+          if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
         }
-      });
+      }
+    });
 
-      // Sum totals
-      Object.entries(balancesByCode).forEach(([code, balance]) => {
-        if (code.startsWith('1')) {
-          totalAssets += balance;
-          if (code === '10101001') {
-            netVaultCash = balance;
-          }
-        } else if (code.startsWith('2')) {
-          totalLiabilities += balance;
-        }
-      });
-    } else {
-      // DYNAMIC TRANSACTIONS-BASED FALLBACK
-      const plInflow = safeAllTxs
-        .filter(tx => tx.transaction_type === 'Income' && isCompleted(tx.payment_status))
-        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-      const plOutflow = safeAllTxs
-        .filter(tx => tx.transaction_type === 'Expense' && isCompleted(tx.payment_status))
-        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-      const startingCash = userGold - plInflow + plOutflow;
-      balancesByCode['10101001'] = startingCash;
-
-      safeAllTxs.forEach(tx => {
-        if (!isCompleted(tx.payment_status)) return;
-        const amt = Number(tx.amount) || 0;
-
-        if (tx.transaction_type === 'Income') {
-          const src = tx.source_dest_bank || '10101001';
-          if (src in balancesByCode) balancesByCode[src] += amt;
-        } else if (tx.transaction_type === 'Expense') {
-          const src = tx.source_dest_bank || '10101001';
-          if (src in balancesByCode) balancesByCode[src] -= amt;
-        } else if (tx.transaction_type === 'Assets') {
-          const src = tx.source_dest_bank;
-          const tgt = tx.target_account;
-          if (tx.flow === 'neutral') {
-            if (src && src in balancesByCode) balancesByCode[src] -= amt;
-            if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
-          } else if (tx.flow === 'inflow') {
-            if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
-          } else if (tx.flow === 'outflow') {
-            if (src && src in balancesByCode) balancesByCode[src] -= amt;
-          }
-        } else if (tx.transaction_type === 'Liabilities') {
-          const src = tx.source_dest_bank;
-          const tgt = tx.target_account;
-
-          if (tx.flow === 'inflow') {
-            if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
-            if (src && src in balancesByCode) balancesByCode[src] += amt;
-          } else if (tx.flow === 'outflow') {
-            if (tgt && tgt in balancesByCode) balancesByCode[tgt] -= amt;
-            if (src && src in balancesByCode) balancesByCode[src] -= amt;
-          }
-        }
-      });
-
-      // Sum totals
-      netVaultCash = balancesByCode['10101001'];
-      totalAssets = 0;
-      totalLiabilities = 0;
-      Object.entries(balancesByCode).forEach(([code, balance]) => {
-        if (code.startsWith('1')) {
-          totalAssets += balance;
-        } else if (code.startsWith('2')) {
-          totalLiabilities += balance;
-        }
-      });
-    }
+    // Sum totals
+    netVaultCash = balancesByCode['10101001'];
+    totalAssets = 0;
+    totalLiabilities = 0;
+    Object.entries(balancesByCode).forEach(([code, balance]) => {
+      if (code.startsWith('10104')) {
+        return; // Skip Fixed Debt accounts
+      }
+      if (code.startsWith('1')) {
+        totalAssets += balance;
+      } else if (code.startsWith('2')) {
+        totalLiabilities += balance;
+      }
+    });
 
     const netWorth = totalAssets - totalLiabilities;
 
@@ -170,7 +140,7 @@ export function useDashboardEngine(filteredTransactions = []) {
     // Distribuição por Categorias (Apenas P&L)
     const categoryMap = {};
     plTransactions.forEach(tx => {
-      const cat = entityMappings[tx.entity] || tx.transaction_category || 'Other';
+      const cat = tx.transaction_category || entityMappings[tx.entity] || 'Other';
       if (!categoryMap[cat]) {
         categoryMap[cat] = { name: cat, income: 0, expense: 0, totalClass: 0 };
       }
@@ -251,7 +221,7 @@ export function useDashboardEngine(filteredTransactions = []) {
 
     const debtCatMap = {};
     debtTxs.forEach(tx => {
-      const cat = entityMappings[tx.entity] || tx.transaction_category || 'Other';
+      const cat = tx.transaction_category || entityMappings[tx.entity] || 'Other';
       const amt = Number(tx.amount) || 0;
       if (tx.payment_status === 'Completed') {
         if (tx.flow === 'inflow') {
@@ -280,7 +250,7 @@ export function useDashboardEngine(filteredTransactions = []) {
     const plRevenues = {};
     const plExpenses = {};
     plTransactions.forEach(tx => {
-      const cat = entityMappings[tx.entity] || tx.transaction_category || 'Other';
+      const cat = tx.transaction_category || entityMappings[tx.entity] || 'Other';
       const amt = Number(tx.amount) || 0;
       if (tx.transaction_type === 'Income') {
         plRevenues[cat] = (plRevenues[cat] || 0) + amt;
@@ -321,7 +291,9 @@ export function useDashboardEngine(filteredTransactions = []) {
     Object.entries(balancesByCode).forEach(([code, balance]) => {
       const name = chartOfAccounts[code];
       const formatted = formatNumberCompact(balance);
-      if (code.startsWith('1')) {
+      if (code.startsWith('10104')) {
+        // Skip Fixed Debt accounts
+      } else if (code.startsWith('1')) {
         assetsList.push({ code, name, balance, formatted });
       } else if (code.startsWith('2')) {
         liabilitiesList.push({ code, name, balance, formatted });

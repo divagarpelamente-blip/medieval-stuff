@@ -6,6 +6,8 @@ import { Z_LAYERS, STANDARD_MODAL_PROPS } from '../constants/UI_UX';
 import { useKingdomStore } from '../store/useKingdomStore';
 import TableSortHeader from './shared/TableSortHeader';
 
+import { accountMappings } from '../utils/accountMappings';
+
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 
 export default function GoldMineLedger({
@@ -40,6 +42,15 @@ export default function GoldMineLedger({
   setFilterCategory,
   filterEntity,
   setFilterEntity,
+  filterAccountCode,
+  setFilterAccountCode,
+  filterAccountLabel,
+  setFilterAccountLabel,
+  filterBeforeOrInPeriod,
+  setFilterBeforeOrInPeriod,
+  filterBeforeOrInYear,
+  filterBeforeOrInMonth,
+  filterBeforeOrInQuarter,
   isFiltersExpanded,
   setIsFiltersExpanded,
   uniqueYears,
@@ -85,8 +96,8 @@ export default function GoldMineLedger({
         valA = a.transaction_type || '';
         valB = b.transaction_type || '';
       } else if (sortField === 'category') {
-        valA = entityMappings[a.entity] || a.transaction_category || '';
-        valB = entityMappings[b.entity] || b.transaction_category || '';
+        valA = a.transaction_category || entityMappings[a.entity] || '';
+        valB = b.transaction_category || entityMappings[b.entity] || '';
       } else if (sortField === 'entity') {
         valA = a.entity || '';
         valB = b.entity || '';
@@ -427,6 +438,9 @@ export default function GoldMineLedger({
                     setFilterClass('All');
                     setFilterCategory('All');
                     setFilterEntity('All');
+                    setFilterAccountCode('All');
+                    setFilterAccountLabel('');
+                    setFilterBeforeOrInPeriod(false);
                     toast.success(t.filters_cleared);
                   }}
                   className="text-[9px] font-black text-rose-800 hover:text-rose-955 uppercase transition-colors cursor-pointer"
@@ -434,6 +448,29 @@ export default function GoldMineLedger({
                   {t.clear_all}
                 </button>
               </div>
+
+              {(filterAccountCode !== 'All' || filterBeforeOrInPeriod) && (
+                <div className="bg-[#faf4e5] border border-[#8b4513]/30 rounded-lg p-2.5 mb-3 flex items-center justify-between text-[#5d4037] text-[10px] font-bold">
+                  <div className="flex items-center gap-2">
+                    <span>👁️</span>
+                    <span>
+                      {filterAccountCode !== 'All' && `Account: ${filterAccountLabel || filterAccountCode} `}
+                      {filterBeforeOrInPeriod && `(Accumulated up to: ${filterBeforeOrInMonth ? filterBeforeOrInMonth + ' ' : ''}${filterBeforeOrInQuarter ? filterBeforeOrInQuarter + ' ' : ''}${filterBeforeOrInYear})`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterAccountCode('All');
+                      setFilterAccountLabel('');
+                      setFilterBeforeOrInPeriod(false);
+                    }}
+                    className="px-2 py-1 rounded bg-[#8b4513] text-[#ffd700] text-[9px] hover:bg-[#8b4513]/90 transition-colors cursor-pointer"
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
                 {/* Status */}
@@ -569,14 +606,6 @@ export default function GoldMineLedger({
                         className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
                       />
                       <TableSortHeader
-                        label={t('ledger.headers.due_date') || 'Due Date'}
-                        field="due_date"
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                        className="py-2.5 px-3 whitespace-nowrap text-left hover:bg-[#70300d]"
-                      />
-                      <TableSortHeader
                         label={t('ledger.headers.from')}
                         field="from"
                         sortField={sortField}
@@ -655,14 +684,6 @@ export default function GoldMineLedger({
                                 type="date"
                                 value={editingTxs[tx.id]?.posting_date || ''}
                                 onChange={e => handleFieldChange(tx.id, 'posting_date', e.target.value)}
-                                className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
-                              />
-                            </td>
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              <input
-                                type="date"
-                                value={editingTxs[tx.id]?.due_date || ''}
-                                onChange={e => handleFieldChange(tx.id, 'due_date', e.target.value)}
                                 className="w-24 bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded text-[9px] font-bold text-[#4b2c20] focus:outline-none px-1 py-0.5 font-sans"
                               />
                             </td>
@@ -751,7 +772,6 @@ export default function GoldMineLedger({
                             </span>
                           </td>
                           <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.posting_date || tx.value_date || '-'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.due_date || '-'}</td>
                           <td className="py-2 px-3 whitespace-nowrap font-bold text-[#4b2c20]">{tx.from || '-'}</td>
                           <td className="py-2 px-3 whitespace-nowrap">
                             <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
@@ -764,7 +784,7 @@ export default function GoldMineLedger({
                               {tx.transaction_type}
                             </span>
                           </td>
-                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{entityMappings[tx.entity] || tx.transaction_category || '-'}</td>
+                          <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.transaction_category || entityMappings[tx.entity] || '-'}</td>
                           <td className="py-2 px-3 whitespace-nowrap text-stone-600">{tx.entity || '-'}</td>
                           <td className={`py-2 px-3 whitespace-nowrap text-right font-mono font-black ${
                             tx.flow === 'inflow' ? 'text-emerald-700' : (tx.flow === 'outflow' ? 'text-rose-700' : 'text-stone-600')

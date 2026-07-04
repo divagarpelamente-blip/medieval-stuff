@@ -39,10 +39,42 @@ const isBeforeOrInYear = (txYear, targetYear) => {
   return Number(txYear) <= Number(targetYear);
 };
 
-export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t, formatNumberCompact, show = 'all', selectedYears = [], selectedQuarters = [], selectedMonths = [] }) {
+export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t, formatNumberCompact, show = 'all', selectedYears = [], selectedQuarters = [], selectedMonths = [], onViewInLedger }) {
   const allTxs = useKingdomStore(state => state.transactions) || [];
   const userGold = useKingdomStore(state => state.gold) || 0;
-  const subtypeToCategoryMap = useKingdomStore(state => state.subtypeToCategoryMap) || {};
+  const storeSubtypeToCategoryMap = useKingdomStore(state => state.subtypeToCategoryMap) || {};
+  const defaultSubtypeToCategoryMap = {
+    "Banks": ["Bank account", "Savings account", "Investments account"],
+    "Fixed Assets": ["Fixed Assets"],
+    "Personal Debt": ["Loans & Burrow", "Credit Cards"],
+    "Other Debts": ["Other Debts"],
+    "Living & Household": ["Household", "Utilities"],
+    "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
+    "Public Transports": ["Public Transports"],
+    "Other Transports": ["Other Transports"],
+    "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
+    "Health": ["Health"],
+    "Entertainment": ["Entertainment"],
+    "Education": ["Education"],
+    "Insurances": ["Insurances"],
+    "Taxes & State": ["Taxes", "Interest"],
+    "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
+    "Payroll": ["Salary", "Payroll Subsidies"],
+    "Other Income": ["Other Incomes"],
+    "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
+  };
+  const subtypeToCategoryMap = {};
+  const allSubtypes = new Set([
+    ...Object.keys(defaultSubtypeToCategoryMap),
+    ...Object.keys(storeSubtypeToCategoryMap)
+  ]);
+  allSubtypes.forEach(sub => {
+    subtypeToCategoryMap[sub] = Array.from(new Set([
+      ...(storeSubtypeToCategoryMap[sub] || []),
+      ...(defaultSubtypeToCategoryMap[sub] || [])
+    ]));
+  });
+
   const subtypeTypes = useKingdomStore(state => state.subtypeTypes) || {};
 
   // 2. Inverted Subtype Map to look up Group from Subtype
@@ -81,14 +113,13 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
     const nextExpanded = {};
     const traverse = (nodeCode, level) => {
       nextExpanded[nodeCode] = level < targetLevel;
-      const node = { ...assetNodes[nodeCode], ...liabilityNodes[nodeCode], ...allDebtNodes[nodeCode] };
+      const node = { ...assetNodes[nodeCode], ...liabilityNodes[nodeCode] };
       if (node && node.children) {
         node.children.forEach(child => traverse(child, level + 1));
       }
     };
     traverse('1', 1);
     traverse('2', 1);
-    traverse('3', 1);
     setExpandedNodes(nextExpanded);
   };
 
@@ -152,6 +183,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
     if (flatList) {
       flatList.forEach(item => {
         const code = item.code;
+        if (code.startsWith('10104')) return; // Skip Fixed Debt accounts completely
         const balance = Number(item.balance) || 0;
 
         // Parse subtype from account name (this is the category)
@@ -239,11 +271,11 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
     return list;
   };
 
-  // Determine current active filter values based on today's calendar date (aligned with P&L)
+  // Determine current active filter values based on selected filters or today's calendar date
   const today = new Date();
-  const activeYear = String(today.getFullYear());
-  const activeMonth = monthNames[today.getMonth()];
-  const activeQuarter = 'Q' + (Math.floor(today.getMonth() / 3) + 1);
+  const activeYear = selectedYears.length > 0 ? String(selectedYears[0]) : String(today.getFullYear());
+  const activeMonth = selectedMonths.length > 0 ? selectedMonths[0] : monthNames[today.getMonth()];
+  const activeQuarter = selectedQuarters.length > 0 ? selectedQuarters[0] : 'Q' + (Math.floor(today.getMonth() / 3) + 1);
 
   // Calculate previous period details
   const getPreviousPeriod = (year, quarter, month, type) => {
@@ -292,69 +324,69 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   // Balance Sheet snapshot calculation helper
   const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
 
-  const getBalancesAtPoint = (targetYear, targetQuarter, targetMonth, type) => {
-    const allCompletedInflows = allTxs
-      .filter(tx => tx.transaction_type === 'Income' && isCompleted(tx.payment_status))
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const allCompletedOutflows = allTxs
-      .filter(tx => tx.transaction_type === 'Expense' && isCompleted(tx.payment_status))
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const baselineCash = userGold - allCompletedInflows + allCompletedOutflows;
-
+  const getBalancesAtPoint = (targetYear, targetQuarter, targetMonth, type, exactPeriod = false) => {
     const filterTx = (tx) => {
       if (!isCompleted(tx.payment_status)) return false;
-      const txYear = tx.year || new Date(tx.posting_date).getFullYear();
+      if (exactPeriod && tx.flow === 'neutral') return false;
+      const txYear = String(tx.year || new Date(tx.posting_date).getFullYear());
       const txMonth = tx.month || new Date(tx.posting_date).toLocaleString('default', { month: 'long' });
       const txQuarter = tx.quarter || 'Q' + (Math.floor(new Date(tx.posting_date).getMonth() / 3) + 1);
 
-      if (type === 'M') {
-        return isBeforeOrInMonth(txYear, txMonth, targetYear, targetMonth);
-      } else if (type === 'Q') {
-        return isBeforeOrInQuarter(txYear, txQuarter, targetYear, targetQuarter);
+      if (exactPeriod) {
+        if (type === 'M') {
+          return txYear === String(targetYear) && txMonth === targetMonth;
+        } else if (type === 'Q') {
+          return txYear === String(targetYear) && txQuarter === targetQuarter;
+        } else {
+          return txYear === String(targetYear);
+        }
       } else {
-        return isBeforeOrInYear(txYear, targetYear);
+        if (type === 'M') {
+          return isBeforeOrInMonth(txYear, txMonth, targetYear, targetMonth);
+        } else if (type === 'Q') {
+          return isBeforeOrInQuarter(txYear, txQuarter, targetYear, targetQuarter);
+        } else {
+          return isBeforeOrInYear(txYear, targetYear);
+        }
       }
     };
 
     const txsUpToTarget = allTxs.filter(filterTx);
 
-    const inflowsUpToTarget = txsUpToTarget
-      .filter(tx => tx.transaction_type === 'Income')
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const outflowsUpToTarget = txsUpToTarget
-      .filter(tx => tx.transaction_type === 'Expense')
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-    const cashAtTarget = baselineCash + inflowsUpToTarget - outflowsUpToTarget;
-
     const balances = {};
     Object.keys(accountMappings).forEach(code => {
       balances[code] = 0;
     });
-    balances['111001'] = cashAtTarget;
+
+    if (!exactPeriod) {
+      const accountBalances = useKingdomStore.getState().accountBalances || [];
+      accountBalances.forEach(b => {
+        if (b.account_code && b.account_code in balances) {
+          balances[b.account_code] = Number(b.balance) || 0;
+        }
+      });
+    }
 
     txsUpToTarget.forEach(tx => {
       const amt = Number(tx.amount) || 0;
-      if (tx.transaction_type === 'Assets') {
+      if (tx.transaction_type === 'Income') {
+        const src = tx.source_dest_bank || '10101001';
+        if (src in balances) balances[src] += amt;
+      } else if (tx.transaction_type === 'Expense') {
+        const src = tx.source_dest_bank || '10101001';
+        if (src in balances) balances[src] -= amt;
+      } else if (tx.transaction_type === 'Assets' || tx.transaction_type === 'Liabilities') {
         const src = tx.source_dest_bank;
         const tgt = tx.target_account;
         if (tx.flow === 'neutral') {
           if (src && src in balances) balances[src] -= amt;
           if (tgt && tgt in balances) balances[tgt] += amt;
         } else if (tx.flow === 'inflow') {
-          if (tgt && tgt in balances) balances[tgt] += amt;
-        } else if (tx.flow === 'outflow') {
-          if (src && src in balances) balances[src] -= amt;
-        }
-      } else if (tx.transaction_type === 'Liabilities') {
-        const src = tx.source_dest_bank;
-        const tgt = tx.target_account;
-        if (tx.flow === 'inflow') {
-          if (tgt && tgt in balances) balances[tgt] += amt;
           if (src && src in balances) balances[src] += amt;
-        } else if (tx.flow === 'outflow') {
           if (tgt && tgt in balances) balances[tgt] -= amt;
+        } else if (tx.flow === 'outflow') {
           if (src && src in balances) balances[src] -= amt;
+          if (tgt && tgt in balances) balances[tgt] += amt;
         }
       }
     });
@@ -362,59 +394,21 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
     return balances;
   };
 
-  const currentBalances = getBalancesAtPoint(activeYear, activeQuarter, activeMonth, compareMode);
-  const previousBalances = getBalancesAtPoint(prevYear, prevQuarter, prevMonth, compareMode);
+  const currentBalances = getBalancesAtPoint(activeYear, activeQuarter, activeMonth, compareMode, true);
+  const previousBalances = getBalancesAtPoint(prevYear, prevQuarter, prevMonth, compareMode, true);
+  const accumulatedBalances = getBalancesAtPoint(activeYear, activeQuarter, activeMonth, compareMode, false);
 
   const sumNodeBalance = (nodeCode, balancesMap) => {
-    if (nodeCode === '1') {
-      let sum = 0;
-      Object.entries(balancesMap).forEach(([code, val]) => {
-        if (code.startsWith('1') && !otherCodes.has(code)) {
-          sum += val;
-        }
-      });
-      return sum;
-    }
-
-    if (nodeCode === '3') {
-      let sum = 0;
-      const getLeaves = (code) => {
-        const node = allDebtNodes[code];
-        if (!node) return;
-        if (node.children.length === 0 && /^\d{8}$/.test(node.code)) {
-          const actualCode = node.code.replace(/^3/, '1');
-          sum += (balancesMap[actualCode] || 0);
-        } else {
-          node.children.forEach(getLeaves);
-        }
-      };
-      getLeaves('3');
-      return sum;
-    }
-
-    if (nodeCode.startsWith('3')) {
-      let sum = 0;
-      const getLeaves = (code) => {
-        const node = allDebtNodes[code];
-        if (!node) return;
-        if (node.children.length === 0 && /^\d{8}$/.test(node.code)) {
-          const actualCode = node.code.replace(/^3/, '1');
-          sum += (balancesMap[actualCode] || 0);
-        } else {
-          node.children.forEach(getLeaves);
-        }
-      };
-      getLeaves(nodeCode);
-      return sum;
-    }
-
-    let sum = 0;
-    Object.entries(balancesMap).forEach(([code, val]) => {
-      if (code.startsWith(nodeCode)) {
-        sum += val;
-      }
-    });
-    return sum;
+    const rootCode = nodeCode.startsWith('2') ? '2' : '1';
+    const flatList = Object.entries(balancesMap)
+      .filter(([code]) => code.startsWith(rootCode))
+      .map(([code, val]) => ({
+        code,
+        name: accountMappings[code] || '',
+        balance: val
+      }));
+    const nodes = buildHierarchy(flatList, rootCode);
+    return nodes[nodeCode] ? nodes[nodeCode].balance : 0;
   };
 
   // Cash Flow Calculations
@@ -442,7 +436,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
 
     txsInPeriod.forEach(tx => {
       if (tx.transaction_type === 'Income' || tx.transaction_type === 'Expense') {
-        const cat = entityMappings[tx.entity] || tx.transaction_category || 'Other';
+        const cat = tx.transaction_category || entityMappings[tx.entity] || 'Other';
         const amt = Number(tx.amount) || 0;
         if (tx.transaction_type === 'Income') {
           financingFlows[cat] = (financingFlows[cat] || 0) + amt;
@@ -469,10 +463,33 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   const currentCashFlow = getCashFlowAtPeriod(activeYear, activeQuarter, activeMonth, compareMode);
   const previousCashFlow = getCashFlowAtPeriod(prevYear, prevQuarter, prevMonth, compareMode);
 
+  const getColorClassForVal = (code, val) => {
+    const num = Number(val) || 0;
+    if (Math.abs(num) < 0.005) return 'text-stone-500';
+    return num > 0 ? 'text-emerald-700' : 'text-rose-700';
+  };
+
+  const formatBalance = (val) => {
+    const num = Number(val) || 0;
+    if (num < 0) {
+      const absVal = Math.abs(num);
+      const formatted = absVal.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).replace(/,/g, ' ');
+      return `(${formatted})`;
+    }
+    return formatNumberCompact(num);
+  };
+
   // Render unified statement rows containing both left-side normal value and right-side comparison columns
   const renderStatementRows = (nodes, rootCode) => {
     const list = getRenderList(nodes, rootCode);
     
+    const getDisplayVal = (code, val) => {
+      return Number(val) || 0;
+    };
+
     return list.map((node) => {
       const hasChildren = node.children.length > 0;
       const isExpanded = isNodeExpanded(node.code);
@@ -488,13 +505,18 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
       const previousVal = sumNodeBalance(node.code, previousBalances);
       const diff = currentVal - previousVal;
 
+      const displayBalance = getDisplayVal(node.code, node.balance);
+      const displayCurrentVal = getDisplayVal(node.code, currentVal);
+      const displayPreviousVal = getDisplayVal(node.code, previousVal);
+      const displayDiff = getDisplayVal(node.code, diff);
+
       return (
         <div 
           key={node.code} 
           className={`flex justify-between items-center py-1 border-b border-[#8b4513]/5 hover:bg-[#8b4513]/5 transition-colors duration-150 ${node.level === 1 ? 'bg-[#8b4513]/5 mt-2 rounded px-1' : ''}`}
         >
-          {/* Left Side (53% Width) - Name and Sidebar Value */}
-          <div className="w-[53%] flex justify-between items-center pr-2">
+          {/* Left Side (38% Width) - Name only */}
+          <div className="w-[38%] flex justify-between items-center pr-2">
             <div className={`flex items-center gap-1.5 ${indentClass}`}>
               <span>{icon}</span>
               <span>{node.name}</span>
@@ -508,18 +530,28 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
                 </button>
               )}
             </div>
-            <span className={`font-mono font-bold ${node.code.startsWith('1') ? 'text-emerald-700' : 'text-rose-700'} text-[9px]`}>
-              {formatNumberCompact(node.balance)}
-            </span>
           </div>
-
-          {/* Right Side (47% Width) - Comparative Columns */}
-          <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
-            <span className={`w-[75px] ${node.code.startsWith('1') ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNumberCompact(currentVal)}</span>
-            <span className="w-[75px] text-[#5d4037]/70">{formatNumberCompact(previousVal)}</span>
-            <span className={`w-[80px] ${diff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatNumberCompact(diff)}
+ 
+          {/* Right Side (62% Width) - Comparative Columns + Accumulated */}
+          <div className="w-[62%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+            <span className={`w-[75px] ${getColorClassForVal(node.code, currentVal)}`}>{formatBalance(currentVal)}</span>
+            <span className={`w-[75px] ${getColorClassForVal(node.code, previousVal)}`}>{formatBalance(previousVal)}</span>
+            <span className={`w-[80px] ${getColorClassForVal(node.code, diff)}`}>
+              {diff > 0 ? `+${formatNumberCompact(diff).replace('+', '')}` : formatBalance(diff)}
             </span>
+            <div className="w-[85px] flex items-center justify-end gap-1">
+              <span className={getColorClassForVal(node.code, sumNodeBalance(node.code, accumulatedBalances))}>
+                {formatBalance(sumNodeBalance(node.code, accumulatedBalances))}
+              </span>
+              <button
+                type="button"
+                onClick={() => onViewInLedger && onViewInLedger(resolveLeafAccounts(node.code), node.name)}
+                className="text-[#8b4513] hover:text-[#ffd700] transition-colors duration-150 p-0.5 leading-none text-[9px] cursor-pointer"
+                title="View in Ledger"
+              >
+                👁️
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -531,101 +563,34 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   const assetNodes = buildHierarchy(bsAssets.list || [], '1');
   const liabilityNodes = buildHierarchy(bsLiabilities.list || [], '2');
 
-  const allDebtNodes = {};
-  allDebtNodes['3'] = {
-    code: '3',
-    name: 'All debt',
-    level: 1,
-    balance: 0,
-    children: []
-  };
-
-  const otherCodes = new Set();
-  const otherNodeKey = Object.keys(assetNodes).find(key => key.endsWith('_st_Other') || assetNodes[key]?.name === 'Other');
-  if (otherNodeKey && assetNodes[otherNodeKey]) {
-    const collectLeafCodes = (key) => {
-      const node = assetNodes[key];
-      if (!node) return;
-      if (node.children.length === 0 && /^\d{8}$/.test(node.code)) {
-        otherCodes.add(node.code);
+  const resolveLeafAccounts = (nodeCode) => {
+    if (nodeCode === 'netEquity') {
+      return ['1', '2'];
+    }
+    if (nodeCode === '1' || nodeCode === '2') {
+      return [nodeCode];
+    }
+    if (!nodeCode.includes('_')) {
+      return [nodeCode];
+    }
+    const allNodes = { ...assetNodes, ...liabilityNodes };
+    const leaves = [];
+    const traverse = (nCode) => {
+      const n = allNodes[nCode];
+      if (!n) return;
+      if (!n.children || n.children.length === 0) {
+        if (!n.code.includes('_')) {
+          leaves.push(n.code);
+        }
       } else {
-        node.children.forEach(collectLeafCodes);
+        n.children.forEach(traverse);
       }
     };
-    collectLeafCodes(otherNodeKey);
-
-    // Copy subtree to allDebtNodes starting with '3' prefix
-    const copySubtree = (oldKey, newParentKey) => {
-      const node = assetNodes[oldKey];
-      if (!node) return;
-      
-      const newKey = oldKey.replace(/^1_/, '3_').replace(/^10/, '30');
-      const newChildren = [];
-      
-      allDebtNodes[newKey] = {
-        ...node,
-        code: newKey,
-        children: newChildren
-      };
-      allDebtNodes[newParentKey].children.push(newKey);
-      
-      node.children.forEach(childKey => {
-        copySubtree(childKey, newKey);
-      });
-    };
-    
-    copySubtree(otherNodeKey, '3');
-    
-    // Delete 'Other' from Assets
-    if (assetNodes['1']) {
-      assetNodes['1'].children = assetNodes['1'].children.filter(k => k !== otherNodeKey);
-    }
-    const keysToDelete = [];
-    const collectKeys = (key) => {
-      keysToDelete.push(key);
-      if (assetNodes[key]?.children) {
-        assetNodes[key].children.forEach(collectKeys);
-      }
-    };
-    collectKeys(otherNodeKey);
-    keysToDelete.forEach(k => {
-      delete assetNodes[k];
-    });
-  }
-
-  // Recalculate Assets root balance after deleting the Other subtree
-  const recalcAssetBalance = (nodeCode) => {
-    const node = assetNodes[nodeCode];
-    if (!node) return 0;
-    if (node.children.length === 0) {
-      return node.balance;
-    }
-    let sum = 0;
-    node.children.forEach(childCode => {
-      sum += recalcAssetBalance(childCode);
-    });
-    node.balance = sum;
-    return sum;
+    traverse(nodeCode);
+    return leaves.length > 0 ? leaves : [nodeCode];
   };
-  if (assetNodes['1']) {
-    recalcAssetBalance('1');
-  }
 
-  // Compute balances bottom-up recursively for allDebtNodes
-  const computeAllDebtBalance = (nodeCode) => {
-    const node = allDebtNodes[nodeCode];
-    if (!node) return 0;
-    if (node.children.length === 0) {
-      return node.balance;
-    }
-    let sum = 0;
-    node.children.forEach(childCode => {
-      sum += computeAllDebtBalance(childCode);
-    });
-    node.balance = sum;
-    return sum;
-  };
-  computeAllDebtBalance('3');
+
 
 
   // Left Header Controls Render (Levels and Zero Hider)
@@ -692,7 +657,24 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
   };
 
   // Unified Columns Header Row
-  const renderUnifiedHeader = () => {
+  const renderUnifiedHeader = (isBalanceSheet = false) => {
+    if (isBalanceSheet) {
+      return (
+        <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[8.5px] uppercase tracking-wider mb-2">
+          {/* Left Side Header (38%) */}
+          <div className="w-[38%] flex justify-between pr-2">
+            <span>Name</span>
+          </div>
+          {/* Right Side Header (62%) */}
+          <div className="w-[62%] flex justify-end gap-3 text-right">
+            <span className="w-[75px]">{col1Header}</span>
+            <span className="w-[75px]">{col2Header}</span>
+            <span className="w-[80px]">Difference</span>
+            <span className="w-[85px]">Accumulated</span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex justify-between items-center py-1 font-bold text-[#8b4513] border-b border-[#8b4513]/15 text-[8.5px] uppercase tracking-wider mb-2">
         {/* Left Side Header (53%) */}
@@ -721,7 +703,7 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
             {renderRightHeaderControls()}
           </div>
 
-          {renderUnifiedHeader()}
+          {renderUnifiedHeader(true)}
 
           <div className="space-y-6">
             {/* Assets Section */}
@@ -738,38 +720,41 @@ export default function TreasuryStatements({ cashFlowStatement, balanceSheet, t,
               </div>
             </div>
 
-            {/* All Debt Section */}
-            <div className="space-y-3">
-              <div className="space-y-1 text-[9.5px]">
-                {renderStatementRows(allDebtNodes, '3')}
-              </div>
-            </div>
-
             {/* Equity Section Summary */}
             <div className="flex justify-between items-center bg-[#f4e4bc]/50 border border-[#8b4513]/15 rounded-lg p-2 mt-2">
-              {/* Left Side (53% Width) - Name and Sidebar Value */}
-              <div className="w-[53%] flex justify-between items-center pr-2">
+              {/* Left Side (38% Width) - Name only */}
+              <div className="w-[38%] flex justify-between items-center pr-2">
                 <div className="pl-0 font-black text-[#4b2c20] text-[9.5px] uppercase flex items-center gap-1.5">
                   <span>🛡️</span>
                   <span>{t('accumulated_wealth', 'Accumulated Wealth (Net Equity)')}</span>
                 </div>
-                <span className={`font-mono font-bold ${bsEquity.accumulatedWealth >= 0 ? 'text-emerald-700' : 'text-rose-700'} text-[9.5px]`}>
-                  {formatNumberCompact(bsEquity.accumulatedWealth)}
-                </span>
               </div>
 
-              {/* Right Side (47% Width) - Comparative Columns */}
-              <div className="w-[47%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
-                <span className={`w-[75px] ${sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {formatNumberCompact(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances))}
+              {/* Right Side (62% Width) - Comparative Columns + Accumulated */}
+              <div className="w-[62%] flex justify-end gap-3 font-mono text-[8.5px] text-right font-bold">
+                <span className={`w-[75px] ${getColorClassForVal('netEquity', sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances))}`}>
+                  {formatBalance(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances))}
                 </span>
-                <span className="w-[75px] text-[#5d4037]/70">
-                  {formatNumberCompact(sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances))}
+                <span className={`w-[75px] ${getColorClassForVal('netEquity', sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances))}`}>
+                  {formatBalance(sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances))}
                 </span>
-                <span className={`w-[80px] ${(sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances)) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances))) > 0 ? '+' : ''}
-                  {formatNumberCompact((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances) + sumNodeBalance('3', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances) + sumNodeBalance('3', previousBalances)))}
+                <span className={`w-[80px] ${getColorClassForVal('netEquity', (sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances)))}`}>
+                  {((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances))) > 0 ? '+' : ''}
+                  {formatBalance((sumNodeBalance('1', currentBalances) - sumNodeBalance('2', currentBalances)) - (sumNodeBalance('1', previousBalances) - sumNodeBalance('2', previousBalances)))}
                 </span>
+                <div className="w-[85px] flex items-center justify-end gap-1">
+                  <span className={getColorClassForVal('netEquity', sumNodeBalance('1', accumulatedBalances) - sumNodeBalance('2', accumulatedBalances))}>
+                    {formatBalance(sumNodeBalance('1', accumulatedBalances) - sumNodeBalance('2', accumulatedBalances))}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onViewInLedger && onViewInLedger('netEquity')}
+                    className="text-[#8b4513] hover:text-[#ffd700] transition-colors duration-150 p-0.5 leading-none text-[9px] cursor-pointer"
+                    title="View in Ledger"
+                  >
+                    👁️
+                  </button>
+                </div>
               </div>
             </div>
           </div>
