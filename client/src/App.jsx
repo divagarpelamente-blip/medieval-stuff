@@ -43,6 +43,10 @@ import FlatListEditor from './components/FlatListEditor';
 import AllActionsEditor from './components/AllActionsEditor';
 import InitialBalancesEditor from './components/InitialBalancesEditor';
 import StatisticsWindow from './components/StatisticsWindow';
+import QuestModal from './components/QuestModal';
+import AchievementsModal from './components/AchievementsModal';
+import QuickActionModal from './components/QuickActionModal';
+import SettingsModal from './components/SettingsModal';
 
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
@@ -936,877 +940,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     toast.success("Categories matrix updated successfully!");
   };
 
-  const renderSettingsPanel = () => {
-    if (selectedSettingType === 'initialBalances') {
-      return (
-        <InitialBalancesEditor
-          t={t}
-          accountMappings={accountMappings}
-        />
-      );
-    }
-
-    if (selectedSettingType === 'subcategories') {
-      return (
-        <SubtypeCategoryEditor
-          t={t}
-          subtypeToCategoryMap={subtypeToCategoryMap}
-          subtypeTypes={subtypeTypes}
-          syncSettings={syncSettings}
-        />
-      );
-    }
-
-    if (selectedSettingType === 'coa') {
-      return (
-        <COAEditor
-          t={t}
-          accountMappings={accountMappings}
-          subtypeToCategoryMap={subtypeToCategoryMap}
-          subtypeTypes={subtypeTypes}
-          syncSettings={syncSettings}
-        />
-      );
-    }
-
-    if (selectedSettingType === 'class') {
-      return (
-        <CategoryMatrixEditor
-          t={t}
-          subClassOptions={subClassOptions}
-          categoryOptions={categoryOptions}
-          entityOptions={entityOptions}
-          entityMappings={entityMappings}
-          subtypeToCategoryMap={subtypeToCategoryMap}
-          syncSettings={syncSettings}
-          getMatrixRows={getMatrixRows}
-          handleSaveMatrix={handleSaveMatrix}
-          settingsFileInputRef={settingsFileInputRef}
-          importSettingsCSV={importSettingsCSV}
-          exportSettingsCSV={exportSettingsCSV}
-        />
-      );
-    }
-
-    if (selectedSettingType === 'from' || selectedSettingType === 'status') {
-      const type = selectedSettingType;
-      const title = type === 'from' ? 'Origin/From' : 'Status';
-      const list = type === 'from' ? fromOptions : statusOptions;
-      return (
-        <FlatListEditor
-          t={t}
-          title={title}
-          list={list}
-          onAdd={(val) => addOption(type, val)}
-          onEdit={(oldVal, newVal) => editOption(type, oldVal, newVal)}
-          onDelete={(val) => handleDeleteOption(val)}
-          settingsFileInputRef={settingsFileInputRef}
-          importSettingsCSV={importSettingsCSV}
-          exportSettingsCSV={exportSettingsCSV}
-        />
-      );
-    }
-    if (selectedSettingType === 'allActions') {
-      return (
-        <AllActionsEditor
-          t={t}
-          templates={templates}
-          selectedQaNames={selectedQaNames}
-          setSelectedQaNames={setSelectedQaNames}
-          onEditQuickAction={(tpl) => {
-            setSelectedQaTemplateName(tpl.name);
-            setQaName(tpl.name);
-            setQaIcon(tpl.icon || '⚡');
-            setQaFrom(tpl.data.from || '');
-            setQaClass(tpl.data.transaction_type || '');
-            setQaSubClass(tpl.data.transaction_subtype || '');
-            setQaEntity(tpl.data.entity || '');
-            setQaCategory(tpl.data.transaction_category || '');
-            setQaTargetAccount(tpl.data.target_account || '');
-            setQaSourceDestBank(tpl.data.source_dest_bank || '');
-            setQaFlow(tpl.data.flow || '');
-            setQaStatus(tpl.data.payment_status || '');
-            setQaDescription(tpl.data.description || '');
-            setQaAmount(tpl.data.amount || '');
-            setQaDueDate(tpl.data.due_date || '');
-            setQaValueDate(tpl.data.value_date || '');
-            setQaPostingDate(tpl.data.posting_date || '');
-            setIsEditingQa(true);
-            setSelectedSettingType('quickAction');
-          }}
-          handleDeleteQuickAction={handleDeleteQuickAction}
-          qaFileInputRef={qaFileInputRef}
-          importQuickActionsCSV={importQuickActionsCSV}
-          handleExportAllActionsCSV={handleExportAllActionsCSV}
-        />
-      );
-    }
-
-    let title = '';
-    let currentList = [];
-    let showEntityCategorySelector = false;
-
-    // Derive dynamic filter lists for All Actions
-    const dynamicSubtypes = Array.from(new Set(
-      templates
-        .filter(tpl => !filterActionType || tpl.data?.transaction_type === filterActionType)
-        .map(tpl => tpl.data?.transaction_subtype)
-        .filter(Boolean)
-    )).sort();
-
-    const dynamicCategories = Array.from(new Set(
-      templates
-        .filter(tpl => {
-          if (filterActionType && tpl.data?.transaction_type !== filterActionType) return false;
-          if (filterActionSubtype && tpl.data?.transaction_subtype !== filterActionSubtype) return false;
-          return true;
-        })
-        .map(tpl => tpl.data?.transaction_category)
-        .filter(Boolean)
-    )).sort();
-
-    const dynamicEntities = Array.from(new Set(
-      templates
-        .filter(tpl => {
-          if (filterActionType && tpl.data?.transaction_type !== filterActionType) return false;
-          if (filterActionSubtype && tpl.data?.transaction_subtype !== filterActionSubtype) return false;
-          if (filterActionCategory && tpl.data?.transaction_category !== filterActionCategory) return false;
-          return true;
-        })
-        .map(tpl => tpl.data?.entity)
-        .filter(Boolean)
-    )).sort();
-
-    switch (selectedSettingType) {
-      case 'from':
-        title = 'Origin/From';
-        currentList = fromOptions;
-        break;
-      case 'status':
-        title = 'Status';
-        currentList = statusOptions;
-        break;
-      case 'class':
-        title = 'Categories';
-        currentList = classOptions;
-        break;
-      case 'quickAction':
-        title = 'Quick Actions';
-        currentList = templates;
-        break;
-      case 'allActions':
-        title = 'All Actions';
-        currentList = templates.filter(tpl => {
-          if (filterActionType && tpl.data?.transaction_type !== filterActionType) return false;
-          if (filterActionSubtype && tpl.data?.transaction_subtype !== filterActionSubtype) return false;
-          if (filterActionCategory && tpl.data?.transaction_category !== filterActionCategory) return false;
-          if (filterActionEntity && tpl.data?.entity !== filterActionEntity) return false;
-          return true;
-        });
-        break;
-      default:
-        break;
-    }
-
-    const handleAddOptionSubmit = (e) => {
-      e.preventDefault();
-      if (selectedSettingType === 'quickAction') {
-        if (!qaName.trim()) {
-          toast.error(t.err_enter_value);
-          return;
-        }
-        const nameVal = qaName.trim();
-        if (templates.some(tpl => tpl.name.toLowerCase() === nameVal.toLowerCase())) {
-          toast.error(t.err_value_exists);
-          return;
-        }
-
-        const newTemplateData = {
-          icon: qaIcon || '⚡',
-          data: {
-            from: qaFrom,
-            transaction_type: qaClass,
-            transaction_subtype: qaSubClass,
-            entity: qaEntity,
-            transaction_category: qaCategory,
-            target_account: qaTargetAccount,
-            source_dest_bank: qaSourceDestBank,
-            flow: qaFlow,
-            payment_status: qaStatus,
-            description: qaDescription || `${qaName} action`,
-            amount: qaAmount || '0',
-            due_date: qaDueDate || null,
-            value_date: qaValueDate || null,
-            posting_date: qaPostingDate || null
-          }
-        };
-
-        addOption('quickAction', nameVal, newTemplateData);
-        setQaName('');
-        setQaDescription('');
-        setQaAmount('');
-        setQaDueDate('');
-        setQaValueDate('');
-        setQaPostingDate('');
-        setQaFrom('');
-        setQaClass('');
-        setQaStatus('');
-        setQaSubClass('');
-        setQaEntity('');
-        setQaCategory('');
-        setQaTargetAccount('');
-        setQaSourceDestBank('');
-        setQaFlow('');
-        toast.success(t('success_added_option', { val: nameVal }));
-        return;
-      }
-
-      if (!newOptionVal.trim()) {
-        toast.error(t.err_enter_value);
-        return;
-      }
-      const val = newOptionVal.trim();
-      if (currentList.some(item => typeof item === 'string' && item.toLowerCase() === val.toLowerCase())) {
-        toast.error(t.err_value_exists);
-        return;
-      }
-
-      const extraData = selectedSettingType === 'entity' ? { entityCategory: newEntityCatVal } : undefined;
-      addOption(selectedSettingType, val, extraData);
-      setNewOptionVal('');
-      toast.success(t('success_added_option', { val }));
-    };
-
-    const handleDeleteOption = (val) => {
-      deleteOption(selectedSettingType, val);
-      toast.success(t('success_deleted_option', { val }));
-    };
-
-
-
-    return (
-      <div className="flex flex-col h-full overflow-hidden">
-        {/* Title */}
-        <div className="border-b border-[#8b4513]/20 pb-2 mb-4 flex justify-between items-center">
-          <div>
-            <h3 className="title-font text-sm font-black text-[#4b2c20] uppercase">{title}</h3>
-            <p className="text-[9px] text-[#5d4037]/75 font-bold uppercase tracking-wider font-sans">{t.official_ledger_editor}</p>
-          </div>
-          {(selectedSettingType === 'quickAction' || selectedSettingType === 'allActions') && (
-            <div className="flex items-center gap-2.5">
-              {/* Buttons */}
-              <div className="flex gap-1">
-                {selectedQaNames.length > 0 ? (
-                  <>
-                    {selectedSettingType === 'quickAction' && (
-                      <button
-                        type="button"
-                        onClick={handleSaveQuickAction}
-                        className="w-[28px] h-[28px] bg-emerald-755 hover:bg-emerald-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
-                        title={t('save', 'Save')}
-                      >
-                        💾
-                      </button>
-                    )}
-                    {selectedSettingType === 'allActions' && selectedQaNames.length === 1 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const tpl = templates.find(t => t.name === selectedQaNames[0]);
-                          if (tpl) {
-                            setSelectedQaTemplateName(tpl.name);
-                            setQaName(tpl.name);
-                            setQaIcon(tpl.icon || '⚡');
-                            setQaFrom(tpl.data.from);
-                            setQaClass(tpl.data.transaction_type);
-                            setQaSubClass(tpl.data.transaction_subtype);
-                            setQaEntity(tpl.data.entity);
-                            setQaCategory(tpl.data.transaction_category);
-                            setQaTargetAccount(tpl.data.target_account);
-                            setQaSourceDestBank(tpl.data.source_dest_bank);
-                            setQaFlow(tpl.data.flow);
-                            setQaStatus(tpl.data.payment_status);
-                            setQaDescription(tpl.data.description || '');
-                            setQaAmount(tpl.data.amount || '');
-                            setQaDueDate(tpl.data.due_date || '');
-                            setQaValueDate(tpl.data.value_date || '');
-                            setQaPostingDate(tpl.data.posting_date || '');
-                            setIsEditingQa(true);
-                          }
-                        }}
-                        className="w-[28px] h-[28px] bg-blue-700 hover:bg-blue-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
-                        title="Edit Quick Action"
-                      >
-                        ✏️
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleDeleteQuickAction}
-                      className="w-[28px] h-[28px] bg-red-755 hover:bg-red-800 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
-                      title={t('delete', 'Delete')}
-                    >
-                      🗑️
-                    </button>
-                  </>
-                ) : (
-                  selectedSettingType === 'quickAction' && (
-                    <button
-                      type="submit"
-                      form="quick-action-form"
-                      className="w-[28px] h-[28px] bg-[#8b4513] hover:bg-[#8b4513]/90 text-white rounded-lg hover:scale-[1.05] active:scale-95 transition-all shadow cursor-pointer flex items-center justify-center font-bold text-xs"
-                      title={t('add', 'Add')}
-                    >
-                      ➕
-                    </button>
-                  )
-                )}
-                {selectedSettingType === 'allActions' && (
-                  <div className="flex items-center gap-1.5 ml-1">
-                    <button
-                      type="button"
-                      onClick={() => qaFileInputRef.current.click()}
-                      className="px-2.5 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-                      title="Import All Actions CSV"
-                    >
-                      <span>📥</span> Import
-                    </button>
-                    <input
-                      type="file"
-                      ref={qaFileInputRef}
-                      onChange={importQuickActionsCSV}
-                      accept=".csv"
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleExportAllActionsCSV(templates, t)}
-                      className="px-2.5 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-                      title="Export All Actions to CSV"
-                    >
-                      <span>📤</span> Export
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {selectedSettingType === 'quickAction' && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => qaFileInputRef.current.click()}
-                    className="px-2 h-[28px] bg-[#faf4e5]/90 border border-[#8b4513]/25 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-[#8b4513]/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-                    title={typeof t === 'function' ? t('import_csv', 'Import CSV') : (t.import_csv || "Import CSV")}
-                  >
-                    <span>📥</span> Import
-                  </button>
-                  <input
-                    type="file"
-                    ref={qaFileInputRef}
-                    onChange={importQuickActionsCSV}
-                    accept=".csv"
-                    className="hidden"
-                  />
-                  <select
-                    value={selectedQaTemplateName || ''}
-                    onChange={(e) => {
-                      const tplName = e.target.value;
-                      setSelectedQaTemplateName(tplName);
-                      if (tplName) {
-                        const tpl = templates.find((t) => t.name === tplName);
-                        if (tpl) {
-                          setQaName(tpl.name);
-                          setQaIcon(tpl.icon || '⚡');
-                          setQaFrom(tpl.data.from);
-                          setQaClass(tpl.data.transaction_type);
-                          setQaSubClass(tpl.data.transaction_subtype);
-                          setQaEntity(tpl.data.entity);
-                          setQaCategory(tpl.data.transaction_category);
-                          setQaTargetAccount(tpl.data.target_account);
-                          setQaSourceDestBank(tpl.data.source_dest_bank);
-                          setQaFlow(tpl.data.flow);
-                          setQaStatus(tpl.data.payment_status);
-                          setQaDescription(tpl.data.description || '');
-                          setQaAmount(tpl.data.amount || '');
-                          setQaDueDate(tpl.data.due_date || '');
-                          setQaValueDate(tpl.data.value_date || '');
-                          setQaPostingDate(tpl.data.posting_date || '');
-                        }
-                      } else {
-                        setQaName('');
-                        setQaIcon('⚡');
-                        setQaFrom('');
-                        setQaClass('');
-                        setQaSubClass('');
-                        setQaEntity('');
-                        setQaCategory('');
-                        setQaTargetAccount('');
-                        setQaSourceDestBank('');
-                        setQaFlow('');
-                        setQaStatus('');
-                        setQaDescription('');
-                        setQaAmount('');
-                        setQaDueDate('');
-                        setQaValueDate('');
-                        setQaPostingDate('');
-                        setSelectedQaNames([]);
-                      }
-                    }}
-                    className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="">-- Choose Quick Action --</option>
-                    {templates.map((tpl) => (
-                      <option key={tpl.name} value={tpl.name}>
-                        {tpl.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {selectedSettingType === 'quickAction' ? (
-          <ManageQuickActionsPanel
-            qaName={qaName}
-            setQaName={setQaName}
-            qaIcon={qaIcon}
-            setQaIcon={setQaIcon}
-            qaClass={qaClass}
-            setQaClass={setQaClass}
-            qaSubClass={qaSubClass}
-            setQaSubClass={setQaSubClass}
-            qaFlow={qaFlow}
-            setQaFlow={setQaFlow}
-            qaStatus={qaStatus}
-            setQaStatus={setQaStatus}
-            qaFrom={qaFrom}
-            setQaFrom={setQaFrom}
-            qaCategory={qaCategory}
-            setQaCategory={setQaCategory}
-            qaEntity={qaEntity}
-            setQaEntity={setQaEntity}
-            qaAmount={qaAmount}
-            setQaAmount={setQaAmount}
-            qaValueDate={qaValueDate}
-            setQaValueDate={setQaValueDate}
-            qaDueDate={qaDueDate}
-            setQaDueDate={setQaDueDate}
-            qaPostingDate={qaPostingDate}
-            setQaPostingDate={setQaPostingDate}
-            qaDescription={qaDescription}
-            setQaDescription={setQaDescription}
-            qaSourceDestBank={qaSourceDestBank}
-            setQaSourceDestBank={setQaSourceDestBank}
-            qaTargetAccount={qaTargetAccount}
-            setQaTargetAccount={setQaTargetAccount}
-            classOptions={classOptions}
-            subClassOptions={subClassOptions}
-            statusOptions={statusOptions}
-            fromOptions={fromOptions}
-            categoryOptions={categoryOptions}
-            entityOptions={entityOptions}
-            entityMappings={entityMappings}
-            accountMappings={accountMappings}
-            templates={templates}
-            selectedQaTemplateName={selectedQaTemplateName}
-            setSelectedQaTemplateName={setSelectedQaTemplateName}
-            setSelectedQaNames={setSelectedQaNames}
-            onSubmit={handleAddOptionSubmit}
-          />
-        ) : (
-          <>
-            {selectedSettingType !== 'allActions' && selectedSettingType !== 'class' && (
-              <form onSubmit={handleAddOptionSubmit} className="bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl p-3.5 mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-                  <div>
-                    <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                      {t.new_value}
-                    </label>
-                    <input
-                      type="text"
-                      value={newOptionVal}
-                      onChange={(e) => setNewOptionVal(e.target.value)}
-                      placeholder={t('placeholder.item')}
-                      required
-                      className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-3 text-xs font-bold text-[#4b2c20] placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50"
-                    />
-                  </div>
-
-                  {showEntityCategorySelector && (
-                    <div>
-                      <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                        {t.default_category}
-                      </label>
-                      <select
-                        value={newEntityCatVal}
-                        onChange={(e) => setNewEntityCatVal(e.target.value)}
-                        className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[34px] px-2 text-xs font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                      >
-                        {categoryOptions.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className={`${!showEntityCategorySelector ? 'sm:col-span-2' : ''} flex justify-end`}>
-                    <button
-                      type="submit"
-                      className="px-3 h-[28px] bg-[#8b4513] text-white font-black text-[9px] uppercase tracking-wider rounded-lg hover:scale-[1.02] active:scale-98 transition-all shadow border border-[#d4af37]/20 cursor-pointer flex items-center justify-center"
-                    >
-                      ➕ {t.add}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            )}
-
-            {/* Filter Dropdowns for All Actions */}
-            {selectedSettingType === 'allActions' && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 p-3 bg-[#faf4e5]/40 border border-[#8b4513]/15 rounded-xl">
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Type
-                  </label>
-                  <select
-                    value={filterActionType}
-                    onChange={(e) => {
-                      setFilterActionType(e.target.value);
-                      setActionsCurrentPage(1);
-                      setFilterActionSubtype('');
-                      setFilterActionCategory('');
-                      setFilterActionEntity('');
-                    }}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="">All Types</option>
-                    {classOptions.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Subtype
-                  </label>
-                  <select
-                    value={filterActionSubtype}
-                    onChange={(e) => {
-                      setFilterActionSubtype(e.target.value);
-                      setActionsCurrentPage(1);
-                      setFilterActionCategory('');
-                      setFilterActionEntity('');
-                    }}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="">All Subtypes</option>
-                    {dynamicSubtypes.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Category
-                  </label>
-                  <select
-                    value={filterActionCategory}
-                    onChange={(e) => {
-                      setFilterActionCategory(e.target.value);
-                      setActionsCurrentPage(1);
-                      setFilterActionEntity('');
-                    }}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="">All Categories</option>
-                    {dynamicCategories.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">
-                    Entity
-                  </label>
-                  <select
-                    value={filterActionEntity}
-                    onChange={(e) => {
-                      setFilterActionEntity(e.target.value);
-                      setActionsCurrentPage(1);
-                    }}
-                    className="w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg h-[28px] px-2 text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:border-[#8b4513]/50"
-                  >
-                    <option value="">All Entities</option>
-                    {dynamicEntities.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* List of items */}
-            <div className="flex-1 overflow-y-auto border border-[#8b4513]/20 rounded-xl bg-[#faf4e5]/20 custom-scrollbar">
-              {currentList.length > 0 ? (
-                selectedSettingType === 'allActions' ? (
-              <div className="flex flex-col h-full overflow-hidden">
-                <div className="flex-1 overflow-y-auto">
-                  {(() => {
-                    let sortedList = [...currentList];
-                    if (actionsSortField) {
-                      sortedList.sort((a, b) => {
-                        let valA = '';
-                        let valB = '';
-                        if (actionsSortField === 'name') {
-                          valA = t(`tpl_${a.name.toLowerCase().replace(/\s+/g, '_')}`, a.name).toLowerCase();
-                          valB = t(`tpl_${b.name.toLowerCase().replace(/\s+/g, '_')}`, b.name).toLowerCase();
-                        } else if (actionsSortField === 'type') {
-                          valA = `${a.data.transaction_type || ''} • ${a.data.transaction_subtype || ''}`.toLowerCase();
-                          valB = `${b.data.transaction_type || ''} • ${b.data.transaction_subtype || ''}`.toLowerCase();
-                        } else if (actionsSortField === 'entity') {
-                          valA = (a.data.entity || '').toLowerCase();
-                          valB = (b.data.entity || '').toLowerCase();
-                        }
- 
-                        if (valA < valB) return actionsSortDirection === 'asc' ? -1 : 1;
-                        if (valA > valB) return actionsSortDirection === 'asc' ? 1 : -1;
-                        return 0;
-                      });
-                    }
- 
-                    const itemsPerPage = 10;
-                    const totalPages = Math.ceil(sortedList.length / itemsPerPage) || 1;
-                    const safeCurrentPage = Math.min(Math.max(actionsCurrentPage, 1), totalPages);
-                    const paginatedList = sortedList.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
-
-                    return (
-                      <table className="w-full text-left border-collapse text-[9.5px] font-sans">
-                        <thead className="sticky top-0 bg-[#faf4e5] z-10 border-b border-[#8b4513]/25 shadow-sm">
-                          <tr className="text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                            <th className="py-1.5 px-2 w-8 text-center">
-                              <input
-                                type="checkbox"
-                                checked={paginatedList.length > 0 && paginatedList.every(tpl => selectedQaNames.includes(tpl.name))}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedQaNames(prev => Array.from(new Set([...prev, ...paginatedList.map(tpl => tpl.name)])));
-                                  } else {
-                                    setSelectedQaNames(prev => prev.filter(name => !paginatedList.some(tpl => tpl.name === name)));
-                                  }
-                                }}
-                                className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
-                              />
-                            </th>
-                            <th
-                              className="py-1.5 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                              onClick={() => {
-                                if (actionsSortField === 'name') {
-                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                                } else {
-                                  setActionsSortField('name');
-                                  setActionsSortDirection('asc');
-                                }
-                              }}
-                            >
-                              Action {actionsSortField === 'name' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
-                            </th>
-                            <th
-                              className="py-1.5 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                              onClick={() => {
-                                if (actionsSortField === 'type') {
-                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                                } else {
-                                  setActionsSortField('type');
-                                  setActionsSortDirection('asc');
-                                }
-                              }}
-                            >
-                              Type/Subtype {actionsSortField === 'type' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
-                            </th>
-                            <th
-                              className="py-1.5 px-2 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                              onClick={() => {
-                                if (actionsSortField === 'entity') {
-                                  setActionsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                                } else {
-                                  setActionsSortField('entity');
-                                  setActionsSortDirection('asc');
-                                }
-                              }}
-                            >
-                              Entity {actionsSortField === 'entity' ? (actionsSortDirection === 'asc' ? '▲' : '▼') : ''}
-                            </th>
-                            <th className="py-1.5 px-2 text-right">Edit</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                          {paginatedList.map((tpl) => {
-                            const isChecked = selectedQaNames.includes(tpl.name);
-                            return (
-                              <tr key={tpl.name} className={`hover:bg-[#8b4513]/5 transition-colors ${isChecked ? 'bg-[#8b4513]/10' : ''}`}>
-                                <td className="py-1 px-2 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      let updated;
-                                      if (e.target.checked) {
-                                        updated = [...selectedQaNames, tpl.name];
-                                      } else {
-                                        updated = selectedQaNames.filter(n => n !== tpl.name);
-                                      }
-                                      setSelectedQaNames(updated);
-                                    }}
-                                    className="cursor-pointer rounded border-[#8b4513]/30 text-[#8b4513] focus:ring-[#8b4513]"
-                                  />
-                                </td>
-                                <td className="py-1 px-2 font-bold text-[#4b2c20] text-[9.5px]">
-                                  {t(`tpl_${tpl.name.toLowerCase().replace(/\s+/g, '_')}`, tpl.name)}
-                                </td>
-                                <td className="py-1 px-2 text-stone-500 font-medium text-[9px]">
-                                  {tpl.data.transaction_type} • {tpl.data.transaction_subtype}
-                                </td>
-                                <td className="py-1 px-2 text-stone-500 font-medium text-[9px]">{tpl.data.entity}</td>
-                                <td className="py-1 px-2 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedQaTemplateName(tpl.name);
-                                      setQaName(tpl.name);
-                                      setQaIcon(tpl.icon || '⚡');
-                                      setQaFrom(tpl.data.from || '');
-                                      setQaClass(tpl.data.transaction_type || '');
-                                      setQaSubClass(tpl.data.transaction_subtype || '');
-                                      setQaEntity(tpl.data.entity || '');
-                                      setQaCategory(tpl.data.transaction_category || '');
-                                      setQaTargetAccount(tpl.data.target_account || '');
-                                      setQaSourceDestBank(tpl.data.source_dest_bank || '');
-                                      setQaFlow(tpl.data.flow || '');
-                                      setQaStatus(tpl.data.payment_status || '');
-                                      setQaDescription(tpl.data.description || '');
-                                      setQaAmount(tpl.data.amount || '');
-                                      setQaDueDate(tpl.data.due_date || '');
-                                      setQaValueDate(tpl.data.value_date || '');
-                                      setQaPostingDate(tpl.data.posting_date || '');
-                                      setIsEditingQa(true);
-                                    }}
-                                    className="text-blue-700 hover:text-blue-900 font-bold px-1.5 py-0.5 rounded border border-transparent hover:border-blue-200 hover:bg-blue-50 transition-all cursor-pointer text-[10px]"
-                                    title="Edit Quick Action"
-                                  >
-                                    ✏️
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot className="sticky bottom-0 bg-[#faf4e5] z-10 border-t border-[#8b4513]/25 shadow-sm">
-                          <tr>
-                            <td colSpan={5} className="py-1.5 px-3">
-                              <div className="flex flex-wrap items-center justify-between gap-2 text-[#4b2c20] text-[9.5px] font-black uppercase font-sans">
-                                <div>
-                                  Page {safeCurrentPage} of {totalPages} ({sortedList.length} total)
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    disabled={safeCurrentPage === 1}
-                                    onClick={() => setActionsCurrentPage(safeCurrentPage - 1)}
-                                    className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
-                                  >
-                                    ◀ Prev
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={safeCurrentPage === totalPages}
-                                    onClick={() => setActionsCurrentPage(safeCurrentPage + 1)}
-                                    className="px-2 py-0.5 bg-[#8b4513] text-white rounded disabled:opacity-40 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider"
-                                  >
-                                    Next ▶
-                                  </button>
-                                  <div className="flex items-center gap-1 ml-2">
-                                    <span>Go to:</span>
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      max={totalPages}
-                                      value={manualPageInput}
-                                      onChange={(e) => {
-                                        setManualPageInput(e.target.value);
-                                        const p = parseInt(e.target.value, 10);
-                                        if (p >= 1 && p <= totalPages) {
-                                          setActionsCurrentPage(p);
-                                        }
-                                      }}
-                                      className="w-10 px-1 py-0.5 bg-white border border-[#8b4513]/30 rounded text-center text-[10px] font-bold text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    );
-                  })()}
-                </div>
-              </div>
-            ) : (
-              (() => {
-                const sortedCurrentList = [...currentList].sort((a, b) => {
-                  return settingsSortDirection === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
-                });
-                return (
-                  <table className="w-full text-left border-collapse text-[10px] font-sans">
-                    <thead>
-                      <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[#4b2c20] font-black uppercase tracking-wider title-font">
-                        <th 
-                          className="py-2 px-3 cursor-pointer hover:bg-[#8b4513]/20 select-none"
-                          onClick={() => setSettingsSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-                        >
-                          {t.value} {settingsSortDirection === 'asc' ? '▲' : '▼'}
-                        </th>
-                        {selectedSettingType === 'entity' && <th className="py-2 px-3">{t.default_category}</th>}
-                        <th className="py-2 px-3 text-right">{t.actions}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#8b4513]/10 text-stone-700 font-bold">
-                      {sortedCurrentList.map((val) => (
-                        <tr key={val} className="hover:bg-[#8b4513]/5 transition-colors">
-                          <td className="py-2 px-3 font-bold text-[#4b2c20]">{val}</td>
-                          {selectedSettingType === 'entity' && (
-                            <td className="py-2 px-3 text-stone-500 font-medium">{entityMappings[val] || '-'}</td>
-                          )}
-                          <td className="py-2 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteOption(val)}
-                              className="text-red-700 hover:text-red-900 font-black px-2 py-0.5 rounded border border-transparent hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
-                              title={t.eliminate}
-                            >
-                              ❌ {t.eliminate}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                );
-              })()
-            )
-          ) : (
-            <p className="text-center py-8 text-xs text-[#5d4037]/60 italic font-serif">
-              {t.no_options_registered}
-            </p>
-          )}
-        </div>
-      </>
-    )}
-  </div>
-    );
-  };
 
 
 
@@ -1911,100 +1044,84 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         </div>
 
         {/* Settings View */}
-        {activeTab === 'settings' && (
-          <div 
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setActiveTab('quests');
-              }
-            }}
-            className={`absolute inset-0 flex ${STANDARD_MODAL_PROPS.align} justify-center p-4 bg-black/60 backdrop-blur-xs`}
-            style={{ zIndex: Z_LAYERS.OVERLAY }}
-          >
-            <div className={`bg-[#f4e4bc] w-full ${STANDARD_MODAL_PROPS.size} rounded-xl border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] relative flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300`}>
-              
-              {/* Parchment Texture */}
-              <div 
-                className="absolute inset-0 pointer-events-none opacity-25 mix-blend-multiply"
-                style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')" }}
-              />
+        <SettingsModal
+          isOpen={activeTab === 'settings'}
+          onClose={() => setActiveTab('quests')}
+          t={t}
+          selectedSettingType={selectedSettingType}
+          setSelectedSettingType={setSelectedSettingType}
+          newOptionVal={newOptionVal}
+          setNewOptionVal={setNewOptionVal}
+          newEntityCatVal={newEntityCatVal}
+          setNewEntityCatVal={setNewEntityCatVal}
+          accountMappings={accountMappings}
+          subtypeToCategoryMap={subtypeToCategoryMap}
+          subtypeTypes={subtypeTypes}
+          syncSettings={syncSettings}
+          subClassOptions={subClassOptions}
+          categoryOptions={categoryOptions}
+          entityOptions={entityOptions}
+          entityMappings={entityMappings}
+          getMatrixRows={getMatrixRows}
+          handleSaveMatrix={handleSaveMatrix}
+          settingsFileInputRef={settingsFileInputRef}
+          importSettingsCSV={importSettingsCSV}
+          exportSettingsCSV={exportSettingsCSV}
+          fromOptions={fromOptions}
+          statusOptions={statusOptions}
+          classOptions={classOptions}
+          templates={templates}
+          selectedQaNames={selectedQaNames}
+          setSelectedQaNames={setSelectedQaNames}
+          setSelectedQaTemplateName={setSelectedQaTemplateName}
+          setQaName={setQaName}
+          setQaIcon={setQaIcon}
+          setQaFrom={setQaFrom}
+          setQaClass={setQaClass}
+          setQaSubClass={setQaSubClass}
+          setQaEntity={setQaEntity}
+          setQaCategory={setQaCategory}
+          setQaTargetAccount={setQaTargetAccount}
+          setQaSourceDestBank={setQaSourceDestBank}
+          setQaFlow={setQaFlow}
+          setQaStatus={setQaStatus}
+          setQaDescription={setQaDescription}
+          setQaAmount={setQaAmount}
+          setQaDueDate={setQaDueDate}
+          setQaValueDate={setQaValueDate}
+          setQaPostingDate={setQaPostingDate}
+          setIsEditingQa={setIsEditingQa}
+          handleDeleteQuickAction={handleDeleteQuickAction}
+          qaFileInputRef={qaFileInputRef}
+          importQuickActionsCSV={importQuickActionsCSV}
+          handleExportAllActionsCSV={handleExportAllActionsCSV}
+          qaName={qaName}
+          qaIcon={qaIcon}
+          qaFrom={qaFrom}
+          qaClass={qaClass}
+          qaSubClass={qaSubClass}
+          qaEntity={qaEntity}
+          qaCategory={qaCategory}
+          qaTargetAccount={qaTargetAccount}
+          qaSourceDestBank={qaSourceDestBank}
+          qaFlow={qaFlow}
+          qaStatus={qaStatus}
+          qaDescription={qaDescription}
+          qaAmount={qaAmount}
+          qaDueDate={qaDueDate}
+          qaValueDate={qaValueDate}
+          qaPostingDate={qaPostingDate}
+          addOption={addOption}
+          editOption={editOption}
+          deleteOption={deleteOption}
+          handleSaveQuickAction={handleSaveQuickAction}
+          filterActionType={filterActionType}
+          filterActionSubtype={filterActionSubtype}
+          filterActionCategory={filterActionCategory}
+          filterActionEntity={filterActionEntity}
+        />
 
-              {/* Ornate Corners */}
-              <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-[#8b4513]/30 rounded-tl-lg pointer-events-none" />
-              <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-[#8b4513]/30 rounded-tr-lg pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-[#8b4513]/30 rounded-bl-lg pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-[#8b4513]/30 rounded-br-lg pointer-events-none" />
-
-              {/* Close Button to return to quests */}
-              <button 
-                onClick={() => setActiveTab('quests')}
-                className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group"
-                style={{ zIndex: Z_LAYERS.MODAL_CONTENT }}
-                title={t.back_to_map}
-              >
-                <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
-                <span className="text-[#ffd700] text-lg font-black font-sans">✕</span>
-              </button>
-
-              {/* Header Ribbon */}
-              <div className="relative h-16 flex items-center justify-center z-10 pt-2">
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[110%] h-10 bg-gradient-to-r from-[#8b4513] via-[#5d4037] to-[#8b4513] shadow-lg transform -rotate-1 skew-x-12 z-0 border-y-2 border-[#d4af37]" />
-                <h2 className="title-font text-lg sm:text-xl text-[#ffd700] font-bold uppercase tracking-[0.2em] relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                  {t.configuration_panel}
-                </h2>
-              </div>
-
-              {/* Body */}
-              <div className="p-4 sm:p-6 overflow-hidden flex-grow relative z-10 text-[#2d1b0d] flex gap-4">
-                
-                {/* Left Navigation Menu (Wood buttons) */}
-                <div className="w-[22%] min-w-[115px] max-w-[145px] border-r border-[#8b4513]/25 pr-2 flex flex-col gap-1.5 flex-shrink-0">
-                  <h4 className="text-[8.5px] font-black uppercase text-[#8b4513]/70 tracking-widest mb-1.5 pl-1 title-font">{t.kingdom_lists}</h4>
-                  <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar-subtle">
-                    {[
-                      { id: 'from', label: 'Origin/From', icon: '👤' },
-                      { id: 'status', label: 'Status', icon: '📊' },
-                      { id: 'class', label: 'Categories', icon: '📁' },
-                      { id: 'subcategories', label: 'Subtypes & Categories', icon: '🏷️' },
-                      { id: 'coa', label: 'Chart of Accounts', icon: '📖' },
-                      { id: 'initialBalances', label: 'Initial Balances', icon: '⚖️' },
-                      { id: 'quickAction', label: 'Quick Actions', icon: '⚡' },
-                      { id: 'allActions', label: 'All Actions', icon: '📋' }
-                    ].map((btn) => {
-                      const isSel = selectedSettingType === btn.id;
-                      return (
-                        <button
-                          key={btn.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedSettingType(btn.id);
-                            setNewOptionVal('');
-                          }}
-                          className={`text-left px-2 py-2 md:py-1.5 rounded-lg font-black text-[8.5px] leading-tight uppercase tracking-wider transition-all border cursor-pointer min-h-[36px] md:min-h-0 flex items-center ${
-                            isSel
-                              ? 'bg-[#8b4513]/20 border-[#8b4513] text-[#4b2c20] shadow-inner font-black scale-[1.02]'
-                              : 'bg-[#faf4e5]/80 border-[#8b4513]/10 text-[#5d4037]/80 hover:bg-[#8b4513]/5 hover:text-[#4b2c20]'
-                          }`}
-                        >
-                          <span className="mr-1 text-[10px] flex-shrink-0">{btn.icon}</span>
-                          <span className="truncate">{btn.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Right Settings Detail Panel */}
-                <div className="flex-1 flex flex-col overflow-hidden pl-1">
-                  {renderSettingsPanel()}
-                </div>
-
-              </div>
-
-            </div>
-          </div>
-        )}
-        <EditQuickActionModal
+        <QuickActionModal
           isOpen={isEditingQa}
           onClose={() => setIsEditingQa(false)}
           onSave={handleSaveQuickAction}
@@ -2053,17 +1170,17 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
         {/* Navegação Inferior (Estática) */}
         <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
 
-        {/* Modal das Quests (Vazio) */}
-        <Modal
+        <QuestModal
           isOpen={isQuestsModalOpen}
           onClose={() => setIsQuestsModalOpen(false)}
-          title={t('quests_modal_title', 'Quests')}
-          {...STANDARD_MODAL_PROPS}
-        >
-          <div className="text-center py-8 text-[#5d4037]/60 italic font-serif">
-            {t('quests_empty_msg', 'No quests registered at this time.')}
-          </div>
-        </Modal>
+          t={t}
+        />
+
+        <AchievementsModal
+          isOpen={activeTab === 'achievements'}
+          onClose={() => setActiveTab('quests')}
+          t={t}
+        />
 
         {/* Modal do Menu da Tesouraria Real */}
         <Modal
