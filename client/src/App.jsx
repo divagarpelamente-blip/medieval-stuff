@@ -138,6 +138,8 @@ function App() {
   const savingsRateData = useKingdomStore((state) => state.savingsRateData);
   const fetchRunwayData = useKingdomStore((state) => state.fetchRunwayData);
   const runwayData = useKingdomStore((state) => state.runwayData);
+  const fetchDtiData = useKingdomStore((state) => state.fetchDtiData);
+  const dtiData = useKingdomStore((state) => state.dtiData);
 
   const coaSubtypesAndEntities = useMemo(() => {
     const subtypes = new Set();
@@ -622,7 +624,10 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
     fetchExpenseVariance(selectedYears, selectedQuarters, selectedMonths);
     fetchSavingsRate(selectedYears, selectedQuarters, selectedMonths);
     fetchRunwayData(selectedYears, selectedQuarters, selectedMonths);
-  }, [user?.id, selectedYears, selectedQuarters, selectedMonths, fetchExpenseVariance, fetchSavingsRate, fetchRunwayData]);
+  // --- ADD THIS LINE: ---
+  fetchDtiData(selectedYears, selectedQuarters, selectedMonths);
+ 
+}, [user?.id, selectedYears, selectedQuarters, selectedMonths, fetchExpenseVariance, fetchSavingsRate, fetchRunwayData, fetchDtiData]); // <-- Don't forget to add fetchDtiData to the dependency array
 
   // Initialize auth state and listen for session transitions
   useEffect(() => {
@@ -1965,7 +1970,7 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                         ⚖️ {t('metrics.overview_ratios', 'Overview & Ratios')}
                       </h3>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Expense Variance Card */}
                         <div className="bg-[#faf4e5] border border-[#8b4513]/25 rounded-lg p-4 shadow-sm flex flex-col justify-between relative overflow-hidden text-left">
                           {/* Decorative subtle shield/scroll icon */}
@@ -2127,6 +2132,60 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                     </div>
                   </div>
                 )}
+                {/* DTI Ratio Card */}
+<div className="bg-[#faf4e5] border border-[#8b4513]/25 rounded-lg p-4 shadow-sm flex flex-col justify-between relative overflow-hidden text-left">
+  {/* Decorative subtle scales icon */}
+  <div className="absolute right-3 top-3 text-[#8b4513]/10 text-5xl pointer-events-none font-serif">
+    ⚖️
+  </div>
+  
+  <div>
+    <span className="block text-[9px] font-black uppercase text-[#5d4037]/70 tracking-wider font-sans mb-1">
+      {t('metrics.dti_ratio', 'Debt-to-Income')}
+    </span>
+    <div className="flex items-baseline gap-2 mt-1">
+      <span className={`text-2xl font-mono font-black ${
+        dtiData?.dti_percentage <= 36 ? 'text-emerald-700' : 
+        dtiData?.dti_percentage <= 43 ? 'text-amber-600' : 'text-rose-700'
+      }`}>
+        {Number(dtiData?.dti_percentage || 0).toFixed(2)}%
+      </span>
+    </div>
+    
+    <div className="text-[10px] text-[#5d4037]/75 font-bold font-sans mt-3 space-y-1">
+      <div>
+        {t('metrics.amortization', 'Amortization')}:{' '}
+        <span className="font-mono text-[#4b2c20]">
+          {Number(dtiData?.total_amortization || 0).toLocaleString()}g
+        </span>
+      </div>
+      <div>
+        {t('metrics.total_income', 'Total Income')}:{' '}
+        <span className="font-mono text-[#4b2c20]">
+          {Number(dtiData?.total_income || 0).toLocaleString()}g
+        </span>
+      </div>
+    </div>
+  </div>
+  <div className="mt-4 pt-3 border-t border-[#8b4513]/15 flex items-center justify-between">
+    <span className="text-[9px] font-black uppercase text-[#8b4513] tracking-widest font-sans">
+      {t('metrics.risk_level', 'Risk Level')}
+    </span>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${
+      dtiData?.dti_percentage <= 36 
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+        : dtiData?.dti_percentage <= 43
+          ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : 'bg-rose-50 text-rose-700 border-rose-200'
+    }`}>
+      {dtiData?.dti_percentage <= 36 
+        ? t('metrics.healthy', 'Healthy') 
+        : dtiData?.dti_percentage <= 43 
+          ? t('metrics.caution', 'Caution') 
+          : t('metrics.danger', 'Danger')}
+    </span>
+  </div>
+</div>
 
                 {/* SUBTAB: INCOME & EXPENSES */}
                 {dashSubTab === 'income_expense' && (
