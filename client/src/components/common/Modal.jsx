@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { Z_LAYERS } from '../constants/UI_UX';
+import { Z_LAYERS } from '../../constants/UI_UX';
 
 const Modal = ({ isOpen, onClose, title, children, footer, size = 'max-w-xl', align = 'items-center' }) => {
   const overlayRef = useRef(null);

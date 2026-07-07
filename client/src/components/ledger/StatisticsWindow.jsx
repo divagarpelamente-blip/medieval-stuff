@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
-import Modal from './Modal';
-import { supabase } from '../lib/supabaseClient';
-import { useKingdomStore } from '../store/useKingdomStore';
-import StatisticCard from './shared/StatisticCard';
+import Modal from '../common/Modal';
+import { supabase } from '../../lib/supabaseClient';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import StatisticCard from './StatisticCard';
 
 const monthOptions = [
   "January", "February", "March", "April", "May", "June",

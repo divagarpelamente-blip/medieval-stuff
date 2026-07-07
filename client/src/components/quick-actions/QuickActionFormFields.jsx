@@ -5,7 +5,7 @@
 // @antigravity-ignore
 // =====================================================================
 import React from 'react';
-import { useKingdomStore } from '../store/useKingdomStore';
+import { useKingdomStore } from '../../store/useKingdomStore';
 
 const QuickActionFormFields = ({
   qaName,

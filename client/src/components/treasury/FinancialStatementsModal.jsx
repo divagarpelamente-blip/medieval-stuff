@@ -1,7 +1,7 @@
 import React from 'react';
-import BaseDashboardTab from './BaseDashboardTab';
+import BaseDashboardTab from '../dashboard/BaseDashboardTab';
 import ConsolidatedFinancialStatement from './ConsolidatedFinancialStatement';
-import { STANDARD_MODAL_PROPS, Z_LAYERS } from '../constants/UI_UX';
+import { STANDARD_MODAL_PROPS, Z_LAYERS } from '../../constants/UI_UX';
 
 const FinancialStatementsModal = ({
   isOpen,

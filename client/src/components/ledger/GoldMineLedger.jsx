@@ -1,11 +1,11 @@
 import { useState, useRef, useMemo, memo, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
-import { supabase } from '../lib/supabaseClient';
-import { Z_LAYERS, STANDARD_MODAL_PROPS } from '../constants/UI_UX';
-import { useKingdomStore } from '../store/useKingdomStore';
-import TableSortHeader from './shared/TableSortHeader';
+import { supabase } from '../../lib/supabaseClient';
+import { Z_LAYERS, STANDARD_MODAL_PROPS } from '../../constants/UI_UX';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import TableSortHeader from '../common/TableSortHeader';
 
-import { accountMappings } from '../utils/accountMappings';
+import { accountMappings } from '../../utils/accountMappings';
 
 const GUEST_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
 

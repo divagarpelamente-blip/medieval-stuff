@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { useKingdomStore } from '../store/useKingdomStore';
+import { useKingdomStore } from '../../store/useKingdomStore';
 
 export default function InitialBalancesEditor({ t, accountMappings }) {
   const accountBalances = useKingdomStore((state) => state.accountBalances) || [];

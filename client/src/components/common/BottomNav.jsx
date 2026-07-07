@@ -1,6 +1,6 @@
 import { Compass, Trophy, BookOpen, LayoutDashboard, Settings, BarChart3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Z_LAYERS } from '../constants/UI_UX';
+import { Z_LAYERS } from '../../constants/UI_UX';
 
 const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
   const { t } = useTranslation();

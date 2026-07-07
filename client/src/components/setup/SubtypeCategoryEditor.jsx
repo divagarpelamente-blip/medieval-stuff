@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import Modal from './Modal';
-import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
+import Modal from '../common/Modal';
+import { STANDARD_MODAL_PROPS } from '../../constants/UI_UX';
 
 const TYPE_NAMES = {
   '1': 'Assets',

@@ -1,6 +1,6 @@
 import React from 'react';
-import Modal from './Modal';
-import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
+import Modal from '../common/Modal';
+import { STANDARD_MODAL_PROPS } from '../../constants/UI_UX';
 import QuickActionFormFields from './QuickActionFormFields';
 
 const EditQuickActionModal = ({

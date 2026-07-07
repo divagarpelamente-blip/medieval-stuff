@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useKingdomStore } from '../store/useKingdomStore';
-import TableSortHeader from './shared/TableSortHeader';
-import TablePagination from './shared/TablePagination';
-import BulkActionBar from './shared/BulkActionBar';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import TableSortHeader from '../common/TableSortHeader';
+import TablePagination from '../common/TablePagination';
+import BulkActionBar from '../common/BulkActionBar';
 
 export default function AllActionsEditor({
   t,

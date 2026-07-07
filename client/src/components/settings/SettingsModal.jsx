@@ -1,13 +1,13 @@
 import React from 'react';
 import { toast } from 'react-hot-toast';
-import { STANDARD_MODAL_PROPS, Z_LAYERS } from '../constants/UI_UX';
-import InitialBalancesEditor from './InitialBalancesEditor';
-import SubtypeCategoryEditor from './SubtypeCategoryEditor';
-import COAEditor from './COAEditor';
-import CategoryMatrixEditor from './CategoryMatrixEditor';
-import FlatListEditor from './FlatListEditor';
-import AllActionsEditor from './AllActionsEditor';
-import ManageQuickActionsPanel from './ManageQuickActionsPanel';
+import { STANDARD_MODAL_PROPS, Z_LAYERS } from '../../constants/UI_UX';
+import InitialBalancesEditor from '../setup/InitialBalancesEditor';
+import SubtypeCategoryEditor from '../setup/SubtypeCategoryEditor';
+import COAEditor from '../setup/COAEditor';
+import CategoryMatrixEditor from '../setup/CategoryMatrixEditor';
+import FlatListEditor from '../setup/FlatListEditor';
+import AllActionsEditor from '../setup/AllActionsEditor';
+import ManageQuickActionsPanel from '../quick-actions/ManageQuickActionsPanel';
 
 export default function SettingsModal({
   isOpen,

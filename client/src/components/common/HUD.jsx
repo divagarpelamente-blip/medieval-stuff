@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { useKingdomStore } from '../store/useKingdomStore';
-import { supabase } from '../lib/supabaseClient';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { supabase } from '../../lib/supabaseClient';
 
 const HUD = ({ profile, diamonds = 1000 }) => {
   const level = profile?.level || 1;

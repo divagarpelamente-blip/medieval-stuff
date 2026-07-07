@@ -1,11 +1,11 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
-import Modal from './Modal';
-import { STANDARD_MODAL_PROPS } from '../constants/UI_UX';
-import TableSortHeader from './shared/TableSortHeader';
-import TablePagination from './shared/TablePagination';
-import BulkActionBar from './shared/BulkActionBar';
+import Modal from '../common/Modal';
+import { STANDARD_MODAL_PROPS } from '../../constants/UI_UX';
+import TableSortHeader from '../common/TableSortHeader';
+import TablePagination from '../common/TablePagination';
+import BulkActionBar from '../common/BulkActionBar';
 
 export default function FlatListEditor({
   t,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useKingdomStore } from '../store/useKingdomStore';
-import { accountMappings } from '../utils/accountMappings';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { accountMappings } from '../../utils/accountMappings';
 
 // 1. Parsing Helper
 const parseAccountName = (code, fullName) => {
