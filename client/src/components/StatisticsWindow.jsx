@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import Modal from './Modal';
 import { supabase } from '../lib/supabaseClient';
 import { useKingdomStore } from '../store/useKingdomStore';
+import StatisticCard from './shared/StatisticCard';
 
 const monthOptions = [
   "January", "February", "March", "April", "May", "June",
@@ -489,108 +490,6 @@ export default function StatisticsWindow({
       });
   };
 
-  const renderRow = (label, metric) => {
-    const diffColor = metric.diff > 0 ? 'text-emerald-700 font-bold' : metric.diff < 0 ? 'text-rose-700 font-bold' : 'text-stone-500';
-    const diffPrefix = metric.diff > 0 ? '+' : '';
-    return (
-      <tr className="border-b border-[#8b4513]/10 hover:bg-[#8b4513]/5 transition-colors">
-        <td className="py-2 px-4 text-xs font-serif font-black text-[#4b2c20] pl-6 capitalize">{label}</td>
-        <td className="py-2 px-4 text-xs font-mono font-bold text-stone-700 text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            <span>{formatVal(metric.curr)}</span>
-            <button 
-              type="button" 
-              onClick={() => handleOpenDetails(`${label} (${activeMonth})`, metric.currList)}
-              className="text-[10px] hover:scale-125 active:scale-90 transition-transform cursor-pointer opacity-75 hover:opacity-100"
-              title="View records"
-            >
-              📜
-            </button>
-          </div>
-        </td>
-        <td className="py-2 px-4 text-xs font-mono text-stone-500 text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            <span>{formatVal(metric.prev)}</span>
-            <button 
-              type="button" 
-              onClick={() => handleOpenDetails(`${label} (${prevPeriod.month})`, metric.prevList)}
-              className="text-[10px] hover:scale-125 active:scale-90 transition-transform cursor-pointer opacity-75 hover:opacity-100"
-              title="View records"
-            >
-              📜
-            </button>
-          </div>
-        </td>
-        <td className={`py-2 px-4 text-xs font-mono text-right ${diffColor}`}>
-          {diffPrefix}{formatVal(metric.diff)}
-        </td>
-        <td className="py-2 px-4 text-xs font-mono font-black text-[#4b2c20] text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            <span>{formatVal(metric.accum)}</span>
-            <button 
-              type="button" 
-              onClick={() => handleOpenDetails(`${label} (Accumulated)`, metric.accumList)}
-              className="text-[10px] hover:scale-125 active:scale-90 transition-transform cursor-pointer opacity-75 hover:opacity-100"
-              title="View records"
-            >
-              📜
-            </button>
-          </div>
-        </td>
-      </tr>
-    );
-  };
-
-  const renderSectionHeader = (label, metrics) => {
-    const diffColor = metrics.diff > 0 ? 'text-emerald-700 font-extrabold' : metrics.diff < 0 ? 'text-rose-700 font-extrabold' : 'text-[#8b4513]';
-    const diffPrefix = metrics.diff > 0 ? '+' : '';
-    return (
-      <tr className="bg-[#8b4513]/15 border-y border-[#8b4513]/35 font-sans font-bold">
-        <td className="py-2 px-4 text-xs font-black uppercase text-[#8b4513] tracking-wide">{label}</td>
-        <td className="py-2 px-4 text-xs font-mono font-black text-[#8b4513] text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            <span>{formatVal(metrics.curr)}</span>
-            <button 
-              type="button" 
-              onClick={() => handleOpenDetails(`${label} Total (${activeMonth})`, metrics.currList)}
-              className="text-[10px] hover:scale-125 active:scale-90 transition-transform cursor-pointer opacity-75 hover:opacity-100"
-              title="View records"
-            >
-              📜
-            </button>
-          </div>
-        </td>
-        <td className="py-2 px-4 text-xs font-mono font-bold text-stone-600 text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            <span>{formatVal(metrics.prev)}</span>
-            <button 
-              type="button" 
-              onClick={() => handleOpenDetails(`${label} Total (${prevPeriod.month})`, metrics.prevList)}
-              className="text-[10px] hover:scale-125 active:scale-90 transition-transform cursor-pointer opacity-75 hover:opacity-100"
-              title="View records"
-            >
-              📜
-            </button>
-          </div>
-        </td>
-        <td className={`py-2 px-4 text-xs font-mono text-right ${diffColor}`}>{diffPrefix}{formatVal(metrics.diff)}</td>
-        <td className="py-2 px-4 text-xs font-mono font-black text-[#8b4513] text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            <span>{formatVal(metrics.accum)}</span>
-            <button 
-              type="button" 
-              onClick={() => handleOpenDetails(`${label} Total (Accumulated)`, metrics.accumList)}
-              className="text-[10px] hover:scale-125 active:scale-90 transition-transform cursor-pointer opacity-75 hover:opacity-100"
-              title="View records"
-            >
-              📜
-            </button>
-          </div>
-        </td>
-      </tr>
-    );
-  };
-
   const handleClearFilters = () => {
     setSelectedYear('All');
     setSelectedMonth('All');
@@ -684,45 +583,99 @@ export default function StatisticsWindow({
             </div>
           </div>
 
-          {/* Content Table */}
-          <div className="overflow-x-auto border border-[#8b4513]/10 rounded-xl shadow-sm bg-white">
-            <table className="w-full text-left border-collapse overflow-hidden">
-              <thead>
-                <tr className="bg-[#8b4513]/5 text-[#4b2c20] border-b border-[#8b4513]/20">
-                  <th className="py-2 px-4 text-[9px] font-black uppercase tracking-wider font-sans">{t('stat_name', 'Statistic Name')}</th>
-                  <th className="py-2 px-4 text-[9px] font-black uppercase tracking-wider font-sans text-right">
-                    {t(`month_${activeMonth.toLowerCase()}`, activeMonth)}
-                  </th>
-                  <th className="py-2 px-4 text-[9px] font-black uppercase tracking-wider font-sans text-right">
-                    {t(`month_${prevPeriod.month.toLowerCase()}`, prevPeriod.month)}
-                  </th>
-                  <th className="py-2 px-4 text-[9px] font-black uppercase tracking-wider font-sans text-right">{t('stat_diff', 'Difference')}</th>
-                  <th className="py-2 px-4 text-[9px] font-black uppercase tracking-wider font-sans text-right">{t('stat_accumulated', 'Accumulated Balance')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Cash Section */}
-                {renderSectionHeader(t('stat_group_cash', 'Cash'), cashSubtotal)}
-                {renderRow(t('stat_bank_accounts', 'Bank accounts'), stats.bankAccounts)}
-                {renderRow(t('stat_saving_accounts', 'Saving accounts'), stats.savingsAccounts)}
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            {/* Cash Section */}
+            <div className="md:col-span-2 lg:col-span-3 text-sm font-black uppercase text-[#8b4513] tracking-wide mb-2 mt-4 first:mt-0">
+              {t('stat_group_cash', 'Cash')}
+            </div>
+            <StatisticCard 
+              label={t('stat_bank_accounts', 'Bank accounts')} 
+              metric={stats.bankAccounts} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
+            <StatisticCard 
+              label={t('stat_saving_accounts', 'Saving accounts')} 
+              metric={stats.savingsAccounts} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
 
-                {/* Debt Section */}
-                {renderSectionHeader(t('stat_group_debt', 'Debt'), debtSubtotal)}
-                {renderRow(t('stat_credit_cards', 'Credit cards'), stats.creditCards)}
-                {renderRow(t('stat_loans_burrow', 'Loans & Burrow'), stats.loansBurrow)}
-                {renderRow(t('stat_other_debts', 'Other Debts'), stats.otherDebts)}
+            {/* Debt Section */}
+            <div className="md:col-span-2 lg:col-span-3 text-sm font-black uppercase text-[#8b4513] tracking-wide mb-2 mt-4">
+              {t('stat_group_debt', 'Debt')}
+            </div>
+            <StatisticCard 
+              label={t('stat_credit_cards', 'Credit cards')} 
+              metric={stats.creditCards} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
+            <StatisticCard 
+              label={t('stat_loans_burrow', 'Loans & Burrow')} 
+              metric={stats.loansBurrow} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
+            <StatisticCard 
+              label={t('stat_other_debts', 'Other Debts')} 
+              metric={stats.otherDebts} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
 
-                {/* Expenses Section */}
-                {renderSectionHeader(t('stat_group_expenses', 'Expenses'), expensesSubtotal)}
-                {renderRow(t('stat_expenses_unpaid', 'Expenses not paid'), stats.expensesPending)}
-                {renderRow(t('stat_expenses_paid', 'Expenses paid'), stats.expensesCompleted)}
+            {/* Expenses Section */}
+            <div className="md:col-span-2 lg:col-span-3 text-sm font-black uppercase text-[#8b4513] tracking-wide mb-2 mt-4">
+              {t('stat_group_expenses', 'Expenses')}
+            </div>
+            <StatisticCard 
+              label={t('stat_expenses_unpaid', 'Expenses not paid')} 
+              metric={stats.expensesPending} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
+            <StatisticCard 
+              label={t('stat_expenses_paid', 'Expenses paid')} 
+              metric={stats.expensesCompleted} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
 
-                {/* Income Section */}
-                {renderSectionHeader(t('stat_group_income', 'Income'), incomeSubtotal)}
-                {renderRow(t('stat_income_unpaid', 'Income not received'), stats.incomePending)}
-                {renderRow(t('stat_income_paid', 'Income received'), stats.incomeCompleted)}
-              </tbody>
-            </table>
+            {/* Income Section */}
+            <div className="md:col-span-2 lg:col-span-3 text-sm font-black uppercase text-[#8b4513] tracking-wide mb-2 mt-4">
+              {t('stat_group_income', 'Income')}
+            </div>
+            <StatisticCard 
+              label={t('stat_income_unpaid', 'Income not received')} 
+              metric={stats.incomePending} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
+            <StatisticCard 
+              label={t('stat_income_paid', 'Income received')} 
+              metric={stats.incomeCompleted} 
+              activeMonth={activeMonth} 
+              prevPeriod={prevPeriod} 
+              t={t} 
+              handleOpenDetails={handleOpenDetails} 
+            />
           </div>
         </div>
       </Modal>
