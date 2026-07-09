@@ -1000,10 +1000,6 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
   const importCSV = (e) => handleImportCSV(e, { t, fromOptions, registerTransactions, GUEST_PROFILE_ID });
   const importQuickActionsCSV = (e) => handleImportQuickActionsCSV(e, { t, addOption, templates });
 
-
-
-
-
   if (!user) {
     return (
       <div className="w-screen h-screen overflow-hidden select-none bg-black flex items-center justify-center">

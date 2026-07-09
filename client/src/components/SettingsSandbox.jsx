@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { toast } from "react-hot-toast";
-import { useKingdomStore } from "../../store/useKingdomStore";
 import {
   Sparkles,
   Layers,
@@ -31,36 +29,31 @@ import {
   ArrowDown,
   ArrowUp,
   Calendar,
-  Save,
-  Upload,
-  Download
+  Save
 } from "lucide-react";
 
 // ============================================================================
-// HELPER COMBOBOX COMPONENT
-// Styled to match the Feudal Parchment & Wood Palette
+// HELPER COMBOBOX COMPONENT (Outside main component to prevent focus loss)
+// Styled to match the Feudal Parchment & Wood Palette of SettingsModal
 // ============================================================================
 const Combobox = ({
   id,
   label,
   value,
   onChange,
-  options = [],
-  onSaveNew,
+  options,
+  setOptions,
   activeDropdownId,
   setActiveDropdownId,
+  showNotice,
   placeholder = "Select or type custom..."
 }) => {
-  const isNewValue =
-    value &&
-    value.trim() !== "" &&
-    !options.some((opt) => opt.toLowerCase() === value.trim().toLowerCase());
+  const isNewValue = value.trim() !== "" && !options.some(opt => opt.toLowerCase() === value.trim().toLowerCase());
 
   const handleActionClick = () => {
     if (isNewValue) {
-      if (onSaveNew) {
-        onSaveNew(value.trim());
-      }
+      setOptions([...options, value.trim()]);
+      showNotice(`Injected new parameter option: "${value.trim()}"`);
     } else {
       setActiveDropdownId(activeDropdownId === id ? null : id);
     }
@@ -86,11 +79,7 @@ const Combobox = ({
             onClick={() => setActiveDropdownId(activeDropdownId === id ? null : id)}
             className="absolute right-3.5 top-3.5 text-[#8b4513]/70 hover:text-[#8b4513] transition-colors"
           >
-            <ChevronDown
-              className={`w-4 h-4 transition-transform duration-200 ${
-                activeDropdownId === id ? "rotate-180" : ""
-              }`}
-            />
+            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${activeDropdownId === id ? "rotate-180" : ""}`} />
           </button>
 
           {/* Dropdown Options Box */}
@@ -110,15 +99,13 @@ const Combobox = ({
                 </button>
               ))}
               {options.length === 0 && (
-                <div className="p-3 text-center text-[10px] text-slate-500 uppercase tracking-widest font-sans">
-                  No options registered
-                </div>
+                <div className="p-3 text-center text-[10px] text-slate-500 uppercase tracking-widest font-sans">No options registered</div>
               )}
             </div>
           )}
         </div>
 
-        {/* Dynamic Action Button */}
+        {/* Dynamic Action Button: Snaps between "+New" (inactive) and "Save" (new value typed) */}
         <button
           type="button"
           onClick={handleActionClick}
@@ -137,105 +124,14 @@ const Combobox = ({
 };
 
 // ============================================================================
-// MAIN SETTINGS MODAL
+// MAIN SETTINGS SANDBOX MODAL (RE-THEMED TO FEUDAL/PARCHMENT AESTHETIC)
 // ============================================================================
-export default function SettingsModal({
-  isOpen,
-  onClose,
-  t,
-  accountMappings,
-  subtypeToCategoryMap,
-  subtypeTypes,
-  syncSettings,
-  subClassOptions,
-  categoryOptions,
-  entityOptions,
-  entityMappings,
-  getMatrixRows,
-  settingsFileInputRef,
-  importSettingsCSV,
-  exportSettingsCSV,
-  fromOptions,
-  statusOptions,
-  classOptions,
-  templates,
-  selectedQaNames,
-  setSelectedQaNames,
-  setSelectedQaTemplateName,
-  setQaName,
-  setQaIcon,
-  setQaFrom,
-  setQaClass,
-  setQaSubClass,
-  setQaEntity,
-  setQaCategory,
-  setQaTargetAccount,
-  setQaSourceDestBank,
-  setQaFlow,
-  setQaStatus,
-  setQaDescription,
-  setQaAmount,
-  setQaDueDate,
-  setQaValueDate,
-  setQaPostingDate,
-  setIsEditingQa,
-  handleDeleteQuickAction,
-  qaFileInputRef,
-  importQuickActionsCSV,
-  handleExportAllActionsCSV,
-  qaName,
-  qaIcon,
-  qaFrom,
-  qaClass,
-  qaSubClass,
-  qaEntity,
-  qaCategory,
-  qaTargetAccount,
-  qaSourceDestBank,
-  qaFlow,
-  qaStatus,
-  qaDescription,
-  qaAmount,
-  qaDueDate,
-  qaValueDate,
-  qaPostingDate,
-  addOption,
-  editOption,
-  deleteOption,
-  handleSaveQuickAction
+export default function SettingsSandbox({
+  isOpen = true,
+  onClose = () => {}
 }) {
-  // --- STATE FOR ACTIVE DROPDOWNS ---
+  // --- ACTIVE COMBOBOX DROPDOWN MANAGEMENT STATE ---
   const [activeDropdownId, setActiveDropdownId] = useState(null);
-
-  // --- NAVIGATION STATE (ALIGNED TO SANDBOX TABS) ---
-  const [activePrimaryTab, setActivePrimaryTab] = useState("coa");
-  const [activeSecondaryTab, setActiveSecondaryTab] = useState("from");
-
-  // --- SCROLL MANAGEMENT ---
-  const scrollContainerRef = useRef(null);
-  const [isAtBottom, setIsAtBottom] = useState(false);
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
-
-  // --- LOCAL COMBINED FORM FIELD STATES ---
-  const [coaType, setCoaType] = useState("Assets");
-  const [coaSubtype, setCoaSubtype] = useState("Banks");
-  const [coaCategory, setCoaCategory] = useState("Bank account");
-  const [coaEntity, setCoaEntity] = useState("CGD");
-  const [coaCode, setCoaCode] = useState("10101010");
-  const [coaNameInput, setCoaNameInput] = useState("");
-
-  const [matrixType, setMatrixType] = useState("Assets");
-  const [matrixSubtype, setMatrixSubtype] = useState("Banks");
-  const [matrixCategory, setMatrixCategory] = useState("Bank account");
-  const [matrixEntity, setMatrixEntity] = useState("CGD");
-
-  const [moreOrigin, setMoreOrigin] = useState("Pedro");
-  const [moreStatus, setMoreStatus] = useState("Completed");
-
-  // Zustand bindings for Live Balance updates
-  const accountBalances = useKingdomStore((state) => state.accountBalances);
-  const updateAccountBalance = useKingdomStore((state) => state.updateAccountBalance);
-  const user = useKingdomStore((state) => state.user);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -244,18 +140,36 @@ export default function SettingsModal({
     return () => window.removeEventListener("click", handleOutsideClick);
   }, []);
 
-  // Monitor Scroll Position
+  // --- NAVIGATION STATE ---
+  const [activePrimaryTab, setActivePrimaryTab] = useState("coa");
+  const [activeSecondaryTab, setActiveSecondaryTab] = useState("from");
+
+  // --- GLOBAL LAYOUT CONTROLS (SMART SCROLL) ---
+  const scrollContainerRef = useRef(null);
+  const [isAtBottom, setIsAtBottom] = useState(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  // Monitor Scroll Position to swap direction and visibility of Floating Scroll Button
   const handleScroll = () => {
     const el = scrollContainerRef.current;
     if (!el) return;
+
     const { scrollTop, scrollHeight, clientHeight } = el;
-    setShowScrollBtn(scrollHeight > clientHeight + 40);
-    setIsAtBottom(scrollHeight - scrollTop - clientHeight < 40);
+    
+    if (scrollHeight > clientHeight + 40) {
+      setShowScrollBtn(true);
+    } else {
+      setShowScrollBtn(false);
+    }
+
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 40;
+    setIsAtBottom(isNearBottom);
   };
 
   const handleScrollAction = () => {
     const el = scrollContainerRef.current;
     if (!el) return;
+
     if (isAtBottom) {
       el.scrollTo({ top: 0, behavior: "smooth" });
     } else {
@@ -270,156 +184,187 @@ export default function SettingsModal({
     return () => clearTimeout(timer);
   }, [activePrimaryTab, activeSecondaryTab]);
 
-  if (!isOpen) return null;
+  // --- COMBOBOX MASTER LISTS ---
+  const [lvlITypes, setLvlITypes] = useState(["Asset", "Liability", "Equity", "Revenue", "Expense"]);
+  const [lvlIISubtypes, setLvlIISubtypes] = useState(["Liquidity Reserves", "Short-term Receivables", "Vendor Liabilities", "SaaS Licensing"]);
+  const [lvlIIICategories, setLvlIIICategories] = useState(["Cash & Equivalents", "Accounts Receivable", "Vendor Invoicing", "Operational Overheads"]);
+  const [entityOptions, setEntityOptions] = useState(["Stripe Processing Terminal", "AWS Compute West", "Apex Clearing Pipe"]);
+  const [originOptions, setOriginOptions] = useState(["HQ Operations", "Stripe Pipeline", "AWS Stack Engine", "SaaS Webhook API"]);
+  const [statusOptionsList, setStatusOptionsList] = useState(["ST-ACT (Active / Settled)", "ST-PEN (Pending Compliance)", "ST-REV (Under Review)"]);
 
-  // --- PROCESS COA ROWS FROM ZUSTAND STRUCTURES ---
-  const parsedCoaData = Object.entries(accountMappings).map(([code, fullName]) => {
-    let remaining = fullName;
-    if (remaining.startsWith(code)) {
-      remaining = remaining.substring(code.length).replace(/^\s*-\s*/, "");
+  // --- COMBOBOX STATE BINDINGS ---
+  const [coaType, setCoaType] = useState("Asset");
+  const [coaSubtype, setCoaSubtype] = useState("Liquidity Reserves");
+  const [coaCategory, setCoaCategory] = useState("Cash & Equivalents");
+  const [coaEntity, setCoaEntity] = useState("Stripe Processing Terminal");
+
+  const [matrixType, setMatrixType] = useState("");
+  const [matrixSubtype, setMatrixSubtype] = useState("");
+  const [matrixCategory, setMatrixCategory] = useState("");
+  const [matrixEntity, setMatrixEntity] = useState("");
+
+  const [moreOrigin, setMoreOrigin] = useState("HQ Operations");
+  const [moreStatus, setMoreStatus] = useState("ST-ACT (Active / Settled)");
+
+  // --- REGISTRY TABLES DATA ---
+  const [coaData, setCoaData] = useState([
+    { code: "1010", name: "Bank Balance (Ops Vault)", type: "Asset", subtype: "Liquidity Reserves", category: "Cash & Equivalents" },
+    { code: "1200", name: "Accounts Receivable Node", type: "Asset", subtype: "Short-term Receivables", category: "Receivables" },
+    { code: "2010", name: "Accounts Payable Ledger", type: "Liability", subtype: "Vendor Invoice Pay", category: "Payables" },
+    { code: "3010", name: "Paid-In Stakeholder Capital", type: "Equity", subtype: "Share Issuance", category: "Equity" }
+  ]);
+
+  const [matrixData, setMatrixData] = useState([
+    { id: "MX-001", type: "Asset", subtype: "Liquidity Reserves", category: "Cash & Equivalents", entity: "Stripe Pipeline", status: "Verified" },
+    { id: "MX-002", type: "Asset", subtype: "Short-term Receivables", category: "Receivables", entity: "Enterprise Sales", status: "Verified" },
+    { id: "MX-003", type: "Liability", subtype: "Vendor Invoice Pay", category: "Payables", entity: "AWS Portal", status: "Active" }
+  ]);
+
+  const [originItems, setOriginItems] = useState([
+    { name: "SaaS Billing Terminal", type: "Direct API Integration", status: "Active" },
+    { name: "SVB Corporate Checking", type: "Bank Feed SFTP", status: "Active" },
+    { name: "Manual CSV Upload Hub", type: "File Import", status: "Legacy" }
+  ]);
+
+  const [statusItems, setStatusItems] = useState([
+    { name: "ST-ACT (Active / Settled)", plImpact: true, cashflowImpact: true },
+    { name: "ST-PEN (Pending Compliance)", plImpact: false, cashflowImpact: false },
+    { name: "ST-REV (Under Review)", plImpact: true, cashflowImpact: false }
+  ]);
+
+  // --- QUICK ACTIONS REGISTRY ---
+  const [quickActionsRegistry, setQuickActionsRegistry] = useState([
+    {
+      name: "Sweep Operating Capital",
+      flow: "Inflow",
+      status: "ST-ACT",
+      amount: 25000,
+      type: "Asset",
+      subtype: "Liquidity Reserves",
+      targetAccount: "1010",
+      entity: "Stripe Corporate Integration"
+    },
+    {
+      name: "Settle Tech Stack Billing",
+      flow: "Outflow",
+      status: "ST-ACT",
+      amount: 8400,
+      type: "Expense",
+      subtype: "SaaS Licensing",
+      targetAccount: "5020",
+      entity: "AWS Compute Cluster"
     }
-    const parts = remaining.split(/\s*-\s*/);
-    const category = parts[0] || "";
-    const entity = parts.slice(1).join(" - ") || "";
+  ]);
 
-    let subtype = "";
-    for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
-      if (cats && cats.includes(category)) {
-        subtype = sub;
-        break;
-      }
-    }
+  // Quick Action Form State
+  const [qaName, setQaName] = useState("");
+  const [qaValueDate, setQaValueDate] = useState("");
+  const [qaPostingDate, setQaPostingDate] = useState("");
+  const [qaFlow, setQaFlow] = useState("Inflow");
+  const [qaStatus, setQaStatus] = useState("ST-ACT (Active / Settled)");
+  const [qaOrigin, setQaOrigin] = useState("HQ Operations");
+  const [qaAmount, setQaAmount] = useState(0); 
+  const [qaType, setQaType] = useState("Asset");
+  const [qaDescription, setQaDescription] = useState("");
+  const [qaSubtype, setQaSubtype] = useState("Liquidity Reserves");
+  const [qaSourceAccount, setQaSourceAccount] = useState("1010 - Operating Capital");
+  const [qaCategory, setQaCategory] = useState("Cash & Equivalents");
+  const [qaTargetAccount, setQaTargetAccount] = useState("1020 - Receivables Pool");
+  const [qaEntity, setQaEntity] = useState("");
 
-    let type = "Assets";
-    if (code.startsWith("2")) type = "Liabilities";
-    else if (code.startsWith("3")) type = "Equity";
-    else if (code.startsWith("7")) type = "Income";
-    else if (code.startsWith("6")) type = "Expense";
+  // UI Interactive States
+  const [coaCode, setCoaCode] = useState("1020");
+  const [coaName, setCoaName] = useState("");
+  const [isCodeAvailable, setIsCodeAvailable] = useState(true);
+  const [plImpact, setPlImpact] = useState(false);
+  const [cashflowImpact, setCashflowImpact] = useState(false);
 
-    return {
-      code,
-      name: fullName,
-      category,
-      entity,
-      subtype,
-      type
-    };
-  });
+  // Global Notification State
+  const [notification, setNotification] = useState("");
+  const showNotice = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(""), 3000);
+  };
 
-  // --- PROCESS MATRIX ROWS ---
-  const parsedMatrixRows = getMatrixRows().map((row, idx) => {
-    let type = "Assets";
-    if (row.subtype) {
-      const typeCode = subtypeTypes[row.subtype]?.[0];
-      if (typeCode === "2") type = "Liabilities";
-      else if (typeCode === "6") type = "Expense";
-      else if (typeCode === "7") type = "Income";
-    }
-    return {
-      id: `MX-${String(idx + 1).padStart(3, "0")}`,
-      key: row.key,
-      type,
-      subtype: row.subtype,
-      category: row.category,
-      entity: row.entity,
-      status: "Verified"
-    };
-  });
-
-  // --- PROCESS METRICS FOR BALANCE TAB ---
-  const totalDebits = accountBalances
-    .filter(
-      (b) =>
-        b.account_code &&
-        (b.account_code.startsWith("1") ||
-          b.account_code.startsWith("5") ||
-          b.account_code.startsWith("6"))
-    )
-    .reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
-
-  const totalCredits = accountBalances
-    .filter(
-      (b) =>
-        b.account_code &&
-        (b.account_code.startsWith("2") ||
-          b.account_code.startsWith("3") ||
-          b.account_code.startsWith("4") ||
-          b.account_code.startsWith("7"))
-    )
-    .reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
-
-  // --- REGISTRATION LOGIC: CHART OF ACCOUNTS ---
+  // Handlers
   const handleRegisterAccount = () => {
-    if (!coaNameInput.trim() || !coaCode.trim()) {
-      toast.error(t("err_enter_value") || "Please fill in Account Code and Identity Name");
+    if (!coaName || !coaCode) {
+      showNotice("Please fill in Account Code and Name");
       return;
     }
-    const derivedFullName = `${coaCode} - ${coaCategory} - ${coaEntity || "Unassociated"}`;
-    const updatedMappings = {
-      ...accountMappings,
-      [coaCode]: derivedFullName
+    setCoaData([...coaData, {
+      code: coaCode,
+      name: coaName,
+      type: coaType || "Asset",
+      subtype: coaSubtype || "Liquidity Reserves",
+      category: coaCategory || "Cash & Equivalents"
+    }]);
+    showNotice(`Registered COA Node [${coaCode}] successfully.`);
+    setCoaName("");
+    setCoaCode((prev) => String(Number(prev) + 10));
+  };
+
+  const handleSaveQuickAction = (e) => {
+    e.preventDefault();
+    if (!qaName.trim()) {
+      showNotice("Please enter a valid Quick Action name.");
+      return;
+    }
+    const newAction = {
+      name: qaName,
+      flow: qaFlow,
+      status: qaStatus.split(" ")[0],
+      amount: Number(qaAmount) || 0,
+      type: qaType,
+      subtype: qaSubtype,
+      targetAccount: qaTargetAccount,
+      entity: qaEntity || "Universal Node"
     };
-    syncSettings({ accountMappings: updatedMappings });
-    toast.success(`Registered COA Node [${coaCode}] successfully.`);
-    setCoaNameInput("");
-    setCoaCode((prev) => {
-      const num = Number(prev);
-      return isNaN(num) ? prev : String(num + 10);
-    });
+
+    setQuickActionsRegistry([newAction, ...quickActionsRegistry]);
+    showNotice(`Committed Quick Action Blueprint: ${qaName}`);
+    
+    // Reset Form Fields (Defaults strictly to 0)
+    setQaName("");
+    setQaValueDate("");
+    setQaPostingDate("");
+    setQaAmount(0);
+    setQaDescription("");
+    setQaEntity("");
   };
 
-  // --- REGISTRATION LOGIC: MATRIX ---
-  const handleRegisterMatrixNode = () => {
-    if (!matrixEntity) {
-      toast.error("Please enter or select a valid host entity.");
-      return;
-    }
-    const updatedMappings = { ...entityMappings, [matrixEntity]: matrixCategory };
-    if (!entityOptions.includes(matrixEntity)) {
-      addOption("entity", matrixEntity, { category: matrixCategory });
-    } else {
-      syncSettings({ entityMappings: updatedMappings });
-    }
-    toast.success(`Injected route mapping node: ${matrixEntity} ➔ ${matrixCategory}`);
-  };
-
-  // --- CLEAR FORM LOGIC: QUICK ACTIONS ---
   const handleResetQaForm = () => {
     setQaName("");
     setQaValueDate("");
     setQaPostingDate("");
-    setQaAmount("");
+    setQaAmount(0);
     setQaDescription("");
     setQaEntity("");
-    setQaFrom("");
-    setQaClass("");
-    setQaStatus("");
-    setQaSubClass("");
-    setQaCategory("");
-    setQaTargetAccount("");
-    setQaSourceDestBank("");
-    setQaFlow("");
-    toast.success("Quick Action form parameters cleared.");
+    showNotice("Quick Action form blueprint parameters cleared.");
   };
 
-  const handleSaveQuickActionSubmit = (e) => {
-    e.preventDefault();
-    if (!qaName.trim()) {
-      toast.error("Please enter a valid Quick Action name.");
-      return;
-    }
-    handleSaveQuickAction(e);
-  };
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto z-[9999]">
+      
+      {/* Toast Alert Banner (Medieval Alert colors) */}
+
+        {notification && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-2.5 px-4 py-3 bg-[#faf4e5] border-2 border-[#8b4513] text-[#4b2c20] font-sans font-black text-xs rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+            <Zap className="w-4 h-4 text-[#8b4513] animate-pulse" />
+            <span>{notification}</span>
+          </div>
+        )}
+
+
+      {/* FIXED SIZE FEUDAL/PARCHMENT WINDOW DESIGN (h-[820px] constant size with ornate detailing) */}
       <div className="relative w-full max-w-6xl h-[820px] bg-[#f4e4bc] border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] rounded-xl flex flex-col overflow-hidden">
+        
         {/* Parchment Texture Overlay */}
-        <div
+        <div 
           className="absolute inset-0 pointer-events-none opacity-25 mix-blend-multiply z-0"
-          style={{
-            backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')"
-          }}
+          style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')" }}
         />
 
         {/* Ornate Corner Accents */}
@@ -436,14 +381,15 @@ export default function SettingsModal({
             </div>
             <div>
               <h1 className="text-sm font-black text-[#4b2c20] tracking-wider uppercase font-sans">
-                {t.configuration_panel || "Acuity Compliance Matrix"}
+                Acuity Compliance Matrix
               </h1>
               <p className="text-[9px] text-[#5d4037]/75 font-sans font-bold tracking-widest uppercase">
-                {t.official_ledger_editor || "DOUBLE-ENTRY COMPLIANCE HUB"}
+                DOUBLE-ENTRY COMPLIANCE HUB
               </p>
             </div>
           </div>
-
+          
+          {/* Burgundy/Red fantasy close button */}
           <button
             onClick={onClose}
             className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group cursor-pointer"
@@ -483,69 +429,65 @@ export default function SettingsModal({
             })}
           </div>
 
-          {/* CSV File Controls */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => settingsFileInputRef.current?.click()}
-              className="px-3 py-2 bg-[#faf4e5]/90 border border-[#8b4513]/30 hover:bg-[#8b4513]/10 rounded-xl text-[10px] text-[#4b2c20] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="Import Settings CSV"
-            >
-              <Upload className="w-3.5 h-3.5 text-[#8b4513]" />
-              <span>Import</span>
-            </button>
-            <button
-              onClick={exportSettingsCSV}
-              className="px-3 py-2 bg-[#faf4e5]/90 border border-[#8b4513]/30 hover:bg-[#8b4513]/10 rounded-xl text-[10px] text-[#4b2c20] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="Export Settings CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-[#8b4513]" />
-              <span>Export</span>
-            </button>
+          {/* Inline Feudal Query Bar */}
+          <div className="relative max-w-xs w-full self-end md:self-auto">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#8b4513]/70">
+              <Search className="w-3.5 h-3.5" />
+            </span>
+            <input
+              type="text"
+              placeholder="Query parameters..."
+              className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl py-2 pl-9 pr-4 text-[11px] text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513]/50 font-serif shadow-inner"
+            />
           </div>
         </div>
 
-        {/* MORE SUB-PILLS */}
-        {activePrimaryTab === "more" && (
-          <div className="px-6 py-2.5 bg-[#faf4e5]/40 border-b border-[#8b4513]/20 shrink-0 z-10 relative">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: "from", label: "Origin / From Nodes", icon: Globe },
-                { id: "status", label: "Ledger Status Rules", icon: Sliders },
-                { id: "balances", label: "Initial Balance Alignment", icon: Scale }
-              ].map((sec) => {
-                const isSel = activeSecondaryTab === sec.id;
-                const Icon = sec.icon;
-                return (
-                  <button
-                    key={sec.id}
-                    type="button"
-                    onClick={() => setActiveSecondaryTab(sec.id)}
-                    className={`px-3.5 py-2 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer flex items-center gap-2 ${
-                      isSel
-                        ? "bg-[#8b4513]/15 border-[#8b4513]/40 text-[#4b2c20]"
-                        : "bg-transparent border-transparent text-[#5d4037]/75 hover:text-[#4b2c20]"
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{sec.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* MORE SUB-PILLS (UNDER 'MORE' TAB ONLY) */}
 
-        {/* INNER SCROLLABLE WINDOW */}
+          {activePrimaryTab === "more" && (
+            <div className="px-6 py-2.5 bg-[#faf4e5]/40 border-b border-[#8b4513]/20 shrink-0 z-10 relative">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "from", label: "Origin / From Nodes", icon: Globe },
+                  { id: "status", label: "Ledger Status Rules", icon: Sliders },
+                  { id: "balances", label: "Initial Balance Alignment", icon: Scale }
+                ].map((sec) => {
+                  const isSel = activeSecondaryTab === sec.id;
+                  const Icon = sec.icon;
+                  return (
+                    <button
+                      key={sec.id}
+                      type="button"
+                      onClick={() => setActiveSecondaryTab(sec.id)}
+                      className={`px-3.5 py-2 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer flex items-center gap-2 ${
+                        isSel
+                          ? "bg-[#8b4513]/15 border-[#8b4513]/40 text-[#4b2c20]"
+                          : "bg-transparent border-transparent text-[#5d4037]/75 hover:text-[#4b2c20]"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{sec.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+
+        {/* INNER SCROLLABLE WINDOW (No redundant headers) */}
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-[#8b4513]/45 scrollbar-track-transparent relative z-10"
         >
           <div className="space-y-6">
+            
             {/* ================= TAB 1: CHART OF ACCOUNTS ================= */}
             {activePrimaryTab === "coa" && (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
                   {/* Left Column Forms (Using Combobox) */}
                   <div className="bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-5 relative shadow-sm">
                     <p className="text-xs text-[#5d4037] font-serif leading-relaxed flex items-center gap-2 mb-2">
@@ -559,10 +501,11 @@ export default function SettingsModal({
                         label="Lvl I: Type"
                         value={coaType}
                         onChange={setCoaType}
-                        options={classOptions}
-                        onSaveNew={(val) => addOption("class", val)}
+                        options={lvlITypes}
+                        setOptions={setLvlITypes}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
 
                       <Combobox
@@ -570,10 +513,11 @@ export default function SettingsModal({
                         label="Lvl II: Subtype"
                         value={coaSubtype}
                         onChange={setCoaSubtype}
-                        options={subClassOptions}
-                        onSaveNew={(val) => addOption("subClass", val)}
+                        options={lvlIISubtypes}
+                        setOptions={setLvlIISubtypes}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
 
                       <Combobox
@@ -581,18 +525,17 @@ export default function SettingsModal({
                         label="Lvl III: Category"
                         value={coaCategory}
                         onChange={setCoaCategory}
-                        options={categoryOptions}
-                        onSaveNew={(val) => addOption("category", val)}
+                        options={lvlIIICategories}
+                        setOptions={setLvlIIICategories}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
 
                       {/* Account Code / Name */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                            Account Code
-                          </label>
+                          <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">Account Code</label>
                           <div className="relative font-mono">
                             <input
                               type="text"
@@ -600,20 +543,20 @@ export default function SettingsModal({
                               onChange={(e) => setCoaCode(e.target.value)}
                               className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513]/50 font-bold shadow-inner"
                             />
-                            <div className="absolute right-3 top-3 flex items-center gap-1 text-[8px] font-black text-[#8b4513] bg-[#8b4513]/10 px-1.5 py-0.5 rounded border border-[#8b4513]/20 uppercase tracking-widest">
-                              <Check className="w-3.5 h-3.5" /> Approved
-                            </div>
+                            {isCodeAvailable && (
+                              <div className="absolute right-3 top-3 flex items-center gap-1 text-[8px] font-black text-[#8b4513] bg-[#8b4513]/10 px-1.5 py-0.5 rounded border border-[#8b4513]/20 uppercase tracking-widest">
+                                <Check className="w-3.5 h-3.5" /> Approved
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                            Identity Name
-                          </label>
+                          <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">Account Name</label>
                           <input
                             type="text"
                             placeholder="Operational Vault"
-                            value={coaNameInput}
-                            onChange={(e) => setCoaNameInput(e.target.value)}
+                            value={coaName}
+                            onChange={(e) => setCoaName(e.target.value)}
                             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513]/50 font-serif font-bold shadow-inner"
                           />
                         </div>
@@ -645,19 +588,16 @@ export default function SettingsModal({
                         value={coaEntity}
                         onChange={setCoaEntity}
                         options={entityOptions}
-                        onSaveNew={(val) => addOption("entity", val, { category: coaCategory })}
+                        setOptions={setEntityOptions}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
                     </div>
 
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!coaEntity) return;
-                        addOption("entity", coaEntity, { category: coaCategory });
-                        toast.success("Associated target entity registered.");
-                      }}
+                      onClick={() => showNotice("Associated target entity registered.")}
                       className="w-full h-11 bg-[#faf4e5] hover:bg-[#8b4513]/5 border border-[#8b4513]/30 text-[#4b2c20] rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 mt-6 lg:mt-0 font-serif"
                     >
                       <Layers className="w-4 h-4 text-[#8b4513]" />
@@ -669,9 +609,7 @@ export default function SettingsModal({
                 {/* COA Manifest Table */}
                 <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl overflow-hidden shadow-sm">
                   <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                      Active Chart of Accounts Registers
-                    </span>
+                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">Active Chart of Accounts Registers</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse font-serif">
@@ -686,54 +624,18 @@ export default function SettingsModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {parsedCoaData.map((row) => (
+                        {coaData.map((row) => (
                           <tr key={row.code} className="hover:bg-[#8b4513]/5 transition-colors">
-                            <td className="p-4 font-mono text-[#8b4513] font-bold text-sm">
-                              {row.code}
-                            </td>
+                            <td className="p-4 font-mono text-[#8b4513] font-bold text-sm">{row.code}</td>
                             <td className="p-4 text-[#4b2c20] font-black">{row.name}</td>
-                            <td className="p-4 text-[#5d4037] uppercase tracking-wider text-[10px] font-sans">
-                              {row.type}
-                            </td>
+                            <td className="p-4 text-[#5d4037] uppercase tracking-wider text-[10px] font-sans">{row.type}</td>
                             <td className="p-4 text-[#5d4037]">{row.subtype}</td>
                             <td className="p-4 text-[#5d4037]">{row.category}</td>
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-2.5">
-                                <button
-                                  onClick={() => {
-                                    setCoaCode(row.code);
-                                    setCoaNameInput(row.name);
-                                    toast.success(`Editing ${row.name}`);
-                                  }}
-                                  className="p-1 text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#8b4513]/10 rounded transition-colors"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const nextCode = String(Number(row.code) + 1);
-                                    const updated = {
-                                      ...accountMappings,
-                                      [nextCode]: `${nextCode} - ${row.category} - ${row.entity}`
-                                    };
-                                    syncSettings({ accountMappings: updated });
-                                    toast.success(`Duplicated node to code ${nextCode}`);
-                                  }}
-                                  className="p-1 text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#8b4513]/10 rounded transition-colors"
-                                >
-                                  <Copy className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const updated = { ...accountMappings };
-                                    delete updated[row.code];
-                                    syncSettings({ accountMappings: updated });
-                                    toast.success(`Deleted ${row.name}`);
-                                  }}
-                                  className="p-1 text-[#8b0000] hover:bg-red-50 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <button onClick={() => showNotice(`Editing ${row.name}`)} className="p-1 text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#8b4513]/10 rounded transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => showNotice(`Duplicated ${row.name}`)} className="p-1 text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#8b4513]/10 rounded transition-colors"><Copy className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => { setCoaData(coaData.filter(c => c.code !== row.code)); showNotice(`Deleted ${row.name}`); }} className="p-1 text-[#8b0000] hover:bg-red-50 rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                               </div>
                             </td>
                           </tr>
@@ -749,6 +651,7 @@ export default function SettingsModal({
             {activePrimaryTab === "matrix" && (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
                   {/* Left Column Forms with Custom Combobox Fields */}
                   <div className="bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-6 shadow-sm">
                     <p className="text-xs text-[#5d4037] font-serif leading-relaxed">
@@ -761,10 +664,11 @@ export default function SettingsModal({
                         label="Type"
                         value={matrixType}
                         onChange={setMatrixType}
-                        options={classOptions}
-                        onSaveNew={(val) => addOption("class", val)}
+                        options={lvlITypes}
+                        setOptions={setLvlITypes}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
 
                       <Combobox
@@ -772,10 +676,11 @@ export default function SettingsModal({
                         label="Subtype"
                         value={matrixSubtype}
                         onChange={setMatrixSubtype}
-                        options={subClassOptions}
-                        onSaveNew={(val) => addOption("subClass", val)}
+                        options={lvlIISubtypes}
+                        setOptions={setLvlIISubtypes}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
 
                       <Combobox
@@ -783,10 +688,11 @@ export default function SettingsModal({
                         label="Category"
                         value={matrixCategory}
                         onChange={setMatrixCategory}
-                        options={categoryOptions}
-                        onSaveNew={(val) => addOption("category", val)}
+                        options={lvlIIICategories}
+                        setOptions={setLvlIIICategories}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
 
                       <Combobox
@@ -795,36 +701,41 @@ export default function SettingsModal({
                         value={matrixEntity}
                         onChange={setMatrixEntity}
                         options={entityOptions}
-                        onSaveNew={(val) => addOption("entity", val, { category: matrixCategory })}
+                        setOptions={setEntityOptions}
                         activeDropdownId={activeDropdownId}
                         setActiveDropdownId={setActiveDropdownId}
+                        showNotice={showNotice}
                       />
 
                       <div className="pt-2">
                         <button
                           type="button"
-                          onClick={handleRegisterMatrixNode}
+                          onClick={() => {
+                            const newMatrixItem = {
+                              id: `MX-00${matrixData.length + 1}`,
+                              type: matrixType || "Asset",
+                              subtype: matrixSubtype || "Liquidity Reserves",
+                              category: matrixCategory || "Cash & Equivalents",
+                              entity: matrixEntity || "Universal Terminal",
+                              status: "Verified"
+                            };
+                            setMatrixData([...matrixData, newMatrixItem]);
+                            showNotice("Injected route mapping node successfully.");
+                          }}
                           className="w-full h-11 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 font-serif"
                         >
                           <Layers className="w-4 h-4" />
-                          <span>Register Entity Mapping</span>
+                          <span>Register Entity</span>
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column: Dynamic Status Overview */}
+                  {/* Right Column: Empty Placeholder */}
                   <div className="hidden lg:block border-2 border-dashed border-[#8b4513]/25 bg-[#faf4e5]/30 rounded-2xl p-6 relative min-h-[400px]">
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
-                      <Database className="w-12 h-12 text-[#8b4513] opacity-30" />
-                      <div>
-                        <span className="text-[10px] font-mono font-bold tracking-widest text-[#5d4037] uppercase block">
-                          Mapped Entity Registry
-                        </span>
-                        <p className="text-xs text-[#5d4037]/70 font-serif max-w-xs mt-1">
-                          Mappings dynamically feed compliance processes and balance alignment calculations.
-                        </p>
-                      </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-30">
+                      <Database className="w-12 h-12 text-[#8b4513] mb-2" />
+                      <span className="text-[10px] font-mono font-bold tracking-widest text-[#5d4037] uppercase">Reservation Segment Empty</span>
                     </div>
                   </div>
                 </div>
@@ -832,9 +743,7 @@ export default function SettingsModal({
                 {/* Association Matrix Table */}
                 <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl overflow-hidden shadow-sm">
                   <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                      Valid Association Matrix Mapping Nodes
-                    </span>
+                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">Valid Association Matrix Mapping Nodes</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse font-serif">
@@ -850,34 +759,18 @@ export default function SettingsModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {parsedMatrixRows.map((row) => (
-                          <tr key={row.key} className="hover:bg-[#8b4513]/5 transition-colors">
-                            <td className="p-4 font-mono text-[#8b4513] font-bold text-xs">
-                              {row.id}
-                            </td>
-                            <td className="p-4 text-[#5d4037] uppercase tracking-widest text-[9px] font-sans">
-                              {row.type}
-                            </td>
+                        {matrixData.map((row) => (
+                          <tr key={row.id} className="hover:bg-[#8b4513]/5 transition-colors">
+                            <td className="p-4 font-mono text-[#8b4513] font-bold text-xs">{row.id}</td>
+                            <td className="p-4 text-[#5d4037] uppercase tracking-widest text-[9px] font-sans">{row.type}</td>
                             <td className="p-4 text-[#5d4037]">{row.subtype}</td>
                             <td className="p-4 text-[#4b2c20] font-black">{row.category}</td>
                             <td className="p-4 text-[#5d4037]">{row.entity}</td>
                             <td className="p-4 text-center">
-                              <span className="text-[9px] font-sans font-black px-2 py-0.5 rounded-full border border-[#8b4513]/20 bg-[#faf4e5] text-[#8b4513] uppercase">
-                                {row.status}
-                              </span>
+                              <span className="text-[9px] font-sans font-black px-2 py-0.5 rounded-full border border-[#8b4513]/20 bg-[#faf4e5] text-[#8b4513] uppercase">{row.status}</span>
                             </td>
                             <td className="p-4 text-right">
-                              <button
-                                onClick={() => {
-                                  if (row.entity) {
-                                    deleteOption("entity", row.entity);
-                                    toast.success(`Removed mapping node ${row.entity}`);
-                                  }
-                                }}
-                                className="p-1.5 text-[#8b0000] hover:bg-red-50 rounded-lg cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              <button onClick={() => { setMatrixData(matrixData.filter(m => m.id !== row.id)); showNotice(`Deleted ${row.id}`); }} className="p-1.5 text-[#8b0000] hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                             </td>
                           </tr>
                         ))}
@@ -891,13 +784,11 @@ export default function SettingsModal({
             {/* ================= TAB 3: MORE WORKSPACE ================= */}
             {activePrimaryTab === "more" && (
               <div className="space-y-8">
-                {/* Option 3A: Origin / From */}
+                {/* Option 3A: Origin / From with Custom Combobox */}
                 {activeSecondaryTab === "from" && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-serif">
                     <div className="lg:col-span-5 bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-6 h-fit shadow-sm">
-                      <p className="text-xs text-[#5d4037] leading-relaxed">
-                        Establish primary input nodes where system pipeline records originate.
-                      </p>
+                      <p className="text-xs text-[#5d4037] leading-relaxed">Establish primary input nodes where system pipeline records originate.</p>
 
                       <div className="space-y-4">
                         <Combobox
@@ -905,18 +796,16 @@ export default function SettingsModal({
                           label="Origin / From"
                           value={moreOrigin}
                           onChange={setMoreOrigin}
-                          options={fromOptions}
-                          onSaveNew={(val) => addOption("from", val)}
+                          options={originOptions}
+                          setOptions={setOriginOptions}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
 
                         <button
                           type="button"
-                          onClick={() => {
-                            addOption("from", moreOrigin);
-                            toast.success(`Origin registered: ${moreOrigin}`);
-                          }}
+                          onClick={() => { setOriginItems([...originItems, { name: moreOrigin || "Custom Host Node", type: "Combobox Dynamic Feed", status: "Active" }]); showNotice("Origin registered."); }}
                           className="w-full h-11 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <Globe className="w-4 h-4" />
@@ -926,26 +815,18 @@ export default function SettingsModal({
                     </div>
 
                     <div className="lg:col-span-7 bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5">
-                        <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                          Configured Input Pipelines
-                        </span>
-                      </div>
+                      <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5"><span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">Configured Input pipelines</span></div>
                       <div className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {fromOptions.map((item, idx) => (
+                        {originItems.map((item, idx) => (
                           <div key={idx} className="flex items-center justify-between p-4 hover:bg-[#8b4513]/5">
                             <div className="flex items-center gap-3">
                               <Globe className="w-4 h-4 text-[#8b4513]" />
                               <div>
-                                <p className="text-xs font-black text-[#4b2c20]">{item}</p>
-                                <p className="text-[10px] text-[#5d4037]/70 uppercase font-sans tracking-wider mt-0.5">
-                                  Input Pipeline Feed
-                                </p>
+                                <p className="text-xs font-black text-[#4b2c20]">{item.name}</p>
+                                <p className="text-[10px] text-[#5d4037]/70 uppercase font-sans tracking-wider mt-0.5">{item.type}</p>
                               </div>
                             </div>
-                            <span className="text-[9px] font-sans font-black px-2 py-0.5 rounded-full border border-[#8b4513]/20 bg-[#faf4e5] text-[#8b4513] uppercase">
-                              Active
-                            </span>
+                            <span className="text-[9px] font-sans font-black px-2 py-0.5 rounded-full border border-[#8b4513]/20 bg-[#faf4e5] text-[#8b4513] uppercase">{item.status}</span>
                           </div>
                         ))}
                       </div>
@@ -953,13 +834,11 @@ export default function SettingsModal({
                   </div>
                 )}
 
-                {/* Option 3B: Status Rules */}
+                {/* Option 3B: Status Rules with Custom Combobox */}
                 {activeSecondaryTab === "status" && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-serif">
                     <div className="lg:col-span-5 bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-6 h-fit shadow-sm">
-                      <p className="text-xs text-[#5d4037] leading-relaxed">
-                        Control processing impacts on statement flows and P&L indicators.
-                      </p>
+                      <p className="text-xs text-[#5d4037] leading-relaxed">Control processing impacts on P&L and statement flows.</p>
 
                       <div className="space-y-4">
                         <Combobox
@@ -967,18 +846,34 @@ export default function SettingsModal({
                           label="Status Target"
                           value={moreStatus}
                           onChange={setMoreStatus}
-                          options={statusOptions}
-                          onSaveNew={(val) => addOption("status", val)}
+                          options={statusOptionsList}
+                          setOptions={setStatusOptionsList}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
+
+                        <div className="space-y-3 pt-2">
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                            <input type="checkbox" checked={plImpact} onChange={(e) => setPlImpact(e.target.checked)} className="w-4 h-4 bg-[#faf4e5] border border-[#8b4513]/30 text-[#8b4513] cursor-pointer accent-[#8b4513]" />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-black text-[#4b2c20] group-hover:text-[#8b4513] transition-colors">Profit and Loss impact</span>
+                              <span className="text-[9px] text-[#5d4037]/75 font-sans leading-normal">Flags immediate revenue or operational expense recognition.</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                            <input type="checkbox" checked={cashflowImpact} onChange={(e) => setCashflowImpact(e.target.checked)} className="w-4 h-4 bg-[#faf4e5] border border-[#8b4513]/30 text-[#8b4513] cursor-pointer accent-[#8b4513]" />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-black text-[#4b2c20] group-hover:text-[#8b4513] transition-colors">Cashflow Impact</span>
+                              <span className="text-[9px] text-[#5d4037]/75 font-sans leading-normal">Links ledger state to direct banking reserves calculation.</span>
+                            </div>
+                          </label>
+                        </div>
 
                         <button
                           type="button"
-                          onClick={() => {
-                            addOption("status", moreStatus);
-                            toast.success(`Status registered: ${moreStatus}`);
-                          }}
+                          onClick={() => { setStatusItems([...statusItems, { name: moreStatus || "ST-CUSTOM", plImpact, cashflowImpact }]); showNotice("Status Registered."); }}
                           className="w-full h-11 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <Sliders className="w-4 h-4" />
@@ -988,26 +883,18 @@ export default function SettingsModal({
                     </div>
 
                     <div className="lg:col-span-7 bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5">
-                        <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                          Enforced Status Rules
-                        </span>
-                      </div>
+                      <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5"><span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">Enforced status rules</span></div>
                       <div className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {statusOptions.map((item, idx) => (
+                        {statusItems.map((item, idx) => (
                           <div key={idx} className="flex items-center justify-between p-4 hover:bg-[#8b4513]/5">
                             <div className="flex items-center gap-3">
                               <Sliders className="w-4 h-4 text-[#8b4513]" />
                               <div>
-                                <p className="text-xs font-black text-[#4b2c20]">{item}</p>
+                                <p className="text-xs font-black text-[#4b2c20]">{item.name}</p>
                                 <div className="flex items-center gap-2 mt-1 text-[9px] font-sans text-[#5d4037]/75 font-bold uppercase tracking-widest">
-                                  <span className="text-emerald-700 font-sans font-black">
-                                    P&L Impact
-                                  </span>
+                                  <span className={item.plImpact ? "text-emerald-700" : "text-[#5d4037]/40"}>P&L Impact</span>
                                   <span>•</span>
-                                  <span className="text-cyan-700 font-sans font-black">
-                                    Cashflow Impact
-                                  </span>
+                                  <span className={item.cashflowImpact ? "text-cyan-700" : "text-[#5d4037]/40"}>Cashflow Impact</span>
                                 </div>
                               </div>
                             </div>
@@ -1018,94 +905,54 @@ export default function SettingsModal({
                   </div>
                 )}
 
-                {/* Option 3C: Balance Alignment */}
+                {/* Option 3C: Balance Alignment (Initial Allocations strictly initialized to 0) */}
                 {activeSecondaryTab === "balances" && (
                   <div className="space-y-6 font-serif">
                     <div className="border border-[#8b4513]/30 bg-[#faf4e5] p-5 rounded-2xl flex items-center justify-between">
                       <div className="space-y-1">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-[#8b4513]">
-                          Ledger Balance Alignment
-                        </h4>
-                        <p className="text-[11px] text-[#5d4037] leading-relaxed font-serif">
-                          Configured initial alignment matrices.
-                        </p>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-[#8b4513]">Ledger Balance Alignment</h4>
+                        <p className="text-[11px] text-[#5d4037] leading-relaxed font-serif">Total configured debits must equal credits identically.</p>
                       </div>
-                      <div className="flex gap-4 text-xs font-mono font-bold text-[#8b4513]">
-                        <span>Dr: ${totalDebits.toLocaleString()}</span>
-                        <span>|</span>
-                        <span>Cr: ${totalCredits.toLocaleString()}</span>
-                      </div>
+                      <div className="flex gap-3 text-xs font-mono font-bold text-[#8b4513]">$0.00 / $0.00</div>
                     </div>
 
                     <div className="bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-5 space-y-3 shadow-sm">
-                      {parsedCoaData.map((acc) => {
-                        const balanceRecord = accountBalances.find(
-                          (b) => b.account_code === acc.code
-                        );
-                        const balanceAmount = balanceRecord ? balanceRecord.balance : 0;
-                        return (
-                          <div
-                            key={acc.code}
-                            className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-3 bg-[#faf4e5]/60 border border-[#8b4513]/15 rounded-xl hover:border-[#8b4513]/40 transition-all"
-                          >
-                            <span className="sm:col-span-2 font-mono text-xs text-[#8b4513] font-bold">
-                              {acc.code}
-                            </span>
-                            <span className="sm:col-span-5 text-xs text-[#4b2c20] font-black">
-                              {acc.name}
-                            </span>
-                            <span className="sm:col-span-2 text-[10px] text-[#5d4037] uppercase tracking-wider font-sans">
-                              {acc.type}
-                            </span>
-                            <div className="sm:col-span-3">
-                              <input
-                                type="number"
-                                value={balanceAmount}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value) || 0;
-                                  updateAccountBalance(user?.id, acc.code, val);
-                                }}
-                                className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded p-1.5 text-right font-mono text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
-                              />
-                            </div>
+                      {coaData.map((acc) => (
+                        <div key={acc.code} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-3 bg-[#faf4e5]/60 border border-[#8b4513]/15 rounded-xl hover:border-[#8b4513]/40 transition-all">
+                          <span className="sm:col-span-2 font-mono text-xs text-[#8b4513] font-bold">{acc.code}</span>
+                          <span className="sm:col-span-5 text-xs text-[#4b2c20] font-black">{acc.name}</span>
+                          <span className="sm:col-span-2 text-[10px] text-[#5d4037] uppercase tracking-wider font-sans">{acc.type}</span>
+                          <div className="sm:col-span-3">
+                            <input
+                              type="number"
+                              defaultValue={0} 
+                              className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded p-1.5 text-right font-mono text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+                            />
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* ================= TAB 4: QUICK ACTIONS ================= */}
+            {/* ================= TAB 4: NEW QUICK ACTIONS (REBUILT GRID & ALIGNMENT) ================= */}
             {activePrimaryTab === "quick_actions" && (
-              <div className="space-y-8 font-serif">
+              <div className="space-y-8 font-serif animate-in fade-in duration-200">
+                
                 {/* Clean Slate Form Container */}
                 <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl p-6 space-y-6 shadow-sm">
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs text-[#5d4037]">
-                      Configure unified operational posting parameters across system ledgers.
-                    </p>
-                    {selectedQaNames.length > 0 && (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={handleDeleteQuickAction}
-                          className="px-3 py-1 bg-red-800 text-white text-xs font-black rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                        >
-                          Delete Selected ({selectedQaNames.length})
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-xs text-[#5d4037]">Configure unified operational posting parameters across system ledgers.</p>
 
-                  <form onSubmit={handleSaveQuickActionSubmit} className="space-y-6">
+                  <form onSubmit={handleSaveQuickAction} className="space-y-6">
+                    
+                    {/* Grid Math: Exact grid-cols-4 Tailwind implementation */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      {/* ROW 1 */}
+                      
+                      {/* ROW 1: Quick Action name (col-span-2), Value date (col-span-1), Posting date (col-span-1) */}
                       <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Quick Action Name
-                        </label>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">Quick Action Name</label>
                         <input
                           type="text"
                           required
@@ -1116,43 +963,35 @@ export default function SettingsModal({
                         />
                       </div>
                       <div className="md:col-span-1 font-sans">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">
-                          Value Date
-                        </label>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">Value Date</label>
                         <input
                           type="date"
-                          value={qaValueDate || ""}
+                          value={qaValueDate}
                           onChange={(e) => setQaValueDate(e.target.value)}
                           className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] font-mono shadow-inner"
                         />
                       </div>
                       <div className="md:col-span-1 font-sans">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">
-                          Posting Date
-                        </label>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">Posting Date</label>
                         <input
                           type="date"
-                          value={qaPostingDate || ""}
+                          value={qaPostingDate}
                           onChange={(e) => setQaPostingDate(e.target.value)}
                           className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] font-mono shadow-inner"
                         />
                       </div>
 
-                      {/* ROW 2 */}
+                      {/* ROW 2: Flow (col-span-1), Status (col-span-1), Origin/From (col-span-1), Amount (col-span-1) */}
                       <div className="md:col-span-1">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Flow
-                        </label>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">Flow</label>
                         <div className="relative">
                           <select
                             value={qaFlow}
                             onChange={(e) => setQaFlow(e.target.value)}
                             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none appearance-none font-black font-serif shadow-inner"
                           >
-                            <option value="">-</option>
-                            <option value="inflow">Inflow</option>
-                            <option value="outflow">Outflow</option>
-                            <option value="neutral">Neutral</option>
+                            <option value="Inflow">Inflow</option>
+                            <option value="Outflow">Outflow</option>
                           </select>
                           <ChevronDown className="absolute right-3.5 top-3.5 w-4 h-4 text-[#8b4513]/80 pointer-events-none" />
                         </div>
@@ -1164,30 +1003,30 @@ export default function SettingsModal({
                           label="Status"
                           value={qaStatus}
                           onChange={setQaStatus}
-                          options={statusOptions}
-                          onSaveNew={(val) => addOption("status", val)}
+                          options={statusOptionsList}
+                          setOptions={setStatusOptionsList}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
                       </div>
 
                       <div className="md:col-span-1">
                         <Combobox
-                          id="qa-from"
+                          id="qa-origin"
                           label="Origin/From"
-                          value={qaFrom}
-                          onChange={setQaFrom}
-                          options={fromOptions}
-                          onSaveNew={(val) => addOption("from", val)}
+                          value={qaOrigin}
+                          onChange={setQaOrigin}
+                          options={originOptions}
+                          setOptions={setOriginOptions}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
                       </div>
 
                       <div className="md:col-span-1 font-sans">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">
-                          Amount ($)
-                        </label>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">Amount ($)</label>
                         <input
                           type="number"
                           value={qaAmount}
@@ -1196,23 +1035,22 @@ export default function SettingsModal({
                         />
                       </div>
 
-                      {/* ROW 3 */}
+                      {/* ROW 3: Type (col-span-2), Description (col-span-2) */}
                       <div className="md:col-span-2">
                         <Combobox
-                          id="qa-class"
+                          id="qa-type"
                           label="Type"
-                          value={qaClass}
-                          onChange={setQaClass}
-                          options={classOptions}
-                          onSaveNew={(val) => addOption("class", val)}
+                          value={qaType}
+                          onChange={setQaType}
+                          options={lvlITypes}
+                          setOptions={setLvlITypes}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Description Memo
-                        </label>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">Description Memo</label>
                         <input
                           type="text"
                           placeholder="Add core descriptor metadata..."
@@ -1222,75 +1060,61 @@ export default function SettingsModal({
                         />
                       </div>
 
-                      {/* ROW 4 */}
+                      {/* ROW 4: Subtype (col-span-2), Source account (col-span-2) */}
                       <div className="md:col-span-2">
                         <Combobox
-                          id="qa-subclass"
+                          id="qa-subtype"
                           label="Subtype"
-                          value={qaSubClass}
-                          onChange={setQaSubClass}
-                          options={subClassOptions}
-                          onSaveNew={(val) => addOption("subClass", val)}
+                          value={qaSubtype}
+                          onChange={setQaSubtype}
+                          options={lvlIISubtypes}
+                          setOptions={setLvlIISubtypes}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Source Account Code
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={qaSourceDestBank}
-                            onChange={(e) => setQaSourceDestBank(e.target.value)}
-                            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] appearance-none font-bold shadow-inner"
-                          >
-                            <option value="">-</option>
-                            {Object.entries(accountMappings).map(([code, name]) => (
-                              <option key={code} value={code}>
-                                {code} - {name}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-3.5 top-3.5 w-4 h-4 text-[#8b4513]/80 pointer-events-none" />
-                        </div>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">Source Account</label>
+                        <input
+                          type="text"
+                          value={qaSourceAccount}
+                          onChange={(e) => setQaSourceAccount(e.target.value)}
+                          className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] font-bold shadow-inner"
+                        />
                       </div>
 
-                      {/* ROW 5 */}
+                      {/* ROW 5: Category (col-span-2), Target account (col-span-2) */}
                       <div className="md:col-span-2">
                         <Combobox
                           id="qa-category"
                           label="Category"
                           value={qaCategory}
                           onChange={setQaCategory}
-                          options={categoryOptions}
-                          onSaveNew={(val) => addOption("category", val)}
+                          options={lvlIIICategories}
+                          setOptions={setLvlIIICategories}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Target Account Code
-                        </label>
+                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">Target Account</label>
                         <div className="relative">
                           <select
                             value={qaTargetAccount}
                             onChange={(e) => setQaTargetAccount(e.target.value)}
                             className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] appearance-none font-bold shadow-inner"
                           >
-                            <option value="">-</option>
-                            {Object.entries(accountMappings).map(([code, name]) => (
-                              <option key={code} value={code}>
-                                {code} - {name}
-                              </option>
+                            {coaData.map(c => (
+                              <option key={c.code} value={`${c.code} - ${c.name}`}>{c.code} - {c.name}</option>
                             ))}
                           </select>
                           <ChevronDown className="absolute right-3.5 top-3.5 w-4 h-4 text-[#8b4513]/80 pointer-events-none" />
                         </div>
                       </div>
 
-                      {/* ROW 6 */}
+                      {/* ROW 6: Entity (col-span-2), Save & Cancel Configuration Buttons Aligned Right */}
                       <div className="md:col-span-2">
                         <Combobox
                           id="qa-entity"
@@ -1298,13 +1122,14 @@ export default function SettingsModal({
                           value={qaEntity}
                           onChange={setQaEntity}
                           options={entityOptions}
-                          onSaveNew={(val) => addOption("entity", val, { category: qaCategory })}
+                          setOptions={setEntityOptions}
                           activeDropdownId={activeDropdownId}
                           setActiveDropdownId={setActiveDropdownId}
+                          showNotice={showNotice}
                         />
                       </div>
 
-                      {/* BUTTON ALIGNMENT */}
+                      {/* BUTTON ALIGNMENT: Strictly place "Save Blueprint" to the Left of "Cancel" as required */}
                       <div className="md:col-span-2 flex items-end justify-end gap-3 pt-4 font-sans">
                         <button
                           type="submit"
@@ -1313,7 +1138,7 @@ export default function SettingsModal({
                           <Save className="w-4 h-4" />
                           <span>Save Blueprint</span>
                         </button>
-
+                        
                         <button
                           type="button"
                           onClick={handleResetQaForm}
@@ -1322,6 +1147,7 @@ export default function SettingsModal({
                           Cancel
                         </button>
                       </div>
+
                     </div>
                   </form>
                 </div>
@@ -1329,12 +1155,8 @@ export default function SettingsModal({
                 {/* Quick Actions Registry Data Table */}
                 <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl overflow-hidden shadow-sm">
                   <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                      Quick Actions Registry
-                    </span>
-                    <span className="text-[9px] font-mono text-[#8b4513] font-bold">
-                      Total Routes: {templates.length}
-                    </span>
+                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">Quick Actions Registry</span>
+                    <span className="text-[9px] font-mono text-[#8b4513] font-bold">Total Routes: {quickActionsRegistry.length}</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse font-serif">
@@ -1346,72 +1168,31 @@ export default function SettingsModal({
                           <th className="p-4 text-right">Amount ($)</th>
                           <th className="p-4">COA Path ID</th>
                           <th className="p-4">Entity Mapped Node</th>
-                          <th className="p-4 text-right">Edit</th>
                           <th className="p-4 text-right">Deprecate</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {templates.map((item, idx) => (
+                        {quickActionsRegistry.map((item, idx) => (
                           <tr key={idx} className="hover:bg-[#8b4513]/5 transition-colors">
                             <td className="p-4 text-[#4b2c20] font-black">{item.name}</td>
                             <td className="p-4 font-sans">
-                              <span
-                                className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${
-                                  item.data?.flow === "inflow"
-                                    ? "text-emerald-700 border-emerald-500/20 bg-emerald-50"
-                                    : item.data?.flow === "outflow"
-                                    ? "text-[#8b0000] border-[#8b0000]/20 bg-red-50"
-                                    : "text-gray-700 border-gray-400/20 bg-gray-50"
-                                }`}
-                              >
-                                {item.data?.flow || "neutral"}
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${
+                                item.flow === "Inflow" ? "text-emerald-700 border-emerald-500/20 bg-emerald-50" : "text-[#8b0000] border-[#8b0000]/20 bg-red-50"
+                              }`}>
+                                {item.flow}
                               </span>
                             </td>
                             <td className="p-4 font-sans">
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#faf4e5] text-[#5d4037] border border-[#8b4513]/20">
-                                {item.data?.payment_status || "Pending"}
-                              </span>
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#faf4e5] text-[#5d4037] border border-[#8b4513]/20">{item.status}</span>
                             </td>
-                            <td className="p-4 text-right font-mono text-[#8b4513] font-semibold">
-                              ${parseFloat(item.data?.amount || 0).toLocaleString()}
-                            </td>
-                            <td className="p-4 font-mono text-[#5d4037]">
-                              [{item.data?.target_account || "N/A"}]
-                            </td>
-                            <td className="p-4 text-[#5d4037]">{item.data?.entity || "Universal"}</td>
+                            <td className="p-4 text-right font-mono text-[#8b4513] font-semibold">${parseFloat(item.amount).toLocaleString()}</td>
+                            <td className="p-4 font-mono text-[#5d4037]">[{item.targetAccount.split(" ")[0]}]</td>
+                            <td className="p-4 text-[#5d4037]">{item.entity}</td>
                             <td className="p-4 text-right">
                               <button
                                 onClick={() => {
-                                  setSelectedQaTemplateName(item.name);
-                                  setQaName(item.name);
-                                  setQaIcon(item.icon || "⚡");
-                                  setQaFrom(item.data.from || "");
-                                  setQaClass(item.data.transaction_type || "");
-                                  setQaSubClass(item.data.transaction_subtype || "");
-                                  setQaEntity(item.data.entity || "");
-                                  setQaCategory(item.data.transaction_category || "");
-                                  setQaTargetAccount(item.data.target_account || "");
-                                  setQaSourceDestBank(item.data.source_dest_bank || "");
-                                  setQaFlow(item.data.flow || "");
-                                  setQaStatus(item.data.payment_status || "");
-                                  setQaDescription(item.data.description || "");
-                                  setQaAmount(item.data.amount || "");
-                                  setQaDueDate(item.data.due_date || "");
-                                  setQaValueDate(item.data.value_date || "");
-                                  setQaPostingDate(item.data.posting_date || "");
-                                  setIsEditingQa(true);
-                                  toast.success(`Loaded blueprint: ${item.name}`);
-                                }}
-                                className="p-1.5 text-blue-800 hover:bg-blue-50 rounded-lg cursor-pointer"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                            <td className="p-4 text-right">
-                              <button
-                                onClick={() => {
-                                  deleteOption("quickAction", item.name);
-                                  toast.success(`Deprecating blueprint action: ${item.name}`);
+                                  setQuickActionsRegistry(quickActionsRegistry.filter((_, i) => i !== idx));
+                                  showNotice(`Deprecating blueprint action: ${item.name}`);
                                 }}
                                 className="p-1.5 text-[#8b0000] hover:bg-red-50 rounded-lg cursor-pointer"
                               >
@@ -1424,12 +1205,14 @@ export default function SettingsModal({
                     </table>
                   </div>
                 </div>
+
               </div>
             )}
+
           </div>
         </div>
 
-        {/* FLOATING SMART SCROLL INDICATOR BUTTON */}
+        {/* FLOATING SMART SCROLL INDICATOR BUTTON (RE-THEMED TO PARCHMENT WOOD) */}
         {showScrollBtn && (
           <button
             onClick={handleScrollAction}
@@ -1440,7 +1223,7 @@ export default function SettingsModal({
           </button>
         )}
 
-        {/* SYSTEM BOTTOM ACTION BAR */}
+        {/* SYSTEM BOTTOM ACTION BAR (WOOD BAR AND PARCHMENT ACTIONS) */}
         <div className="p-4 bg-[#5d4037]/10 border-t border-[#8b4513]/20 flex justify-end gap-3 shrink-0 z-10 font-sans">
           <button
             onClick={onClose}
@@ -1450,7 +1233,7 @@ export default function SettingsModal({
           </button>
           <button
             onClick={() => {
-              toast.success("Ledger compliance parameters committed safely.");
+              showNotice("Ledger compliance parameters committed safely.");
               onClose();
             }}
             className="px-5 h-10 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/45 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md hover:scale-105 active:scale-95"
@@ -1460,21 +1243,6 @@ export default function SettingsModal({
           </button>
         </div>
 
-        {/* HIDDEN FILE INPUTS FOR BACKWARD COMPATIBILITY CSV ACTIONS */}
-        <input
-          type="file"
-          ref={settingsFileInputRef}
-          onChange={importSettingsCSV}
-          className="hidden"
-          accept=".csv"
-        />
-        <input
-          type="file"
-          ref={qaFileInputRef}
-          onChange={importQuickActionsCSV}
-          className="hidden"
-          accept=".csv"
-        />
       </div>
     </div>
   );
