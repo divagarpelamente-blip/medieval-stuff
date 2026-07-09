@@ -35,29 +35,38 @@ export function useDashboardEngine(filteredTransactions = []) {
     const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
 
     // ==============================================================
-    // 1. P&L FIREWALL: Filtrar apenas Income & Expense
+    // 1. P&L FIREWALL: Single-Pass Aggregation for Income & Expense
     // ==============================================================
-    const plTransactions = safeFilteredTxs.filter(
-      tx => tx.transaction_type === 'Income' || tx.transaction_type === 'Expense'
-    );
+    const plTransactions = [];
+    const incomeTxs = [];
+    const expenseTxs = [];
+    let realizedIncome = 0;
+    let forecastIncome = 0;
+    let realizedExpense = 0;
+    let forecastExpense = 0;
 
-    // Totais de Receita (Income)
-    const incomeTxs = plTransactions.filter(tx => tx.transaction_type === 'Income');
-    const realizedIncome = incomeTxs
-      .filter(tx => isCompleted(tx.payment_status))
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const forecastIncome = incomeTxs
-      .filter(tx => tx.payment_status === 'Pending')
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-    // Totais de Despesa (Expense)
-    const expenseTxs = plTransactions.filter(tx => tx.transaction_type === 'Expense');
-    const realizedExpense = expenseTxs
-      .filter(tx => isCompleted(tx.payment_status))
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-    const forecastExpense = expenseTxs
-      .filter(tx => tx.payment_status === 'Pending')
-      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    for (const tx of safeFilteredTxs) {
+      const type = tx.transaction_type;
+      if (type === 'Income') {
+        plTransactions.push(tx);
+        incomeTxs.push(tx);
+        const amt = Number(tx.amount) || 0;
+        if (isCompleted(tx.payment_status)) {
+          realizedIncome += amt;
+        } else if (tx.payment_status === 'Pending') {
+          forecastIncome += amt;
+        }
+      } else if (type === 'Expense') {
+        plTransactions.push(tx);
+        expenseTxs.push(tx);
+        const amt = Number(tx.amount) || 0;
+        if (isCompleted(tx.payment_status)) {
+          realizedExpense += amt;
+        } else if (tx.payment_status === 'Pending') {
+          forecastExpense += amt;
+        }
+      }
+    }
 
     const netRealized = realizedIncome - realizedExpense;
     const netForecast = (realizedIncome + forecastIncome) - (realizedExpense + forecastExpense);

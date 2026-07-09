@@ -1,5 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 import { useKingdomStore } from '../store/useKingdomStore';
@@ -27,6 +26,8 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   const entityOptions = useKingdomStore((state) => state.entityOptions);
   const categoryOptions = useKingdomStore((state) => state.categoryOptions);
   const entityMappings = useKingdomStore((state) => state.entityMappings);
+  const accountMappings = useKingdomStore((state) => state.accountMappings);
+  const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap);
   
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const fetchKingdomData = useKingdomStore((state) => state.fetchKingdomData);
@@ -50,6 +51,60 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   const [txFlow, setTxFlow] = useState('');
   const [editingTxId, setEditingTxId] = useState(null);
   const [txQuickActionName, setTxQuickActionName] = useState(null);
+
+  // Dynamic Cascading Filters Engine
+  const getMatrixRows = useKingdomStore((state) => state.getMatrixRows);
+  const matrixRows = useMemo(() => {
+    return getMatrixRows ? getMatrixRows() : [];
+  }, [getMatrixRows, subClassOptions, categoryOptions, entityOptions, entityMappings, accountMappings, subtypeToCategoryMap]);
+
+  const allUniqueSubClasses = useMemo(() => {
+    const set = new Set();
+    matrixRows.forEach(r => { if (r.subtype) set.add(r.subtype); });
+    return Array.from(set).sort();
+  }, [matrixRows]);
+
+  const allUniqueCategories = useMemo(() => {
+    const set = new Set();
+    matrixRows.forEach(r => { if (r.category) set.add(r.category); });
+    return Array.from(set).sort();
+  }, [matrixRows]);
+
+  const allUniqueEntities = useMemo(() => {
+    const set = new Set();
+    matrixRows.forEach(r => { if (r.entity) set.add(r.entity); });
+    return Array.from(set).sort();
+  }, [matrixRows]);
+
+  const allowedSubClasses = useMemo(() => {
+    return allUniqueSubClasses.filter(val => {
+      return matrixRows.some(r => {
+        const matchCategory = !txCategory || r.category === txCategory;
+        const matchEntity = !txEntity || r.entity === txEntity;
+        return r.subtype === val && matchCategory && matchEntity;
+      });
+    });
+  }, [matrixRows, txCategory, txEntity, allUniqueSubClasses]);
+
+  const allowedCategories = useMemo(() => {
+    return allUniqueCategories.filter(val => {
+      return matrixRows.some(r => {
+        const matchSubClass = !txSubClass || r.subtype === txSubClass;
+        const matchEntity = !txEntity || r.entity === txEntity;
+        return r.category === val && matchSubClass && matchEntity;
+      });
+    });
+  }, [matrixRows, txSubClass, txEntity, allUniqueCategories]);
+
+  const allowedEntities = useMemo(() => {
+    return allUniqueEntities.filter(val => {
+      return matrixRows.some(r => {
+        const matchSubClass = !txSubClass || r.subtype === txSubClass;
+        const matchCategory = !txCategory || r.category === txCategory;
+        return r.entity === val && matchSubClass && matchCategory;
+      });
+    });
+  }, [matrixRows, txSubClass, txCategory, allUniqueEntities]);
 
   // Cascading Configuration (exactly as defined in App.jsx)
   const cascadingConfig = {
@@ -471,10 +526,24 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
         toast.error("Erro de Validação: Escolha uma Categoria.");
         return;
       }
-      if (!txEntity) {
+      if (!txEntity || txEntity.trim() === '') {
         toast.error("Erro de Validação: Escolha uma Entidade.");
         return;
       }
+
+      // Validate relationship matrix compatibility (forces match against strictly complete non-placeholder rows)
+      const isCombinationValid = matrixRows.some(row => 
+        (row.entity || '').trim() !== '' &&
+        (row.subtype || '').trim() === (txSubClass || '').trim() &&
+        (row.category || '').trim() === (txCategory || '').trim() &&
+        (row.entity || '').trim() === (txEntity || '').trim()
+      );
+
+      if (!isCombinationValid) {
+        toast.error("Erro de Validação: A combinação de Subtipo, Categoria e Entidade selecionada não é válida de acordo com a Matriz de Associação.");
+        return;
+      }
+
       if (!txAmount || isNaN(txAmount) || Number(txAmount) <= 0) {
         toast.error(t.err_invalid_amount);
         return;
@@ -587,6 +656,9 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     mainMenu, setMainMenu,
     subMenuAction, setSubMenuAction,
     cascadingConfig,
+    allowedSubClasses,
+    allowedCategories,
+    allowedEntities,
     handleMainMenuChange,
     handleSubMenuChange,
     handleEntityChange,

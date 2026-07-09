@@ -1,5 +1,3 @@
-import React from 'react';
-import { useKingdomStore } from '../../store/useKingdomStore';
 
 const RegisterTransactionForm = ({
   txClass,
@@ -40,85 +38,8 @@ const RegisterTransactionForm = ({
   accountMappings = {},
   t = (key, fallback) => fallback || key
 }) => {
-  const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap) || {
-    "Banks": ["Bank account", "Saving account"],
-    "Investments": ["Investment account"],
-    "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
-    "Other Debts": ["Other Debts"],
-    "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
-    "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
-    "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
-    "Public Transports": ["Public Transports"],
-    "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy", "Other Incomes"],
-    "Education": ["PhD", "Trainings"],
-    "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
-    "Food & Consumables": ["Food", "Drinks", "Supermarket (Other)"],
-    "Tools & Materials": ["Tools", "Other materials"],
-    "Clothing & Shoes": ["Clothing", "Shoes"],
-    "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
-    "Insurances": ["Insurances"],
-    "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"],
-    "Markets & Personal care": [],
-    "Other Consumables": []
-  };
-
-  const defaultSubtypeToCategoryMap = {
-    "Banks": ["Bank account", "Savings account", "Investments account"],
-    "Fixed Assets": ["Fixed Assets"],
-    "Personal Debt": ["Loans & Burrow", "Credit Cards"],
-    "Other Debts": ["Other Debts"],
-    "Living & Household": ["Household", "Utilities"],
-    "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
-    "Public Transports": ["Public Transports"],
-    "Other Transports": ["Other Transports"],
-    "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
-    "Health": ["Health"],
-    "Entertainment": ["Entertainment"],
-    "Education": ["Education"],
-    "Insurances": ["Insurances"],
-    "Taxes & State": ["Taxes", "Interest"],
-    "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
-    "Payroll": ["Salary", "Payroll Subsidies"],
-    "Other Income": ["Other Incomes"],
-    "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
-  };
-
-  let filteredCategories = categoryOptions;
-  if (txSubClass) {
-    const allowedCategories = Array.from(new Set([
-      ...(subtypeToCategoryMap[txSubClass] || []),
-      ...(defaultSubtypeToCategoryMap[txSubClass] || [])
-    ]));
-    filteredCategories = categoryOptions.filter(opt => allowedCategories.includes(opt));
-  }
-
-  const coaMappings = [];
-  Object.entries(accountMappings || {}).forEach(([code, fullName]) => {
-    let remaining = fullName;
-    if (remaining.startsWith(code)) {
-      remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
-    }
-    const parts = remaining.split(/\s*-\s*/);
-    const category = parts[0] || '';
-    const entity = parts.slice(1).join(' - ') || '';
-    if (category && entity) {
-      coaMappings.push({ category, entity });
-    }
-  });
-
-  let filteredEntities = entityOptions;
-  if (txCategory) {
-    filteredEntities = entityOptions.filter(opt => 
-      entityMappings[opt] === txCategory ||
-      coaMappings.some(m => m.category === txCategory && m.entity === opt)
-    );
-  } else if (txSubClass) {
-    const allowedCategories = subtypeToCategoryMap[txSubClass] || [];
-    filteredEntities = entityOptions.filter(opt => 
-      allowedCategories.includes(entityMappings[opt]) ||
-      coaMappings.some(m => allowedCategories.includes(m.category) && m.entity === opt)
-    );
-  }
+  const filteredCategories = categoryOptions;
+  const filteredEntities = entityOptions;
 
   return (
     <div className="bg-[#faf4e5]/80 border border-[#8b4513]/30 rounded-xl p-3.5 space-y-3 shadow-sm">

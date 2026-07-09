@@ -440,6 +440,124 @@ export const useKingdomStore = create((set, get) => ({
     get().syncSettings(updates);
   },
 
+  getMatrixRows: () => {
+    const rows = [];
+    const coveredEntities = new Set();
+    const coveredCategories = new Set();
+    const coveredSubtypes = new Set();
+
+    const isEntityInvalid = (ent) => {
+      const val = (ent || '').trim().toLowerCase();
+      return !val || val === 'none' || val === 'null' || val === 'undefined';
+    };
+
+    const accountMappings = get().accountMappings || {};
+    const entityOptions = get().entityOptions || [];
+    const entityMappings = get().entityMappings || {};
+    const subtypeToCategoryMap = get().subtypeToCategoryMap || {};
+    const categoryOptions = get().categoryOptions || [];
+    const subClassOptions = get().subClassOptions || [];
+
+    // 1. Scan Chart of Accounts (COA) for specific mappings first
+    const coaMappingsList = [];
+    Object.entries(accountMappings).forEach(([code, fullName]) => {
+      let remaining = fullName;
+      if (remaining.startsWith(code)) {
+        remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+      }
+      const parts = remaining.split(/\s*-\s*/);
+      const category = parts[0] || '';
+      const entity = parts.slice(1).join(' - ') || '';
+      
+      if (category && entity && !isEntityInvalid(entity)) {
+        coaMappingsList.push({ category: category.trim(), entity: entity.trim() });
+      }
+    });
+
+    coaMappingsList.forEach(({ category, entity }) => {
+      let subtype = '';
+      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
+        if (cats && cats.includes(category)) {
+          subtype = sub;
+          break;
+        }
+      }
+      
+      const key = `${subtype}:::${category}:::${entity}`;
+      if (!rows.some(r => r.key === key)) {
+        rows.push({
+          key,
+          subtype,
+          category,
+          entity
+        });
+      }
+      
+      coveredEntities.add(entity);
+      coveredCategories.add(category);
+      if (subtype) coveredSubtypes.add(subtype);
+    });
+
+    // 2. Loop over standard entityMappings
+    entityOptions.forEach((entity) => {
+      if (!entity || coveredEntities.has(entity)) return;
+      const category = entityMappings[entity] || '';
+      let subtype = '';
+      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
+        if (cats && cats.includes(category)) {
+          subtype = sub;
+          break;
+        }
+      }
+      const key = `${subtype}:::${category}:::${entity}`;
+      if (!rows.some(r => r.key === key)) {
+        rows.push({
+          key,
+          subtype,
+          category,
+          entity
+        });
+      }
+      coveredEntities.add(entity);
+      if (category) coveredCategories.add(category);
+      if (subtype) coveredSubtypes.add(subtype);
+    });
+
+    // 3. Loop over categoryOptions for remaining uncovered category placeholders
+    categoryOptions.forEach((category) => {
+      if (!category || coveredCategories.has(category)) return;
+      let subtype = '';
+      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
+        if (cats && cats.includes(category)) {
+          subtype = sub;
+          break;
+        }
+      }
+      rows.push({
+        key: `${subtype}:::${category}:::`,
+        subtype,
+        category,
+        entity: ''
+      });
+      coveredCategories.add(category);
+      if (subtype) coveredSubtypes.add(subtype);
+    });
+
+    // 4. Loop over subclass options
+    subClassOptions.forEach((subtype) => {
+      if (!subtype || coveredSubtypes.has(subtype)) return;
+      rows.push({
+        key: `${subtype}::::::`,
+        subtype,
+        category: '',
+        entity: ''
+      });
+      coveredSubtypes.add(subtype);
+    });
+
+    return rows;
+  },
+
   // Fetch lightweight profile data (single-row polling mechanics)
   fetchKingdomData: async (profileId) => {
     const userId = get().user?.id || profileId;
@@ -666,14 +784,9 @@ export const useKingdomStore = create((set, get) => ({
         .reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
       const calculatedGold = Math.floor(startingGold + netCash);
 
-      // If calculatedGold is different from state gold, sync it to state and database
+      // If calculatedGold is different from state gold, sync it to state
       if (calculatedGold !== get().gold) {
         set({ gold: calculatedGold });
-        supabase
-          .from('profiles')
-          .update({ gold: calculatedGold })
-          .eq('id', userId)
-          .then();
       }
 
       set({ 
@@ -889,6 +1002,9 @@ export const useKingdomStore = create((set, get) => ({
     }
 
     const prevTransactions = get().transactions;
+    const prevGold = get().gold;
+    const prevXp = get().xp;
+    const prevLevel = get().level;
     set({ transactions: [tempTx, ...prevTransactions], isLoading: true });
 
     try {
@@ -927,29 +1043,41 @@ export const useKingdomStore = create((set, get) => ({
         }));
       }
 
-      const finalGold = Math.floor(newGold);
       const finalXp = Math.floor(newXp);
-      // Update profiles directly in database to ensure sync even if trigger is missing
+      // Update profiles directly in database for XP and level
       await supabase
         .from('profiles')
         .update({
-          gold: finalGold,
           xp: finalXp,
           level: newLevel
         })
         .eq('id', userId);
 
-      set({
-        gold: finalGold,
-        xp: finalXp,
-        level: newLevel
-      });
+      // Fetch the updated profile to synchronize gold (computed by the database trigger) along with XP and level
+      const { data: profileRes } = await supabase
+        .from('profiles')
+        .select('gold, xp, level')
+        .eq('id', userId)
+        .single();
+
+      if (profileRes) {
+        set({
+          gold: Number(profileRes.gold),
+          xp: Number(profileRes.xp),
+          level: Number(profileRes.level)
+        });
+      } else {
+        set({
+          xp: finalXp,
+          level: newLevel
+        });
+      }
 
       get().fetchDashboardData(userId);
 
       return { success: true, data };
     } catch (err) {
-      set({ transactions: prevTransactions });
+      set({ transactions: prevTransactions, gold: prevGold, xp: prevXp, level: prevLevel, isLoading: false });
       console.error('Error registering transaction:', err);
       return { success: false, error: err.message || err };
     } finally {

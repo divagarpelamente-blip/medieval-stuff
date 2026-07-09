@@ -225,6 +225,9 @@ function App() {
     mainMenu, setMainMenu,
     subMenuAction, setSubMenuAction,
     cascadingConfig,
+    allowedSubClasses,
+    allowedCategories,
+    allowedEntities,
     handleMainMenuChange,
     handleSubMenuChange,
     handleEntityChange,
@@ -1860,11 +1863,11 @@ const uniqueCategories = Array.from(new Set(dashboardFilteredTransactions.map(tx
                 txTargetAccount={txTargetAccount}
                 setTxTargetAccount={setTxTargetAccount}
                 classOptions={classOptions}
-                subClassOptions={subClassOptions}
+                subClassOptions={allowedSubClasses}
                 statusOptions={statusOptions}
                 fromOptions={fromOptions}
-                categoryOptions={categoryOptions}
-                entityOptions={entityOptions}
+                categoryOptions={allowedCategories}
+                entityOptions={allowedEntities}
                 entityMappings={entityMappings}
                 accountMappings={accountMappings}
                 t={t}

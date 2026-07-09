@@ -1,0 +1,6 @@
+{
+  "name": "Financial Transaction Ledger",
+  "description": "A financial transaction recorder featuring a dynamic chart of accounts hierarchy with cascading dropdown menus, ledger tracking, and configurations for accounts and entities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
