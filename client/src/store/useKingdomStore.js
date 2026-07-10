@@ -111,7 +111,8 @@ export const useKingdomStore = create((set, get) => ({
     const userId = get().user?.id;
     if (userId) {
       const settings = {
-        templates: get().templates,
+        templates
+        : get().templates,
         fromOptions: get().fromOptions,
         entityOptions: get().entityOptions,
         categoryOptions: get().categoryOptions,
@@ -350,6 +351,7 @@ export const useKingdomStore = create((set, get) => ({
       "source_dest_bank": "10101001",
       "flow": "outflow",
       "payment_status": "Completed",
+      
       "description": "Credit card payment"
     }
   }
