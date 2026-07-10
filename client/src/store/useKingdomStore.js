@@ -60,6 +60,175 @@ try {
   // Ignore
 }
 
+export const defaultValidationMatrix = [
+  // ASSETS (Type: Assets)
+  // Subtype: Liquid Assets
+  { accountCode: "11010001", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "CGD" },
+  { accountCode: "11010002", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "Universo" },
+  { accountCode: "11010003", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "ActivoBank" },
+  { accountCode: "11010004", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "Inter Bank" },
+  { accountCode: "11010005", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "WiZink" },
+  { accountCode: "11020001", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "CGD" },
+  { accountCode: "11020002", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "Universo" },
+  { accountCode: "11020003", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "ActivoBank" },
+  { accountCode: "11020004", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "Inter Bank" },
+  { accountCode: "11020005", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "WiZink" },
+  { accountCode: "11030001", type: "Assets", subtype: "Liquid Assets", category: "Cash", entity: "Dinheiro Físico" },
+
+  // Subtype: Sinking Funds
+  { accountCode: "12010001", type: "Assets", subtype: "Sinking Funds", category: "Short-Term Goals", entity: "Fundo Férias" },
+  { accountCode: "12010002", type: "Assets", subtype: "Sinking Funds", category: "Short-Term Goals", entity: "Fundo Emergência" },
+
+  // Subtype: Investments
+  { accountCode: "13010001", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "CGD" },
+  { accountCode: "13010002", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "Universo" },
+  { accountCode: "13010003", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "ActivoBank" },
+  { accountCode: "13010004", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "Inter Bank" },
+  { accountCode: "13010005", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "WiZink" },
+  { accountCode: "13020001", type: "Assets", subtype: "Investments", category: "Retirement", entity: "PPR" },
+
+  // Subtype: Fixed Assets
+  { accountCode: "14010001", type: "Assets", subtype: "Fixed Assets", category: "Real Estate", entity: "Habitação Própria" },
+  { accountCode: "14020001", type: "Assets", subtype: "Fixed Assets", category: "Vehicles", entity: "Carro Pessoal" },
+  { accountCode: "14020002", type: "Assets", subtype: "Fixed Assets", category: "Vehicles", entity: "Mota Pessoal" },
+
+  // LIABILITIES (Type: Liabilities)
+  // Subtype: Short-Term Debt
+  { accountCode: "21010001", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "CGD" },
+  { accountCode: "21010002", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "Universo" },
+  { accountCode: "21010003", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "ActivoBank" },
+  { accountCode: "21010004", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "Inter Bank" },
+  { accountCode: "21010005", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "WiZink" },
+  { accountCode: "21020001", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Cofidis" },
+  { accountCode: "21020002", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Mãe" },
+  { accountCode: "21020003", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Pedro" },
+  { accountCode: "21020004", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Reni" },
+  { accountCode: "21030001", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Finanças" },
+  { accountCode: "21030002", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Segurança Social" },
+  { accountCode: "21030003", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Justiça" },
+
+  // Subtype: Long-Term Debt
+  { accountCode: "22010001", type: "Liabilities", subtype: "Long-Term Debt", category: "Other Loans", entity: "Crédito Automóvel" },
+  { accountCode: "22010002", type: "Liabilities", subtype: "Long-Term Debt", category: "Other Loans", entity: "Crédito Habitação" },
+
+  // EXPENSES (Type: Expenses)
+  // Subtype: Housing & Utilities
+  { accountCode: "61010001", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Renda" },
+  { accountCode: "61010002", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Endesa" },
+  { accountCode: "61010003", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Agua" },
+  { accountCode: "61010004", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "NOS" },
+  { accountCode: "61010005", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "DIGAL" },
+  { accountCode: "61020001", type: "Expenses", subtype: "Housing & Utilities", category: "Maintenance", entity: "Obras e Decoração" },
+
+  // Subtype: Food & Living
+  { accountCode: "62010001", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Mercearia e Alimentação" },
+  { accountCode: "62010002", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Limpeza e Higiene" },
+  { accountCode: "62010003", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Drinks & Alcohol" },
+  { accountCode: "62020001", type: "Expenses", subtype: "Food & Living", category: "Pet Care", entity: "Pet Food" },
+  { accountCode: "62020002", type: "Expenses", subtype: "Food & Living", category: "Pet Care", entity: "Veterinário" },
+  { accountCode: "62030001", type: "Expenses", subtype: "Food & Living", category: "Dependents", entity: "Educação Filhos" },
+
+  // Subtype: Transportation
+  { accountCode: "63010001", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Gasoline" },
+  { accountCode: "63010002", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Tolls Via Verde" },
+  { accountCode: "63010003", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Repairs & Parking" },
+  { accountCode: "63020001", type: "Expenses", subtype: "Transportation", category: "Public & Taxis", entity: "Public Transport Navegante" },
+  { accountCode: "63020002", type: "Expenses", subtype: "Transportation", category: "Public & Taxis", entity: "Uber / Taxis" },
+
+  // Subtype: Health & Wellness
+  { accountCode: "64010001", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Hospital & Consultas" },
+  { accountCode: "64010002", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Dentista" },
+  { accountCode: "64010003", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Psicologia" },
+  { accountCode: "64020001", type: "Expenses", subtype: "Health & Wellness", category: "Pharmacy", entity: "Farmácia" },
+
+  // Subtype: Shopping & Personal
+  { accountCode: "65010001", type: "Expenses", subtype: "Shopping & Personal", category: "Retail", entity: "Clothing & Shoes" },
+  { accountCode: "65020001", type: "Expenses", subtype: "Shopping & Personal", category: "Hobbies & Tech", entity: "Tools & Electronics" },
+
+  // Subtype: Entertainment
+  { accountCode: "66010001", type: "Expenses", subtype: "Entertainment", category: "Leisure", entity: "Cinema & Dining Out" },
+  { accountCode: "66010002", type: "Expenses", subtype: "Entertainment", category: "Leisure", entity: "Nightlife & Drinks" },
+  { accountCode: "66020001", type: "Expenses", subtype: "Entertainment", category: "Subscriptions", entity: "Streaming" },
+
+  // Subtype: Education & Business
+  { accountCode: "67010001", type: "Expenses", subtype: "Education & Business", category: "Professional", entity: "PhD" },
+  { accountCode: "67010002", type: "Expenses", subtype: "Education & Business", category: "Professional", entity: "Trainings" },
+  { accountCode: "67020001", type: "Expenses", subtype: "Education & Business", category: "Freelance Expenses", entity: "Software & Materials" },
+
+  // Subtype: Insurances
+  { accountCode: "68010001", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Health Insurance" },
+  { accountCode: "68010002", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Car & Motorcycle Insurance" },
+  { accountCode: "68010003", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Life Insurance" },
+
+  // Subtype: Taxes & State
+  { accountCode: "69010001", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "IRS Pagamento" },
+  { accountCode: "69010002", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "IUC / Finanças" },
+  { accountCode: "69010003", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "Social Security" },
+
+  // Subtype: Financial & Fees
+  { accountCode: "69020001", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Bank Fees & Commissions" },
+  { accountCode: "69020002", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Fines & Penalties" },
+  { accountCode: "69020003", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Credit Interest Paid" },
+
+  // Subtype: Giving & Charity
+  { accountCode: "69030001", type: "Expenses", subtype: "Giving & Charity", category: "Philanthropy", entity: "Donativos Institucionais" },
+  { accountCode: "69030002", type: "Expenses", subtype: "Giving & Charity", category: "Philanthropy", entity: "Prendas a Terceiros" },
+
+  // INCOME (Type: Income)
+  // Subtype: Active Income
+  { accountCode: "71010001", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Base Salary" },
+  { accountCode: "71010002", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Bonus Scorecard" },
+  { accountCode: "71010003", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Vacation Subsidy" },
+  { accountCode: "71010004", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Christmas Subsidy" },
+  { accountCode: "71020001", type: "Income", subtype: "Active Income", category: "Freelance & Services", entity: "Consulting" },
+  { accountCode: "71020002", type: "Income", subtype: "Active Income", category: "Freelance & Services", entity: "Teaching Classes" },
+
+  // Subtype: Passive & Other
+  { accountCode: "72010001", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Cashbacks CGD" },
+  { accountCode: "72010002", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Cashbacks Universo" },
+  { accountCode: "72010003", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Family Gifts" },
+  { accountCode: "72020001", type: "Income", subtype: "Passive & Other", category: "Refunds", entity: "IRS Refund" },
+  { accountCode: "72020002", type: "Income", subtype: "Passive & Other", category: "Refunds", entity: "Health Insurance Refund" }
+];
+
+const derivedSubtypeToCategoryMap = {};
+const derivedSubtypeTypes = {};
+const derivedEntityMappings = {};
+const derivedClassOptions = ['Income', 'Expenses', 'Assets', 'Liabilities'];
+const derivedSubClassOptions = [];
+const derivedEntityOptions = [];
+const derivedCategoryOptions = [];
+
+defaultValidationMatrix.forEach(row => {
+  let typeCode = "1";
+  if (row.type === "Liabilities") typeCode = "2";
+  else if (row.type === "Expenses") typeCode = "6";
+  else if (row.type === "Income") typeCode = "7";
+  
+  derivedSubtypeTypes[row.subtype] = [typeCode];
+
+  if (!derivedSubtypeToCategoryMap[row.subtype]) {
+    derivedSubtypeToCategoryMap[row.subtype] = [];
+  }
+  if (!derivedSubtypeToCategoryMap[row.subtype].includes(row.category)) {
+    derivedSubtypeToCategoryMap[row.subtype].push(row.category);
+  }
+
+  derivedEntityMappings[row.entity] = row.category;
+
+  if (!derivedSubClassOptions.includes(row.subtype)) {
+    derivedSubClassOptions.push(row.subtype);
+  }
+
+  if (!derivedEntityOptions.includes(row.entity)) {
+    derivedEntityOptions.push(row.entity);
+  }
+
+  if (!derivedCategoryOptions.includes(row.category)) {
+    derivedCategoryOptions.push(row.category);
+  }
+});
+
 const initialAccountMappings = loadLocal('accountMappings', defaultAccountMappings);
 setDynamicAccountMappings(initialAccountMappings);
 
@@ -111,8 +280,7 @@ export const useKingdomStore = create((set, get) => ({
     const userId = get().user?.id;
     if (userId) {
       const settings = {
-        templates
-        : get().templates,
+        templates: get().templates,
         fromOptions: get().fromOptions,
         entityOptions: get().entityOptions,
         categoryOptions: get().categoryOptions,
@@ -138,169 +306,13 @@ export const useKingdomStore = create((set, get) => ({
   // Dropdown manage lists
   fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
   statusOptions: ['Pending', 'Completed'],
-  classOptions: ['Income', 'Expense', 'Assets', 'Liabilities'],
-  subClassOptions: ["Banks", "Fixed Assets", "Personal Debt", "Other Debts", "Living & Household", "Personal Transports", "Public Transports", "Other Transports", "Markets & Consumables", "Health", "Entertainment", "Education", "Insurances", "Insurances (income)", "Taxes & State", "Taxes & State (income)", "Financial Expenses", "Payroll", "Other Income", "Financial Income"],
-  entityOptions: loadLocal('entityOptions', [
-    'CGD', 'Universo', 'Active Bank', 'Inter Bank', 'Wizink', 'Cofidis', 'Other Loans', 'Jota', 'Mae', 'Reni', 'Pedro', 'Other Burrow',
-    'Social Security', 'Finances', 'NOS',
-    'Oeiras', 'Oeiras Utensils', 'Oeiras Decoration', 'Other Household', 'Portela',
-    'DIGAL', 'SIMAS', 'Other Utilities',
-    'Motorcycle', 'Car', 'Via Verde', 'Parking',
-    'Public Transport (Metro/Train/Bus)', 'Uber / Chauffeur', 'Taxis',
-    'Food', 'Pet Food', 'Food (work lunch)', 'Soda Drinks', 'Alcoholic Drinks', 'Cleaning Products', 'Personal Hygiene', 'Cosmetics',
-    'Tools', 'Clothing', 'Shoes', 'Other Market consumables',
-    'Public Hospital', 'Private Hospital', 'Medical Sessions & Exams', 'Active Psicologia Coimbra', 'Psicologist 2', 'Marco (Jota Mateus)', 'Marco Consultas (private)', 'Dentist Beatriz', 'Dentist 2', 'Farmacia Oeiras', 'Farmacia Portela',
-    'Restaurant dinner', 'Cinema', 'Streaming', 'Nightlife & Disco', 'Gaming',
-    'PhD', 'Trainings',
-    'Health Insurance', 'Life insurance',
-    'Mobility (IUC)', 'IRS', 'Interest', 'Fines',
-    'Base Salary', 'Consulting / Contract Services', 'Teaching Classes', 'Bonus (Scorecard)',
-    'Vacation Subsidy', 'Christmas Subsidy',
-    'Family Gifts', 'Cashbacks & Rewards',
-    'Mobility', 'Justice',
-    'CGD Credit Cards', 'Universo Credit Cards', 'Active Bank Credit Cards', 'Inter Bank Credit Cards'
-  ]),
-  categoryOptions: loadLocal('categoryOptions', [
-    "Bank account", "Savings account", "Investments account",
-    "Loans & Burrow", "Credit Cards", "Other Debts",
-    "Household", "Utilities", "Gasoline", "Tolls", "Parking", "Repairs",
-    "Public Transports", "Other Transports",
-    "Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables",
-    "Health", "Entertainment", "Education", "Insurances", "Taxes",
-    "Interest paid", "Fines",
-    "Salary", "Payroll Subsidies", "Other Incomes", "Interest",
-    "Fixed Assets"
-  ]),
-  subtypeToCategoryMap: loadLocal('subtypeToCategoryMap', {
-    "Banks": ["Bank account", "Savings account", "Investments account"],
-    "Fixed Assets": ["Fixed Assets"],
-    "Personal Debt": ["Loans & Burrow", "Credit Cards"],
-    "Other Debts": ["Other Debts"],
-    "Living & Household": ["Household", "Utilities"],
-    "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
-    "Public Transports": ["Public Transports"],
-    "Other Transports": ["Other Transports"],
-    "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
-    "Health": ["Health"],
-    "Entertainment": ["Entertainment"],
-    "Education": ["Education"],
-    "Insurances": ["Insurances"],
-    "Insurances (income)": ["Insurances"],
-    "Taxes & State": ["Taxes", "Interest"],
-    "Taxes & State (income)": ["Taxes", "Interest"],
-    "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
-    "Payroll": ["Salary", "Payroll Subsidies"],
-    "Other Income": ["Other Incomes"],
-    "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
-  }),
-  subtypeTypes: loadLocal('subtypeTypes', {
-    "Banks": ["1"],
-    "Fixed Assets": ["1"],
-    "Personal Debt": ["2"],
-    "Other Debts": ["2"],
-    "Living & Household": ["6"],
-    "Personal Transports": ["6"],
-    "Public Transports": ["6"],
-    "Other Transports": ["6"],
-    "Markets & Consumables": ["6"],
-    "Health": ["6"],
-    "Entertainment": ["6"],
-    "Education": ["6"],
-    "Insurances": ["6"],
-    "Insurances (income)": ["7"],
-    "Taxes & State": ["6"],
-    "Taxes & State (income)": ["7"],
-    "Financial Expenses": ["6"],
-    "Payroll": ["7"],
-    "Other Income": ["7"],
-    "Financial Income": ["7"]
-  }),
-  entityMappings: loadLocal('entityMappings', {
-    "CGD": "Bank account",
-    "Universo": "Bank account",
-    "Active Bank": "Bank account",
-    "Inter Bank": "Bank account",
-    "Wizink": "Investments account",
-    "Cofidis": "Loans & Burrow",
-    "Other Loans": "Loans & Burrow",
-    "Jota": "Loans & Burrow",
-    "Mae": "Loans & Burrow",
-    "Reni": "Loans & Burrow",
-    "Pedro": "Loans & Burrow",
-    "Other Burrow": "Loans & Burrow",
-    "Social Security": "Taxes",
-    "Finances": "Taxes",
-    "NOS": "Utilities",
-    "Oeiras": "Household",
-    "Oeiras Utensils": "Household",
-    "Oeiras Decoration": "Household",
-    "Other Household": "Household",
-    "Portela": "Household",
-    "DIGAL": "Utilities",
-    "SIMAS": "Utilities",
-    "Other Utilities": "Utilities",
-    "Motorcycle": "Gasoline",
-    "Car": "Gasoline",
-    "Via Verde": "Tolls",
-    "Parking": "Parking",
-    "Public Transport (Metro/Train/Bus)": "Public Transports",
-    "Uber / Chauffeur": "Other Transports",
-    "Taxis": "Other Transports",
-    "Food": "Markets & Groceries",
-    "Pet Food": "Markets & Groceries",
-    "Food (work lunch)": "Markets & Groceries",
-    "Soda Drinks": "Markets & Groceries",
-    "Alcoholic Drinks": "Markets & Groceries",
-    "Cleaning Products": "Markets & Groceries",
-    "Personal Hygiene": "Markets & Groceries",
-    "Cosmetics": "Markets & Groceries",
-    "Tools": "Markets and Tools",
-    "Clothing": "Markets and Clothing",
-    "Shoes": "Markets and Clothing",
-    "Other Market consumables": "Other Market consumables",
-    "Public Hospital": "Health",
-    "Private Hospital": "Health",
-    "Medical Sessions & Exams": "Health",
-    "Active Psicologia Coimbra": "Health",
-    "Psicologist 2": "Health",
-    "Marco (Jota Mateus)": "Health",
-    "Marco Consultas (private)": "Health",
-    "Dentist Beatriz": "Health",
-    "Dentist 2": "Health",
-    "Farmacia Oeiras": "Health",
-    "Farmacia Portela": "Health",
-    "Restaurant dinner": "Entertainment",
-    "Cinema": "Entertainment",
-    "Streaming": "Entertainment",
-    "Nightlife & Disco": "Entertainment",
-    "Gaming": "Entertainment",
-    "PhD": "Education",
-    "Trainings": "Education",
-    "Health Insurance": "Insurances",
-    "Life insurance": "Insurances",
-    "Mobility (IUC)": "Taxes",
-    "IRS": "Taxes",
-    "Interest": "Interest",
-    "Fines": "Fines",
-    "Loans Cofidis": "Loans & Burrow",
-    "Loans CGD": "Loans & Burrow",
-    "Borrow Jota": "Loans & Burrow",
-    "Borrow Mum": "Loans & Burrow",
-    "Base Salary": "Salary",
-    "Consulting / Contract Services": "Salary",
-    "Teaching Classes": "Salary",
-    "Bonus (Scorecard)": "Salary",
-    "Vacation Subsidy": "Payroll Subsidies",
-    "Christmas Subsidy": "Payroll Subsidies",
-    "Family Gifts": "Other Incomes",
-    "Cashbacks & Rewards": "Other Incomes",
-    "Mobility": "Taxes",
-    "Justice": "Taxes",
-    "CGD Credit Cards": "Credit Cards",
-    "Universo Credit Cards": "Credit Cards",
-    "Active Bank Credit Cards": "Credit Cards",
-    "Inter Bank Credit Cards": "Credit Cards"
-  }),
+  classOptions: derivedClassOptions,
+  subClassOptions: derivedSubClassOptions,
+  entityOptions: loadLocal('entityOptions', derivedEntityOptions),
+  categoryOptions: loadLocal('categoryOptions', derivedCategoryOptions),
+  subtypeToCategoryMap: loadLocal('subtypeToCategoryMap', derivedSubtypeToCategoryMap),
+  subtypeTypes: loadLocal('subtypeTypes', derivedSubtypeTypes),
+  entityMappings: loadLocal('entityMappings', derivedEntityMappings),
   monthOptions: [
     'January', 'February', 'March', 'April', 'May', 'June', 
     'July', 'August', 'September', 'October', 'November', 'December'
