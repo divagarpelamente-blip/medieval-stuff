@@ -19,16 +19,14 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   // Bind Zustand states & actions
   const user = useKingdomStore((state) => state.user);
   const email = useKingdomStore((state) => state.email);
-  const fromOptions = useKingdomStore((state) => state.fromOptions);
-  const statusOptions = useKingdomStore((state) => state.statusOptions);
-  const classOptions = useKingdomStore((state) => state.classOptions);
-  const subClassOptions = useKingdomStore((state) => state.subClassOptions);
-  const entityOptions = useKingdomStore((state) => state.entityOptions);
-  const categoryOptions = useKingdomStore((state) => state.categoryOptions);
-  const entityMappings = useKingdomStore((state) => state.entityMappings);
-  const accountMappings = useKingdomStore((state) => state.accountMappings);
-  const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap);
+  const flatMatrix = useKingdomStore((state) => state.flatMatrix) || [];
   
+  const getTypes = useKingdomStore((state) => state.getTypes);
+  const getSubtypesByType = useKingdomStore((state) => state.getSubtypesByType);
+  const getCategoriesBySubtype = useKingdomStore((state) => state.getCategoriesBySubtype);
+  const getEntitiesByCategory = useKingdomStore((state) => state.getEntitiesByCategory);
+  const getAccountCode = useKingdomStore((state) => state.getAccountCode);
+
   const registerTransaction = useKingdomStore((state) => state.registerTransaction);
   const fetchKingdomData = useKingdomStore((state) => state.fetchKingdomData);
   const fetchDashboardData = useKingdomStore((state) => state.fetchDashboardData);
@@ -52,61 +50,75 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   const [editingTxId, setEditingTxId] = useState(null);
   const [txQuickActionName, setTxQuickActionName] = useState(null);
 
-  // Dynamic Cascading Filters Engine
-  const getMatrixRows = useKingdomStore((state) => state.getMatrixRows);
-  const matrixRows = useMemo(() => {
-    return getMatrixRows ? getMatrixRows() : [];
-  }, [getMatrixRows, subClassOptions, categoryOptions, entityOptions, entityMappings, accountMappings, subtypeToCategoryMap]);
+  // Unified fallback arrays for non-cascading defaults
+  const fromOptions = useMemo(() => ['Pedro', 'Reni', 'Kingdom Treasury'], []);
+  const statusOptions = useMemo(() => ['Pending', 'Completed', 'Cancelled'], []);
 
-  const allUniqueSubClasses = useMemo(() => {
-    const set = new Set();
-    matrixRows.forEach(r => { if (r.subtype) set.add(r.subtype); });
-    return Array.from(set).sort();
-  }, [matrixRows]);
+  // Omni-directional choices resolved directly from Flat Matrix
+  const classOptions = useMemo(() => {
+    const types = getTypes ? getTypes() : [];
+    return types.length > 0 ? types : ['Assets', 'Liabilities', 'Income', 'Expense'];
+  }, [getTypes, flatMatrix]);
 
-  const allUniqueCategories = useMemo(() => {
-    const set = new Set();
-    matrixRows.forEach(r => { if (r.category) set.add(r.category); });
-    return Array.from(set).sort();
-  }, [matrixRows]);
+  // Handle Synchronous State Cascade Clears to eliminate React Race Conditions
+  const handleSetTxClass = (val) => {
+    setTxClass(val);
+    setTxSubClass('');
+    setTxCategory('');
+    setTxEntity('');
+    setTxTargetAccount('');
+  };
 
-  const allUniqueEntities = useMemo(() => {
-    const set = new Set();
-    matrixRows.forEach(r => { if (r.entity) set.add(r.entity); });
-    return Array.from(set).sort();
-  }, [matrixRows]);
+  const handleSetTxSubClass = (val) => {
+    setTxSubClass(val);
+    setTxCategory('');
+    setTxEntity('');
+    setTxTargetAccount('');
+  };
 
+  const handleSetTxCategory = (val) => {
+    setTxCategory(val);
+    setTxEntity('');
+    setTxTargetAccount('');
+  };
+
+  const handleEntityChange = (entityVal) => {
+    setTxEntity(entityVal);
+    if (txClass && txSubClass && txCategory && entityVal) {
+      const code = getAccountCode(txClass, txSubClass, txCategory, entityVal);
+      if (code) {
+        setTxTargetAccount(code);
+      } else {
+        setTxTargetAccount('');
+      }
+    } else {
+      setTxTargetAccount('');
+    }
+  };
+
+  // Permitted options computed in real-time
   const allowedSubClasses = useMemo(() => {
-    return allUniqueSubClasses.filter(val => {
-      return matrixRows.some(r => {
-        const matchCategory = !txCategory || r.category === txCategory;
-        const matchEntity = !txEntity || r.entity === txEntity;
-        return r.subtype === val && matchCategory && matchEntity;
-      });
-    });
-  }, [matrixRows, txCategory, txEntity, allUniqueSubClasses]);
+    if (!txClass) {
+      return [...new Set(flatMatrix.map(r => r.subtype))].filter(Boolean).sort();
+    }
+    return getSubtypesByType ? getSubtypesByType(txClass) : [];
+  }, [flatMatrix, txClass, getSubtypesByType]);
 
   const allowedCategories = useMemo(() => {
-    return allUniqueCategories.filter(val => {
-      return matrixRows.some(r => {
-        const matchSubClass = !txSubClass || r.subtype === txSubClass;
-        const matchEntity = !txEntity || r.entity === txEntity;
-        return r.category === val && matchSubClass && matchEntity;
-      });
-    });
-  }, [matrixRows, txSubClass, txEntity, allUniqueCategories]);
+    if (!txSubClass) {
+      return [...new Set(flatMatrix.map(r => r.category))].filter(Boolean).sort();
+    }
+    return getCategoriesBySubtype ? getCategoriesBySubtype(txSubClass) : [];
+  }, [flatMatrix, txSubClass, getCategoriesBySubtype]);
 
   const allowedEntities = useMemo(() => {
-    return allUniqueEntities.filter(val => {
-      return matrixRows.some(r => {
-        const matchSubClass = !txSubClass || r.subtype === txSubClass;
-        const matchCategory = !txCategory || r.category === txCategory;
-        return r.entity === val && matchSubClass && matchCategory;
-      });
-    });
-  }, [matrixRows, txSubClass, txCategory, allUniqueEntities]);
+    if (!txCategory) {
+      return [...new Set(flatMatrix.map(r => r.entity))].filter(Boolean).sort();
+    }
+    return getEntitiesByCategory ? getEntitiesByCategory(txCategory) : [];
+  }, [flatMatrix, txCategory, getEntitiesByCategory]);
 
-  // Cascading Configuration (exactly as defined in App.jsx)
+  // Cascading Navigation Templates (Aligned to 8-digit prefixes)
   const cascadingConfig = {
     'House & Utilities': {
       'Oeiras': { transaction_type: 'Expense', transaction_subtype: 'Living & Household', transaction_category: 'Household', target_account: '60101001', flow: 'outflow', payment_status: 'Pending' },
@@ -122,9 +134,9 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
       'Parking': { transaction_type: 'Expense', transaction_subtype: 'Personal Transports', transaction_category: 'Parking', target_account: '60203001', flow: 'outflow', payment_status: 'Completed' }
     },
     'Banking & Liabilities': {
-      'Universo': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Debt', transaction_category: 'Credit Cards', target_account: '20103002', flow: 'outflow', payment_status: 'Completed' },
-      'CGD': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Debt', transaction_category: 'Loans & Burrow', target_account: '20101001', flow: 'outflow', payment_status: 'Completed' },
-      'Active Bank': { transaction_type: 'Assets', transaction_subtype: 'Banks', transaction_category: 'Savings account', target_account: '10102002', flow: 'neutral', payment_status: 'Completed' }
+      'Universo': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Debt', transaction_category: 'Credit Cards', target_account: '21010001', flow: 'outflow', payment_status: 'Completed' },
+      'CGD': { transaction_type: 'Liabilities', transaction_subtype: 'Personal Debt', transaction_category: 'Loans & Burrow', target_account: '21020001', flow: 'outflow', payment_status: 'Completed' },
+      'Active Bank': { transaction_type: 'Assets', transaction_subtype: 'Banks', transaction_category: 'Savings account', target_account: '11020001', flow: 'neutral', payment_status: 'Completed' }
     },
     'Personal & Lifestyle': {
       'Restaurant dinner': { transaction_type: 'Expense', transaction_subtype: 'Entertainment', transaction_category: 'Entertainment', target_account: '60701001', flow: 'outflow', payment_status: 'Completed' },
@@ -141,130 +153,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   const [mainMenu, setMainMenu] = useState('House & Utilities');
   const [subMenuAction, setSubMenuAction] = useState('Oeiras');
 
-  const entityToTargetAccount = {
-    // Assets (1xxxxxxx)
-    "CGD": "10101001",
-    "Universo": "10101002",
-    "Active Bank": "10101003",
-    "Inter Bank": "10101004",
-    "Wizink": "10103004",
-
-    // Liabilities (2xxxxxxx)
-    "Other Loans": "20101007",
-    "Jota": "20102001",
-    "Mae": "20102002",
-    "Reni": "20102003",
-    "Pedro": "20102004",
-    "Other Burrow": "20102005",
-    "Social Security": "20201001",
-    "Finances": "20201002",
-    "NOS": "20201003",
-
-    // Expenses (6xxxxxxx)
-    "Oeiras": "60101001",
-    "Oeiras Utensils": "60101002",
-    "Oeiras Decoration": "60101003",
-    "Other Household": "60101004",
-    "Portela": "60101005",
-    "DIGAL": "60102001",
-    "SIMAS": "60102002",
-    "Other Utilities": "60102004",
-    "Motorcycle": "60201001",
-    "Car": "60201002",
-    "Via Verde": "60202001",
-    "Parking": "60203001",
-    "Public Transport (Metro/Train/Bus)": "60301001",
-    "Uber / Chauffeur": "60401001",
-    "Taxis": "60401002",
-    "Food": "60501001",
-    "Pet Food": "60501002",
-    "Food (work lunch)": "60501003",
-    "Soda Drinks": "60501004",
-    "Alcoholic Drinks": "60501005",
-    "Cleaning Products": "60501006",
-    "Personal Hygiene": "60501007",
-    "Cosmetics": "60501008",
-    "Tools": "60502001",
-    "Clothing": "60503001",
-    "Shoes": "60503002",
-    "Other Market consumables": "60504001",
-    "Public Hospital": "60601001",
-    "Private Hospital": "60601002",
-    "Medical Sessions & Exams": "60601003",
-    "Active Psicologia Coimbra": "60601004",
-    "Psicologist 2": "60601005",
-    "Marco (Jota Mateus)": "60601006",
-    "Marco Consultas (private)": "60601007",
-    "Dentist Beatriz": "60601008",
-    "Dentist 2": "60601009",
-    "Farmacia Oeiras": "60601010",
-    "Farmacia Portela": "60601011",
-    "Restaurant dinner": "60701001",
-    "Cinema": "60701002",
-    "Streaming": "60701003",
-    "Nightlife & Disco": "60701004",
-    "Gaming": "60701005",
-    "PhD": "60801001",
-    "Trainings": "60801002",
-    "Health Insurance": "60901001",
-    "Life insurance": "60901004",
-    "Mobility (IUC)": "61001001",
-    "IRS": "61001005",
-    "Interest": "61101001",
-    "Fines": "61102001",
-    "Cofidis": "61103003",
-
-    // Income (7xxxxxxx)
-    "Base Salary": "70101001",
-    "Consulting / Contract Services": "70101002",
-    "Teaching Classes": "70101003",
-    "Bonus (Scorecard)": "70101004",
-    "Vacation Subsidy": "70102001",
-    "Christmas Subsidy": "70102002",
-    "Family Gifts": "70201001",
-    "Cashbacks & Rewards": "70201002",
-    "Mobility": "70401002",
-    "Justice": "70401005"
-  };
-
-  // Sync selectors defaults when store changes
-  useEffect(() => {
-    if (txFrom !== '' && fromOptions && !fromOptions.includes(txFrom)) {
-      setTxFrom(fromOptions[0] || '');
-    }
-  }, [fromOptions, txFrom]);
-
-  useEffect(() => {
-    if (txStatus !== '' && statusOptions && !statusOptions.includes(txStatus)) {
-      setTxStatus(statusOptions[0] || '');
-    }
-  }, [statusOptions, txStatus]);
-
-  useEffect(() => {
-    if (txClass !== '' && classOptions && !classOptions.includes(txClass)) {
-      setTxClass(classOptions[0] || '');
-    }
-  }, [classOptions, txClass]);
-
-  useEffect(() => {
-    if (txSubClass !== '' && subClassOptions && !subClassOptions.includes(txSubClass)) {
-      setTxSubClass(subClassOptions[0] || '');
-    }
-  }, [subClassOptions, txSubClass]);
-
-  useEffect(() => {
-    if (txEntity !== '' && entityOptions && !entityOptions.includes(txEntity)) {
-      setTxEntity(entityOptions[0] || '');
-    }
-  }, [entityOptions, txEntity]);
-
-  useEffect(() => {
-    if (txCategory !== '' && categoryOptions && !categoryOptions.includes(txCategory)) {
-      setTxCategory(categoryOptions[0] || '');
-    }
-  }, [categoryOptions, txCategory]);
-
-  // Set default Pedro if email is divagarpelamente@gmail.com
+  // Enforce automatic defaults based on authenticated user
   useEffect(() => {
     if (email === 'divagarpelamente@gmail.com') {
       setTxFrom('Pedro');
@@ -286,153 +175,26 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
       setTxClass(payload.transaction_type);
       setTxSubClass(payload.transaction_subtype);
       setTxCategory(payload.transaction_category);
-      setTxTargetAccount(payload.target_account);
+      setTxEntity(sub);
       setTxFlow(payload.flow);
       setTxStatus(payload.payment_status);
-      setTxEntity(sub);
-    }
-  };
 
-  const handleEntityChange = (entityVal) => {
-    setTxEntity(entityVal);
-    const mapped = entityMappings[entityVal];
-    if (mapped) {
-      setTxCategory(mapped);
-    }
-    
-    // Resolve dynamic target account conflicts based on selected transaction metadata
-    let defaultTarget = entityToTargetAccount[entityVal];
-    
-    if (entityVal === 'CGD') {
-      if (txClass === 'Assets') {
-        if (txCategory === 'Savings account') defaultTarget = '10102001';
-        else if (txCategory === 'Investments account') defaultTarget = '10103001';
-        else defaultTarget = '10101001';
-      } else if (txClass === 'Liabilities') {
-        if (txCategory === 'Credit Cards') defaultTarget = '20103001';
-        else defaultTarget = '20101001';
-      } else if (txClass === 'Expense') {
-        if (txCategory === 'Credit Cards') defaultTarget = '61104001';
-        else defaultTarget = '61103001';
-      } else if (txClass === 'Income') {
-        if (txCategory === 'Credit Cards') defaultTarget = '70504001';
-        else defaultTarget = '70503001';
-      }
-    } else if (entityVal === 'Universo') {
-      if (txClass === 'Assets') {
-        if (txCategory === 'Investments account') defaultTarget = '10103002';
-        else defaultTarget = '10101002';
-      } else if (txClass === 'Liabilities') {
-        if (txCategory === 'Credit Cards') defaultTarget = '20103002';
-        else defaultTarget = '20101002';
-      } else if (txClass === 'Expense') {
-        if (txCategory === 'Credit Cards') defaultTarget = '61104002';
-        else defaultTarget = '61103002';
-      } else if (txClass === 'Income') {
-        if (txCategory === 'Credit Cards') defaultTarget = '70504002';
-        else defaultTarget = '70503002';
-      }
-    } else if (entityVal === 'Active Bank') {
-      if (txClass === 'Assets') {
-        if (txCategory === 'Savings account') defaultTarget = '10102002';
-        else if (txCategory === 'Investments account') defaultTarget = '10103003';
-        else defaultTarget = '10101003';
-      } else if (txClass === 'Liabilities') {
-        if (txCategory === 'Credit Cards') defaultTarget = '20103003';
-        else defaultTarget = '20101003';
-      } else if (txClass === 'Expense') {
-        defaultTarget = '61104003';
-      } else if (txClass === 'Income') {
-        defaultTarget = '70504003';
-      }
-    } else if (entityVal === 'Inter Bank') {
-      if (txClass === 'Assets') {
-        if (txCategory === 'Savings account') defaultTarget = '10102003';
-        else if (txCategory === 'Investments account') defaultTarget = '10103005';
-        else defaultTarget = '10101004';
-      } else if (txClass === 'Liabilities') {
-        if (txCategory === 'Credit Cards') defaultTarget = '20103004';
-        else defaultTarget = '20101004';
-      } else if (txClass === 'Expense') {
-        defaultTarget = '61104004';
-      } else if (txClass === 'Income') {
-        defaultTarget = '70504004';
-      }
-    } else if (entityVal === 'Wizink') {
-      if (txClass === 'Assets') {
-        defaultTarget = '10103004';
-      } else if (txClass === 'Liabilities') {
-        if (txCategory === 'Credit Cards') defaultTarget = '20103005';
-        else defaultTarget = '20101005';
-      }
-    } else if (entityVal === 'Cofidis') {
-      if (txClass === 'Liabilities') defaultTarget = '20101006';
-      else if (txClass === 'Expense') defaultTarget = '61103003';
-      else if (txClass === 'Income') defaultTarget = '70503003';
-    } else if (entityVal === 'Jota') {
-      if (txClass === 'Liabilities') defaultTarget = '20102001';
-      else if (txClass === 'Expense') defaultTarget = '61103004';
-      else if (txClass === 'Income') defaultTarget = '70503004';
-    } else if (entityVal === 'Mae') {
-      if (txClass === 'Liabilities') defaultTarget = '20102002';
-      else if (txClass === 'Expense') defaultTarget = '61103005';
-      else if (txClass === 'Income') defaultTarget = '70503005';
-    } else if (entityVal === 'Social Security') {
-      if (txClass === 'Liabilities') defaultTarget = '20201001';
-      else if (txClass === 'Expense') defaultTarget = '61001003';
-      else if (txClass === 'Income') defaultTarget = '70401004';
-    } else if (entityVal === 'Finances') {
-      if (txClass === 'Liabilities') defaultTarget = '20201002';
-      else if (txClass === 'Expense') defaultTarget = '61001002';
-      else if (txClass === 'Income') defaultTarget = '70401003';
-    } else if (entityVal === 'NOS') {
-      if (txClass === 'Liabilities') defaultTarget = '20201003';
-      else if (txClass === 'Expense') defaultTarget = '60102003';
-    } else if (entityVal === 'Justice') {
-      if (txClass === 'Expense') defaultTarget = '61001004';
-      else if (txClass === 'Income') defaultTarget = '70401005';
-    } else if (entityVal === 'IRS') {
-      if (txClass === 'Expense') defaultTarget = '61001005';
-      else if (txClass === 'Income') defaultTarget = '70401001';
-    } else if (entityVal === 'Car') {
-      if (txClass === 'Expense') {
-        if (txCategory === 'Repairs') defaultTarget = '60204002';
-        else if (txCategory === 'Insurances') defaultTarget = '60901002';
-        else defaultTarget = '60201002';
-      } else if (txClass === 'Income') {
-        defaultTarget = '70301002';
-      }
-    } else if (entityVal === 'Motorcycle') {
-      if (txClass === 'Expense') {
-        if (txCategory === 'Repairs') defaultTarget = '60204001';
-        else if (txCategory === 'Insurances') defaultTarget = '60901003';
-        else defaultTarget = '60201001';
-      } else if (txClass === 'Income') {
-        defaultTarget = '70301003';
-      }
-    } else if (entityVal === 'Health Insurance') {
-      if (txClass === 'Expense') defaultTarget = '60901001';
-      else if (txClass === 'Income') defaultTarget = '70301001';
-    } else if (entityVal === 'Life insurance') {
-      if (txClass === 'Expense') defaultTarget = '60901004';
-      else if (txClass === 'Income') defaultTarget = '70301004';
-    } else if (entityVal === 'Interest') {
-      if (txClass === 'Expense') defaultTarget = '61101001';
-      else if (txClass === 'Income') defaultTarget = '70501001';
-    } else if (entityVal === 'Fines') {
-      if (txClass === 'Expense') defaultTarget = '61102001';
-      else if (txClass === 'Income') defaultTarget = '70502001';
-    }
-    
-    if (defaultTarget) {
-      setTxTargetAccount(defaultTarget);
+      // Resolve the system's strict 8-digit target account from the flat matrix
+      const resolvedCode = getAccountCode(
+        payload.transaction_type,
+        payload.transaction_subtype,
+        payload.transaction_category,
+        sub
+      );
+      setTxTargetAccount(resolvedCode || payload.target_account || '');
+      setTxSourceDestBank('11010001'); // Safe 8-digit checking default
     }
   };
 
   const resetFormState = () => {
     setTxAmount('');
     setTxDescription('');
-    setTxFrom('');
+    setTxFrom(email === 'divagarpelamente@gmail.com' ? 'Pedro' : '');
     setTxSubClass('');
     setTxEntity('');
     setTxCategory('');
@@ -448,25 +210,33 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   };
 
   const applyTemplate = (tpl) => {
-    setTxClass(tpl.data.transaction_type);
-    setTxAmount(tpl.data.amount);
-    setTxFrom(email === 'divagarpelamente@gmail.com' ? 'Pedro' : tpl.data.from);
-    setTxStatus(tpl.data.payment_status);
-    setTxSubClass(tpl.data.transaction_subtype);
-    setTxEntity(tpl.data.entity);
-    setTxCategory(tpl.data.transaction_category);
-    setTxDescription(tpl.data.description);
-    setTxTargetAccount(tpl.data.target_account || '60101001');
-    setTxSourceDestBank(tpl.data.source_dest_bank || '10101001');
+    setTxClass(tpl.data.transaction_type || '');
+    setTxAmount(tpl.data.amount || '');
+    setTxFrom(email === 'divagarpelamente@gmail.com' ? 'Pedro' : (tpl.data.from || ''));
+    setTxStatus(tpl.data.payment_status || '');
+    setTxSubClass(tpl.data.transaction_subtype || '');
+    setTxEntity(tpl.data.entity || '');
+    setTxCategory(tpl.data.transaction_category || '');
+    setTxDescription(tpl.data.description || '');
     setTxFlow(tpl.data.flow || 'outflow');
     setTxValueDate(new Date().toISOString().split('T')[0]);
     setTxPostingDate(new Date().toISOString().split('T')[0]);
     setTxQuickActionName(tpl.name);
 
+    // Dynamic mapping configuration resolve
+    const resolvedTarget = getAccountCode(
+      tpl.data.transaction_type,
+      tpl.data.transaction_subtype,
+      tpl.data.transaction_category,
+      tpl.data.entity
+    );
+    setTxTargetAccount(resolvedTarget || tpl.data.target_account || '');
+    setTxSourceDestBank(tpl.data.source_dest_bank || '11010001');
+
     let matched = false;
     for (const [main, subActions] of Object.entries(cascadingConfig)) {
-      for (const [sub, payload] of Object.entries(subActions)) {
-        if (payload.target_account === tpl.data.target_account || sub.toLowerCase() === tpl.name.toLowerCase() || tpl.name.toLowerCase().includes(sub.toLowerCase())) {
+      for (const [sub] of Object.entries(subActions)) {
+        if (sub.toLowerCase() === (tpl.data.entity || '').toLowerCase()) {
           setMainMenu(main);
           setSubMenuAction(sub);
           matched = true;
@@ -490,7 +260,7 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
     setTxStatus(tx.payment_status || '');
     setTxSubClass(tx.transaction_subtype || '');
     setTxEntity(tx.entity || '');
-    setTxCategory(tx.transaction_category || entityMappings[tx.entity] || '');
+    setTxCategory(tx.transaction_category || '');
     setTxDescription(tx.description || '');
     setTxTargetAccount(tx.target_account || '');
     setTxSourceDestBank(tx.source_dest_bank || '');
@@ -531,8 +301,8 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
         return;
       }
 
-      // Validate relationship matrix compatibility (forces match against strictly complete non-placeholder rows)
-      const isCombinationValid = matrixRows.some(row => 
+      // Check association against the flat matrix
+      const isCombinationValid = flatMatrix.some(row => 
         (row.entity || '').trim() !== '' &&
         (row.subtype || '').trim() === (txSubClass || '').trim() &&
         (row.category || '').trim() === (txCategory || '').trim() &&
@@ -551,14 +321,14 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
 
       const accountCodeRegex = /^\d{8}$/;
       const safeTarget = txTargetAccount || '';
-      const safeSource = txSourceDestBank || '';
+      const safeSource = txSourceDestBank || '11010001';
 
       if (!accountCodeRegex.test(safeTarget)) {
-        toast.error(`Erro de Validação: Código da Conta de Destino (Target Account) deve ter 8 dígitos.`);
+        toast.error(`Erro de Validação: Código da Conta de Destino (Target Account) deve ter exatamente 8 dígitos.`);
         return;
       }
       if (!accountCodeRegex.test(safeSource)) {
-        toast.error(`Erro de Validação: Código da Conta de Origem (Source account) deve ter 8 dígitos.`);
+        toast.error(`Erro de Validação: Código da Conta de Origem (Source account) deve ter exatamente 8 dígitos.`);
         return;
       }
 
@@ -636,16 +406,16 @@ export function useManualTransactionForm(setIsNewTxModalOpen) {
   };
 
   return {
-    txClass, setTxClass,
+    txClass, setTxClass: handleSetTxClass,
     txAmount, setTxAmount,
     txFrom, setTxFrom,
     txValueDate, setTxValueDate,
     txPostingDate, setTxPostingDate,
     txDueDate, setTxDueDate,
     txStatus, setTxStatus,
-    txSubClass, setTxSubClass,
+    txSubClass, setTxSubClass: handleSetTxSubClass,
     txEntity, setTxEntity,
-    txCategory, setTxCategory,
+    txCategory, setTxCategory: handleSetTxCategory,
     txSubCategory,
     txDescription, setTxDescription,
     txTargetAccount, setTxTargetAccount,

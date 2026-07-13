@@ -132,7 +132,7 @@ The Categories Matrix layout supports a fully consolidated **⚡ Reconcile** act
 
 1. **Cross-Schema Coverage Resolution**: The row generator (`getMatrixRows`) scans both the flat `entityMappings` registry and the structured Chart of Accounts (`accountMappings`). This resolves flat-schema duplicate limitations, allowing a single entity (such as `CGD`) to be mapped simultaneously to multiple categories (`Bank account` and `Credit Cards`) without generating redundant warning placeholders.
 2. **Self-Healing Subclasses**: Detects subclasses that contain zero associated categories (e.g. `Insurances (income)`) and dynamically restores default category options (`Insurances`), registering them in the global `categoryOptions` state list.
-3. **Trace-Back Subtype Recovery**: Scans missing subtypes (e.g., `None - Fixed Debts - Jota`) and traces them back to the system default subclasses by locating matching account codes inside `defaultAccountMappings`.
+3. **Trace-Back Subtype Recovery**: Scans missing subtypes (e.g., `None - Personal Loans - Pedro`) and traces them back to the system default subclasses by locating matching account codes inside `defaultAccountMappings`.
 4. **Smart Expansion & Cleanup**: Automatically expands generic category-only mappings into specific entity-bound rows using COA assets. Once successfully expanded, the original generic row is permanently removed from the matrix.
 5. **Strict Entity Sanitization**: Features an `isEntityInvalid` checker that rejects invalid strings (`None`, `null`, `undefined`, or empty fields) from generating redundant matrix rows, avoiding infinite reconciliation loops.
 
@@ -239,8 +239,8 @@ Contains the detailed financial ledger records natively utilizing a modern `snak
 
 - `transaction_type` (`TEXT` - e.g. `'Income'`, `'Expense'`, `'Asset'`, `'Debt'`)
 - `transaction_subtype` (`TEXT` - e.g. `'Base Salary'`, `'Cash payment'`)
-- `target_account` (`TEXT` - Destination Chart of Accounts code, e.g. `'711001'`)
-- `source_dest_bank` (`TEXT` - Origin Chart of Accounts code, e.g. `'111001'`)
+- `target_account` (`TEXT` - Destination Chart of Accounts code, e.g. `'11010001'`)
+- `source_dest_bank` (`TEXT` - Origin Chart of Accounts code, e.g. `'11020001'`)
 - `flow` (`TEXT` - Check: `'inflow'`, `'outflow'`, or `'neutral'`)
 - `entity` (`TEXT` - Specific destination/origin)
 - `origin` (`TEXT` - Payer/originator of funds, renamed from `"from"` to prevent reserved SQL keyword conflicts)

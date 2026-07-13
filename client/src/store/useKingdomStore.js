@@ -4,6 +4,7 @@ import i18n from '../i18n';
 import { toast } from 'react-hot-toast';
 import { defaultAccountMappings, setDynamicAccountMappings } from '../utils/accountMappings';
 
+// Local storage helpers
 const loadLocal = (key, defaultVal) => {
   try {
     const saved = localStorage.getItem(`eldoria_${key}`);
@@ -27,8 +28,18 @@ const saveLocal = (key, val) => {
   }
 };
 
-// Purge legacy local storage keys that no longer map to the new Engine structure
-['classOptions', 'subClassOptions', 'statusOptions', 'monthOptions'].forEach(key => {
+// Purge legacy taxonomic caches to save local storage namespace
+[
+  'classOptions', 
+  'subClassOptions', 
+  'statusOptions', 
+  'monthOptions', 
+  'entityOptions', 
+  'categoryOptions', 
+  'subtypeToCategoryMap', 
+  'entityMappings',
+  'subtypeTypes'
+].forEach(key => {
   try {
     localStorage.removeItem(`eldoria_${key}`);
   } catch {
@@ -36,203 +47,144 @@ const saveLocal = (key, val) => {
   }
 });
 
-try {
-  const cachedEntities = localStorage.getItem('eldoria_entityOptions');
-  const cachedSubClass = localStorage.getItem('eldoria_subClassOptions');
-  if (cachedEntities || cachedSubClass) {
-    const parsedEnt = cachedEntities ? JSON.parse(cachedEntities) : [];
-    const parsedSub = cachedSubClass ? JSON.parse(cachedSubClass) : [];
-    if (
-      !parsedEnt.includes('CGD Bank Account') ||
-      parsedSub.includes('Salary (payroll)') ||
-      parsedSub.includes('Income • Payroll') ||
-      (parsedSub.length > 0 && !parsedSub.includes('Bank Accounts (Ordem)'))
-    ) {
-      localStorage.removeItem('eldoria_entityOptions');
-      localStorage.removeItem('eldoria_entityMappings');
-      localStorage.removeItem('eldoria_templates');
-      localStorage.removeItem('eldoria_categoryOptions');
-      localStorage.removeItem('eldoria_subClassOptions');
-      localStorage.removeItem('eldoria_subtypeToCategoryMap');
-    }
-  }
-} catch (e) {
-  // Ignore
-}
-
-export const defaultValidationMatrix = [
+// Flat Matrix default fallback compliant with 8-digit COA structure
+export const defaultFlatMatrix = [
   // ASSETS (Type: Assets)
   // Subtype: Liquid Assets
-  { accountCode: "11010001", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "CGD" },
-  { accountCode: "11010002", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "Universo" },
-  { accountCode: "11010003", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "ActivoBank" },
-  { accountCode: "11010004", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "Inter Bank" },
-  { accountCode: "11010005", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "WiZink" },
-  { accountCode: "11020001", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "CGD" },
-  { accountCode: "11020002", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "Universo" },
-  { accountCode: "11020003", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "ActivoBank" },
-  { accountCode: "11020004", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "Inter Bank" },
-  { accountCode: "11020005", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "WiZink" },
-  { accountCode: "11030001", type: "Assets", subtype: "Liquid Assets", category: "Cash", entity: "Dinheiro Físico" },
+  { code: "11010001", account_name: "Checking Accounts CGD", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "CGD" },
+  { code: "11010002", account_name: "Checking Accounts Universo", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "Universo" },
+  { code: "11010003", account_name: "Checking Accounts ActivoBank", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "ActivoBank" },
+  { code: "11010004", account_name: "Checking Accounts Inter Bank", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "Inter Bank" },
+  { code: "11010005", account_name: "Checking Accounts WiZink", type: "Assets", subtype: "Liquid Assets", category: "Checking Accounts", entity: "WiZink" },
+  { code: "11020001", account_name: "Savings & Wallets CGD", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "CGD" },
+  { code: "11020002", account_name: "Savings & Wallets Universo", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "Universo" },
+  { code: "11020003", account_name: "Savings & Wallets ActivoBank", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "ActivoBank" },
+  { code: "11020004", account_name: "Savings & Wallets Inter Bank", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "Inter Bank" },
+  { code: "11020005", account_name: "Savings & Wallets WiZink", type: "Assets", subtype: "Liquid Assets", category: "Savings & Wallets", entity: "WiZink" },
+  { code: "11030001", account_name: "Cash Dinheiro Físico", type: "Assets", subtype: "Liquid Assets", category: "Cash", entity: "Dinheiro Físico" },
 
   // Subtype: Sinking Funds
-  { accountCode: "12010001", type: "Assets", subtype: "Sinking Funds", category: "Short-Term Goals", entity: "Fundo Férias" },
-  { accountCode: "12010002", type: "Assets", subtype: "Sinking Funds", category: "Short-Term Goals", entity: "Fundo Emergência" },
+  { code: "12010001", account_name: "Short-Term Goals Fundo Férias", type: "Assets", subtype: "Sinking Funds", category: "Short-Term Goals", entity: "Fundo Férias" },
+  { code: "12010002", account_name: "Short-Term Goals Fundo Emergência", type: "Assets", subtype: "Sinking Funds", category: "Short-Term Goals", entity: "Fundo Emergência" },
 
   // Subtype: Investments
-  { accountCode: "13010001", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "CGD" },
-  { accountCode: "13010002", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "Universo" },
-  { accountCode: "13010003", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "ActivoBank" },
-  { accountCode: "13010004", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "Inter Bank" },
-  { accountCode: "13010005", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "WiZink" },
-  { accountCode: "13020001", type: "Assets", subtype: "Investments", category: "Retirement", entity: "PPR" },
+  { code: "13010001", account_name: "Invest Accounts CGD", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "CGD" },
+  { code: "13010002", account_name: "Invest Accounts Universo", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "Universo" },
+  { code: "13010003", account_name: "Invest Accounts ActivoBank", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "ActivoBank" },
+  { code: "13010004", account_name: "Invest Accounts Inter Bank", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "Inter Bank" },
+  { code: "13010005", account_name: "Invest Accounts WiZink", type: "Assets", subtype: "Investments", category: "Invest Accounts", entity: "WiZink" },
+  { code: "13020001", account_name: "Retirement PPR", type: "Assets", subtype: "Investments", category: "Retirement", entity: "PPR" },
 
   // Subtype: Fixed Assets
-  { accountCode: "14010001", type: "Assets", subtype: "Fixed Assets", category: "Real Estate", entity: "Habitação Própria" },
-  { accountCode: "14020001", type: "Assets", subtype: "Fixed Assets", category: "Vehicles", entity: "Carro Pessoal" },
-  { accountCode: "14020002", type: "Assets", subtype: "Fixed Assets", category: "Vehicles", entity: "Mota Pessoal" },
+  { code: "14010001", account_name: "Real Estate Habitação Própria", type: "Assets", subtype: "Fixed Assets", category: "Real Estate", entity: "Habitação Própria" },
+  { code: "14020001", account_name: "Vehicles Carro Pessoal", type: "Assets", subtype: "Fixed Assets", category: "Vehicles", entity: "Carro Pessoal" },
+  { code: "14020002", account_name: "Vehicles Mota Pessoal", type: "Assets", subtype: "Fixed Assets", category: "Vehicles", entity: "Mota Pessoal" },
 
   // LIABILITIES (Type: Liabilities)
   // Subtype: Short-Term Debt
-  { accountCode: "21010001", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "CGD" },
-  { accountCode: "21010002", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "Universo" },
-  { accountCode: "21010003", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "ActivoBank" },
-  { accountCode: "21010004", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "Inter Bank" },
-  { accountCode: "21010005", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "WiZink" },
-  { accountCode: "21020001", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Cofidis" },
-  { accountCode: "21020002", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Mãe" },
-  { accountCode: "21020003", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Pedro" },
-  { accountCode: "21020004", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Reni" },
-  { accountCode: "21030001", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Finanças" },
-  { accountCode: "21030002", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Segurança Social" },
-  { accountCode: "21030003", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Justiça" },
+  { code: "21010001", account_name: "Credit Cards CGD", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "CGD" },
+  { code: "21010002", account_name: "Credit Cards Universo", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "Universo" },
+  { code: "21010003", account_name: "Credit Cards ActivoBank", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "ActivoBank" },
+  { code: "21010004", account_name: "Credit Cards Inter Bank", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "Inter Bank" },
+  { code: "21010005", account_name: "Credit Cards WiZink", type: "Liabilities", subtype: "Short-Term Debt", category: "Credit Cards", entity: "WiZink" },
+  { code: "21020001", account_name: "Personal Loans Cofidis", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Cofidis" },
+  { code: "21020002", account_name: "Personal Loans Mãe", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Mãe" },
+  { code: "21020003", account_name: "Personal Loans Pedro", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Pedro" },
+  { code: "21020004", account_name: "Personal Loans Reni", type: "Liabilities", subtype: "Short-Term Debt", category: "Personal Loans", entity: "Reni" },
+  { code: "21030001", account_name: "State Debts Finanças", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Finanças" },
+  { code: "21030002", account_name: "State Debts Segurança Social", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Segurança Social" },
+  { code: "21030003", account_name: "State Debts Justiça", type: "Liabilities", subtype: "Short-Term Debt", category: "State Debts", entity: "Justiça" },
 
   // Subtype: Long-Term Debt
-  { accountCode: "22010001", type: "Liabilities", subtype: "Long-Term Debt", category: "Other Loans", entity: "Crédito Automóvel" },
-  { accountCode: "22010002", type: "Liabilities", subtype: "Long-Term Debt", category: "Other Loans", entity: "Crédito Habitação" },
+  { code: "22010001", account_name: "Other Loans Crédito Automóvel", type: "Liabilities", subtype: "Long-Term Debt", category: "Other Loans", entity: "Crédito Automóvel" },
+  { code: "22010002", account_name: "Other Loans Crédito Habitação", type: "Liabilities", subtype: "Long-Term Debt", category: "Other Loans", entity: "Crédito Habitação" },
 
   // EXPENSES (Type: Expenses)
   // Subtype: Housing & Utilities
-  { accountCode: "61010001", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Renda" },
-  { accountCode: "61010002", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Endesa" },
-  { accountCode: "61010003", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Agua" },
-  { accountCode: "61010004", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "NOS" },
-  { accountCode: "61010005", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "DIGAL" },
-  { accountCode: "61020001", type: "Expenses", subtype: "Housing & Utilities", category: "Maintenance", entity: "Obras e Decoração" },
+  { code: "61010001", account_name: "Utilities Renda", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Renda" },
+  { code: "61010002", account_name: "Utilities Endesa", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Endesa" },
+  { code: "61010003", account_name: "Utilities Agua", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "Agua" },
+  { code: "61010004", account_name: "Utilities NOS", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "NOS" },
+  { code: "61010005", account_name: "Utilities DIGAL", type: "Expenses", subtype: "Housing & Utilities", category: "Utilities", entity: "DIGAL" },
+  { code: "61020001", account_name: "Maintenance Obras e Decoração", type: "Expenses", subtype: "Housing & Utilities", category: "Maintenance", entity: "Obras e Decoração" },
 
   // Subtype: Food & Living
-  { accountCode: "62010001", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Mercearia e Alimentação" },
-  { accountCode: "62010002", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Limpeza e Higiene" },
-  { accountCode: "62010003", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Drinks & Alcohol" },
-  { accountCode: "62020001", type: "Expenses", subtype: "Food & Living", category: "Pet Care", entity: "Pet Food" },
-  { accountCode: "62020002", type: "Expenses", subtype: "Food & Living", category: "Pet Care", entity: "Veterinário" },
-  { accountCode: "62030001", type: "Expenses", subtype: "Food & Living", category: "Dependents", entity: "Educação Filhos" },
+  { code: "62010001", account_name: "Supermarket Mercearia e Alimentação", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Mercearia e Alimentação" },
+  { code: "62010002", account_name: "Supermarket Limpeza e Higiene", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Limpeza e Higiene" },
+  { code: "62010003", account_name: "Supermarket Drinks & Alcohol", type: "Expenses", subtype: "Food & Living", category: "Supermarket", entity: "Drinks & Alcohol" },
+  { code: "62020001", account_name: "Pet Care Pet Food", type: "Expenses", subtype: "Food & Living", category: "Pet Care", entity: "Pet Food" },
+  { code: "62020002", account_name: "Pet Care Veterinário", type: "Expenses", subtype: "Food & Living", category: "Pet Care", entity: "Veterinário" },
+  { code: "62030001", account_name: "Dependents Educação Filhos", type: "Expenses", subtype: "Food & Living", category: "Dependents", entity: "Educação Filhos" },
 
   // Subtype: Transportation
-  { accountCode: "63010001", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Gasoline" },
-  { accountCode: "63010002", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Tolls Via Verde" },
-  { accountCode: "63010003", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Repairs & Parking" },
-  { accountCode: "63020001", type: "Expenses", subtype: "Transportation", category: "Public & Taxis", entity: "Public Transport Navegante" },
-  { accountCode: "63020002", type: "Expenses", subtype: "Transportation", category: "Public & Taxis", entity: "Uber / Taxis" },
+  { code: "63010001", account_name: "Personal Vehicle Gasoline", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Gasoline" },
+  { code: "63010002", account_name: "Personal Vehicle Tolls Via Verde", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Tolls Via Verde" },
+  { code: "63010003", account_name: "Personal Vehicle Repairs & Parking", type: "Expenses", subtype: "Transportation", category: "Personal Vehicle", entity: "Repairs & Parking" },
+  { code: "63020001", account_name: "Public & Taxis Public Transport Navegante", type: "Expenses", subtype: "Transportation", category: "Public & Taxis", entity: "Public Transport Navegante" },
+  { code: "63020002", account_name: "Public & Taxis Uber / Taxis", type: "Expenses", subtype: "Transportation", category: "Public & Taxis", entity: "Uber / Taxis" },
 
   // Subtype: Health & Wellness
-  { accountCode: "64010001", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Hospital & Consultas" },
-  { accountCode: "64010002", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Dentista" },
-  { accountCode: "64010003", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Psicologia" },
-  { accountCode: "64020001", type: "Expenses", subtype: "Health & Wellness", category: "Pharmacy", entity: "Farmácia" },
+  { code: "64010001", account_name: "Medical Hospital & Consultas", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Hospital & Consultas" },
+  { code: "64010002", account_name: "Medical Dentista", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Dentista" },
+  { code: "64010003", account_name: "Medical Psicologia", type: "Expenses", subtype: "Health & Wellness", category: "Medical", entity: "Psicologia" },
+  { code: "64020001", account_name: "Pharmacy Farmácia", type: "Expenses", subtype: "Health & Wellness", category: "Pharmacy", entity: "Farmácia" },
 
   // Subtype: Shopping & Personal
-  { accountCode: "65010001", type: "Expenses", subtype: "Shopping & Personal", category: "Retail", entity: "Clothing & Shoes" },
-  { accountCode: "65020001", type: "Expenses", subtype: "Shopping & Personal", category: "Hobbies & Tech", entity: "Tools & Electronics" },
+  { code: "65010001", account_name: "Retail Clothing & Shoes", type: "Expenses", subtype: "Shopping & Personal", category: "Retail", entity: "Clothing & Shoes" },
+  { code: "65020001", account_name: "Hobbies & Tech Tools & Electronics", type: "Expenses", subtype: "Shopping & Personal", category: "Hobbies & Tech", entity: "Tools & Electronics" },
 
   // Subtype: Entertainment
-  { accountCode: "66010001", type: "Expenses", subtype: "Entertainment", category: "Leisure", entity: "Cinema & Dining Out" },
-  { accountCode: "66010002", type: "Expenses", subtype: "Entertainment", category: "Leisure", entity: "Nightlife & Drinks" },
-  { accountCode: "66020001", type: "Expenses", subtype: "Entertainment", category: "Subscriptions", entity: "Streaming" },
+  { code: "66010001", account_name: "Leisure Cinema & Dining Out", type: "Expenses", subtype: "Entertainment", category: "Leisure", entity: "Cinema & Dining Out" },
+  { code: "66010002", account_name: "Leisure Nightlife & Drinks", type: "Expenses", subtype: "Entertainment", category: "Leisure", entity: "Nightlife & Drinks" },
+  { code: "66020001", account_name: "Subscriptions Streaming", type: "Expenses", subtype: "Entertainment", category: "Subscriptions", entity: "Streaming" },
 
   // Subtype: Education & Business
-  { accountCode: "67010001", type: "Expenses", subtype: "Education & Business", category: "Professional", entity: "PhD" },
-  { accountCode: "67010002", type: "Expenses", subtype: "Education & Business", category: "Professional", entity: "Trainings" },
-  { accountCode: "67020001", type: "Expenses", subtype: "Education & Business", category: "Freelance Expenses", entity: "Software & Materials" },
+  { code: "67010001", account_name: "Professional PhD", type: "Expenses", subtype: "Education & Business", category: "Professional", entity: "PhD" },
+  { code: "67010002", account_name: "Professional Trainings", type: "Expenses", subtype: "Education & Business", category: "Professional", entity: "Trainings" },
+  { code: "67020001", account_name: "Freelance Expenses Software & Materials", type: "Expenses", subtype: "Education & Business", category: "Freelance Expenses", entity: "Software & Materials" },
 
   // Subtype: Insurances
-  { accountCode: "68010001", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Health Insurance" },
-  { accountCode: "68010002", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Car & Motorcycle Insurance" },
-  { accountCode: "68010003", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Life Insurance" },
+  { code: "68010001", account_name: "Policies Health Insurance", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Health Insurance" },
+  { code: "68010002", account_name: "Policies Car & Motorcycle Insurance", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Car & Motorcycle Insurance" },
+  { code: "68010003", account_name: "Policies Life Insurance", type: "Expenses", subtype: "Insurances", category: "Policies", entity: "Life Insurance" },
 
   // Subtype: Taxes & State
-  { accountCode: "69010001", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "IRS Pagamento" },
-  { accountCode: "69010002", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "IUC / Finanças" },
-  { accountCode: "69010003", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "Social Security" },
+  { code: "69010001", account_name: "Direct Taxes IRS Pagamento", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "IRS Pagamento" },
+  { code: "69010002", account_name: "Direct Taxes IUC / Finanças", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "IUC / Finanças" },
+  { code: "69010003", account_name: "Direct Taxes Social Security", type: "Expenses", subtype: "Taxes & State", category: "Direct Taxes", entity: "Social Security" },
 
   // Subtype: Financial & Fees
-  { accountCode: "69020001", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Bank Fees & Commissions" },
-  { accountCode: "69020002", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Fines & Penalties" },
-  { accountCode: "69020003", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Credit Interest Paid" },
+  { code: "69020001", account_name: "Interest & Bank Fees Bank Fees & Commissions", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Bank Fees & Commissions" },
+  { code: "69020002", account_name: "Interest & Bank Fees Fines & Penalties", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Fines & Penalties" },
+  { code: "69020003", account_name: "Interest & Bank Fees Credit Interest Paid", type: "Expenses", subtype: "Financial & Fees", category: "Interest & Bank Fees", entity: "Credit Interest Paid" },
 
   // Subtype: Giving & Charity
-  { accountCode: "69030001", type: "Expenses", subtype: "Giving & Charity", category: "Philanthropy", entity: "Donativos Institucionais" },
-  { accountCode: "69030002", type: "Expenses", subtype: "Giving & Charity", category: "Philanthropy", entity: "Prendas a Terceiros" },
+  { code: "69030001", account_name: "Philanthropy Donativos Institucionais", type: "Expenses", subtype: "Giving & Charity", category: "Philanthropy", entity: "Donativos Institucionais" },
+  { code: "69030002", account_name: "Philanthropy Prendas a Terceiros", type: "Expenses", subtype: "Giving & Charity", category: "Philanthropy", entity: "Prendas a Terceiros" },
 
   // INCOME (Type: Income)
   // Subtype: Active Income
-  { accountCode: "71010001", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Base Salary" },
-  { accountCode: "71010002", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Bonus Scorecard" },
-  { accountCode: "71010003", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Vacation Subsidy" },
-  { accountCode: "71010004", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Christmas Subsidy" },
-  { accountCode: "71020001", type: "Income", subtype: "Active Income", category: "Freelance & Services", entity: "Consulting" },
-  { accountCode: "71020002", type: "Income", subtype: "Active Income", category: "Freelance & Services", entity: "Teaching Classes" },
+  { code: "71010001", account_name: "Payroll Base Salary", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Base Salary" },
+  { code: "71010002", account_name: "Payroll Bonus Scorecard", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Bonus Scorecard" },
+  { code: "71010003", account_name: "Payroll Vacation Subsidy", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Vacation Subsidy" },
+  { code: "71010004", account_name: "Payroll Christmas Subsidy", type: "Income", subtype: "Active Income", category: "Payroll", entity: "Christmas Subsidy" },
+  { code: "71020001", account_name: "Freelance & Services Consulting", type: "Income", subtype: "Active Income", category: "Freelance & Services", entity: "Consulting" },
+  { code: "71020002", account_name: "Freelance & Services Teaching Classes", type: "Income", subtype: "Active Income", category: "Freelance & Services", entity: "Teaching Classes" },
 
   // Subtype: Passive & Other
-  { accountCode: "72010001", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Cashbacks CGD" },
-  { accountCode: "72010002", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Cashbacks Universo" },
-  { accountCode: "72010003", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Family Gifts" },
-  { accountCode: "72020001", type: "Income", subtype: "Passive & Other", category: "Refunds", entity: "IRS Refund" },
-  { accountCode: "72020002", type: "Income", subtype: "Passive & Other", category: "Refunds", entity: "Health Insurance Refund" }
+  { code: "72010001", account_name: "Cashbacks & Rewards Cashbacks CGD", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Cashbacks CGD" },
+  { code: "72010002", account_name: "Cashbacks & Rewards Cashbacks Universo", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Cashbacks Universo" },
+  { code: "72010003", account_name: "Cashbacks & Rewards Family Gifts", type: "Income", subtype: "Passive & Other", category: "Cashbacks & Rewards", entity: "Family Gifts" },
+  { code: "72020001", account_name: "Refunds IRS Refund", type: "Income", subtype: "Passive & Other", category: "Refunds", entity: "IRS Refund" },
+  { code: "72020002", account_name: "Refunds Health Insurance Refund", type: "Income", subtype: "Passive & Other", category: "Refunds", entity: "Health Insurance Refund" }
 ];
-
-const derivedSubtypeToCategoryMap = {};
-const derivedSubtypeTypes = {};
-const derivedEntityMappings = {};
-const derivedClassOptions = ['Income', 'Expenses', 'Assets', 'Liabilities'];
-const derivedSubClassOptions = [];
-const derivedEntityOptions = [];
-const derivedCategoryOptions = [];
-
-defaultValidationMatrix.forEach(row => {
-  let typeCode = "1";
-  if (row.type === "Liabilities") typeCode = "2";
-  else if (row.type === "Expenses") typeCode = "6";
-  else if (row.type === "Income") typeCode = "7";
-  
-  derivedSubtypeTypes[row.subtype] = [typeCode];
-
-  if (!derivedSubtypeToCategoryMap[row.subtype]) {
-    derivedSubtypeToCategoryMap[row.subtype] = [];
-  }
-  if (!derivedSubtypeToCategoryMap[row.subtype].includes(row.category)) {
-    derivedSubtypeToCategoryMap[row.subtype].push(row.category);
-  }
-
-  derivedEntityMappings[row.entity] = row.category;
-
-  if (!derivedSubClassOptions.includes(row.subtype)) {
-    derivedSubClassOptions.push(row.subtype);
-  }
-
-  if (!derivedEntityOptions.includes(row.entity)) {
-    derivedEntityOptions.push(row.entity);
-  }
-
-  if (!derivedCategoryOptions.includes(row.category)) {
-    derivedCategoryOptions.push(row.category);
-  }
-});
 
 const initialAccountMappings = loadLocal('accountMappings', defaultAccountMappings);
 setDynamicAccountMappings(initialAccountMappings);
 
 export const useKingdomStore = create((set, get) => ({
+  // Core State
+  flatMatrix: loadLocal('flatMatrix', defaultFlatMatrix),
   accountMappings: initialAccountMappings,
   gold: 0,
   gems: 100,
@@ -247,6 +199,8 @@ export const useKingdomStore = create((set, get) => ({
   role: 'lord',
   mineLevel: 1,
   lastCollectionTime: null,
+  
+  // Dashboard Analytics States
   expenseVarianceData: {
     current_period_expenses: 0,
     previous_period_expenses: 0,
@@ -269,6 +223,116 @@ export const useKingdomStore = create((set, get) => ({
     dti_percentage: 0
   },
 
+  // Base Options
+  fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
+  statusOptions: ['Pending', 'Completed'],
+  monthOptions: [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ],
+
+  // 8-Digit COA Conforming Transaction Templates
+  templates: loadLocal('templates', [
+    {
+      "name": "Transfers",
+      "icon": "💸",
+      "data": {
+        "from": "Consolidated",
+        "transaction_type": "Assets",
+        "transaction_subtype": "Liquid Assets",
+        "entity": "CGD",
+        "transaction_category": "Savings & Wallets",
+        "target_account": "11020001",
+        "source_dest_bank": "11010001",
+        "flow": "neutral",
+        "payment_status": "Completed",
+        "description": "Internal transfer"
+      }
+    },
+    {
+      "name": "Use Credit card",
+      "icon": "💳",
+      "data": {
+        "from": "Pedro",
+        "transaction_type": "Liabilities",
+        "transaction_subtype": "Short-Term Debt",
+        "entity": "Universo",
+        "transaction_category": "Credit Cards",
+        "target_account": "",
+        "source_dest_bank": "21010002",
+        "flow": "outflow",
+        "payment_status": "Completed",
+        "description": "Credit card purchase"
+      }
+    },
+    {
+      "name": "Pay Credit card",
+      "icon": "🧾",
+      "data": {
+        "from": "Pedro",
+        "transaction_type": "Liabilities",
+        "transaction_subtype": "Short-Term Debt",
+        "entity": "WiZink",
+        "transaction_category": "Credit Cards",
+        "target_account": "21010005",
+        "source_dest_bank": "11010001",
+        "flow": "outflow",
+        "payment_status": "Completed",
+        "description": "Credit card payment"
+      }
+    }
+  ]),
+
+  // Dynamic Taxonomic Helper Selectors (Version 2.0 Flat Matrix Rules)
+  getTypes: () => {
+    const matrix = get().flatMatrix || [];
+    const uniqueTypes = [...new Set(matrix.map(row => row.type).filter(Boolean))];
+    const preferredOrder = ['Assets', 'Liabilities', 'Income', 'Expenses'];
+    return uniqueTypes.sort((a, b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b));
+  },
+
+  getSubtypesByType: (type) => {
+    const matrix = get().flatMatrix || [];
+    return [...new Set(
+      matrix
+        .filter(row => !type || row.type === type)
+        .map(row => row.subtype)
+        .filter(Boolean)
+    )];
+  },
+
+  getCategoriesBySubtype: (subtype) => {
+    const matrix = get().flatMatrix || [];
+    return [...new Set(
+      matrix
+        .filter(row => !subtype || row.subtype === subtype)
+        .map(row => row.category)
+        .filter(Boolean)
+    )];
+  },
+
+  getEntitiesByCategory: (category) => {
+    const matrix = get().flatMatrix || [];
+    return [...new Set(
+      matrix
+        .filter(row => !category || row.category === category)
+        .map(row => row.entity)
+        .filter(Boolean)
+    )];
+  },
+
+  getAccountCode: (type, subtype, category, entity) => {
+    const matrix = get().flatMatrix || [];
+    const match = matrix.find(row => 
+      (!type || row.type === type) &&
+      (!subtype || row.subtype === subtype) &&
+      (!category || row.category === category) &&
+      (!entity || row.entity === entity)
+    );
+    return match ? match.code : '';
+  },
+
+  // Supabase Syncing Mechanics
   syncSettings: async (updates) => {
     set(updates);
     Object.entries(updates).forEach(([key, val]) => {
@@ -282,12 +346,7 @@ export const useKingdomStore = create((set, get) => ({
       const settings = {
         templates: get().templates,
         fromOptions: get().fromOptions,
-        entityOptions: get().entityOptions,
-        categoryOptions: get().categoryOptions,
-        entityMappings: get().entityMappings,
-        subtypeToCategoryMap: get().subtypeToCategoryMap,
-        subtypeTypes: get().subtypeTypes,
-        subClassOptions: get().subClassOptions,
+        flatMatrix: get().flatMatrix,
         accountMappings: get().accountMappings,
         language: get().language,
         ...updates
@@ -303,74 +362,8 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Dropdown manage lists
-  fromOptions: loadLocal('fromOptions', ['Pedro', 'Reni', 'Consolidated']),
-  statusOptions: ['Pending', 'Completed'],
-  classOptions: derivedClassOptions,
-  subClassOptions: derivedSubClassOptions,
-  entityOptions: loadLocal('entityOptions', derivedEntityOptions),
-  categoryOptions: loadLocal('categoryOptions', derivedCategoryOptions),
-  subtypeToCategoryMap: loadLocal('subtypeToCategoryMap', derivedSubtypeToCategoryMap),
-  subtypeTypes: loadLocal('subtypeTypes', derivedSubtypeTypes),
-  entityMappings: loadLocal('entityMappings', derivedEntityMappings),
-  monthOptions: [
-    'January', 'February', 'March', 'April', 'May', 'June', 
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ],
-  templates: loadLocal('templates', [
-  {
-    "name": "Transfers",
-    "icon": "💸",
-    "data": {
-      "from": "Consolidated",
-      "transaction_type": "Assets",
-      "transaction_subtype": "Banks",
-      "entity": "CGD",
-      "transaction_category": "Bank account",
-      "target_account": "10102001",
-      "source_dest_bank": "10101001",
-      "flow": "neutral",
-      "payment_status": "Completed",
-      "description": "Internal transfer"
-    }
-  },
-  {
-    "name": "Use Credit card",
-    "icon": "💳",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Liabilities",
-      "transaction_subtype": "Personal Debt",
-      "entity": "Universo",
-      "transaction_category": "Credit Cards",
-      "target_account": "",
-      "source_dest_bank": "20103002",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      "description": "Credit card purchase"
-    }
-  },
-  {
-    "name": "Pay Credit card",
-    "icon": "🧾",
-    "data": {
-      "from": "Pedro",
-      "transaction_type": "Liabilities",
-      "transaction_subtype": "Personal Debt",
-      "entity": "Wizink",
-      "transaction_category": "Credit Cards",
-      "target_account": "20103005",
-      "source_dest_bank": "10101001",
-      "flow": "outflow",
-      "payment_status": "Completed",
-      
-      "description": "Credit card payment"
-    }
-  }
-]),
-
-  // Actions to manage options
-  addOption: (type, value, extraData) => {
+  // Option Mutation Functions Integrated with Flat Matrix
+  addOption: async (type, value, extraData) => {
     if (type === 'quickAction') {
       const updated = [...get().templates, { name: value, icon: extraData.icon || '⚡', data: extraData.data }];
       get().syncSettings({ templates: updated });
@@ -381,23 +374,49 @@ export const useKingdomStore = create((set, get) => ({
       return;
     }
 
-    const key = `${type}Options`;
-    const currentList = get()[key];
-    if (!currentList) return;
-    if (currentList.includes(value)) return;
-
-    const updated = [...currentList, value];
-    const updates = { [key]: updated };
-    
-    // If adding an entity, we also add its category mapping
     if (type === 'entity' && extraData?.category) {
-      updates.entityMappings = { ...get().entityMappings, [value]: extraData.category };
-    }
+      const matrix = [...get().flatMatrix];
+      const category = extraData.category;
+      const targetCategoryRow = matrix.find(r => r.category === category);
+      
+      if (targetCategoryRow) {
+        const rowType = targetCategoryRow.type;
+        const rowSubtype = targetCategoryRow.subtype;
+        const prefix = targetCategoryRow.code.substring(0, 4);
+        
+        const siblingRows = matrix.filter(r => r.code.startsWith(prefix));
+        const maxSuffix = siblingRows.reduce((max, r) => {
+          const suffix = parseInt(r.code.substring(4), 10) || 0;
+          return suffix > max ? suffix : max;
+        }, 0);
+        
+        const newCode = prefix + String(maxSuffix + 1).padStart(4, '0');
+        const newRow = {
+          code: newCode,
+          account_name: `${category} ${value}`,
+          type: rowType,
+          subtype: rowSubtype,
+          category: category,
+          entity: value
+        };
 
-    get().syncSettings(updates);
+        const updatedMatrix = [...matrix, newRow];
+        set({ flatMatrix: updatedMatrix });
+        get().syncSettings({ flatMatrix: updatedMatrix });
+
+        const userId = get().user?.id;
+        if (userId) {
+          try {
+            await supabase.from('dim_contas').insert([newRow]);
+          } catch (err) {
+            console.error('Failed to sync new option row to dim_contas:', err);
+          }
+        }
+      }
+    }
   },
 
-  editOption: (type, oldValue, newValue, extraData) => {
+  editOption: async (type, oldValue, newValue, extraData) => {
     if (type === 'quickAction') {
       const updated = get().templates.map(tpl => {
         if (tpl.name === oldValue) {
@@ -409,170 +428,78 @@ export const useKingdomStore = create((set, get) => ({
       return;
     }
 
-    const key = `${type}Options`;
-    const currentList = get()[key];
-    if (currentList) {
-      const updated = currentList.map(v => v === oldValue ? newValue : v);
-      const updates = { [key]: updated };
-      
-      // If editing an entity name, we also update its entityMapping key
-      if (type === 'entity') {
-        const oldMapping = get().entityMappings[oldValue];
-        if (oldMapping !== undefined) {
-          const newMappings = { ...get().entityMappings };
-          delete newMappings[oldValue];
-          newMappings[newValue] = oldMapping;
-          updates.entityMappings = newMappings;
+    if (type === 'entity') {
+      const updatedMatrix = get().flatMatrix.map(row => {
+        if (row.entity === oldValue) {
+          return { ...row, entity: newValue, account_name: row.account_name.replace(oldValue, newValue) };
+        }
+        return row;
+      });
+      set({ flatMatrix: updatedMatrix });
+      get().syncSettings({ flatMatrix: updatedMatrix });
+
+      const userId = get().user?.id;
+      if (userId) {
+        try {
+          await supabase
+            .from('dim_contas')
+            .update({ entity: newValue })
+            .eq('entity', oldValue);
+        } catch (err) {
+          console.error('Failed to update dim_contas entity:', err);
         }
       }
-      
-      get().syncSettings(updates);
-      return;
     }
   },
 
-  deleteOption: (type, value) => {
+  deleteOption: async (type, value) => {
     if (type === 'quickAction') {
       const updated = get().templates.filter(tpl => tpl.name !== value);
       get().syncSettings({ templates: updated });
       return;
     }
 
-    const key = `${type}Options`;
-    const currentList = get()[key];
-    if (!currentList) return;
-
-    const updated = currentList.filter(v => v !== value);
-    const updates = { [key]: updated };
-    
     if (type === 'entity') {
-      const updatedMappings = { ...get().entityMappings };
-      delete updatedMappings[value];
-      updates.entityMappings = updatedMappings;
+      const updatedMatrix = get().flatMatrix.filter(row => row.entity !== value);
+      set({ flatMatrix: updatedMatrix });
+      get().syncSettings({ flatMatrix: updatedMatrix });
+
+      const userId = get().user?.id;
+      if (userId) {
+        try {
+          await supabase
+            .from('dim_contas')
+            .delete()
+            .eq('entity', value);
+        } catch (err) {
+          console.error('Failed to delete dim_contas entity:', err);
+        }
+      }
     }
-
-    get().syncSettings(updates);
   },
 
-  getMatrixRows: () => {
-    const rows = [];
-    const coveredEntities = new Set();
-    const coveredCategories = new Set();
-    const coveredSubtypes = new Set();
+  // Central Database Fetching for Chart of Accounts (dim_contas)
+  fetchChartOfAccounts: async () => {
+    set({ isLoading: true });
+    try {
+      const { data, error } = await supabase
+        .from('dim_contas')
+        .select('*')
+        .order('code', { ascending: true });
 
-    const isEntityInvalid = (ent) => {
-      const val = (ent || '').trim().toLowerCase();
-      return !val || val === 'none' || val === 'null' || val === 'undefined';
-    };
-
-    const accountMappings = get().accountMappings || {};
-    const entityOptions = get().entityOptions || [];
-    const entityMappings = get().entityMappings || {};
-    const subtypeToCategoryMap = get().subtypeToCategoryMap || {};
-    const categoryOptions = get().categoryOptions || [];
-    const subClassOptions = get().subClassOptions || [];
-
-    // 1. Scan Chart of Accounts (COA) for specific mappings first
-    const coaMappingsList = [];
-    Object.entries(accountMappings).forEach(([code, fullName]) => {
-      let remaining = fullName;
-      if (remaining.startsWith(code)) {
-        remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        set({ flatMatrix: data });
+        saveLocal('flatMatrix', data);
       }
-      const parts = remaining.split(/\s*-\s*/);
-      const category = parts[0] || '';
-      const entity = parts.slice(1).join(' - ') || '';
-      
-      if (category && entity && !isEntityInvalid(entity)) {
-        coaMappingsList.push({ category: category.trim(), entity: entity.trim() });
-      }
-    });
-
-    coaMappingsList.forEach(({ category, entity }) => {
-      let subtype = '';
-      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
-        if (cats && cats.includes(category)) {
-          subtype = sub;
-          break;
-        }
-      }
-      
-      const key = `${subtype}:::${category}:::${entity}`;
-      if (!rows.some(r => r.key === key)) {
-        rows.push({
-          key,
-          subtype,
-          category,
-          entity
-        });
-      }
-      
-      coveredEntities.add(entity);
-      coveredCategories.add(category);
-      if (subtype) coveredSubtypes.add(subtype);
-    });
-
-    // 2. Loop over standard entityMappings
-    entityOptions.forEach((entity) => {
-      if (!entity || coveredEntities.has(entity)) return;
-      const category = entityMappings[entity] || '';
-      let subtype = '';
-      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
-        if (cats && cats.includes(category)) {
-          subtype = sub;
-          break;
-        }
-      }
-      const key = `${subtype}:::${category}:::${entity}`;
-      if (!rows.some(r => r.key === key)) {
-        rows.push({
-          key,
-          subtype,
-          category,
-          entity
-        });
-      }
-      coveredEntities.add(entity);
-      if (category) coveredCategories.add(category);
-      if (subtype) coveredSubtypes.add(subtype);
-    });
-
-    // 3. Loop over categoryOptions for remaining uncovered category placeholders
-    categoryOptions.forEach((category) => {
-      if (!category || coveredCategories.has(category)) return;
-      let subtype = '';
-      for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
-        if (cats && cats.includes(category)) {
-          subtype = sub;
-          break;
-        }
-      }
-      rows.push({
-        key: `${subtype}:::${category}:::`,
-        subtype,
-        category,
-        entity: ''
-      });
-      coveredCategories.add(category);
-      if (subtype) coveredSubtypes.add(subtype);
-    });
-
-    // 4. Loop over subclass options
-    subClassOptions.forEach((subtype) => {
-      if (!subtype || coveredSubtypes.has(subtype)) return;
-      rows.push({
-        key: `${subtype}::::::`,
-        subtype,
-        category: '',
-        entity: ''
-      });
-      coveredSubtypes.add(subtype);
-    });
-
-    return rows;
+    } catch (err) {
+      console.error('Failed to fetch chart of accounts (dim_contas):', err);
+    } finally {
+      set({ isLoading: false });
+    }
   },
 
-  // Fetch lightweight profile data (single-row polling mechanics)
+  // Synchronize gamified indicators and profile levels
   fetchKingdomData: async (profileId) => {
     const userId = get().user?.id || profileId;
     set({ isLoading: true });
@@ -596,7 +523,6 @@ export const useKingdomStore = create((set, get) => ({
           xp: data.xp || 0,
         });
 
-        // Fetch gold mine building data
         const { data: mineData, error: mineError } = await supabase
           .from('buildings')
           .select('*')
@@ -622,111 +548,12 @@ export const useKingdomStore = create((set, get) => ({
 
         if (data.settings) {
           const s = data.settings;
-          let categoryOpts = s.categoryOptions || get().categoryOptions;
-          let entityMaps = s.entityMappings || get().entityMappings;
-          let temps = s.templates || get().templates;
-          let subClassOpts = s.subClassOptions || get().subClassOptions;
-          let entityOpts = s.entityOptions || get().entityOptions;
-          let subtypeToCategory = s.subtypeToCategoryMap || get().subtypeToCategoryMap;
-          const isObsolete = 
-            categoryOpts.includes('Payroll') || 
-            categoryOpts.includes('Burrowed') ||
-            categoryOpts.includes('Income • Payroll') ||
-            categoryOpts.includes('Salary (payroll)') ||
-            categoryOpts.includes('Bank Accounts (Ordem)') ||
-            categoryOpts.includes('Payroll & Active Income') ||
-            categoryOpts.includes('Saving account') ||
-            categoryOpts.includes('Loans & Burrow income') ||
-            categoryOpts.includes('Health expenses') ||
-            categoryOpts.includes('Insurance paid') ||
-            categoryOpts.includes('Insurance received') ||
-            categoryOpts.includes('Taxes paid') ||
-            categoryOpts.includes('Taxes received') ||
-            categoryOpts.includes('Interest received') ||
-            categoryOpts.includes('Entertainment expenses') ||
-            categoryOpts.includes('Fines expenses') ||
-            categoryOpts.includes('Fines refunds') ||
-            categoryOpts.includes('Loans & Burrow expenses') ||
-            subClassOpts.includes('Salary (payroll)') ||
-            subClassOpts.includes('Income • Payroll') ||
-            subClassOpts.includes('Bank Accounts (Ordem)') ||
-            subClassOpts.includes('Investments') ||
-            subClassOpts.includes('Utilities') ||
-            subClassOpts.includes('Markets & Personal care') ||
-            entityMaps['Salary'] === 'Payroll & Active Income' ||
-            Object.values(entityMaps).includes('Income • Payroll') ||
-            Object.values(entityMaps).includes('Salary (payroll)') ||
-            entityOpts.includes('CGD Bank') ||
-            entityOpts.includes('Active Bank Savings') ||
-            !entityOpts.includes('CGD');
-
-          if (isObsolete) {
-            categoryOpts = get().categoryOptions;
-            entityMaps = get().entityMappings;
-            subClassOpts = get().subClassOptions;
-            entityOpts = get().entityOptions;
-            subtypeToCategory = get().subtypeToCategoryMap;
-
-            if (Array.isArray(temps)) {
-              temps = temps.map(t => {
-                if (t.data) {
-                  let updatedSubtype = t.data.transaction_subtype;
-                  let updatedCategory = t.data.transaction_category;
-                  if (updatedSubtype === 'Bank Accounts (Ordem)') updatedSubtype = 'Banks';
-                  else if (updatedSubtype === 'Payroll & Active Income') updatedSubtype = 'Payroll';
-                  else if (updatedSubtype === 'Salary (payroll)' || updatedSubtype === 'Income • Payroll') updatedSubtype = 'Payroll';
-
-                  if (updatedCategory === 'Bank Accounts (Ordem)') updatedCategory = 'Bank account';
-                  else if (updatedCategory === 'Payroll & Active Income') updatedCategory = 'Salary';
-                  else if (updatedCategory === 'Salary (payroll)' || updatedCategory === 'Income • Payroll') updatedCategory = 'Salary';
-
-                  return {
-                    ...t,
-                    data: {
-                      ...t.data,
-                      transaction_subtype: updatedSubtype,
-                      transaction_category: updatedCategory
-                    }
-                  };
-                }
-                return t;
-              });
-            }
-
-            localStorage.removeItem('eldoria_entityOptions');
-            localStorage.removeItem('eldoria_entityMappings');
-            localStorage.removeItem('eldoria_categoryOptions');
-            localStorage.removeItem('eldoria_subClassOptions');
-            localStorage.removeItem('eldoria_subtypeToCategoryMap');
-            
-            supabase
-              .from('profiles')
-              .update({
-                settings: {
-                  ...s,
-                  categoryOptions: categoryOpts,
-                  entityMappings: entityMaps,
-                  templates: temps,
-                  subClassOptions: subClassOpts,
-                  entityOptions: entityOpts,
-                  subtypeToCategoryMap: subtypeToCategory
-                }
-              })
-              .eq('id', userId)
-              .then();
-          }
-
           const accMaps = s.accountMappings || get().accountMappings;
           setDynamicAccountMappings(accMaps);
 
           set({
-            templates: temps,
+            templates: s.templates || get().templates,
             fromOptions: s.fromOptions || get().fromOptions,
-            entityOptions: entityOpts,
-            categoryOptions: categoryOpts,
-            entityMappings: entityMaps,
-            subtypeToCategoryMap: subtypeToCategory,
-            subClassOptions: subClassOpts,
             accountMappings: accMaps,
             language: s.language || get().language
           });
@@ -735,6 +562,7 @@ export const useKingdomStore = create((set, get) => ({
           }
         }
       }
+      await get().fetchChartOfAccounts();
     } catch (err) {
       console.error('Failed to fetch kingdom data:', err);
     } finally {
@@ -742,7 +570,7 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Fetch raw transactions and account balances for the Dashboard Engine
+  // Calculate live balances strictly with 8-digit Liquid Cash Prefixes (1101, 1102, 1103)
   fetchDashboardData: async (profileId) => {
     const userId = get().user?.id || profileId;
     set({ isLoading: true });
@@ -759,51 +587,49 @@ export const useKingdomStore = create((set, get) => ({
         ...tx,
         from: tx.origin || tx.from
       }));
-      
-      // Calculate live gold from transaction history to verify synchronization
+
       const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
       const netCash = txs
         .filter(t => isCompleted(t.payment_status))
         .reduce((sum, t) => {
           const amt = Number(t.amount) || 0;
           if (t.transaction_type === 'Income') {
-            const src = t.source_dest_bank || '10101001';
-            if (src.startsWith('10101') || src.startsWith('10102')) return sum + amt;
+            const src = t.source_dest_bank || '11010001';
+            if (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103')) return sum + amt;
           }
           if (t.transaction_type === 'Expense') {
-            const src = t.source_dest_bank || '10101001';
-            if (src.startsWith('10101') || src.startsWith('10102')) return sum - amt;
+            const src = t.source_dest_bank || '11010001';
+            if (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103')) return sum - amt;
           }
           if (t.transaction_type === 'Assets' || t.transaction_type === 'Liabilities') {
             const src = t.source_dest_bank;
             const tgt = t.target_account;
             let effect = 0;
             if (t.flow === 'neutral') {
-              if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
-              if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+              if (src && (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103'))) effect -= amt;
+              if (tgt && (tgt.startsWith('1101') || tgt.startsWith('1102') || tgt.startsWith('1103'))) effect += amt;
             } else if (t.flow === 'inflow') {
-              if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect += amt;
-              if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect -= amt;
+              if (src && (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103'))) effect += amt;
+              if (tgt && (tgt.startsWith('1101') || tgt.startsWith('1102') || tgt.startsWith('1103'))) effect -= amt;
             } else if (t.flow === 'outflow') {
-              if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
-              if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+              if (src && (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103'))) effect -= amt;
+              if (tgt && (tgt.startsWith('1101') || tgt.startsWith('1102') || tgt.startsWith('1103'))) effect += amt;
             }
             return sum + effect;
           }
           return sum;
         }, 0);
-      
+
       const startingGold = (balancesRes.data || [])
-        .filter(b => b.account_code && (b.account_code.startsWith('10101') || b.account_code.startsWith('10102')))
+        .filter(b => b.account_code && (b.account_code.startsWith('1101') || b.account_code.startsWith('1102') || b.account_code.startsWith('1103')))
         .reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
       const calculatedGold = Math.floor(startingGold + netCash);
 
-      // If calculatedGold is different from state gold, sync it to state
       if (calculatedGold !== get().gold) {
         set({ gold: calculatedGold });
       }
 
-      set({ 
+      set({
         transactions: txs,
         accountBalances: balancesRes.data || []
       });
@@ -814,7 +640,7 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Fetch expense variance using database RPC
+  // Metric calculation functions invoking Postgres RPC endpoints
   fetchExpenseVariance: async (years = [], quarters = [], months = []) => {
     const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
     try {
@@ -824,10 +650,7 @@ export const useKingdomStore = create((set, get) => ({
         p_quarters: quarters,
         p_months: months
       });
-      if (error) {
-        console.error('Error calling calculate_expense_variance RPC:', error);
-        return;
-      }
+      if (error) throw error;
       if (data && data[0]) {
         set({ expenseVarianceData: data[0] });
       }
@@ -836,7 +659,6 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Fetch savings rate using database RPC
   fetchSavingsRate: async (years = [], quarters = [], months = []) => {
     const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
     try {
@@ -846,10 +668,7 @@ export const useKingdomStore = create((set, get) => ({
         p_quarters: quarters,
         p_months: months
       });
-      if (error) {
-        console.error('Error calling calculate_savings_rate RPC:', error);
-        return;
-      }
+      if (error) throw error;
       if (data && data[0]) {
         set({ savingsRateData: data[0] });
       }
@@ -858,7 +677,6 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Fetch runway metrics using database RPC
   fetchRunwayData: async (years = [], quarters = [], months = []) => {
     const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
     try {
@@ -868,10 +686,7 @@ export const useKingdomStore = create((set, get) => ({
         p_quarters: quarters,
         p_months: months
       });
-      if (error) {
-        console.error('Error calling calculate_kingdom_runway RPC:', error);
-        return;
-      }
+      if (error) throw error;
       if (data && data[0]) {
         set({ runwayData: data[0] });
       }
@@ -880,7 +695,6 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Fetch DTI ratio metrics using database RPC
   fetchDtiData: async (years = [], quarters = [], months = []) => {
     const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
     try {
@@ -890,10 +704,7 @@ export const useKingdomStore = create((set, get) => ({
         p_quarters: quarters,
         p_months: months
       });
-      if (error) {
-        console.error('Error calling calculate_dti_ratio RPC:', error);
-        return;
-      }
+      if (error) throw error;
       if (data && data[0]) {
         set({ dtiData: data[0] });
       }
@@ -901,8 +712,7 @@ export const useKingdomStore = create((set, get) => ({
       console.error('Failed to execute calculate_dti_ratio RPC:', err);
     }
   },
-  
-  // Update or insert a static account balance and refresh store data
+
   updateAccountBalance: async (profileId, accountCode, balanceAmount) => {
     const userId = get().user?.id || profileId;
     set({ isLoading: true });
@@ -945,7 +755,7 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // Insert transaction to database, triggering Postgres profile updates, and synchronize state
+  // Double-entry ledger integration supporting math operations
   registerTransaction: async (profileId, transactionData) => {
     const userId = get().user?.id || profileId;
     const tempId = 'temp-' + Date.now();
@@ -970,7 +780,6 @@ export const useKingdomStore = create((set, get) => ({
       created_at: new Date().toISOString()
     };
 
-    // Calculate Gold, XP, and Level locally as a fail-safe
     let newGold = get().gold;
     let earnedXp = 0;
     const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
@@ -979,25 +788,25 @@ export const useKingdomStore = create((set, get) => ({
     if (isCompletedStatus) {
       const amt = Number(transactionData.amount) || 0;
       if (transactionData.transaction_type === 'Income') {
-        const src = transactionData.source_dest_bank || '10101001';
-        if (src.startsWith('10101') || src.startsWith('10102')) newGold += amt;
+        const src = transactionData.source_dest_bank || '11010001';
+        if (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103')) newGold += amt;
         earnedXp = amt * 2;
       } else if (transactionData.transaction_type === 'Expense') {
-        const src = transactionData.source_dest_bank || '10101001';
-        if (src.startsWith('10101') || src.startsWith('10102')) newGold -= amt;
+        const src = transactionData.source_dest_bank || '11010001';
+        if (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103')) newGold -= amt;
       } else if (transactionData.transaction_type === 'Assets' || transactionData.transaction_type === 'Liabilities') {
         const src = transactionData.source_dest_bank;
         const tgt = transactionData.target_account;
         let effect = 0;
         if (transactionData.flow === 'neutral') {
-          if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
-          if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+          if (src && (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103'))) effect -= amt;
+          if (tgt && (tgt.startsWith('1101') || tgt.startsWith('1102') || tgt.startsWith('1103'))) effect += amt;
         } else if (transactionData.flow === 'inflow') {
-          if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect += amt;
-          if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect -= amt;
+          if (src && (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103'))) effect += amt;
+          if (tgt && (tgt.startsWith('1101') || tgt.startsWith('1102') || tgt.startsWith('1103'))) effect -= amt;
         } else if (transactionData.flow === 'outflow') {
-          if (src && (src.startsWith('10101') || src.startsWith('10102'))) effect -= amt;
-          if (tgt && (tgt.startsWith('10101') || tgt.startsWith('10102'))) effect += amt;
+          if (src && (src.startsWith('1101') || src.startsWith('1102') || src.startsWith('1103'))) effect -= amt;
+          if (tgt && (tgt.startsWith('1101') || tgt.startsWith('1102') || tgt.startsWith('1103'))) effect += amt;
         }
         newGold += effect;
       }
@@ -1046,9 +855,7 @@ export const useKingdomStore = create((set, get) => ({
         ])
         .select();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data && data.length > 0) {
         const savedTx = { ...data[0], from: data[0].origin || data[0].from };
@@ -1058,7 +865,6 @@ export const useKingdomStore = create((set, get) => ({
       }
 
       const finalXp = Math.floor(newXp);
-      // Update profiles directly in database for XP and level
       await supabase
         .from('profiles')
         .update({
@@ -1067,7 +873,6 @@ export const useKingdomStore = create((set, get) => ({
         })
         .eq('id', userId);
 
-      // Fetch the updated profile to synchronize gold (computed by the database trigger) along with XP and level
       const { data: profileRes } = await supabase
         .from('profiles')
         .select('gold, xp, level')
@@ -1088,7 +893,6 @@ export const useKingdomStore = create((set, get) => ({
       }
 
       get().fetchDashboardData(userId);
-
       return { success: true, data };
     } catch (err) {
       set({ transactions: prevTransactions, gold: prevGold, xp: prevXp, level: prevLevel, isLoading: false });
@@ -1167,9 +971,7 @@ export const useKingdomStore = create((set, get) => ({
         .upsert(formatted)
         .select();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data && data.length > 0) {
         set((state) => {
@@ -1184,7 +986,6 @@ export const useKingdomStore = create((set, get) => ({
         });
       }
 
-      // Fetch only the profile stats
       const profileRes = await supabase
         .from('profiles')
         .select('gold, xp, level')
@@ -1200,7 +1001,6 @@ export const useKingdomStore = create((set, get) => ({
       }
 
       get().fetchDashboardData(userId);
-
       return { success: true, data };
     } catch (err) {
       set({ transactions: prevTransactions });
@@ -1222,13 +1022,12 @@ export const useKingdomStore = create((set, get) => ({
 
       if (error) throw error;
 
-      // Sync state
       const profileRes = await supabase
         .from('profiles')
         .select('gold, xp, level')
         .eq('id', userId)
         .single();
-      
+
       if (profileRes.data) {
         set({
           gold: profileRes.data.gold ? Number(profileRes.data.gold) : get().gold,
@@ -1247,8 +1046,8 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
+  // Auth Initialization Pipeline
   initAuth: () => {
-    // Helper function to load profile and data for a session
     const loadSessionUser = async (session) => {
       if (session?.user) {
         set({ user: session.user, email: session.user.email });
@@ -1268,91 +1067,12 @@ export const useKingdomStore = create((set, get) => ({
 
           if (profileData.settings) {
             const s = profileData.settings;
-            let categoryOpts = s.categoryOptions || get().categoryOptions;
-            let entityMaps = s.entityMappings || get().entityMappings;
-            let temps = s.templates || get().templates;
-            let subClassOpts = s.subClassOptions || get().subClassOptions;
-            let entityOpts = s.entityOptions || get().entityOptions;
-            let subtypeToCategory = s.subtypeToCategoryMap || get().subtypeToCategoryMap;
-
-            const isObsolete = 
-              categoryOpts.includes('Payroll') || 
-              categoryOpts.includes('Burrowed') ||
-              categoryOpts.includes('Income • Payroll') ||
-              categoryOpts.includes('Salary (payroll)') ||
-              categoryOpts.includes('Bank Accounts (Ordem)') ||
-              categoryOpts.includes('Payroll & Active Income') ||
-              subClassOpts.includes('Salary (payroll)') ||
-              subClassOpts.includes('Income • Payroll') ||
-              subClassOpts.includes('Bank Accounts (Ordem)') ||
-              entityMaps['Salary'] === 'Payroll & Active Income' ||
-              Object.values(entityMaps).includes('Income • Payroll') ||
-              Object.values(entityMaps).includes('Salary (payroll)');
-
-            if (isObsolete) {
-              categoryOpts = get().categoryOptions;
-              entityMaps = get().entityMappings;
-              subClassOpts = get().subClassOptions;
-              entityOpts = get().entityOptions;
-              subtypeToCategory = get().subtypeToCategoryMap;
-
-              if (Array.isArray(temps)) {
-                temps = temps.map(t => {
-                  if (t.data) {
-                    let updatedSubtype = t.data.transaction_subtype;
-                    let updatedCategory = t.data.transaction_category;
-                    if (updatedSubtype === 'Bank Accounts (Ordem)') updatedSubtype = 'Banks';
-                    else if (updatedSubtype === 'Payroll & Active Income') updatedSubtype = 'Payroll';
-                    else if (updatedSubtype === 'Salary (payroll)' || updatedSubtype === 'Income • Payroll') updatedSubtype = 'Payroll';
-
-                    if (updatedCategory === 'Bank Accounts (Ordem)') updatedCategory = 'Bank account';
-                    else if (updatedCategory === 'Payroll & Active Income') updatedCategory = 'Salary';
-                    else if (updatedCategory === 'Salary (payroll)' || updatedCategory === 'Income • Payroll') updatedCategory = 'Salary';
-
-                    return {
-                      ...t,
-                      data: {
-                        ...t.data,
-                        transaction_subtype: updatedSubtype,
-                        transaction_category: updatedCategory
-                      }
-                    };
-                  }
-                  return t;
-                });
-              }
-
-              localStorage.removeItem('eldoria_entityOptions');
-              localStorage.removeItem('eldoria_entityMappings');
-              localStorage.removeItem('eldoria_categoryOptions');
-              localStorage.removeItem('eldoria_subClassOptions');
-              localStorage.removeItem('eldoria_subtypeToCategoryMap');
-              
-              supabase
-                .from('profiles')
-                .update({
-                  settings: {
-                    ...s,
-                    categoryOptions: categoryOpts,
-                    entityMappings: entityMaps,
-                    templates: temps,
-                    subClassOptions: subClassOpts,
-                    entityOptions: entityOpts,
-                    subtypeToCategoryMap: subtypeToCategory
-                  }
-                })
-                .eq('id', session.user.id)
-                .then();
-            }
+            const accMaps = s.accountMappings || get().accountMappings;
+            setDynamicAccountMappings(accMaps);
 
             set({
-              templates: temps,
+              templates: s.templates || get().templates,
               fromOptions: s.fromOptions || get().fromOptions,
-              entityOptions: entityOpts,
-              categoryOptions: categoryOpts,
-              entityMappings: entityMaps,
-              subtypeToCategoryMap: subtypeToCategory,
-              subClassOptions: subClassOpts,
               language: s.language || get().language
             });
             if (s.language) {
@@ -1360,18 +1080,16 @@ export const useKingdomStore = create((set, get) => ({
             }
           }
         }
-        get().fetchKingdomData(session.user.id);
-        get().fetchDashboardData(session.user.id);
+        await get().fetchKingdomData(session.user.id);
+        await get().fetchDashboardData(session.user.id);
       } else {
         set({ user: null, role: 'lord', email: 'guest@medieval.stuff' });
         get().resetStore();
-        // Fetch guest profile data and dashboard data from Supabase
-        get().fetchKingdomData('00000000-0000-0000-0000-000000000000');
-        get().fetchDashboardData('00000000-0000-0000-0000-000000000000');
+        await get().fetchKingdomData('00000000-0000-0000-0000-000000000000');
+        await get().fetchDashboardData('00000000-0000-0000-0000-000000000000');
       }
     };
 
-    // Load initial session immediately
     supabase.auth.getSession().then(({ data: { session } }) => {
       loadSessionUser(session);
     });
@@ -1387,6 +1105,7 @@ export const useKingdomStore = create((set, get) => ({
     i18n.changeLanguage(lang);
   },
 
+  // Game Logic Mechanics (Buildings and Mine Upgrades)
   collectPassiveGold: async () => {
     const userId = get().user?.id || '00000000-0000-0000-0000-000000000000';
     set({ isLoading: true });
@@ -1465,6 +1184,7 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   resetStore: () => set({
+    flatMatrix: defaultFlatMatrix,
     gold: 0,
     gems: 100,
     xp: 0,

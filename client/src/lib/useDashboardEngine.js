@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
-import { accountMappings } from '../utils/accountMappings';
 
 export const formatNumberCompact = (num) => {
   if (!num) return '0 / g';
@@ -17,22 +16,32 @@ export const formatNumberCompact = (num) => {
 
 /**
  * useDashboardEngine
- * Processa o array bruto de transações em memória para o Dashboard,
- * respeitando os 4 pilares e o modelo de previsão com P&L Firewall.
+ * Processes transactions in-memory to drive the Dashboard KPI metrics,
+ * utilizing the Flat Matrix configuration for dynamic metadata lookup.
  */
 export function useDashboardEngine(filteredTransactions = []) {
   const allTxs = useKingdomStore(state => state.transactions) || [];
   const accountBalances = useKingdomStore(state => state.accountBalances) || [];
-  const userGold = useKingdomStore(state => state.gold) || 0;
+  const flatMatrix = useKingdomStore(state => state.flatMatrix) || [];
 
   return useMemo(() => {
     const safeFilteredTxs = filteredTransactions || [];
     const safeAllTxs = allTxs || [];
     const safeBalances = accountBalances || [];
-    const entityMappings = useKingdomStore.getState().entityMappings || {};
 
-    // Status checker for completed cash flows
+    // Complete transaction verification status checker
     const isCompleted = (status) => ['Completed', 'Paid', 'Paid on Time', 'Paid Late'].includes(status);
+
+    // Metadata resolver dynamically bound to the Flat Matrix
+    const getAccountMeta = (tx) => {
+      const code = tx.target_account || tx.source_dest_bank;
+      const found = code ? flatMatrix.find(row => row.code === code) : null;
+      return {
+        category: tx.transaction_category || found?.category || 'Other',
+        entity: tx.entity || found?.entity || 'Other',
+        name: found?.account_name || 'Other Account'
+      };
+    };
 
     // ==============================================================
     // 1. P&L FIREWALL: Single-Pass Aggregation for Income & Expense
@@ -69,72 +78,83 @@ export function useDashboardEngine(filteredTransactions = []) {
     }
 
     const netRealized = realizedIncome - realizedExpense;
-    const netForecast = (realizedIncome + forecastIncome) - (realizedExpense + forecastExpense);
 
     // ==============================================================
-    // 2. NET WORTH & BALANÇO DE VAULTS (Somente Completed)
+    // 2. NET WORTH & BALANÇO DE VAULTS (8-Digit Prefix Taxonomy)
     // ==============================================================
-    const chartOfAccounts = Object.entries(accountMappings)
-      .filter(([code]) => code.startsWith('1') || code.startsWith('2'))
-      .reduce((acc, [code, name]) => {
-        acc[code] = name;
-        return acc;
-      }, {});
-
     const balancesByCode = {};
-    Object.keys(chartOfAccounts).forEach(code => {
-      balancesByCode[code] = 0;
+
+    // Populate balances from the Flat Matrix schema dynamically
+    flatMatrix.forEach(row => {
+      if (row.code && (row.code.startsWith('1') || row.code.startsWith('2'))) {
+        balancesByCode[row.code] = 0;
+      }
     });
 
-    let totalAssets = 0;
-    let totalLiabilities = 0;
-    let netVaultCash = userGold;
-
-    // DYNAMIC TRANSACTIONS-BASED CALCULATION (Always runs to ensure the Balance Sheet picks up the ledger)
-    accountBalances.forEach(b => {
+    // Seed database-configured balances
+    safeBalances.forEach(b => {
       if (b.account_code && b.account_code in balancesByCode) {
         balancesByCode[b.account_code] = Number(b.balance) || 0;
       }
     });
 
-    netVaultCash = balancesByCode['10101001'] || 0;
-
+    // Apply ledger history to balances based on dynamic Flow Rules
     safeAllTxs.forEach(tx => {
       if (!isCompleted(tx.payment_status)) return;
       const amt = Number(tx.amount) || 0;
+      const type = tx.transaction_type;
 
-      if (tx.transaction_type === 'Income') {
-        const src = tx.source_dest_bank || '10101001';
-        if (src in balancesByCode) balancesByCode[src] += amt;
-      } else if (tx.transaction_type === 'Expense') {
-        const src = tx.source_dest_bank || '10101001';
+      // Fallback to checking account 11010001 if source_dest_bank is missing
+      const src = tx.source_dest_bank || '11010001';
+      const tgt = tx.target_account;
+
+      if (type === 'Income') {
+        if (src in balancesByCode) {
+          balancesByCode[src] += amt;
+        }
+      } else if (type === 'Expense') {
+        if (src in balancesByCode) {
+          balancesByCode[src] -= amt;
+        }
+      } else if (type === 'Transfer') {
         if (src in balancesByCode) balancesByCode[src] -= amt;
-      } else if (tx.transaction_type === 'Assets' || tx.transaction_type === 'Liabilities') {
-        const src = tx.source_dest_bank;
-        const tgt = tx.target_account;
+        if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
+      } else if (type === 'Assets') {
         if (tx.flow === 'neutral') {
-          if (src && src in balancesByCode) balancesByCode[src] -= amt;
+          if (src in balancesByCode) balancesByCode[src] -= amt;
           if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
         } else if (tx.flow === 'inflow') {
-          if (src && src in balancesByCode) balancesByCode[src] += amt;
+          if (src in balancesByCode) balancesByCode[src] += amt;
           if (tgt && tgt in balancesByCode) balancesByCode[tgt] -= amt;
         } else if (tx.flow === 'outflow') {
-          if (src && src in balancesByCode) balancesByCode[src] -= amt;
+          if (src in balancesByCode) balancesByCode[src] -= amt;
           if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
+        }
+      } else if (type === 'Liabilities') {
+        if (tx.flow === 'inflow') {
+          // New Loan: Increases Liability balance and Assets balance
+          if (tgt && tgt in balancesByCode) balancesByCode[tgt] += amt;
+          if (src in balancesByCode) balancesByCode[src] += amt;
+        } else if (tx.flow === 'outflow') {
+          // Debt Payment: Decreases Liability balance and Assets balance
+          if (tgt && tgt in balancesByCode) balancesByCode[tgt] -= amt;
+          if (src in balancesByCode) balancesByCode[src] -= amt;
         }
       }
     });
 
-    // Sum totals
-    netVaultCash = balancesByCode['10101001'];
-    totalAssets = 0;
-    totalLiabilities = 0;
+    // Calculate structural metrics using the strict 8-digit rules
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+    let netVaultCash = 0;
+
     Object.entries(balancesByCode).forEach(([code, balance]) => {
-      if (code.startsWith('10104')) {
-        return; // Skip Fixed Debt accounts
-      }
       if (code.startsWith('1')) {
         totalAssets += balance;
+        // HUD Gold / Net Vault Cash limits to Checking, Savings & Wallets, and Physical Cash
+        if (code.startsWith('1101') || code.startsWith('1102') || code.startsWith('1103')) {
+          netVaultCash += balance;
+        }
       } else if (code.startsWith('2')) {
         totalLiabilities += balance;
       }
@@ -143,13 +163,13 @@ export function useDashboardEngine(filteredTransactions = []) {
     const netWorth = totalAssets - totalLiabilities;
 
     // ==============================================================
-    // 3. ESTRUTURAÇÃO DE DADOS PARA GRÁFICOS (Sem Asset/Debt no P&L)
+    // 3. DATA STRUCTURES FOR GRAPHING (No legacy maps)
     // ==============================================================
 
-    // Distribuição por Categorias (Apenas P&L)
+    // Category Distribution (P&L Context)
     const categoryMap = {};
     plTransactions.forEach(tx => {
-      const cat = tx.transaction_category || entityMappings[tx.entity] || 'Other';
+      const { category: cat } = getAccountMeta(tx);
       if (!categoryMap[cat]) {
         categoryMap[cat] = { name: cat, income: 0, expense: 0, totalClass: 0 };
       }
@@ -163,10 +183,10 @@ export function useDashboardEngine(filteredTransactions = []) {
     });
     const categoryData = Object.values(categoryMap).sort((a, b) => b.totalClass - a.totalClass);
 
-    // Distribuição por Entidades (Apenas P&L)
+    // Entity Distribution (P&L Context)
     const entityMap = {};
     plTransactions.forEach(tx => {
-      const ent = tx.entity || 'Other';
+      const { entity: ent } = getAccountMeta(tx);
       if (!entityMap[ent]) {
         entityMap[ent] = { name: ent, income: 0, expense: 0, totalClass: 0 };
       }
@@ -180,10 +200,10 @@ export function useDashboardEngine(filteredTransactions = []) {
     });
     const entityData = Object.values(entityMap).sort((a, b) => b.totalClass - a.totalClass);
 
-    // Evolução Temporal (P&L + Debt)
+    // Temporal Line Metrics
     const timeMap = {};
     safeFilteredTxs.forEach(tx => {
-      const dateKey = tx.posting_date || new Date(tx.created_at).toISOString().split('T')[0];
+      const dateKey = tx.posting_date || (tx.created_at ? tx.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
       if (!timeMap[dateKey]) {
         timeMap[dateKey] = { date: dateKey, classIncome: 0, classExpense: 0, debtAccrual: 0, debtPayment: 0 };
       }
@@ -202,20 +222,23 @@ export function useDashboardEngine(filteredTransactions = []) {
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(pt => {
         const d = new Date(pt.date);
+        const label = isNaN(d.getTime())
+          ? pt.date
+          : `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`;
         return {
-          label: `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`,
+          label,
           ...pt
         };
       });
 
-    // Dívidas por Entidade e Categoria (Apenas Debt Completed)
+    // Liabilities Analytics (Completed Debt Only)
     const debtTxs = safeAllTxs.filter(tx => tx.transaction_type === 'Liabilities');
 
     const debtEntMap = {};
     debtTxs.forEach(tx => {
-      const ent = tx.entity || 'Other';
+      const { entity: ent } = getAccountMeta(tx);
       const amt = Number(tx.amount) || 0;
-      if (tx.payment_status === 'Completed') {
+      if (isCompleted(tx.payment_status)) {
         if (tx.flow === 'inflow') {
           debtEntMap[ent] = (debtEntMap[ent] || 0) + amt;
         } else {
@@ -230,9 +253,9 @@ export function useDashboardEngine(filteredTransactions = []) {
 
     const debtCatMap = {};
     debtTxs.forEach(tx => {
-      const cat = tx.transaction_category || entityMappings[tx.entity] || 'Other';
+      const { category: cat } = getAccountMeta(tx);
       const amt = Number(tx.amount) || 0;
-      if (tx.payment_status === 'Completed') {
+      if (isCompleted(tx.payment_status)) {
         if (tx.flow === 'inflow') {
           debtCatMap[cat] = (debtCatMap[cat] || 0) + amt;
         } else {
@@ -246,7 +269,7 @@ export function useDashboardEngine(filteredTransactions = []) {
       .sort((a, b) => b.amount - a.amount);
 
     // ==============================================================
-    // 4. MAPEAR PARA COMPATIBILIDADE DE RETORNO (Evitar Regressão no App.jsx)
+    // 4. RETROACTIVE COMPATIBILITY MAPPINGS
     // ==============================================================
     const mapToFormattedArray = (dict) => {
       return Object.entries(dict).map(([name, amount]) => ({
@@ -259,7 +282,7 @@ export function useDashboardEngine(filteredTransactions = []) {
     const plRevenues = {};
     const plExpenses = {};
     plTransactions.forEach(tx => {
-      const cat = tx.transaction_category || entityMappings[tx.entity] || 'Other';
+      const { category: cat } = getAccountMeta(tx);
       const amt = Number(tx.amount) || 0;
       if (tx.transaction_type === 'Income') {
         plRevenues[cat] = (plRevenues[cat] || 0) + amt;
@@ -277,7 +300,6 @@ export function useDashboardEngine(filteredTransactions = []) {
       formattedNet: formatNumberCompact(netRealized)
     };
 
-    // Cash Flow simplificado sob o novo modelo cash-basis
     const cashFlowStatement = {
       operating: mapToFormattedArray(plExpenses),
       investing: [],
@@ -292,17 +314,15 @@ export function useDashboardEngine(filteredTransactions = []) {
       formattedFinancing: formatNumberCompact(realizedIncome)
     };
 
-    // chartOfAccounts and balancesByCode are pre-calculated at the top in Step 2
-
     const assetsList = [];
     const liabilitiesList = [];
 
     Object.entries(balancesByCode).forEach(([code, balance]) => {
-      const name = chartOfAccounts[code];
+      const account = flatMatrix.find(row => row.code === code);
+      const name = account ? account.account_name : `Account ${code}`;
       const formatted = formatNumberCompact(balance);
-      if (code.startsWith('10104')) {
-        // Skip Fixed Debt accounts
-      } else if (code.startsWith('1')) {
+
+      if (code.startsWith('1')) {
         assetsList.push({ code, name, balance, formatted });
       } else if (code.startsWith('2')) {
         liabilitiesList.push({ code, name, balance, formatted });
@@ -334,7 +354,6 @@ export function useDashboardEngine(filteredTransactions = []) {
       }
     };
 
-    // Métricas de compatibilidade de KPIs de Dívida
     const liabilitiesKpis = {
       total_debt: totalLiabilities,
       to_be_paid: safeFilteredTxs.filter(tx => tx.transaction_type === 'Liabilities' && tx.payment_status === 'Pending').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
@@ -343,7 +362,7 @@ export function useDashboardEngine(filteredTransactions = []) {
     };
 
     return {
-      // Novas chaves limpas
+      // Functional metrics
       incomeStats: { realized: realizedIncome, forecast: forecastIncome },
       expenseStats: { realized: realizedExpense, forecast: forecastExpense },
       netWorth: { totalAssets, totalLiabilities, netWorth, netVaultCash },
@@ -353,7 +372,7 @@ export function useDashboardEngine(filteredTransactions = []) {
       debtByEntity,
       debtByType,
 
-      // Chaves legadas mantidas para compatibilidade retroativa
+      // Legacy support mappings
       total_income: realizedIncome,
       total_expenses: realizedExpense,
       total_receipts: realizedIncome,
@@ -373,7 +392,7 @@ export function useDashboardEngine(filteredTransactions = []) {
       cashFlowStatement,
       balanceSheet,
 
-      // Placeholders vazios para gráficos obsoletos evitarem erros
+      // Obsolete visual compatibility fallbacks
       prTimePoints: [],
       openPayablesByCategory: [],
       openPayablesByEntity: [],
@@ -381,5 +400,5 @@ export function useDashboardEngine(filteredTransactions = []) {
       paymentMethodsDistribution: [],
       liabilitiesTimePoints: []
     };
-  }, [allTxs, accountBalances, userGold, filteredTransactions]);
+  }, [allTxs, accountBalances, flatMatrix, filteredTransactions]);
 }

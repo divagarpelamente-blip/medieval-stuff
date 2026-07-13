@@ -16,13 +16,13 @@ export function useQuickActionForm() {
 
   // Bind Zustand states & actions
   const email = useKingdomStore((state) => state.email);
-  const fromOptions = useKingdomStore((state) => state.fromOptions);
-  const statusOptions = useKingdomStore((state) => state.statusOptions);
-  const classOptions = useKingdomStore((state) => state.classOptions);
-  const subClassOptions = useKingdomStore((state) => state.subClassOptions);
-  const entityOptions = useKingdomStore((state) => state.entityOptions);
-  const categoryOptions = useKingdomStore((state) => state.categoryOptions);
-  const entityMappings = useKingdomStore((state) => state.entityMappings);
+  const flatMatrix = useKingdomStore((state) => state.flatMatrix) || [];
+  
+  const getTypes = useKingdomStore((state) => state.getTypes);
+  const getSubtypesByType = useKingdomStore((state) => state.getSubtypesByType);
+  const getCategoriesBySubtype = useKingdomStore((state) => state.getCategoriesBySubtype);
+  const getEntitiesByCategory = useKingdomStore((state) => state.getEntitiesByCategory);
+  const getAccountCode = useKingdomStore((state) => state.getAccountCode);
 
   const addOption = useKingdomStore((state) => state.addOption);
   const editOption = useKingdomStore((state) => state.editOption);
@@ -50,51 +50,60 @@ export function useQuickActionForm() {
   const [selectedQaNames, setSelectedQaNames] = useState([]);
   const [selectedQaTemplateName, setSelectedQaTemplateName] = useState('');
 
-  // Sync selectors defaults when store changes
-  useEffect(() => {
-    if (qaFrom !== '' && fromOptions && !fromOptions.includes(qaFrom)) {
-      setQaFrom(fromOptions[0] || '');
-    }
-  }, [fromOptions, qaFrom]);
+  // Fallback metadata defaults
+  const fromOptions = useMemo(() => ['Pedro', 'Reni', 'Kingdom Treasury'], []);
+  const statusOptions = useMemo(() => ['Pending', 'Completed', 'Cancelled'], []);
 
-  useEffect(() => {
-    if (qaStatus !== '' && statusOptions && !statusOptions.includes(qaStatus)) {
-      setQaStatus(statusOptions[0] || '');
-    }
-  }, [statusOptions, qaStatus]);
+  // Compute clean types array from the Flat Matrix
+  const classOptions = useMemo(() => {
+    const types = getTypes ? getTypes() : [];
+    return types.length > 0 ? types : ['Assets', 'Liabilities', 'Income', 'Expense'];
+  }, [getTypes, flatMatrix]);
 
-  useEffect(() => {
-    if (qaClass !== '' && classOptions && !classOptions.includes(qaClass)) {
-      setQaClass(classOptions[0] || '');
-    }
-  }, [classOptions, qaClass]);
+  // Handle Explicit Cascading resets directly inside setters
+  const handleSetQaClass = (val) => {
+    setQaClass(val);
+    setQaSubClass('');
+    setQaCategory('');
+    setQaEntity('');
+    setQaTargetAccount('');
+  };
 
-  useEffect(() => {
-    if (qaSubClass !== '' && subClassOptions && !subClassOptions.includes(qaSubClass)) {
-      setQaSubClass(subClassOptions[0] || '');
-    }
-  }, [subClassOptions, qaSubClass]);
+  const handleSetQaSubClass = (val) => {
+    setQaSubClass(val);
+    setQaCategory('');
+    setQaEntity('');
+    setQaTargetAccount('');
+  };
 
-  useEffect(() => {
-    if (qaEntity !== '' && entityOptions && !entityOptions.includes(qaEntity)) {
-      setQaEntity(entityOptions[0] || '');
-    }
-  }, [entityOptions, qaEntity]);
+  const handleSetQaCategory = (val) => {
+    setQaCategory(val);
+    setQaEntity('');
+    setQaTargetAccount('');
+  };
 
-  useEffect(() => {
-    if (qaCategory !== '' && categoryOptions && !categoryOptions.includes(qaCategory)) {
-      setQaCategory(categoryOptions[0] || '');
+  const handleQaEntityChange = (entityVal) => {
+    setQaEntity(entityVal);
+    if (qaClass && qaSubClass && qaCategory && entityVal) {
+      const code = getAccountCode(qaClass, qaSubClass, qaCategory, entityVal);
+      if (code) {
+        setQaTargetAccount(code);
+      } else {
+        setQaTargetAccount('');
+      }
+    } else {
+      setQaTargetAccount('');
     }
-  }, [categoryOptions, qaCategory]);
+  };
 
-  // Set default Pedro if email is divagarpelamente@gmail.com
+  // Enforce defaults based on the active user identity
   useEffect(() => {
     if (email === 'divagarpelamente@gmail.com') {
       setQaFrom('Pedro');
     }
   }, [email]);
 
-  const rawTemplates = useKingdomStore((state) => state.templates);
+  const rawTemplates = useKingdomStore((state) => state.templates) || [];
   const templates = useMemo(() => {
     if (email === 'divagarpelamente@gmail.com') {
       return rawTemplates.map(tpl => ({
@@ -108,14 +117,6 @@ export function useQuickActionForm() {
     return rawTemplates;
   }, [rawTemplates, email]);
 
-  const handleQaEntityChange = (entityVal) => {
-    setQaEntity(entityVal);
-    const mapped = entityMappings[entityVal];
-    if (mapped) {
-      setQaCategory(mapped);
-    }
-  };
-
   const resetQaForm = () => {
     setQaName('');
     setQaDescription('');
@@ -123,7 +124,7 @@ export function useQuickActionForm() {
     setQaDueDate('');
     setQaValueDate('');
     setQaPostingDate('');
-    setQaFrom('');
+    setQaFrom(email === 'divagarpelamente@gmail.com' ? 'Pedro' : '');
     setQaClass('');
     setQaStatus('');
     setQaSubClass('');
@@ -141,6 +142,17 @@ export function useQuickActionForm() {
       toast.error(t.err_enter_value || "Escolha um nome.");
       return;
     }
+
+    const accountCodeRegex = /^\d{8}$/;
+    if (qaTargetAccount && !accountCodeRegex.test(qaTargetAccount)) {
+      toast.error("Erro de Validação: Código de Destino (Target Account) deve ter 8 dígitos.");
+      return;
+    }
+    if (qaSourceDestBank && !accountCodeRegex.test(qaSourceDestBank)) {
+      toast.error("Erro de Validação: Código de Origem (Source Account) deve ter 8 dígitos.");
+      return;
+    }
+
     const newTemplateData = {
       icon: qaIcon || '⚡',
       data: {
@@ -150,7 +162,7 @@ export function useQuickActionForm() {
         entity: qaEntity,
         transaction_category: qaCategory,
         target_account: qaTargetAccount,
-        source_dest_bank: qaSourceDestBank,
+        source_dest_bank: qaSourceDestBank || '11010001',
         flow: qaFlow,
         payment_status: qaStatus,
         description: qaDescription || `${qaName} action`,
@@ -190,6 +202,16 @@ export function useQuickActionForm() {
       return;
     }
 
+    const accountCodeRegex = /^\d{8}$/;
+    if (qaTargetAccount && !accountCodeRegex.test(qaTargetAccount)) {
+      toast.error("Erro de Validação: Código de Destino (Target Account) deve ter 8 dígitos.");
+      return;
+    }
+    if (qaSourceDestBank && !accountCodeRegex.test(qaSourceDestBank)) {
+      toast.error("Erro de Validação: Código de Origem (Source Account) deve ter 8 dígitos.");
+      return;
+    }
+
     const newTemplateData = {
       icon: qaIcon || '⚡',
       data: {
@@ -199,7 +221,7 @@ export function useQuickActionForm() {
         entity: qaEntity,
         transaction_category: qaCategory,
         target_account: qaTargetAccount,
-        source_dest_bank: qaSourceDestBank,
+        source_dest_bank: qaSourceDestBank || '11010001',
         flow: qaFlow,
         payment_status: qaStatus,
         description: qaDescription || `${qaName} action`,
@@ -223,14 +245,21 @@ export function useQuickActionForm() {
         setQaName(tpl.name);
         setQaIcon(tpl.icon || '⚡');
         setQaFrom(tpl.data.from);
-        setQaClass(tpl.data.transaction_type);
-        setQaSubClass(tpl.data.transaction_subtype);
-        setQaEntity(tpl.data.entity);
-        setQaCategory(tpl.data.transaction_category);
-        setQaTargetAccount(tpl.data.target_account);
-        setQaSourceDestBank(tpl.data.source_dest_bank);
-        setQaFlow(tpl.data.flow);
-        setQaStatus(tpl.data.payment_status);
+        setQaClass(tpl.data.transaction_type || '');
+        setQaSubClass(tpl.data.transaction_subtype || '');
+        setQaEntity(tpl.data.entity || '');
+        setQaCategory(tpl.data.transaction_category || '');
+
+        const resolvedCode = getAccountCode(
+          tpl.data.transaction_type,
+          tpl.data.transaction_subtype,
+          tpl.data.transaction_category,
+          tpl.data.entity
+        );
+        setQaTargetAccount(resolvedCode || tpl.data.target_account || '');
+        setQaSourceDestBank(tpl.data.source_dest_bank || '11010001');
+        setQaFlow(tpl.data.flow || '');
+        setQaStatus(tpl.data.payment_status || '');
         setQaDescription(tpl.data.description || '');
         setQaAmount(tpl.data.amount || '');
         setQaDueDate(tpl.data.due_date || '');
@@ -249,11 +278,11 @@ export function useQuickActionForm() {
     qaIcon, setQaIcon,
     qaAmount, setQaAmount,
     qaFrom, setQaFrom,
-    qaClass, setQaClass,
+    qaClass, setQaClass: handleSetQaClass,
     qaStatus, setQaStatus,
-    qaSubClass, setQaSubClass,
+    qaSubClass, setQaSubClass: handleSetQaSubClass,
     qaEntity, setQaEntity,
-    qaCategory, setQaCategory,
+    qaCategory, setQaCategory: handleSetQaCategory,
     qaTargetAccount, setQaTargetAccount,
     qaSourceDestBank, setQaSourceDestBank,
     qaFlow, setQaFlow,

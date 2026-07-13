@@ -1,130 +1,72 @@
 import React from 'react';
 import Modal from '../common/Modal';
-import { STANDARD_MODAL_PROPS } from '../../constants/UI_UX';
 import QuickActionFormFields from './QuickActionFormFields';
 
-const EditQuickActionModal = ({
+export default function EditQuickActionModal({
   isOpen,
   onClose,
   onSave,
-  qaName,
-  setQaName,
-  qaIcon,
-  setQaIcon,
-  qaClass,
-  setQaClass,
-  qaSubClass,
-  setQaSubClass,
-  qaFlow,
-  setQaFlow,
-  qaStatus,
-  setQaStatus,
-  qaFrom,
-  setQaFrom,
-  qaCategory,
-  setQaCategory,
-  qaEntity,
-  setQaEntity,
-  qaAmount,
-  setQaAmount,
-  qaValueDate,
-  setQaValueDate,
-  qaDueDate,
-  setQaDueDate,
-  qaPostingDate,
-  setQaPostingDate,
-  qaDescription,
-  setQaDescription,
-  qaSourceDestBank,
-  setQaSourceDestBank,
-  qaTargetAccount,
-  setQaTargetAccount,
+  qaName, setQaName,
+  qaIcon, setQaIcon,
+  qaClass, setQaClass,
+  qaSubClass, setQaSubClass,
+  qaFlow, setQaFlow,
+  qaStatus, setQaStatus,
+  qaFrom, setQaFrom,
+  qaCategory, setQaCategory,
+  qaEntity, setQaEntity,
+  qaAmount, setQaAmount,
+  qaValueDate, setQaValueDate,
+  qaDueDate, setQaDueDate,
+  qaPostingDate, setQaPostingDate,
+  qaDescription, setQaDescription,
+  qaSourceDestBank, setQaSourceDestBank,
+  qaTargetAccount, setQaTargetAccount,
   classOptions = [],
   subClassOptions = [],
   statusOptions = [],
   fromOptions = [],
   categoryOptions = [],
-  entityOptions = [],
-  entityMappings = {},
-  accountMappings = {}
-}) => {
+  entityOptions = []
+}) {
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Edit Quick Action Settings"
-      {...STANDARD_MODAL_PROPS}
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSave();
-        }}
-        className="space-y-1.5 p-1 pr-1 h-full overflow-y-auto custom-scrollbar-subtle"
-      >
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Quick Action" size="max-w-4xl">
+      <div className="bg-[#faf4e5] border-2 border-[#8b4513]/30 rounded-xl p-4 shadow-inner max-h-[80vh] overflow-y-auto custom-scrollbar-subtle">
         <QuickActionFormFields
-          qaName={qaName}
-          setQaName={setQaName}
-          qaIcon={qaIcon}
-          setQaIcon={setQaIcon}
-          qaType={qaClass}
-          setQaType={setQaClass}
-          qaSubType={qaSubClass}
-          setQaSubType={setQaSubClass}
-          qaFlow={qaFlow}
-          setQaFlow={setQaFlow}
-          qaStatus={qaStatus}
-          setQaStatus={setQaStatus}
-          qaFrom={qaFrom}
-          setQaFrom={setQaFrom}
-          qaCategory={qaCategory}
-          setQaCategory={setQaCategory}
-          qaEntity={qaEntity}
-          setQaEntity={setQaEntity}
-          qaAmount={qaAmount}
-          setQaAmount={setQaAmount}
-          qaValueDate={qaValueDate}
-          setQaValueDate={setQaValueDate}
-          qaDueDate={qaDueDate}
-          setQaDueDate={setQaDueDate}
-          qaPostingDate={qaPostingDate}
-          setQaPostingDate={setQaPostingDate}
-          qaDescription={qaDescription}
-          setQaDescription={setQaDescription}
-          qaSourceDestBank={qaSourceDestBank}
-          setQaSourceDestBank={setQaSourceDestBank}
-          qaTargetAccount={qaTargetAccount}
-          setQaTargetAccount={setQaTargetAccount}
-          classOptions={classOptions}
-          subTypeOptions={subClassOptions}
+          qaName={qaName} setQaName={setQaName}
+          qaIcon={qaIcon} setQaIcon={setQaIcon}
+          qaClass={qaClass} setQaClass={setQaClass}
+          qaSubClass={qaSubClass} setQaSubClass={setQaSubClass}
+          qaFlow={qaFlow} setQaFlow={setQaFlow}
+          qaStatus={qaStatus} setQaStatus={setQaStatus}
+          qaFrom={qaFrom} setQaFrom={setQaFrom}
+          qaCategory={qaCategory} setQaCategory={setQaCategory}
+          qaEntity={qaEntity} setQaEntity={setQaEntity}
+          qaAmount={qaAmount} setQaAmount={setQaAmount}
+          qaValueDate={qaValueDate} setQaValueDate={setQaValueDate}
+          qaDueDate={qaDueDate} setQaDueDate={setQaDueDate}
+          qaPostingDate={qaPostingDate} setQaPostingDate={setQaPostingDate}
+          qaDescription={qaDescription} setQaDescription={setQaDescription}
+          qaSourceDestBank={qaSourceDestBank} setQaSourceDestBank={setQaSourceDestBank}
+          qaTargetAccount={qaTargetAccount} setQaTargetAccount={setQaTargetAccount}
           statusOptions={statusOptions}
           fromOptions={fromOptions}
-          categoryOptions={categoryOptions}
-          entityOptions={entityOptions}
-          entityMappings={entityMappings}
-          accountMappings={accountMappings}
-          isCompact={true}
         />
-
-        {/* Save Buttons */}
-        <div className="flex justify-end gap-2 pt-3 border-t border-[#8b4513]/10">
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#8b4513]/20">
           <button
-            type="button"
             onClick={onClose}
-            className="px-3.5 h-[32px] bg-[#faf4e5] border border-[#8b4513]/40 text-[#4b2c20] font-black text-[9px] uppercase tracking-wider rounded-lg hover:bg-[#8b4513]/10 cursor-pointer"
+            className="px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider text-stone-600 bg-stone-200 hover:bg-stone-300 transition-colors"
           >
             Cancel
           </button>
           <button
-            type="submit"
-            className="px-3.5 h-[32px] bg-[#8b4513] text-white font-black text-[9px] uppercase tracking-wider rounded-lg hover:scale-[1.02] cursor-pointer"
+            onClick={onSave}
+            className="px-6 py-2 rounded-lg text-xs font-black uppercase tracking-wider text-[#ffd700] bg-[#8b4513] hover:bg-[#a0522d] border border-[#d4af37]/40 shadow transition-transform active:scale-95"
           >
             Save Changes
           </button>
         </div>
-      </form>
+      </div>
     </Modal>
   );
-};
-
-export default EditQuickActionModal;
+}

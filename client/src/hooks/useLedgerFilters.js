@@ -5,8 +5,6 @@ import { useKingdomStore } from '../store/useKingdomStore';
 export function useLedgerFilters() {
   const transactions = useKingdomStore((state) => state.transactions);
 
-  const entityMappings = useKingdomStore((state) => state.entityMappings);
-
   // Transactions Page Filters state
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
   const [filterYear, setFilterYear] = useState('All');
@@ -112,7 +110,7 @@ export function useLedgerFilters() {
     if (filterFrom !== 'All' && tx.from !== filterFrom) return false;
     if (filterStatus !== 'All' && tx.payment_status !== filterStatus) return false;
     if (filterClass !== 'All' && tx.transaction_type !== filterClass) return false;
-    if (filterCategory !== 'All' && (tx.transaction_category || entityMappings[tx.entity]) !== filterCategory) return false;
+    if (filterCategory !== 'All' && tx.transaction_category !== filterCategory) return false;
     if (filterEntity !== 'All' && tx.entity !== filterEntity) return false;
     return true;
   }).sort((a, b) => {

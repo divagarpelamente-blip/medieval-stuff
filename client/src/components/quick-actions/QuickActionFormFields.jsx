@@ -1,357 +1,139 @@
-// =====================================================================
-// 🛑 AI AGENT DIRECTIVE: DO NOT MODIFY THIS FILE
-// This component's 7-row grid layout is fully modularized and strictly final.
-// Antigravity: Treat this file as strictly READ-ONLY.
-// @antigravity-ignore
-// =====================================================================
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useKingdomStore } from '../../store/useKingdomStore';
 
-const QuickActionFormFields = ({
-  qaName,
-  setQaName,
-  qaIcon,
-  setQaIcon,
-  qaType,
-  setQaType,
-  qaSubType,
-  setQaSubType,
-  qaFlow,
-  setQaFlow,
-  qaStatus,
-  setQaStatus,
-  qaFrom,
-  setQaFrom,
-  qaCategory,
-  setQaCategory,
-  qaEntity,
-  setQaEntity,
-  qaAmount,
-  setQaAmount,
-  qaValueDate,
-  setQaValueDate,
-  qaDueDate,
-  setQaDueDate,
-  qaPostingDate,
-  setQaPostingDate,
-  qaDescription,
-  setQaDescription,
-  qaSourceDestBank,
-  setQaSourceDestBank,
-  qaTargetAccount,
-  setQaTargetAccount,
-  classOptions = [],
-  subTypeOptions = [],
+export default function QuickActionFormFields({
+  t,
+  qaName, setQaName,
+  qaIcon, setQaIcon,
+  qaClass, setQaClass,
+  qaSubClass, setQaSubClass,
+  qaFlow, setQaFlow,
+  qaStatus, setQaStatus,
+  qaFrom, setQaFrom,
+  qaCategory, setQaCategory,
+  qaEntity, setQaEntity,
+  qaAmount, setQaAmount,
+  qaValueDate, setQaValueDate,
+  qaDueDate, setQaDueDate,
+  qaPostingDate, setQaPostingDate,
+  qaDescription, setQaDescription,
+  qaSourceDestBank, setQaSourceDestBank,
+  qaTargetAccount, setQaTargetAccount,
   statusOptions = [],
-  fromOptions = [],
-  categoryOptions = [],
-  entityOptions = [],
-  entityMappings = {},
-  accountMappings = {},
-  isCompact = false
-}) => {
-  const subtypeToCategoryMap = useKingdomStore((state) => state.subtypeToCategoryMap) || {
-    "Banks": ["Bank account", "Saving account"],
-    "Investments": ["Investment account"],
-    "Personal Debt": ["Loans", "Burrow", "Credit Cards"],
-    "Other Debts": ["Other Debts"],
-    "Living & Household": ["Household Décor", "Household Utensils", "Rent"],
-    "Utilities": ["Electricity (house)", "Water (house)", "Gas (house)", "Comunications (house)"],
-    "Personal Transports": ["Vehicle Gasoline", "Vehicle Repair & Maintenance", "Parking", "Tolls", "Vehicle Fines", "Vehicle Bills"],
-    "Public Transports": ["Public Transports"],
-    "Payroll": ["Salary", "Bonus", "Vacation subsidy", "Christmas subsidy", "Teaching classes", "Freelancer", "Consultancy", "Other Incomes"],
-    "Education": ["PhD", "Trainings"],
-    "Entertainment": ["Restaurants", "Nightlife & Disco", "Cinema", "Gaming"],
-    "Food & Consumables": ["Food", "Drinks", "Supermarket (Other)"],
-    "Tools & Materials": ["Tools", "Other materials"],
-    "Clothing & Shoes": ["Clothing", "Shoes"],
-    "Health": ["Psicology session", "Psichiatry session", "Hospital", "Doctor session & Medical Exams", "Dentist", "Pharmacy"],
-    "Insurances": ["Insurances"],
-    "Taxes & State": ["General Taxes", "Tax Fines", "IRS payment", "IRS refund"],
-    "Markets & Personal care": [],
-    "Other Consumables": []
-  };
+  fromOptions = []
+}) {
+  
+  // Pull live Matrix Helpers from Store
+  const getTypes = useKingdomStore(state => state.getTypes);
+  const getSubtypesByType = useKingdomStore(state => state.getSubtypesByType);
+  const getCategoriesBySubtype = useKingdomStore(state => state.getCategoriesBySubtype);
+  const getEntitiesByCategory = useKingdomStore(state => state.getEntitiesByCategory);
+  const getAccountCode = useKingdomStore(state => state.getAccountCode);
 
-  const defaultSubtypeToCategoryMap = {
-    "Banks": ["Bank account", "Savings account", "Investments account"],
-    "Fixed Assets": ["Fixed Assets"],
-    "Personal Debt": ["Loans & Burrow", "Credit Cards"],
-    "Other Debts": ["Other Debts"],
-    "Living & Household": ["Household", "Utilities"],
-    "Personal Transports": ["Gasoline", "Tolls", "Parking", "Repairs"],
-    "Public Transports": ["Public Transports"],
-    "Other Transports": ["Other Transports"],
-    "Markets & Consumables": ["Markets & Groceries", "Markets and Tools", "Markets and Clothing", "Other Market consumables"],
-    "Health": ["Health"],
-    "Entertainment": ["Entertainment"],
-    "Education": ["Education"],
-    "Insurances": ["Insurances"],
-    "Taxes & State": ["Taxes", "Interest"],
-    "Financial Expenses": ["Interest paid", "Fines", "Loans & Burrow", "Credit Cards"],
-    "Payroll": ["Salary", "Payroll Subsidies"],
-    "Other Income": ["Other Incomes"],
-    "Financial Income": ["Fines", "Loans & Burrow", "Credit Cards"]
-  };
+  const types = getTypes() || ['Assets', 'Liabilities', 'Income', 'Expense'];
+  const allowedSubtypes = useMemo(() => qaClass ? getSubtypesByType(qaClass) : [], [qaClass, getSubtypesByType]);
+  const allowedCategories = useMemo(() => qaSubClass ? getCategoriesBySubtype(qaSubClass) : [], [qaSubClass, getCategoriesBySubtype]);
+  const allowedEntities = useMemo(() => qaCategory ? getEntitiesByCategory(qaCategory) : [], [qaCategory, getEntitiesByCategory]);
 
-  let filteredCategories = categoryOptions;
-  if (qaSubType) {
-    const allowedCategories = Array.from(new Set([
-      ...(subtypeToCategoryMap[qaSubType] || []),
-      ...(defaultSubtypeToCategoryMap[qaSubType] || [])
-    ]));
-    filteredCategories = categoryOptions.filter(opt => allowedCategories.includes(opt));
-  }
-
-  const coaMappings = [];
-  Object.entries(accountMappings || {}).forEach(([code, fullName]) => {
-    let remaining = fullName;
-    if (remaining.startsWith(code)) {
-      remaining = remaining.substring(code.length).replace(/^\s*-\s*/, '');
+  const handleChange = (field, value) => {
+    if (field === 'qaClass') {
+      setQaClass(value); setQaSubClass(''); setQaCategory(''); setQaEntity(''); setQaTargetAccount('');
+    } else if (field === 'qaSubClass') {
+      setQaSubClass(value); setQaCategory(''); setQaEntity(''); setQaTargetAccount('');
+    } else if (field === 'qaCategory') {
+      setQaCategory(value); setQaEntity(''); setQaTargetAccount('');
+    } else if (field === 'qaEntity') {
+      setQaEntity(value);
+      const code = getAccountCode(qaClass, qaSubClass, qaCategory, value);
+      setQaTargetAccount(code || '');
     }
-    const parts = remaining.split(/\s*-\s*/);
-    const category = parts[0] || '';
-    const entity = parts.slice(1).join(' - ') || '';
-    if (category && entity) {
-      coaMappings.push({ category, entity });
-    }
-  });
-
-  let filteredEntities = entityOptions;
-  if (qaCategory) {
-    filteredEntities = entityOptions.filter(opt => 
-      entityMappings[opt] === qaCategory ||
-      coaMappings.some(m => m.category === qaCategory && m.entity === opt)
-    );
-  } else if (qaSubType) {
-    const allowedCategories = subtypeToCategoryMap[qaSubType] || [];
-    filteredEntities = entityOptions.filter(opt => 
-      allowedCategories.includes(entityMappings[opt]) ||
-      coaMappings.some(m => allowedCategories.includes(m.category) && m.entity === opt)
-    );
-  }
-
-  const rowSpacing = isCompact ? "space-y-1.5" : "space-y-2";
-  const gridGap = isCompact ? "gap-1.5" : "gap-2";
-  const labelMargin = "mb-0.5";
-  const inputHeight = isCompact ? "h-[26px]" : "h-[30px]";
-  const fontSize = "text-[10px]";
+  };
 
   return (
-    <div className={`${rowSpacing} text-[#4b2c20]`}>
-      {/* Row 1: Name */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Name</label>
-          <input
-            type="text"
-            value={qaName}
-            onChange={(e) => setQaName(e.target.value)}
-            placeholder="e.g. Purchase Wood"
-            required
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
-          />
+    <div className="space-y-4">
+      {/* Name and Icon */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="col-span-3">
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Template Name</label>
+          <input type="text" value={qaName} onChange={(e) => setQaName(e.target.value)} required placeholder="e.g. Pay Rent" className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-3 text-xs font-bold text-[#4b2c20]" />
+        </div>
+        <div className="col-span-1">
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Icon</label>
+          <input type="text" value={qaIcon} onChange={(e) => setQaIcon(e.target.value)} maxLength={2} placeholder="⚡" className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-3 text-center text-lg" />
         </div>
       </div>
 
-      {/* Row 2: Type / Subtype / Flow / Status */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Type</label>
-          <select
-            value={qaType}
-            onChange={(e) => setQaType(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50`}
-          >
-            <option value="">-- Choose Type --</option>
-            {classOptions.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
+      {/* Flat Matrix Omni-directional Dropdowns */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Type</label>
+          <select value={qaClass} onChange={(e) => handleChange('qaClass', e.target.value)} className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-2 text-xs font-bold text-[#4b2c20]">
+            <option value="" disabled>Select Type...</option>
+            {types.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Subtype</label>
-          <select
-            value={qaSubType}
-            onChange={(e) => setQaSubType(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50`}
-          >
-            <option value="">-- Choose Subtype --</option>
-            {subTypeOptions.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Subtype</label>
+          <select value={qaSubClass} onChange={(e) => handleChange('qaSubClass', e.target.value)} disabled={!qaClass} className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-2 text-xs font-bold text-[#4b2c20] disabled:opacity-50">
+            <option value="" disabled>Select Subtype...</option>
+            {allowedSubtypes.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Flow</label>
-          <select
-            value={qaFlow}
-            onChange={(e) => setQaFlow(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none`}
-          >
-            <option value="">-- Choose Flow --</option>
-            <option value="inflow">Inflow</option>
-            <option value="outflow">Outflow</option>
-            <option value="neutral">Neutral</option>
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Category</label>
+          <select value={qaCategory} onChange={(e) => handleChange('qaCategory', e.target.value)} disabled={!qaSubClass} className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-2 text-xs font-bold text-[#4b2c20] disabled:opacity-50">
+            <option value="" disabled>Select Category...</option>
+            {allowedCategories.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Status</label>
-          <select
-            value={qaStatus}
-            onChange={(e) => setQaStatus(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none`}
-          >
-            <option value="">-- Choose Status --</option>
-            {statusOptions.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Entity</label>
+          <select value={qaEntity} onChange={(e) => handleChange('qaEntity', e.target.value)} disabled={!qaCategory} className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-2 text-xs font-bold text-[#4b2c20] disabled:opacity-50">
+            <option value="" disabled>Select Entity...</option>
+            {allowedEntities.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Row 3: Origin/From / Category / Entity / Amount */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Origin/From</label>
-          <select
-            value={qaFrom}
-            onChange={(e) => setQaFrom(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none`}
-          >
-            <option value="">-- Choose Origin/From --</option>
-            {fromOptions.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Category</label>
-          <select
-            value={qaCategory}
-            onChange={(e) => setQaCategory(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50`}
-          >
-            <option value="">-- Choose Category --</option>
-            {filteredCategories.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Entity</label>
-          <select
-            value={qaEntity}
-            onChange={(e) => setQaEntity(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-sans`}
-          >
-            <option value="">-- Choose Entity --</option>
-            {Object.entries(
-              filteredEntities.reduce((acc, opt) => {
-                const cat = entityMappings[opt] || 'Uncategorized';
-                if (!acc[cat]) acc[cat] = [];
-                acc[cat].push(opt);
-                return acc;
-              }, {})
-            ).map(([cat, opts]) => (
-              <optgroup key={cat} label={cat} className="font-bold text-[#8b4513]">
-                {opts.map((opt) => (
-                  <option key={opt} value={opt} className="font-normal text-[#4b2c20]">{opt}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Amount</label>
-          <input
-            type="number" value={qaAmount} onChange={(e) => setQaAmount(e.target.value)} placeholder="Amount" min="0.01" step="0.01"
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50 font-mono`}
-          />
-        </div>
+      <div className="grid grid-cols-2 gap-4 bg-stone-100 p-3 rounded-lg">
+         <div className="col-span-2">
+            <label className="block text-[10px] font-black uppercase tracking-wider text-stone-600 mb-1">Target Account (Resolved via Matrix)</label>
+            <input type="text" readOnly value={qaTargetAccount} className="w-full bg-stone-200 border-none rounded-md h-[30px] px-2 text-xs font-mono font-bold text-stone-600 cursor-not-allowed"/>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Source Account</label>
+            <input type="text" value={qaSourceDestBank} onChange={(e) => setQaSourceDestBank(e.target.value)} className="w-full bg-white border border-stone-300 rounded-md h-[30px] px-2 text-xs font-mono font-bold text-stone-700"/>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Flow Direction</label>
+            <select value={qaFlow} onChange={(e) => setQaFlow(e.target.value)} className="w-full bg-white border border-stone-300 rounded-md h-[30px] px-2 text-xs font-bold text-stone-700">
+              <option value="outflow">Outflow</option>
+              <option value="inflow">Inflow</option>
+              <option value="neutral">Neutral</option>
+            </select>
+          </div>
       </div>
 
-      {/* Row 4: Value date / Due date / Posting date */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Value Date</label>
-          <input
-            type="date"
-            value={qaValueDate}
-            onChange={(e) => setQaValueDate(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
-          />
+      {/* Legacy overrides and optional fields */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Amount (Override)</label>
+          <input type="number" step="0.01" value={qaAmount} onChange={(e) => setQaAmount(e.target.value)} placeholder="0.00" className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-3 text-xs font-bold text-[#4b2c20]" />
         </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Due Date</label>
-          <input
-            type="date"
-            value={qaDueDate}
-            onChange={(e) => setQaDueDate(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
-          />
-        </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Posting Date</label>
-          <input
-            type="date"
-            value={qaPostingDate}
-            onChange={(e) => setQaPostingDate(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
-          />
-        </div>
-      </div>
-
-      {/* Row 5: Description */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-6">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Description</label>
-          <input
-            type="text"
-            value={qaDescription}
-            onChange={(e) => setQaDescription(e.target.value)}
-            placeholder="e.g. Custom action"
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-2.5 ${fontSize} font-bold placeholder-[#5d4037]/45 focus:outline-none focus:border-[#8b4513]/50`}
-          />
-        </div>
-      </div>
-
-      {/* Row 6: Source Account */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-6">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Source Account</label>
-          <select
-            value={qaSourceDestBank}
-            onChange={(e) => setQaSourceDestBank(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
-          >
-            <option value="">-- Choose Source Account --</option>
-            {Object.entries(accountMappings)
-              .map(([code, name]) => (
-                <option key={code} value={code}>{code} - {name}</option>
-              ))
-            }
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Status</label>
+          <select value={qaStatus} onChange={(e) => setQaStatus(e.target.value)} className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-2 text-xs font-bold text-[#4b2c20]">
+            <option value="" disabled>Select...</option>
+            {statusOptions.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
       </div>
-
-      {/* Row 7: Target Account */}
-      <div className={`grid grid-cols-12 ${gridGap} items-end`}>
-        <div className="col-span-12 sm:col-span-6">
-          <label className={`block text-[9px] font-black uppercase tracking-wider text-[#5d4037]/80 ${labelMargin} font-sans`}>Target Account</label>
-          <select
-            value={qaTargetAccount}
-            onChange={(e) => setQaTargetAccount(e.target.value)}
-            className={`w-full bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-lg ${inputHeight} px-1.5 ${fontSize} font-bold focus:outline-none focus:border-[#8b4513]/50 font-mono`}
-          >
-            <option value="">-- Choose Target Account --</option>
-            {Object.entries(accountMappings).map(([code, name]) => (
-              <option key={code} value={code}>{code} - {name}</option>
-            ))}
-          </select>
-        </div>
+      
+      <div>
+        <label className="block text-[10px] font-black uppercase tracking-wider text-[#5d4037]/80 mb-1">Description Template</label>
+        <input type="text" value={qaDescription} onChange={(e) => setQaDescription(e.target.value)} placeholder="Template notes..." className="w-full bg-white border border-stone-300 rounded-md h-[38px] px-3 text-xs font-bold text-[#4b2c20]" />
       </div>
+
     </div>
   );
-};
-
-export default QuickActionFormFields;
+}

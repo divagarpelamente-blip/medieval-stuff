@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { toast } from "react-hot-toast";
 import { useKingdomStore } from "../../store/useKingdomStore";
 import {
@@ -9,31 +9,19 @@ import {
   AlertCircle,
   FileText,
   Zap,
-  Code,
-  DollarSign,
-  ArrowRight,
-  TrendingUp,
-  Cpu,
   Bookmark,
   Search,
   Plus,
   Trash2,
   Edit2,
-  Copy,
   RefreshCw,
   X,
   Globe,
   Database,
-  Scale,
-  Check,
   ChevronDown,
   Info,
-  ArrowDown,
-  ArrowUp,
-  Calendar,
   Save,
-  Upload,
-  Download
+  ArrowRight
 } from "lucide-react";
 
 // ============================================================================
@@ -137,1345 +125,906 @@ const Combobox = ({
 };
 
 // ============================================================================
-// MAIN SETTINGS MODAL
+// MAIN SETTINGS MODAL COMPONENT
+// Composed strictly under the Version 2.0 Flat Matrix & 8-Digit COA Paradigm
 // ============================================================================
-export default function SettingsModal({
-  isOpen,
-  onClose,
-  t,
-  accountMappings,
-  subtypeToCategoryMap,
-  subtypeTypes,
-  syncSettings,
-  subClassOptions,
-  categoryOptions,
-  entityOptions,
-  entityMappings,
-  getMatrixRows,
-  settingsFileInputRef,
-  importSettingsCSV,
-  exportSettingsCSV,
-  fromOptions,
-  statusOptions,
-  classOptions,
-  templates,
-  selectedQaNames,
-  setSelectedQaNames,
-  setSelectedQaTemplateName,
-  setQaName,
-  setQaIcon,
-  setQaFrom,
-  setQaClass,
-  setQaSubClass,
-  setQaEntity,
-  setQaCategory,
-  setQaTargetAccount,
-  setQaSourceDestBank,
-  setQaFlow,
-  setQaStatus,
-  setQaDescription,
-  setQaAmount,
-  setQaDueDate,
-  setQaValueDate,
-  setQaPostingDate,
-  setIsEditingQa,
-  handleDeleteQuickAction,
-  qaFileInputRef,
-  importQuickActionsCSV,
-  handleExportAllActionsCSV,
-  qaName,
-  qaIcon,
-  qaFrom,
-  qaClass,
-  qaSubClass,
-  qaEntity,
-  qaCategory,
-  qaTargetAccount,
-  qaSourceDestBank,
-  qaFlow,
-  qaStatus,
-  qaDescription,
-  qaAmount,
-  qaDueDate,
-  qaValueDate,
-  qaPostingDate,
-  addOption,
-  editOption,
-  deleteOption,
-  handleSaveQuickAction
-}) {
-  // --- STATE FOR ACTIVE DROPDOWNS ---
-  const [activeDropdownId, setActiveDropdownId] = useState(null);
-
-  // --- NAVIGATION STATE (ALIGNED TO SANDBOX TABS) ---
-  const [activePrimaryTab, setActivePrimaryTab] = useState("coa");
-  const [activeSecondaryTab, setActiveSecondaryTab] = useState("from");
-
-  // --- SCROLL MANAGEMENT ---
-  const scrollContainerRef = useRef(null);
-  const [isAtBottom, setIsAtBottom] = useState(false);
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
-
-  // --- LOCAL COMBINED FORM FIELD STATES ---
-  const [coaType, setCoaType] = useState("Assets");
-  const [coaSubtype, setCoaSubtype] = useState("Banks");
-  const [coaCategory, setCoaCategory] = useState("Bank account");
-  const [coaEntity, setCoaEntity] = useState("CGD");
-  const [coaCode, setCoaCode] = useState("10101010");
-  const [coaNameInput, setCoaNameInput] = useState("");
-
-  const [matrixType, setMatrixType] = useState("Assets");
-  const [matrixSubtype, setMatrixSubtype] = useState("Banks");
-  const [matrixCategory, setMatrixCategory] = useState("Bank account");
-  const [matrixEntity, setMatrixEntity] = useState("CGD");
-
-  const [moreOrigin, setMoreOrigin] = useState("Pedro");
-  const [moreStatus, setMoreStatus] = useState("Completed");
-
-  // Zustand bindings for Live Balance updates
-  const accountBalances = useKingdomStore((state) => state.accountBalances);
-  const updateAccountBalance = useKingdomStore((state) => state.updateAccountBalance);
-  const user = useKingdomStore((state) => state.user);
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    const handleOutsideClick = () => setActiveDropdownId(null);
-    window.addEventListener("click", handleOutsideClick);
-    return () => window.removeEventListener("click", handleOutsideClick);
-  }, []);
-
-  // Monitor Scroll Position
-  const handleScroll = () => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const { scrollTop, scrollHeight, clientHeight } = el;
-    setShowScrollBtn(scrollHeight > clientHeight + 40);
-    setIsAtBottom(scrollHeight - scrollTop - clientHeight < 40);
-  };
-
-  const handleScrollAction = () => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    if (isAtBottom) {
-      el.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleScroll();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [activePrimaryTab, activeSecondaryTab]);
-
+const SettingsModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
-  // --- PROCESS COA ROWS FROM ZUSTAND STRUCTURES ---
-  const parsedCoaData = Object.entries(accountMappings).map(([code, fullName]) => {
-    let remaining = fullName;
-    if (remaining.startsWith(code)) {
-      remaining = remaining.substring(code.length).replace(/^\s*-\s*/, "");
-    }
-    const parts = remaining.split(/\s*-\s*/);
-    const category = parts[0] || "";
-    const entity = parts.slice(1).join(" - ") || "";
+  // Store connection using Version 2 Flat Matrix directives
+  const {
+    flatMatrix,
+    fromOptions,
+    templates,
+    language,
+    syncSettings,
+    addOption,
+    editOption,
+    deleteOption,
+    setLanguage,
+    getTypes,
+    getSubtypesByType,
+    getCategoriesBySubtype,
+    getEntitiesByCategory,
+    getAccountCode,
+    fetchChartOfAccounts
+  } = useKingdomStore();
 
-    let subtype = "";
-    for (const [sub, cats] of Object.entries(subtypeToCategoryMap)) {
-      if (cats && cats.includes(category)) {
-        subtype = sub;
-        break;
+  // Navigation & Dropdown Management State
+  const [activeTab, setActiveTab] = useState("general"); // 'general' | 'coa' | 'templates'
+  const [activeDropdownId, setActiveDropdownId] = useState(null);
+
+  // ----------------------------------------------------
+  // TAB 1: GENERAL REALM SETTINGS STATE
+  // ----------------------------------------------------
+  const [newLordName, setNewLordName] = useState("");
+
+  const handleAddLord = () => {
+    const cleanName = newLordName.trim();
+    if (!cleanName) return;
+    if (fromOptions.includes(cleanName)) {
+      toast.error("This Lord is already enlisted in the Council.");
+      return;
+    }
+    const updated = [...fromOptions, cleanName];
+    syncSettings({ fromOptions: updated });
+    setNewLordName("");
+    toast.success("Lord welcomed to the High Council.");
+  };
+
+  const handleRemoveLord = (lord) => {
+    if (fromOptions.length <= 1) {
+      toast.error("The High Council must retain at least one Lord.");
+      return;
+    }
+    const updated = fromOptions.filter((opt) => opt !== lord);
+    syncSettings({ fromOptions: updated });
+    toast.success("Lord dismissed from the Privy council.");
+  };
+
+  // ----------------------------------------------------
+  // TAB 2: LEDGER REGISTRY (CHART OF ACCOUNTS) STATE
+  // ----------------------------------------------------
+  const [coaSearch, setCoaSearch] = useState("");
+  const [entityType, setEntityType] = useState("");
+  const [entitySubtype, setEntitySubtype] = useState("");
+  const [entityCategory, setEntityCategory] = useState("");
+  const [entityValue, setEntityValue] = useState("");
+  const [editingRowCode, setEditingRowCode] = useState(null);
+  const [editEntityInput, setEditEntityInput] = useState("");
+
+  // Filter COA flatMatrix on search string
+  const filteredCOA = useMemo(() => {
+    if (!coaSearch.trim()) return flatMatrix;
+    const term = coaSearch.toLowerCase();
+    return flatMatrix.filter((row) => {
+      return (
+        row.code.includes(term) ||
+        row.account_name.toLowerCase().includes(term) ||
+        row.type.toLowerCase().includes(term) ||
+        row.subtype.toLowerCase().includes(term) ||
+        row.category.toLowerCase().includes(term) ||
+        row.entity.toLowerCase().includes(term)
+      );
+    });
+  }, [flatMatrix, coaSearch]);
+
+  const coaTypes = useMemo(() => getTypes(), [getTypes]);
+  const coaSubtypes = useMemo(() => getSubtypesByType(entityType), [entityType, getSubtypesByType]);
+  const coaCategories = useMemo(() => getCategoriesBySubtype(entitySubtype), [entitySubtype, getCategoriesBySubtype]);
+
+  // Handle explicit category selections and clear descendants
+  const handleTypeChange = (val) => {
+    setEntityType(val);
+    setEntitySubtype("");
+    setEntityCategory("");
+  };
+
+  const handleSubtypeChange = (val) => {
+    setEntitySubtype(val);
+    setEntityCategory("");
+  };
+
+  const handleAddCOAEntity = async (e) => {
+    e.preventDefault();
+    if (!entityCategory) {
+      toast.error("A parent Category must be active to enlist an entity.");
+      return;
+    }
+    if (!entityValue.trim()) {
+      toast.error("The Entity must bear a non-empty taxonomic name.");
+      return;
+    }
+
+    try {
+      await addOption("entity", entityValue.trim(), { category: entityCategory });
+      setEntityValue("");
+      toast.success("Ledger entry registered successfully.");
+    } catch (error) {
+      toast.error("An error occurred while creating the entity.");
+    }
+  };
+
+  const handleStartEditing = (row) => {
+    setEditingRowCode(row.code);
+    setEditEntityInput(row.entity);
+  };
+
+  const handleSaveEntityEdit = async (oldValue) => {
+    const cleanNewVal = editEntityInput.trim();
+    if (!cleanNewVal) {
+      toast.error("The entry name cannot be blank.");
+      return;
+    }
+    try {
+      await editOption("entity", oldValue, cleanNewVal);
+      setEditingRowCode(null);
+      toast.success("Ledger row updated successfully.");
+    } catch (error) {
+      toast.error("An error occurred during preservation.");
+    }
+  };
+
+  const handleDeleteCOAEntity = async (entityName) => {
+    if (window.confirm(`Dissolve ${entityName} from the kingdom accounts?`)) {
+      try {
+        await deleteOption("entity", entityName);
+        toast.success("Ledger balance point decoupled.");
+      } catch (error) {
+        toast.error("Could not dissolve entry.");
       }
     }
-
-    let type = "Assets";
-    if (code.startsWith("2")) type = "Liabilities";
-    else if (code.startsWith("3")) type = "Equity";
-    else if (code.startsWith("7")) type = "Income";
-    else if (code.startsWith("6")) type = "Expense";
-
-    return {
-      code,
-      name: fullName,
-      category,
-      entity,
-      subtype,
-      type
-    };
-  });
-
-  // --- PROCESS MATRIX ROWS ---
-  const parsedMatrixRows = getMatrixRows().map((row, idx) => {
-    let type = "Assets";
-    if (row.subtype) {
-      const typeCode = subtypeTypes[row.subtype]?.[0];
-      if (typeCode === "2") type = "Liabilities";
-      else if (typeCode === "6") type = "Expense";
-      else if (typeCode === "7") type = "Income";
-    }
-    return {
-      id: `MX-${String(idx + 1).padStart(3, "0")}`,
-      key: row.key,
-      type,
-      subtype: row.subtype,
-      category: row.category,
-      entity: row.entity,
-      status: "Verified"
-    };
-  });
-
-  // --- PROCESS METRICS FOR BALANCE TAB ---
-  const totalDebits = accountBalances
-    .filter(
-      (b) =>
-        b.account_code &&
-        (b.account_code.startsWith("1") ||
-          b.account_code.startsWith("5") ||
-          b.account_code.startsWith("6"))
-    )
-    .reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
-
-  const totalCredits = accountBalances
-    .filter(
-      (b) =>
-        b.account_code &&
-        (b.account_code.startsWith("2") ||
-          b.account_code.startsWith("3") ||
-          b.account_code.startsWith("4") ||
-          b.account_code.startsWith("7"))
-    )
-    .reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
-
-  // --- REGISTRATION LOGIC: CHART OF ACCOUNTS ---
-  const handleRegisterAccount = () => {
-    if (!coaNameInput.trim() || !coaCode.trim()) {
-      toast.error(t("err_enter_value") || "Please fill in Account Code and Identity Name");
-      return;
-    }
-    const derivedFullName = `${coaCode} - ${coaCategory} - ${coaEntity || "Unassociated"}`;
-    const updatedMappings = {
-      ...accountMappings,
-      [coaCode]: derivedFullName
-    };
-    syncSettings({ accountMappings: updatedMappings });
-    toast.success(`Registered COA Node [${coaCode}] successfully.`);
-    setCoaNameInput("");
-    setCoaCode((prev) => {
-      const num = Number(prev);
-      return isNaN(num) ? prev : String(num + 10);
-    });
   };
 
-  // --- REGISTRATION LOGIC: MATRIX ---
-  const handleRegisterMatrixNode = () => {
-    if (!matrixEntity) {
-      toast.error("Please enter or select a valid host entity.");
-      return;
-    }
-    const updatedMappings = { ...entityMappings, [matrixEntity]: matrixCategory };
-    if (!entityOptions.includes(matrixEntity)) {
-      addOption("entity", matrixEntity, { category: matrixCategory });
-    } else {
-      syncSettings({ entityMappings: updatedMappings });
-    }
-    toast.success(`Injected route mapping node: ${matrixEntity} ➔ ${matrixCategory}`);
+  // ----------------------------------------------------
+  // TAB 3: SCRIBE TEMPLATES (QUICK ACTIONS) STATE
+  // ----------------------------------------------------
+  const [tplName, setTplName] = useState("");
+  const [tplIcon, setTplIcon] = useState("💸");
+  const [tplFrom, setTplFrom] = useState("Consolidated");
+  const [tplType, setTplType] = useState("Expenses");
+  const [tplSubtype, setTplSubtype] = useState("");
+  const [tplCategory, setTplCategory] = useState("");
+  const [tplEntity, setTplEntity] = useState("");
+  const [tplFlow, setTplFlow] = useState("outflow");
+  const [tplStatus, setTplStatus] = useState("Completed");
+  const [tplDesc, setTplDesc] = useState("");
+
+  // Filter lists for Template Creator
+  const templateSubtypes = useMemo(() => getSubtypesByType(tplType), [tplType, getSubtypesByType]);
+  const templateCategories = useMemo(() => getCategoriesBySubtype(tplSubtype), [tplSubtype, getCategoriesBySubtype]);
+  const templateEntities = useMemo(() => getEntitiesByCategory(tplCategory), [tplCategory, getEntitiesByCategory]);
+
+  const sourceBankOptions = useMemo(() => {
+    return flatMatrix.filter(
+      (row) =>
+        row.code.startsWith("1101") ||
+        row.code.startsWith("1102") ||
+        row.code.startsWith("1103")
+    );
+  }, [flatMatrix]);
+
+  const targetAccountOptions = useMemo(() => flatMatrix, [flatMatrix]);
+
+  const [tplSourceBank, setTplSourceBank] = useState("11010001");
+  const [tplTargetAccount, setTplTargetAccount] = useState("");
+
+  const handleTplTypeChange = (val) => {
+    setTplType(val);
+    setTplSubtype("");
+    setTplCategory("");
+    setTplEntity("");
   };
 
-  // --- CLEAR FORM LOGIC: QUICK ACTIONS ---
-  const handleResetQaForm = () => {
-    setQaName("");
-    setQaValueDate("");
-    setQaPostingDate("");
-    setQaAmount("");
-    setQaDescription("");
-    setQaEntity("");
-    setQaFrom("");
-    setQaClass("");
-    setQaStatus("");
-    setQaSubClass("");
-    setQaCategory("");
-    setQaTargetAccount("");
-    setQaSourceDestBank("");
-    setQaFlow("");
-    toast.success("Quick Action form parameters cleared.");
+  const handleTplSubtypeChange = (val) => {
+    setTplSubtype(val);
+    setTplCategory("");
+    setTplEntity("");
   };
 
-  const handleSaveQuickActionSubmit = (e) => {
+  const handleTplCategoryChange = (val) => {
+    setTplCategory(val);
+    setTplEntity("");
+  };
+
+  const handleAddTemplate = (e) => {
     e.preventDefault();
-    if (!qaName.trim()) {
-      toast.error("Please enter a valid Quick Action name.");
+    if (!tplName.trim()) {
+      toast.error("The scribe blueprint must bear a name.");
       return;
     }
-    handleSaveQuickAction(e);
+
+    const resolvedTarget = tplTargetAccount || getAccountCode(tplType, tplSubtype, tplCategory, tplEntity);
+
+    const payload = {
+      name: tplName.trim(),
+      icon: tplIcon,
+      data: {
+        from: tplFrom,
+        transaction_type: tplType,
+        transaction_subtype: tplSubtype,
+        entity: tplEntity,
+        transaction_category: tplCategory,
+        target_account: resolvedTarget || "",
+        source_dest_bank: tplSourceBank,
+        flow: tplFlow,
+        payment_status: tplStatus,
+        description: tplDesc
+      }
+    };
+
+    addOption("quickAction", payload.name, payload);
+    setTplName("");
+    setTplDesc("");
+    toast.success("Scribe blueprint recorded in local archives.");
+  };
+
+  const handleDeleteTemplate = (name) => {
+    deleteOption("quickAction", name);
+    toast.success("Scribe blueprint expunged.");
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto z-[9999]">
-      <div className="relative w-full max-w-6xl h-[820px] bg-[#f4e4bc] border-[8px] border-[#5d4037] shadow-[0_0_50px_rgba(0,0,0,0.9)] rounded-xl flex flex-col overflow-hidden">
-        {/* Parchment Texture Overlay */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-25 mix-blend-multiply z-0"
-          style={{
-            backgroundImage: "url('https://www.transparenttextures.com/patterns/paper-fibers.png')"
-          }}
-        />
-
-        {/* Ornate Corner Accents */}
-        <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-[#8b4513]/30 rounded-tl-lg pointer-events-none z-10" />
-        <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-[#8b4513]/30 rounded-tr-lg pointer-events-none z-10" />
-        <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-[#8b4513]/30 rounded-bl-lg pointer-events-none z-10" />
-        <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-[#8b4513]/30 rounded-br-lg pointer-events-none z-10" />
-
-        {/* TOP BRANDING BAR WITH GOLD INLAY AND RED CLOSE BUTTON */}
-        <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#8b4513]/20 bg-[#5d4037]/10 shrink-0 z-10 relative">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      onClick={() => setActiveDropdownId(null)}
+    >
+      {/* Outer Ledger Sheet wrapper */}
+      <div
+        className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-[#faf4e5] border-4 border-[#8b4513] rounded-2xl shadow-2xl overflow-hidden font-serif"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Ancient Wood Header */}
+        <div className="bg-[#4b2c20] text-[#ffd700] px-6 py-4 flex items-center justify-between border-b-2 border-[#8b4513]/60">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#8b4513]/10 border border-[#8b4513]/30 rounded-xl text-[#8b4513] shadow">
-              <Cpu className="w-5 h-5 animate-pulse" />
-            </div>
-            <div>
-              <h1 className="text-sm font-black text-[#4b2c20] tracking-wider uppercase font-sans">
-                {t.configuration_panel || "Acuity Compliance Matrix"}
-              </h1>
-              <p className="text-[9px] text-[#5d4037]/75 font-sans font-bold tracking-widest uppercase">
-                {t.official_ledger_editor || "DOUBLE-ENTRY COMPLIANCE HUB"}
-              </p>
-            </div>
+            <Sliders className="w-5 h-5 text-[#ffd700]" />
+            <h2 className="text-lg font-black uppercase tracking-widest">
+              Royal Archive Settings
+            </h2>
           </div>
-
           <button
             onClick={onClose}
-            className="absolute -top-1 -right-1 w-12 h-12 bg-[#8b0000] rounded-full flex items-center justify-center border-4 border-[#5d0000] shadow-[0_4px_10px_rgba(0,0,0,0.5)] active:scale-90 transition-transform group cursor-pointer"
-            title="Exit Matrix"
+            className="text-[#ffd700]/70 hover:text-[#ffd700] p-1.5 rounded-lg hover:bg-white/10 transition-colors"
           >
-            <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-pulse" />
-            <span className="text-[#ffd700] text-lg font-black font-sans">✕</span>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* FEUDAL TOP HORIZONTAL TABS */}
-        <div className="px-6 py-3.5 bg-[#faf4e5]/80 border-b border-[#8b4513]/25 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 z-10 relative">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: "coa", label: "Chart of Accounts", icon: Database },
-              { id: "matrix", label: "Matrix & Entities", icon: Layers },
-              { id: "more", label: "More", icon: Sliders },
-              { id: "quick_actions", label: "Quick Actions", icon: Zap }
-            ].map((tab) => {
-              const isSel = activePrimaryTab === tab.id;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActivePrimaryTab(tab.id)}
-                  className={`relative px-4 py-2.5 rounded-lg border text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center gap-2.5 ${
-                    isSel
-                      ? "bg-[#8b4513]/20 border-[#8b4513] text-[#4b2c20] shadow-inner font-black scale-[1.02]"
-                      : "bg-[#faf4e5]/80 border-[#8b4513]/10 text-[#5d4037]/80 hover:bg-[#8b4513]/5 hover:text-[#4b2c20]"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isSel ? "text-[#8b4513]" : "text-[#5d4037]/60"}`} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* CSV File Controls */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => settingsFileInputRef.current?.click()}
-              className="px-3 py-2 bg-[#faf4e5]/90 border border-[#8b4513]/30 hover:bg-[#8b4513]/10 rounded-xl text-[10px] text-[#4b2c20] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="Import Settings CSV"
-            >
-              <Upload className="w-3.5 h-3.5 text-[#8b4513]" />
-              <span>Import</span>
-            </button>
-            <button
-              onClick={exportSettingsCSV}
-              className="px-3 py-2 bg-[#faf4e5]/90 border border-[#8b4513]/30 hover:bg-[#8b4513]/10 rounded-xl text-[10px] text-[#4b2c20] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="Export Settings CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-[#8b4513]" />
-              <span>Export</span>
-            </button>
-          </div>
+        {/* Tab Selection Row */}
+        <div className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 flex">
+          {[
+            { id: "general", label: "Council Lords & Scribes", icon: Globe },
+            { id: "coa", label: "Chart of Accounts Ledger", icon: Database },
+            { id: "templates", label: "Scribe Templates", icon: FileText }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setActiveDropdownId(null);
+                }}
+                className={`flex items-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-wider border-r border-[#8b4513]/20 transition-all ${
+                  activeTab === tab.id
+                    ? "bg-[#faf4e5] text-[#8b4513] border-b-2 border-b-[#8b4513]"
+                    : "text-[#8b4513]/60 hover:text-[#8b4513] hover:bg-[#8b4513]/5"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* MORE SUB-PILLS */}
-        {activePrimaryTab === "more" && (
-          <div className="px-6 py-2.5 bg-[#faf4e5]/40 border-b border-[#8b4513]/20 shrink-0 z-10 relative">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: "from", label: "Origin / From Nodes", icon: Globe },
-                { id: "status", label: "Ledger Status Rules", icon: Sliders },
-                { id: "balances", label: "Initial Balance Alignment", icon: Scale }
-              ].map((sec) => {
-                const isSel = activeSecondaryTab === sec.id;
-                const Icon = sec.icon;
-                return (
+        {/* Modal Scrollable Contents */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
+          {/* ================================================================= */}
+          {/* TAB 1: GENERAL REALM SETTINGS */}
+          {/* ================================================================= */}
+          {activeTab === "general" && (
+            <div className="space-y-6">
+              {/* Language Settings */}
+              <div className="bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-[#8b4513]/10">
+                  <Globe className="w-4 h-4 text-[#8b4513]" />
+                  <h3 className="text-sm font-black uppercase tracking-wider text-[#4b2c20]">
+                    Realm Language
+                  </h3>
+                </div>
+                <div className="flex gap-3">
                   <button
-                    key={sec.id}
-                    type="button"
-                    onClick={() => setActiveSecondaryTab(sec.id)}
-                    className={`px-3.5 py-2 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer flex items-center gap-2 ${
-                      isSel
-                        ? "bg-[#8b4513]/15 border-[#8b4513]/40 text-[#4b2c20]"
-                        : "bg-transparent border-transparent text-[#5d4037]/75 hover:text-[#4b2c20]"
+                    onClick={() => setLanguage("en")}
+                    className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                      language === "en"
+                        ? "bg-[#8b4513] text-[#ffd700] border-[#d4af37] shadow-md"
+                        : "bg-white/80 text-[#8b4513]/60 border-[#8b4513]/20 hover:bg-[#8b4513]/5"
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{sec.label}</span>
+                    🇬🇧 English Tongue
                   </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                  <button
+                    onClick={() => setLanguage("pt")}
+                    className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                      language === "pt"
+                        ? "bg-[#8b4513] text-[#ffd700] border-[#d4af37] shadow-md"
+                        : "bg-white/80 text-[#8b4513]/60 border-[#8b4513]/20 hover:bg-[#8b4513]/5"
+                    }`}
+                  >
+                    🇵🇹 Língua Portuguesa
+                  </button>
+                </div>
+              </div>
 
-        {/* INNER SCROLLABLE WINDOW */}
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-[#8b4513]/45 scrollbar-track-transparent relative z-10"
-        >
-          <div className="space-y-6">
-            {/* ================= TAB 1: CHART OF ACCOUNTS ================= */}
-            {activePrimaryTab === "coa" && (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column Forms (Using Combobox) */}
-                  <div className="bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-5 relative shadow-sm">
-                    <p className="text-xs text-[#5d4037] font-serif leading-relaxed flex items-center gap-2 mb-2">
-                      <Info className="w-4 h-4 text-[#8b4513] shrink-0" />
-                      Classification Hierarchy: Selections below actively filter other lists symmetrically.
-                    </p>
+              {/* Lords of the Council Setting */}
+              <div className="bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-[#8b4513]/10">
+                  <Sparkles className="w-4 h-4 text-[#8b4513]" />
+                  <h3 className="text-sm font-black uppercase tracking-wider text-[#4b2c20]">
+                    Lords of the Council
+                  </h3>
+                </div>
 
-                    <div className="space-y-4 font-serif">
-                      <Combobox
-                        id="coa-type"
-                        label="Lvl I: Type"
-                        value={coaType}
-                        onChange={setCoaType}
-                        options={classOptions}
-                        onSaveNew={(val) => addOption("class", val)}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
-                      />
-
-                      <Combobox
-                        id="coa-subtype"
-                        label="Lvl II: Subtype"
-                        value={coaSubtype}
-                        onChange={setCoaSubtype}
-                        options={subClassOptions}
-                        onSaveNew={(val) => addOption("subClass", val)}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
-                      />
-
-                      <Combobox
-                        id="coa-category"
-                        label="Lvl III: Category"
-                        value={coaCategory}
-                        onChange={setCoaCategory}
-                        options={categoryOptions}
-                        onSaveNew={(val) => addOption("category", val)}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
-                      />
-
-                      {/* Account Code / Name */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                            Account Code
-                          </label>
-                          <div className="relative font-mono">
-                            <input
-                              type="text"
-                              value={coaCode}
-                              onChange={(e) => setCoaCode(e.target.value)}
-                              className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513]/50 font-bold shadow-inner"
-                            />
-                            <div className="absolute right-3 top-3 flex items-center gap-1 text-[8px] font-black text-[#8b4513] bg-[#8b4513]/10 px-1.5 py-0.5 rounded border border-[#8b4513]/20 uppercase tracking-widest">
-                              <Check className="w-3.5 h-3.5" /> Approved
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                            Identity Name
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Operational Vault"
-                            value={coaNameInput}
-                            onChange={(e) => setCoaNameInput(e.target.value)}
-                            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513]/50 font-serif font-bold shadow-inner"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="pt-2 font-serif">
-                        <button
-                          type="button"
-                          onClick={handleRegisterAccount}
-                          className="w-full h-11 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-150 cursor-pointer shadow flex items-center justify-center gap-2"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Current Active List */}
+                  <div className="space-y-2">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Enlisted Council Members
+                    </label>
+                    <div className="bg-white/60 border border-[#8b4513]/20 rounded-xl divide-y divide-[#8b4513]/10 overflow-hidden">
+                      {fromOptions.map((lord) => (
+                        <div
+                          key={lord}
+                          className="flex items-center justify-between px-4 py-2.5 text-xs font-bold text-[#4b2c20]"
                         >
-                          <Database className="w-4 h-4" />
-                          <span>Register Account</span>
-                        </button>
-                      </div>
+                          <span>{lord}</span>
+                          <button
+                            onClick={() => handleRemoveLord(lord)}
+                            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                            title="Dismiss from Realm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Right Column Form with Combobox */}
-                  <div className="bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 flex flex-col justify-between relative shadow-sm">
-                    <div className="space-y-6">
-                      <p className="text-xs text-[#5d4037] font-serif leading-relaxed">
-                        Interlink root ledger designations to specific operational nodes or integration partners.
-                      </p>
-
-                      <Combobox
-                        id="coa-entity"
-                        label="Entity Association"
-                        value={coaEntity}
-                        onChange={setCoaEntity}
-                        options={entityOptions}
-                        onSaveNew={(val) => addOption("entity", val, { category: coaCategory })}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
+                  {/* Add New Scribe Section */}
+                  <div className="space-y-3 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                        New Enlistment Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newLordName}
+                        onChange={(e) => setNewLordName(e.target.value)}
+                        placeholder="e.g. Duchess Maria"
+                        className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 hover:border-[#8b4513]/60 rounded-xl py-3 px-4 text-xs text-[#4b2c20] placeholder-[#5d4037]/40 focus:outline-none focus:ring-1 focus:ring-[#8b4513]/50 font-serif font-bold shadow-inner"
                       />
                     </div>
-
                     <button
-                      type="button"
-                      onClick={() => {
-                        if (!coaEntity) return;
-                        addOption("entity", coaEntity, { category: coaCategory });
-                        toast.success("Associated target entity registered.");
-                      }}
-                      className="w-full h-11 bg-[#faf4e5] hover:bg-[#8b4513]/5 border border-[#8b4513]/30 text-[#4b2c20] rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 mt-6 lg:mt-0 font-serif"
+                      onClick={handleAddLord}
+                      className="w-full bg-[#8b4513] text-[#ffd700] border border-[#d4af37]/30 hover:bg-[#a0522d] py-3 rounded-xl text-xs font-black uppercase tracking-wider shadow transition-all duration-200"
                     >
-                      <Layers className="w-4 h-4 text-[#8b4513]" />
-                      <span>Register Entity</span>
+                      Enlist Council Lord
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
 
-                {/* COA Manifest Table */}
-                <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                      Active Chart of Accounts Registers
-                    </span>
+          {/* ================================================================= */}
+          {/* TAB 2: LEDGER REGISTRY (CHART OF ACCOUNTS) */}
+          {/* ================================================================= */}
+          {activeTab === "coa" && (
+            <div className="space-y-6">
+              {/* Add Custom Entry Form */}
+              <div className="bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[#8b4513]/10">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#8b4513]" />
+                    <h3 className="text-sm font-black uppercase tracking-wider text-[#4b2c20]">
+                      Enlist New Entity
+                    </h3>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse font-serif">
-                      <thead>
-                        <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[9px] uppercase tracking-widest text-[#5d4037] font-black">
-                          <th className="p-4">Account Code</th>
-                          <th className="p-4">Identity Name</th>
-                          <th className="p-4">Type</th>
-                          <th className="p-4">Subtype</th>
-                          <th className="p-4">Category</th>
-                          <th className="p-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {parsedCoaData.map((row) => (
-                          <tr key={row.code} className="hover:bg-[#8b4513]/5 transition-colors">
-                            <td className="p-4 font-mono text-[#8b4513] font-bold text-sm">
-                              {row.code}
-                            </td>
-                            <td className="p-4 text-[#4b2c20] font-black">{row.name}</td>
-                            <td className="p-4 text-[#5d4037] uppercase tracking-wider text-[10px] font-sans">
-                              {row.type}
-                            </td>
-                            <td className="p-4 text-[#5d4037]">{row.subtype}</td>
-                            <td className="p-4 text-[#5d4037]">{row.category}</td>
-                            <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-2.5">
+                  <button
+                    onClick={() => fetchChartOfAccounts()}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-white border border-[#8b4513]/20 hover:border-[#8b4513]/50 rounded-lg text-[#8b4513]"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Synchronize
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddCOAEntity} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  {/* Select Type */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Ledger Type
+                    </label>
+                    <select
+                      value={entityType}
+                      onChange={(e) => handleTypeChange(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2.5 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      <option value="">-- Choose Type --</option>
+                      {coaTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Select Subtype */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Subtype
+                    </label>
+                    <select
+                      value={entitySubtype}
+                      disabled={!entityType}
+                      onChange={(e) => handleSubtypeChange(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2.5 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="">-- Choose Subtype --</option>
+                      {coaSubtypes.map((sub) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Select Category */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Category
+                    </label>
+                    <select
+                      value={entityCategory}
+                      disabled={!entitySubtype}
+                      onChange={(e) => setEntityCategory(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2.5 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="">-- Choose Category --</option>
+                      {coaCategories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Combobox style input for entity with direct store mapping */}
+                  <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="md:col-span-3">
+                      <Combobox
+                        id="coa_entity_setup"
+                        label="Account Entity Name"
+                        value={entityValue}
+                        onChange={setEntityValue}
+                        options={entityCategory ? getEntitiesByCategory(entityCategory) : []}
+                        activeDropdownId={activeDropdownId}
+                        setActiveDropdownId={setActiveDropdownId}
+                        placeholder="Select or enter custom ledger entity name..."
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] font-black text-xs uppercase tracking-widest border border-[#d4af37]/30 py-3 rounded-xl shadow-md cursor-pointer"
+                    >
+                      Enlist Entry
+                    </button>
+                  </div>
+                </form>
+
+                <div className="flex items-start gap-2 bg-[#8b4513]/5 p-3 rounded-xl border border-[#8b4513]/15">
+                  <Info className="w-4 h-4 text-[#8b4513] shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-[#5d4037] leading-relaxed">
+                    <strong>8-Digit COA Generator:</strong> Enlisting custom entities dynamically derives the corresponding nested COA code sequence matching the taxonomic parameters.
+                  </p>
+                </div>
+              </div>
+
+              {/* COA Ledger Explorer */}
+              <div className="bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-2 border-b border-[#8b4513]/10">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-[#4b2c20]">
+                    Chart of Accounts Directory
+                  </h3>
+                  <div className="relative w-full md:w-72">
+                    <input
+                      type="text"
+                      value={coaSearch}
+                      onChange={(e) => setCoaSearch(e.target.value)}
+                      placeholder="Filter by Name, Category or Code..."
+                      className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl py-2 pl-9 pr-4 text-xs text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none"
+                    />
+                    <Search className="w-3.5 h-3.5 text-[#5d4037]/50 absolute left-3 top-2.5" />
+                  </div>
+                </div>
+
+                <div className="border border-[#8b4513]/20 rounded-xl overflow-hidden max-h-96 overflow-y-auto scrollbar-thin">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-[#4b2c20] text-[#ffd700] uppercase tracking-wider text-[10px] font-black">
+                        <th className="py-3 px-4">Code</th>
+                        <th className="py-3 px-4">Ledger Type</th>
+                        <th className="py-3 px-4">Subclass</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4">Entity</th>
+                        <th className="py-3 px-4 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#8b4513]/10">
+                      {filteredCOA.map((row, idx) => (
+                        <tr
+                          key={row.code + idx}
+                          className={`${
+                            idx % 2 === 0 ? "bg-white/40" : "bg-transparent"
+                          } hover:bg-[#8b4513]/5 transition-colors`}
+                        >
+                          <td className="py-3 px-4 font-mono font-bold text-[#8b4513]">
+                            {row.code}
+                          </td>
+                          <td className="py-3 px-4 font-medium text-[#4b2c20]">
+                            {row.type}
+                          </td>
+                          <td className="py-3 px-4 text-[#5d4037]">{row.subtype}</td>
+                          <td className="py-3 px-4 text-[#5d4037]">{row.category}</td>
+                          <td className="py-3 px-4 font-bold text-[#4b2c20]">
+                            {editingRowCode === row.code ? (
+                              <input
+                                type="text"
+                                value={editEntityInput}
+                                onChange={(e) => setEditEntityInput(e.target.value)}
+                                className="bg-[#faf4e5] border border-[#8b4513]/50 rounded px-2 py-0.5 text-xs text-[#4b2c20] font-bold focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
+                              />
+                            ) : (
+                              row.entity
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {editingRowCode === row.code ? (
                                 <button
-                                  onClick={() => {
-                                    setCoaCode(row.code);
-                                    setCoaNameInput(row.name);
-                                    toast.success(`Editing ${row.name}`);
-                                  }}
-                                  className="p-1 text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#8b4513]/10 rounded transition-colors"
+                                  onClick={() => handleSaveEntityEdit(row.entity)}
+                                  className="p-1 text-green-700 hover:bg-green-100 rounded"
+                                  title="Save Changes"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleStartEditing(row)}
+                                  className="p-1 text-[#8b4513]/80 hover:text-[#8b4513] hover:bg-[#8b4513]/10 rounded"
+                                  title="Rename Entity"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    const nextCode = String(Number(row.code) + 1);
-                                    const updated = {
-                                      ...accountMappings,
-                                      [nextCode]: `${nextCode} - ${row.category} - ${row.entity}`
-                                    };
-                                    syncSettings({ accountMappings: updated });
-                                    toast.success(`Duplicated node to code ${nextCode}`);
-                                  }}
-                                  className="p-1 text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#8b4513]/10 rounded transition-colors"
-                                >
-                                  <Copy className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const updated = { ...accountMappings };
-                                    delete updated[row.code];
-                                    syncSettings({ accountMappings: updated });
-                                    toast.success(`Deleted ${row.name}`);
-                                  }}
-                                  className="p-1 text-[#8b0000] hover:bg-red-50 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ================= TAB 2: MATRIX & ENTITIES ================= */}
-            {activePrimaryTab === "matrix" && (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column Forms with Custom Combobox Fields */}
-                  <div className="bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-6 shadow-sm">
-                    <p className="text-xs text-[#5d4037] font-serif leading-relaxed">
-                      Configure cross-cutting relationships between account types, subclass categories, and operational entities below.
-                    </p>
-
-                    <div className="space-y-4 font-serif">
-                      <Combobox
-                        id="mat-type"
-                        label="Type"
-                        value={matrixType}
-                        onChange={setMatrixType}
-                        options={classOptions}
-                        onSaveNew={(val) => addOption("class", val)}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
-                      />
-
-                      <Combobox
-                        id="mat-subtype"
-                        label="Subtype"
-                        value={matrixSubtype}
-                        onChange={setMatrixSubtype}
-                        options={subClassOptions}
-                        onSaveNew={(val) => addOption("subClass", val)}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
-                      />
-
-                      <Combobox
-                        id="mat-category"
-                        label="Category"
-                        value={matrixCategory}
-                        onChange={setMatrixCategory}
-                        options={categoryOptions}
-                        onSaveNew={(val) => addOption("category", val)}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
-                      />
-
-                      <Combobox
-                        id="mat-entity"
-                        label="Entity Association"
-                        value={matrixEntity}
-                        onChange={setMatrixEntity}
-                        options={entityOptions}
-                        onSaveNew={(val) => addOption("entity", val, { category: matrixCategory })}
-                        activeDropdownId={activeDropdownId}
-                        setActiveDropdownId={setActiveDropdownId}
-                      />
-
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={handleRegisterMatrixNode}
-                          className="w-full h-11 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 font-serif"
-                        >
-                          <Layers className="w-4 h-4" />
-                          <span>Register Entity Mapping</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Dynamic Status Overview */}
-                  <div className="hidden lg:block border-2 border-dashed border-[#8b4513]/25 bg-[#faf4e5]/30 rounded-2xl p-6 relative min-h-[400px]">
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
-                      <Database className="w-12 h-12 text-[#8b4513] opacity-30" />
-                      <div>
-                        <span className="text-[10px] font-mono font-bold tracking-widest text-[#5d4037] uppercase block">
-                          Mapped Entity Registry
-                        </span>
-                        <p className="text-xs text-[#5d4037]/70 font-serif max-w-xs mt-1">
-                          Mappings dynamically feed compliance processes and balance alignment calculations.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Association Matrix Table */}
-                <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                      Valid Association Matrix Mapping Nodes
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse font-serif">
-                      <thead>
-                        <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[9px] uppercase tracking-widest text-[#5d4037] font-black">
-                          <th className="p-4">Matrix Key</th>
-                          <th className="p-4">Type</th>
-                          <th className="p-4">Subtype</th>
-                          <th className="p-4">Category Path</th>
-                          <th className="p-4">Segment Host Entity</th>
-                          <th className="p-4 text-center">Status Alignment</th>
-                          <th className="p-4 text-right">Deprecate</th>
+                              )}
+                              <button
+                                onClick={() => handleDeleteCOAEntity(row.entity)}
+                                className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                                title="Dissolve Account"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {parsedMatrixRows.map((row) => (
-                          <tr key={row.key} className="hover:bg-[#8b4513]/5 transition-colors">
-                            <td className="p-4 font-mono text-[#8b4513] font-bold text-xs">
-                              {row.id}
-                            </td>
-                            <td className="p-4 text-[#5d4037] uppercase tracking-widest text-[9px] font-sans">
-                              {row.type}
-                            </td>
-                            <td className="p-4 text-[#5d4037]">{row.subtype}</td>
-                            <td className="p-4 text-[#4b2c20] font-black">{row.category}</td>
-                            <td className="p-4 text-[#5d4037]">{row.entity}</td>
-                            <td className="p-4 text-center">
-                              <span className="text-[9px] font-sans font-black px-2 py-0.5 rounded-full border border-[#8b4513]/20 bg-[#faf4e5] text-[#8b4513] uppercase">
-                                {row.status}
-                              </span>
-                            </td>
-                            <td className="p-4 text-right">
-                              <button
-                                onClick={() => {
-                                  if (row.entity) {
-                                    deleteOption("entity", row.entity);
-                                    toast.success(`Removed mapping node ${row.entity}`);
-                                  }
-                                }}
-                                className="p-1.5 text-[#8b0000] hover:bg-red-50 rounded-lg cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ================= TAB 3: MORE WORKSPACE ================= */}
-            {activePrimaryTab === "more" && (
-              <div className="space-y-8">
-                {/* Option 3A: Origin / From */}
-                {activeSecondaryTab === "from" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-serif">
-                    <div className="lg:col-span-5 bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-6 h-fit shadow-sm">
-                      <p className="text-xs text-[#5d4037] leading-relaxed">
-                        Establish primary input nodes where system pipeline records originate.
-                      </p>
-
-                      <div className="space-y-4">
-                        <Combobox
-                          id="more-from"
-                          label="Origin / From"
-                          value={moreOrigin}
-                          onChange={setMoreOrigin}
-                          options={fromOptions}
-                          onSaveNew={(val) => addOption("from", val)}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addOption("from", moreOrigin);
-                            toast.success(`Origin registered: ${moreOrigin}`);
-                          }}
-                          className="w-full h-11 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <Globe className="w-4 h-4" />
-                          <span>Register Origin/From</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="lg:col-span-7 bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5">
-                        <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                          Configured Input Pipelines
-                        </span>
-                      </div>
-                      <div className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {fromOptions.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-4 hover:bg-[#8b4513]/5">
-                            <div className="flex items-center gap-3">
-                              <Globe className="w-4 h-4 text-[#8b4513]" />
-                              <div>
-                                <p className="text-xs font-black text-[#4b2c20]">{item}</p>
-                                <p className="text-[10px] text-[#5d4037]/70 uppercase font-sans tracking-wider mt-0.5">
-                                  Input Pipeline Feed
-                                </p>
-                              </div>
-                            </div>
-                            <span className="text-[9px] font-sans font-black px-2 py-0.5 rounded-full border border-[#8b4513]/20 bg-[#faf4e5] text-[#8b4513] uppercase">
-                              Active
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Option 3B: Status Rules */}
-                {activeSecondaryTab === "status" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-serif">
-                    <div className="lg:col-span-5 bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-6 space-y-6 h-fit shadow-sm">
-                      <p className="text-xs text-[#5d4037] leading-relaxed">
-                        Control processing impacts on statement flows and P&L indicators.
-                      </p>
-
-                      <div className="space-y-4">
-                        <Combobox
-                          id="more-status"
-                          label="Status Target"
-                          value={moreStatus}
-                          onChange={setMoreStatus}
-                          options={statusOptions}
-                          onSaveNew={(val) => addOption("status", val)}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addOption("status", moreStatus);
-                            toast.success(`Status registered: ${moreStatus}`);
-                          }}
-                          className="w-full h-11 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <Sliders className="w-4 h-4" />
-                          <span>Register Status</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="lg:col-span-7 bg-[#faf4e5]/80 border border-[#8b4513]/25 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5">
-                        <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                          Enforced Status Rules
-                        </span>
-                      </div>
-                      <div className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {statusOptions.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-4 hover:bg-[#8b4513]/5">
-                            <div className="flex items-center gap-3">
-                              <Sliders className="w-4 h-4 text-[#8b4513]" />
-                              <div>
-                                <p className="text-xs font-black text-[#4b2c20]">{item}</p>
-                                <div className="flex items-center gap-2 mt-1 text-[9px] font-sans text-[#5d4037]/75 font-bold uppercase tracking-widest">
-                                  <span className="text-emerald-700 font-sans font-black">
-                                    P&L Impact
-                                  </span>
-                                  <span>•</span>
-                                  <span className="text-cyan-700 font-sans font-black">
-                                    Cashflow Impact
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Option 3C: Balance Alignment */}
-                {activeSecondaryTab === "balances" && (
-                  <div className="space-y-6 font-serif">
-                    <div className="border border-[#8b4513]/30 bg-[#faf4e5] p-5 rounded-2xl flex items-center justify-between">
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-[#8b4513]">
-                          Ledger Balance Alignment
-                        </h4>
-                        <p className="text-[11px] text-[#5d4037] leading-relaxed font-serif">
-                          Configured initial alignment matrices.
-                        </p>
-                      </div>
-                      <div className="flex gap-4 text-xs font-mono font-bold text-[#8b4513]">
-                        <span>Dr: ${totalDebits.toLocaleString()}</span>
-                        <span>|</span>
-                        <span>Cr: ${totalCredits.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-[#faf4e5]/80 border border-[#8b4513]/15 rounded-2xl p-5 space-y-3 shadow-sm">
-                      {parsedCoaData.map((acc) => {
-                        const balanceRecord = accountBalances.find(
-                          (b) => b.account_code === acc.code
-                        );
-                        const balanceAmount = balanceRecord ? balanceRecord.balance : 0;
-                        return (
-                          <div
-                            key={acc.code}
-                            className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-3 bg-[#faf4e5]/60 border border-[#8b4513]/15 rounded-xl hover:border-[#8b4513]/40 transition-all"
-                          >
-                            <span className="sm:col-span-2 font-mono text-xs text-[#8b4513] font-bold">
-                              {acc.code}
-                            </span>
-                            <span className="sm:col-span-5 text-xs text-[#4b2c20] font-black">
-                              {acc.name}
-                            </span>
-                            <span className="sm:col-span-2 text-[10px] text-[#5d4037] uppercase tracking-wider font-sans">
-                              {acc.type}
-                            </span>
-                            <div className="sm:col-span-3">
-                              <input
-                                type="number"
-                                value={balanceAmount}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value) || 0;
-                                  updateAccountBalance(user?.id, acc.code, val);
-                                }}
-                                className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded p-1.5 text-right font-mono text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513]"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ================= TAB 4: QUICK ACTIONS ================= */}
-            {activePrimaryTab === "quick_actions" && (
-              <div className="space-y-8 font-serif">
-                {/* Clean Slate Form Container */}
-                <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl p-6 space-y-6 shadow-sm">
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs text-[#5d4037]">
-                      Configure unified operational posting parameters across system ledgers.
-                    </p>
-                    {selectedQaNames.length > 0 && (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={handleDeleteQuickAction}
-                          className="px-3 py-1 bg-red-800 text-white text-xs font-black rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                        >
-                          Delete Selected ({selectedQaNames.length})
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <form onSubmit={handleSaveQuickActionSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      {/* ROW 1 */}
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Quick Action Name
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Sweep Stripe Settlements"
-                          value={qaName}
-                          onChange={(e) => setQaName(e.target.value)}
-                          className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513] font-bold shadow-inner"
-                        />
-                      </div>
-                      <div className="md:col-span-1 font-sans">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">
-                          Value Date
-                        </label>
-                        <input
-                          type="date"
-                          value={qaValueDate || ""}
-                          onChange={(e) => setQaValueDate(e.target.value)}
-                          className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] font-mono shadow-inner"
-                        />
-                      </div>
-                      <div className="md:col-span-1 font-sans">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">
-                          Posting Date
-                        </label>
-                        <input
-                          type="date"
-                          value={qaPostingDate || ""}
-                          onChange={(e) => setQaPostingDate(e.target.value)}
-                          className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] font-mono shadow-inner"
-                        />
-                      </div>
-
-                      {/* ROW 2 */}
-                      <div className="md:col-span-1">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Flow
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={qaFlow}
-                            onChange={(e) => setQaFlow(e.target.value)}
-                            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none appearance-none font-black font-serif shadow-inner"
-                          >
-                            <option value="">-</option>
-                            <option value="inflow">Inflow</option>
-                            <option value="outflow">Outflow</option>
-                            <option value="neutral">Neutral</option>
-                          </select>
-                          <ChevronDown className="absolute right-3.5 top-3.5 w-4 h-4 text-[#8b4513]/80 pointer-events-none" />
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-1">
-                        <Combobox
-                          id="qa-status"
-                          label="Status"
-                          value={qaStatus}
-                          onChange={setQaStatus}
-                          options={statusOptions}
-                          onSaveNew={(val) => addOption("status", val)}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-                      </div>
-
-                      <div className="md:col-span-1">
-                        <Combobox
-                          id="qa-from"
-                          label="Origin/From"
-                          value={qaFrom}
-                          onChange={setQaFrom}
-                          options={fromOptions}
-                          onSaveNew={(val) => addOption("from", val)}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-                      </div>
-
-                      <div className="md:col-span-1 font-sans">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5">
-                          Amount ($)
-                        </label>
-                        <input
-                          type="number"
-                          value={qaAmount}
-                          onChange={(e) => setQaAmount(e.target.value)}
-                          className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] font-mono font-bold shadow-inner"
-                        />
-                      </div>
-
-                      {/* ROW 3 */}
-                      <div className="md:col-span-2">
-                        <Combobox
-                          id="qa-class"
-                          label="Type"
-                          value={qaClass}
-                          onChange={setQaClass}
-                          options={classOptions}
-                          onSaveNew={(val) => addOption("class", val)}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Description Memo
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Add core descriptor metadata..."
-                          value={qaDescription}
-                          onChange={(e) => setQaDescription(e.target.value)}
-                          className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] placeholder-[#5d4037]/50 focus:outline-none focus:ring-1 focus:ring-[#8b4513] shadow-inner"
-                        />
-                      </div>
-
-                      {/* ROW 4 */}
-                      <div className="md:col-span-2">
-                        <Combobox
-                          id="qa-subclass"
-                          label="Subtype"
-                          value={qaSubClass}
-                          onChange={setQaSubClass}
-                          options={subClassOptions}
-                          onSaveNew={(val) => addOption("subClass", val)}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Source Account Code
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={qaSourceDestBank}
-                            onChange={(e) => setQaSourceDestBank(e.target.value)}
-                            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] appearance-none font-bold shadow-inner"
-                          >
-                            <option value="">-</option>
-                            {Object.entries(accountMappings).map(([code, name]) => (
-                              <option key={code} value={code}>
-                                {code} - {name}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-3.5 top-3.5 w-4 h-4 text-[#8b4513]/80 pointer-events-none" />
-                        </div>
-                      </div>
-
-                      {/* ROW 5 */}
-                      <div className="md:col-span-2">
-                        <Combobox
-                          id="qa-category"
-                          label="Category"
-                          value={qaCategory}
-                          onChange={setQaCategory}
-                          options={categoryOptions}
-                          onSaveNew={(val) => addOption("category", val)}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black mb-1.5 font-sans">
-                          Target Account Code
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={qaTargetAccount}
-                            onChange={(e) => setQaTargetAccount(e.target.value)}
-                            className="w-full bg-[#faf4e5]/90 border border-[#8b4513]/30 rounded-xl p-3 text-xs text-[#4b2c20] focus:outline-none focus:ring-1 focus:ring-[#8b4513] appearance-none font-bold shadow-inner"
-                          >
-                            <option value="">-</option>
-                            {Object.entries(accountMappings).map(([code, name]) => (
-                              <option key={code} value={code}>
-                                {code} - {name}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-3.5 top-3.5 w-4 h-4 text-[#8b4513]/80 pointer-events-none" />
-                        </div>
-                      </div>
-
-                      {/* ROW 6 */}
-                      <div className="md:col-span-2">
-                        <Combobox
-                          id="qa-entity"
-                          label="Entity Association"
-                          value={qaEntity}
-                          onChange={setQaEntity}
-                          options={entityOptions}
-                          onSaveNew={(val) => addOption("entity", val, { category: qaCategory })}
-                          activeDropdownId={activeDropdownId}
-                          setActiveDropdownId={setActiveDropdownId}
-                        />
-                      </div>
-
-                      {/* BUTTON ALIGNMENT */}
-                      <div className="md:col-span-2 flex items-end justify-end gap-3 pt-4 font-sans">
-                        <button
-                          type="submit"
-                          className="h-[46px] px-6 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/45 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 hover:scale-105 active:scale-95"
-                        >
-                          <Save className="w-4 h-4" />
-                          <span>Save Blueprint</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleResetQaForm}
-                          className="h-[46px] px-6 bg-[#faf4e5] hover:bg-[#8b4513]/5 border border-[#8b4513]/30 text-[#4b2c20] font-black rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-                </div>
-
-                {/* Quick Actions Registry Data Table */}
-                <div className="bg-[#faf4e5]/80 border border-[#8b4513]/20 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="px-5 py-4 border-b border-[#8b4513]/15 bg-[#8b4513]/5 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-widest text-[#8b4513] font-black font-sans">
-                      Quick Actions Registry
-                    </span>
-                    <span className="text-[9px] font-mono text-[#8b4513] font-bold">
-                      Total Routes: {templates.length}
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse font-serif">
-                      <thead>
-                        <tr className="bg-[#8b4513]/10 border-b border-[#8b4513]/20 text-[9px] uppercase tracking-widest text-[#5d4037] font-black">
-                          <th className="p-4">Action Target Name</th>
-                          <th className="p-4">Flow</th>
-                          <th className="p-4">Status</th>
-                          <th className="p-4 text-right">Amount ($)</th>
-                          <th className="p-4">COA Path ID</th>
-                          <th className="p-4">Entity Mapped Node</th>
-                          <th className="p-4 text-right">Edit</th>
-                          <th className="p-4 text-right">Deprecate</th>
+                      ))}
+                      {filteredCOA.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-slate-500 uppercase tracking-widest font-sans">
+                            No ledger structures located
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#8b4513]/10 text-xs font-bold text-[#4b2c20]">
-                        {templates.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-[#8b4513]/5 transition-colors">
-                            <td className="p-4 text-[#4b2c20] font-black">{item.name}</td>
-                            <td className="p-4 font-sans">
-                              <span
-                                className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${
-                                  item.data?.flow === "inflow"
-                                    ? "text-emerald-700 border-emerald-500/20 bg-emerald-50"
-                                    : item.data?.flow === "outflow"
-                                    ? "text-[#8b0000] border-[#8b0000]/20 bg-red-50"
-                                    : "text-gray-700 border-gray-400/20 bg-gray-50"
-                                }`}
-                              >
-                                {item.data?.flow || "neutral"}
-                              </span>
-                            </td>
-                            <td className="p-4 font-sans">
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#faf4e5] text-[#5d4037] border border-[#8b4513]/20">
-                                {item.data?.payment_status || "Pending"}
-                              </span>
-                            </td>
-                            <td className="p-4 text-right font-mono text-[#8b4513] font-semibold">
-                              ${parseFloat(item.data?.amount || 0).toLocaleString()}
-                            </td>
-                            <td className="p-4 font-mono text-[#5d4037]">
-                              [{item.data?.target_account || "N/A"}]
-                            </td>
-                            <td className="p-4 text-[#5d4037]">{item.data?.entity || "Universal"}</td>
-                            <td className="p-4 text-right">
-                              <button
-                                onClick={() => {
-                                  setSelectedQaTemplateName(item.name);
-                                  setQaName(item.name);
-                                  setQaIcon(item.icon || "⚡");
-                                  setQaFrom(item.data.from || "");
-                                  setQaClass(item.data.transaction_type || "");
-                                  setQaSubClass(item.data.transaction_subtype || "");
-                                  setQaEntity(item.data.entity || "");
-                                  setQaCategory(item.data.transaction_category || "");
-                                  setQaTargetAccount(item.data.target_account || "");
-                                  setQaSourceDestBank(item.data.source_dest_bank || "");
-                                  setQaFlow(item.data.flow || "");
-                                  setQaStatus(item.data.payment_status || "");
-                                  setQaDescription(item.data.description || "");
-                                  setQaAmount(item.data.amount || "");
-                                  setQaDueDate(item.data.due_date || "");
-                                  setQaValueDate(item.data.value_date || "");
-                                  setQaPostingDate(item.data.posting_date || "");
-                                  setIsEditingQa(true);
-                                  toast.success(`Loaded blueprint: ${item.name}`);
-                                }}
-                                className="p-1.5 text-blue-800 hover:bg-blue-50 rounded-lg cursor-pointer"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                            <td className="p-4 text-right">
-                              <button
-                                onClick={() => {
-                                  deleteOption("quickAction", item.name);
-                                  toast.success(`Deprecating blueprint action: ${item.name}`);
-                                }}
-                                className="p-1.5 text-[#8b0000] hover:bg-red-50 rounded-lg cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* ================================================================= */}
+          {/* TAB 3: SCRIBE TEMPLATES (QUICK ACTIONS) */}
+          {/* ================================================================= */}
+          {activeTab === "templates" && (
+            <div className="space-y-6">
+              {/* Add New Scribe Template */}
+              <form onSubmit={handleAddTemplate} className="bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-[#8b4513]/10">
+                  <Zap className="w-4 h-4 text-[#8b4513]" />
+                  <h3 className="text-sm font-black uppercase tracking-wider text-[#4b2c20]">
+                    Draft Scribe Blueprint
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Template Title */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Template Title
+                    </label>
+                    <input
+                      type="text"
+                      value={tplName}
+                      onChange={(e) => setTplName(e.target.value)}
+                      placeholder="e.g., Pay Rent"
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Template Icon */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Icon Glyph
+                    </label>
+                    <select
+                      value={tplIcon}
+                      onChange={(e) => setTplIcon(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      <option value="💸">💸 Gold Flow</option>
+                      <option value="💳">💳 Credit Tab</option>
+                      <option value="🧾">🧾 Payment Due</option>
+                      <option value="🛡️">🛡️ Royal Tax</option>
+                      <option value="🏰">🏰 Keep Asset</option>
+                      <option value="🪙">🪙 Vault Gold</option>
+                    </select>
+                  </div>
+
+                  {/* Responsible Council Member */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Council Authority
+                    </label>
+                    <select
+                      value={tplFrom}
+                      onChange={(e) => setTplFrom(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      {fromOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Type Taxonomy */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Taxonomy Type
+                    </label>
+                    <select
+                      value={tplType}
+                      onChange={(e) => handleTplTypeChange(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      {coaTypes.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Subtype Taxonomy */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Subclass
+                    </label>
+                    <select
+                      value={tplSubtype}
+                      onChange={(e) => handleTplSubtypeChange(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      <option value="">-- Select Subtype --</option>
+                      {templateSubtypes.map((sub) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Category Taxonomy */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Category
+                    </label>
+                    <select
+                      value={tplCategory}
+                      disabled={!tplSubtype}
+                      onChange={(e) => handleTplCategoryChange(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="">-- Select Category --</option>
+                      {templateCategories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Entity Taxonomy */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Entity
+                    </label>
+                    <select
+                      value={tplEntity}
+                      disabled={!tplCategory}
+                      onChange={(e) => setTplEntity(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="">-- Select Entity --</option>
+                      {templateEntities.map((ent) => (
+                        <option key={ent} value={ent}>
+                          {ent}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Flow Direction */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Flow Direction
+                    </label>
+                    <select
+                      value={tplFlow}
+                      onChange={(e) => setTplFlow(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      <option value="outflow">Outflow (Expense)</option>
+                      <option value="inflow">Inflow (Income)</option>
+                      <option value="neutral">Neutral (Internal Transfer)</option>
+                    </select>
+                  </div>
+
+                  {/* Default Vault Asset Account */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Source / Bank Vault (8-digit)
+                    </label>
+                    <select
+                      value={tplSourceBank}
+                      onChange={(e) => setTplSourceBank(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      {sourceBankOptions.map((row) => (
+                        <option key={row.code} value={row.code}>
+                          {row.entity} ({row.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Target Account Code */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Target Account Code (8-digit)
+                    </label>
+                    <select
+                      value={tplTargetAccount}
+                      onChange={(e) => setTplTargetAccount(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      <option value="">-- Auto Resolve from Taxonomy --</option>
+                      {targetAccountOptions.map((row) => (
+                        <option key={row.code} value={row.code}>
+                          {row.account_name} ({row.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Payment Status */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Payment Status
+                    </label>
+                    <select
+                      value={tplStatus}
+                      onChange={(e) => setTplStatus(e.target.value)}
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    >
+                      <option value="Completed">Completed</option>
+                      <option value="Pending">Pending</option>
+                    </select>
+                  </div>
+
+                  {/* Ledger Note */}
+                  <div className="md:col-span-3 space-y-1.5">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#8b4513] font-black">
+                      Scribe Narrative / Description
+                    </label>
+                    <input
+                      type="text"
+                      value={tplDesc}
+                      onChange={(e) => setTplDesc(e.target.value)}
+                      placeholder="e.g. Monthly allocation for castle housing"
+                      className="w-full bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#4b2c20] focus:ring-1 focus:ring-[#8b4513]/50 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      className="w-full bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/40 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+                    >
+                      Lock Blueprint
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {/* Scribe Blueprints Directory */}
+              <div className="bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl p-5 shadow-sm space-y-4">
+                <h3 className="text-sm font-black uppercase tracking-wider text-[#4b2c20] pb-2 border-b border-[#8b4513]/10">
+                  Active Scribe Blueprints
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {templates.map((tpl) => (
+                    <div
+                      key={tpl.name}
+                      className="bg-white/40 border border-[#8b4513]/20 rounded-xl p-4 flex items-start gap-4 hover:border-[#8b4513]/40 hover:bg-[#8b4513]/5 transition-all"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-[#8b4513]/10 border border-[#8b4513]/20 flex items-center justify-center text-xl shrink-0">
+                        {tpl.icon || "📜"}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-[#4b2c20]">
+                            {tpl.name}
+                          </h4>
+                          <button
+                            onClick={() => handleDeleteTemplate(tpl.name)}
+                            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                            title="Expunge Blueprint"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-[#5d4037]/70 font-sans italic">
+                          {tpl.data.description || "No description registered."}
+                        </p>
+                        <div className="pt-2 flex flex-wrap gap-1.5 text-[9px] font-black uppercase tracking-widest">
+                          <span className="bg-[#8b4513]/10 text-[#8b4513] px-2 py-0.5 rounded-md">
+                            Flow: {tpl.data.flow}
+                          </span>
+                          <span className="bg-[#8b4513]/10 text-[#8b4513] px-2 py-0.5 rounded-md">
+                            Type: {tpl.data.transaction_type}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {templates.length === 0 && (
+                    <div className="md:col-span-2 py-8 text-center text-slate-500 uppercase tracking-widest font-sans">
+                      No active blueprints registered.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* FLOATING SMART SCROLL INDICATOR BUTTON */}
-        {showScrollBtn && (
-          <button
-            onClick={handleScrollAction}
-            className="absolute bottom-20 right-8 z-[100] p-3 bg-[#faf4e5] hover:bg-[#8b4513] hover:text-[#ffd700] text-[#5d4037] border border-[#8b4513]/30 rounded-full shadow-lg backdrop-blur transition-all duration-250 cursor-pointer active:scale-90"
-            title={isAtBottom ? "Smooth Scroll to Top" : "Smooth Scroll to Bottom"}
-          >
-            {isAtBottom ? <ArrowUp className="w-4.5 h-4.5" /> : <ArrowDown className="w-4.5 h-4.5" />}
-          </button>
-        )}
-
-        {/* SYSTEM BOTTOM ACTION BAR */}
-        <div className="p-4 bg-[#5d4037]/10 border-t border-[#8b4513]/20 flex justify-end gap-3 shrink-0 z-10 font-sans">
-          <button
-            onClick={onClose}
-            className="px-5 h-10 bg-[#faf4e5] hover:bg-[#8b4513]/5 border border-[#8b4513]/30 text-[#4b2c20] font-black rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              toast.success("Ledger compliance parameters committed safely.");
-              onClose();
-            }}
-            className="px-5 h-10 bg-[#8b4513] text-[#ffd700] hover:bg-[#a0522d] border border-[#d4af37]/45 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md hover:scale-105 active:scale-95"
-          >
-            <Check className="w-4 h-4" />
-            <span>Commit Matrix Configuration</span>
-          </button>
-        </div>
-
-        {/* HIDDEN FILE INPUTS FOR BACKWARD COMPATIBILITY CSV ACTIONS */}
-        <input
-          type="file"
-          ref={settingsFileInputRef}
-          onChange={importSettingsCSV}
-          className="hidden"
-          accept=".csv"
-        />
-        <input
-          type="file"
-          ref={qaFileInputRef}
-          onChange={importQuickActionsCSV}
-          className="hidden"
-          accept=".csv"
-        />
       </div>
     </div>
   );
-}
+};
+
+export default SettingsModal;
