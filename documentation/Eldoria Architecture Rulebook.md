@@ -72,7 +72,16 @@ Every transaction requires a base target\_account (resolved from the Matrix). Tr
 * **Net Worth:** Total Assets \- Total Liabilities  
 * **Net Vault Cash (HUD Gold):** Σ(Balances of 1101xxxx, 1102xxxx, and 1103xxxx)
 
-## **4\. Component Refactoring Directives**
+## 4. UI Constraints & The "Modern Dashboard" Layout
+
+* **Aesthetics:** We use Tailwind CSS to create a premium, dark, medieval-fantasy aesthetic. Use deep browns, golds (`#ffd700`), dark stones, and high-contrast borders. **Never** remove existing Tailwind classes unless explicitly instructed; always fix the logic but preserve the paint.
+* **The Single-File Mandate:** For rapid prototyping, all React components, layout, and logic requested must be output into a single, self-contained React file. DO NOT generate TypeScript (.ts or .tsx).
+* **Strict Layout (The "Modern Dashboard"):** The web app screen size must NEVER stretch or collapse based on content. It must permanently obey these constraints:
+  * **Outer Void:** Exactly 100% width and dynamic viewport height (`w-full h-dvh bg-black flex justify-center overflow-hidden`).
+  * **Inner Canvas:** Exactly 100% height of the void, up to a maximum of 1280px wide, perfectly centered (`relative w-full max-w-7xl h-full mx-auto ...`).
+  * **Do not remove these wrappers** or modify their structural flex/height classes.
+
+## 5. Component Refactoring Directives
 
 When fixing legacy components, enforce these rules:
 
@@ -81,7 +90,7 @@ When fixing legacy components, enforce these rules:
 3. **Kill LocalStorage Configurations:** Do not load or save taxonomy lists (classOptions, subClassOptions, etc.) to LocalStorage.  
 4. **Preserve Custom UI:** Eldoria has a premium, medieval aesthetic. **DO NOT** alter Tailwind classes, layout grids, or color palettes unless explicitly instructed. Fix the plumbing, keep the paint.
 
-## **5\. The "Surgical Refactor" Prompt Template**
+## 6. The "Surgical Refactor" Prompt Template
 
 *When using an AI assistant to fix a broken file, copy/paste this prompt along with the broken file and this Rulebook:*
 
@@ -89,14 +98,14 @@ When fixing legacy components, enforce these rules:
 
 **Attached Context:**
 
-1. eldoria\_master\_rulebook.md (The architectural rules you MUST follow).  
-2. \[BROKEN\_FILE\_NAME\].jsx (The legacy file to fix).  
+1. eldoria_master_rulebook.md (The architectural rules you MUST follow).  
+2. \[BROKEN_FILE_NAME\].jsx (The legacy file to fix).  
 3. useKingdomStore.js (How to fetch the flat matrix data).
 
-**Your Task:** Refactor \[BROKEN\_FILE\_NAME\].jsx to strictly comply with the Rulebook.
+**Your Task:** Refactor \[BROKEN_FILE_NAME\].jsx to strictly comply with the Rulebook.
 
 * Strip out all old uni-directional mapping logic, hardcoded overrides, and string-parsing hacks.  
-* Wire the component to consume the dim\_contas flat array and 8-digit COA system.  
+* Wire the component to consume the dim_contas flat array and 8-digit COA system.  
 * **CRITICAL:** Do NOT change my Tailwind layout, custom colors, or CSS. Preserve the exact visual aesthetic.
 
 Please output the complete, production-ready refactored code.

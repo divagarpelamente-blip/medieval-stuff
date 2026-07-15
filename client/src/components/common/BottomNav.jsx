@@ -1,46 +1,29 @@
-import { Compass, Trophy, BookOpen, LayoutDashboard, Settings, BarChart3 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { Z_LAYERS } from '../../constants/UI_UX';
+import React from 'react';
 
-const BottomNav = ({ activeTab = 'quests', onTabChange }) => {
-  const { t } = useTranslation();
-
-  const items = [
-    { id: 'quests', label: t('quests'), icon: Compass },
-    { id: 'achievements', label: t('achievements'), icon: Trophy },
-    { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
-    { id: 'statistics', label: t('menu_statistics', 'Statistics'), icon: BarChart3 },
-    { id: 'settings', label: t('settings'), icon: Settings },
+export default function BottomNav({ activeTab, onTabChange }) {
+  const tabs = [
+    { id: 'ledger', icon: '📜', label: 'Ledger' },
+    { id: 'treasury', icon: '⚖️', label: 'Treasury' },
+    { id: 'quests', icon: '⚔️', label: 'Quests' },
+    { id: 'settings', icon: '⚙️', label: 'Settings' }
   ];
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[48%] max-w-[384px] bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-xl p-0.5 flex justify-around items-center shadow-2xl" style={{ zIndex: Z_LAYERS.BOTTOM_NAV }}>
-      {items.map((item) => {
-        const Icon = item.icon;
-        const isActive = activeTab === item.id || (item.id === 'dashboard' && (activeTab === 'financial_statement' || activeTab === 'transactions'));
-        const isSupported = item.id === 'quests' || item.id === 'settings' || item.id === 'dashboard' || item.id === 'statistics';
-
-        return (
-          <button 
-            key={item.id}
-            onClick={isSupported ? () => onTabChange(item.id) : undefined}
-            disabled={!isSupported}
-            className={`w-9 h-9 sm:w-[41px] sm:h-[41px] flex flex-col items-center justify-center rounded-lg border transition-all select-none ${
-              !isSupported
-                ? 'border-transparent text-gray-400/50 opacity-40 cursor-not-allowed'
-                : isActive 
-                  ? 'bg-white/10 border-white/20 text-[#ffd700] shadow-inner opacity-90 cursor-pointer hover:scale-105 active:scale-95' 
-                  : 'border-transparent text-gray-400/80 opacity-70 hover:opacity-100 hover:text-white cursor-pointer hover:scale-105 active:scale-95'
-            }`}
-            title={isSupported ? item.label : `${item.label} (Under Construction)`}
-          >
-            <Icon size={11} className="sm:w-3.5 sm:h-3.5 mb-0.5" />
-            <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-wider">{item.label}</span>
-          </button>
-        );
-      })}
+    <div className="absolute bottom-0 left-0 w-full bg-[#1a0f0a] border-t-4 border-[#8b4513] p-4 z-50 flex justify-around shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
+      {tabs.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => onTabChange(tab.id)}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === tab.id 
+              ? 'scale-110 opacity-100 text-[#ffd700]' 
+              : 'opacity-50 text-stone-400 hover:opacity-80'
+          }`}
+        >
+          <span className="text-2xl drop-shadow-md">{tab.icon}</span>
+          <span className="text-[10px] font-black uppercase tracking-wider">{tab.label}</span>
+        </button>
+      ))}
     </div>
   );
-};
-
-export default BottomNav;
+}
