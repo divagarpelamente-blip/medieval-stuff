@@ -12,10 +12,11 @@ import React from 'react';
  * @param {string} subtitle - Secondary description text
  * @param {function} onClose - Frame closure handler callback
  * @param {React.ReactNode} children - Embedded modal content
+ * @param {string} maxWidth - Tailwind max-width class (defaults to max-w-4xl)
  */
-export default function Modal({ icon, title, subtitle, onClose, children }) {
+export default function Modal({ icon, title, subtitle, onClose, children, maxWidth = "max-w-4xl" }) {
   return (
-    <div className="w-full max-w-4xl animate-fade-in">
+    <div className={`w-full ${maxWidth} animate-fade-in transition-all duration-300 ease-in-out`}>
       
       {/* Stone Board Frame Wrapper */}
       <div className="bg-stone-950 border-2 border-amber-900/50 rounded-lg shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden backdrop-blur-md">
@@ -45,8 +46,8 @@ export default function Modal({ icon, title, subtitle, onClose, children }) {
           </button>
         </div>
 
-        {/* Dynamic Modal Content Area */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
+        {/* Dynamic Modal Content Area - Increased max height for larger nested views */}
+        <div className="p-6 overflow-y-auto max-h-[85vh] scrollbar-thin scrollbar-thumb-amber-900 scrollbar-track-stone-950">
           {children}
         </div>
 

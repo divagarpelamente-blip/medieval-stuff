@@ -2,7 +2,7 @@ import React from 'react';
 import { useKingdomStore } from "../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 
-export default function LedgerTable({ onEditClick }) {
+export default function LedgerTable({ onEditTransaction }) {
   const transactions = useKingdomStore((state) => state.transactions) || [];
   const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
   const fetchTransactions = useKingdomStore((state) => state.fetchTransactions);
@@ -21,6 +21,7 @@ export default function LedgerTable({ onEditClick }) {
 
   return (
     <section className="bg-stone-950 border-2 border-amber-900/50 rounded-lg p-5 shadow-2xl relative overflow-hidden flex flex-col h-80">
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-base font-serif text-amber-400 tracking-wider flex items-center gap-2">
           Ledger Transaction Log
@@ -34,7 +35,7 @@ export default function LedgerTable({ onEditClick }) {
         </button>
       </div>
 
-      <div className="flex-1 bg-stone-900/50 rounded border border-amber-900/20 overflow-y-auto p-3 font-mono text-xs scrollbar-thin scrollbar-thumb-amber-900 scrollbar-track-stone-950">
+      <div className="flex-1 bg-stone-900/50 rounded border border-amber-900/20 overflow-y-auto p-3 font-mono text-xs">
         {isLedgerLoading && transactions.length === 0 ? (
           <div className="h-full flex items-center justify-center text-amber-500 animate-pulse">
             Loading transactions...
@@ -62,9 +63,10 @@ export default function LedgerTable({ onEditClick }) {
                   {t.flow}
                 </div>
                 <div className="text-right text-amber-400 font-bold">{Number(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-                
+
+                {/* Action Buttons */}
                 <div className="flex justify-center gap-2">
-                  <button onClick={() => onEditClick(t)} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-700/50 transition">
+                  <button onClick={() => onEditTransaction(t)} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-700/50 transition">
                     Edit
                   </button>
                   <button onClick={() => handleDeleteClick(t.id)} className="text-[10px] bg-red-900/50 hover:bg-red-800 text-red-200 px-2 py-0.5 rounded border border-red-700/50 transition">

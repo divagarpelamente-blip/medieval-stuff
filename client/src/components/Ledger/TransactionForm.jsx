@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useKingdomStore } from "../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 
-export default function TransactionForm({ editingId, editingTransaction, onCancelEdit }) {
+export default function TransactionForm({ editingTransaction, onCancelEdit }) {
   // Store subscriptions
   const flatMatrix = useKingdomStore((state) => state.flatMatrix) || [];
   const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
+  const fetchFlatMatrix = useKingdomStore((state) => state.fetchFlatMatrix);
   const addTransaction = useKingdomStore((state) => state.addTransaction);
   const updateTransaction = useKingdomStore((state) => state.updateTransaction);
 
@@ -29,9 +30,14 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedAccountCode, setSelectedAccountCode] = useState('');
 
-  // Sync edits from parent modal container
+  // Fetch dim_contas on mount
   useEffect(() => {
-    if (editingId && editingTransaction) {
+    fetchFlatMatrix();
+  }, [fetchFlatMatrix]);
+
+  // Sync form state if an editing transaction is passed down
+  useEffect(() => {
+    if (editingTransaction) {
       setEntity(editingTransaction.entity || '');
       setSelectedType(editingTransaction.type || '');
       setSelectedSubtype(editingTransaction.subtype || '');
@@ -45,25 +51,8 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
       setPostingDate(editingTransaction.posting_date || todayStr);
       setPaymentDate(editingTransaction.payment_date || '');
       setDescription(editingTransaction.description || '');
-    } else {
-      resetForm();
     }
-  }, [editingId, editingTransaction]);
-
-  const resetForm = () => {
-    setAmount('');
-    setSourceAccount('');
-    setDescription('');
-    setEntity('');
-    setSelectedType('');
-    setSelectedSubtype('');
-    setSelectedCategory('');
-    setSelectedAccountCode('');
-    setPaymentDate('');
-    setValueDate(todayStr);
-    setPostingDate(todayStr);
-    setFlow('outflow');
-  };
+  }, [editingTransaction, todayStr]);
 
   // Unique Matrix Option Calculations
   const uniqueEntities = [...new Set(flatMatrix.map((row) => row.entity).filter(Boolean))].sort();
@@ -93,6 +82,7 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
     const val = e.target.value;
     setEntity(val);
 
+    // Auto-fill logic
     if (val) {
       const match = flatMatrix.find((row) => row.entity === val);
       if (match) {
@@ -154,6 +144,22 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
     }
   };
 
+  const resetForm = () => {
+    setAmount('');
+    setSourceAccount('');
+    setDescription('');
+    setEntity('');
+    setSelectedType('');
+    setSelectedSubtype('');
+    setSelectedCategory('');
+    setSelectedAccountCode('');
+    setPaymentDate('');
+    setValueDate(todayStr);
+    setPostingDate(todayStr);
+    setFlow('outflow');
+    if (onCancelEdit) onCancelEdit();
+  };
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
@@ -189,36 +195,32 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
       category: selectedCategory,
       entity: entity || null,
       description: description,
-      origin: 'Web Client Ledger'
+      origin: 'Web Client'
     };
 
     try {
-      if (editingId) {
-        await updateTransaction(editingId, payload);
+      if (editingTransaction) {
+        await updateTransaction(editingTransaction.id, payload);
         toast.success("Transaction Updated");
-        if (onCancelEdit) onCancelEdit();
       } else {
         await addTransaction(payload);
         toast.success("Transaction Added");
       }
+
       resetForm();
     } catch (error) {
-      toast.error(editingId ? "Failed to update transaction." : "Failed to commit transaction.");
+      toast.error(editingTransaction ? "Failed to update transaction." : "Failed to commit transaction.");
     }
-  };
-
-  const handleCancelClick = () => {
-    resetForm();
-    if (onCancelEdit) onCancelEdit();
   };
 
   return (
     <section className="bg-stone-950 border-2 border-amber-900/50 rounded-lg p-5 shadow-2xl relative overflow-hidden">
       <h2 className="text-base font-serif text-amber-400 tracking-wider mb-4 flex items-center gap-2">
-        {editingId ? 'Edit Transaction' : 'New Transaction'}
+        {editingTransaction ? 'Edit Transaction' : 'New Transaction'}
       </h2>
 
       <form onSubmit={handleFormSubmit} className="space-y-4">
+
         <div className="bg-stone-900/50 p-3 rounded border border-amber-900/20">
           <div className="flex flex-col space-y-1">
             <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
@@ -241,6 +243,7 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-stone-900/40 p-3 rounded border border-amber-900/10">
+
           <div className="flex flex-col space-y-1">
             <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Type</label>
             <select
@@ -298,6 +301,7 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
               ))}
             </select>
           </div>
+
         </div>
 
         {selectedAccountCode && (
@@ -313,6 +317,7 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+
           <div className="flex flex-col space-y-1">
             <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Amount</label>
             <input
@@ -367,9 +372,11 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
               <option value="Pending">Pending</option>
             </select>
           </div>
+
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
           <div className="flex flex-col space-y-1">
             <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Value Date</label>
             <input
@@ -401,6 +408,7 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
               className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition font-mono"
             />
           </div>
+
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 items-end">
@@ -421,13 +429,13 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
               disabled={isLedgerLoading}
               className="w-full md:w-auto px-6 py-2.5 bg-amber-600 hover:bg-amber-500 active:translate-y-px border border-amber-400/50 rounded text-stone-950 text-xs tracking-widest uppercase font-bold transition disabled:opacity-50"
             >
-              {isLedgerLoading ? (editingId ? 'Updating...' : 'Adding...') : (editingId ? 'Update Transaction' : 'Add Transaction')}
+              {isLedgerLoading ? (editingTransaction ? 'Updating...' : 'Adding...') : (editingTransaction ? 'Update Transaction' : 'Add Transaction')}
             </button>
 
-            {editingId && (
+            {editingTransaction && (
               <button
                 type="button"
-                onClick={handleCancelClick}
+                onClick={resetForm}
                 className="w-full md:w-auto px-4 py-2.5 bg-stone-800 hover:bg-stone-700 active:translate-y-px border border-stone-600/50 rounded text-stone-300 text-xs tracking-widest uppercase font-bold transition"
               >
                 Cancel
@@ -435,6 +443,7 @@ export default function TransactionForm({ editingId, editingTransaction, onCance
             )}
           </div>
         </div>
+
       </form>
     </section>
   );

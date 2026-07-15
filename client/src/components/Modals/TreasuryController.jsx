@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import ModalSubmenus from '../Modals/ModalSubmenus';
 import Modal from '../Modals/Modal';
-
-// 1. Import our new Ledger System
-import LedgerModal from '../Modals/LedgerModal'; 
+import TransactionForm from '../Ledger/TransactionForm';
+import LedgerTable from '../Ledger/LedgerTable';
 
 /**
  * TreasuryController Component
@@ -16,6 +15,7 @@ import LedgerModal from '../Modals/LedgerModal';
  */
 export default function TreasuryController({ onClose }) {
   const [activeView, setActiveView] = useState('menu'); // 'menu' | 'ledger' | 'statements' | 'dashboard'
+  const [editingTransaction, setEditingTransaction] = useState(null); // Shared state for edit mode
 
   // Map view types for header configurations
   const viewMetadata = {
@@ -59,14 +59,35 @@ export default function TreasuryController({ onClose }) {
     );
   }
 
-  // --- STATE 2: THE GENERAL LEDGER (NEW) ---
+  // --- STATE 2: THE GENERAL LEDGER ---
   if (activeView === 'ledger') {
     return (
-      <LedgerModal 
-        // We pass a custom onClose that takes the user back to the Treasury Menu 
-        // instead of closing the whole module.
-        onClose={() => setActiveView('menu')} 
-      />
+      <Modal 
+        title="General Ledger" 
+        icon="📖" 
+        subtitle="Royal Treasury - General Ledger" 
+        maxWidth="max-w-7xl" // Expand modal width to support side-by-side layout
+        onClose={() => {
+          setActiveView('menu');
+          setEditingTransaction(null);
+        }}
+      >
+        <div className="flex flex-col xl:flex-row gap-6 w-full">
+          {/* Left/Top: Form */}
+          <div className="flex-1 w-full">
+            <TransactionForm 
+              editingTransaction={editingTransaction}
+              onCancelEdit={() => setEditingTransaction(null)}
+            />
+          </div>
+          {/* Right/Bottom: Table */}
+          <div className="flex-1 w-full">
+            <LedgerTable 
+              onEditTransaction={(txn) => setEditingTransaction(txn)}
+            />
+          </div>
+        </div>
+      </Modal>
     );
   }
 
