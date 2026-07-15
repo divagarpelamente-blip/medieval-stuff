@@ -72,14 +72,31 @@ Every transaction requires a base target\_account (resolved from the Matrix). Tr
 * **Net Worth:** Total Assets \- Total Liabilities  
 * **Net Vault Cash (HUD Gold):** Σ(Balances of 1101xxxx, 1102xxxx, and 1103xxxx)
 
+### **Transaction Mutations & State Synchronization**
+
+* **Adding Transactions:** Executed via `addTransaction(payload)` in `useKingdomStore`. Inserts a new record and prepends it to the ledger state.
+* **Editing Transactions:** Managed dynamically in the UI form using an `editingId` to toggle edit/update mode. Invokes `updateTransaction(id, payload)` to update the record in Supabase and sync the local store state.
+* **Deleting Transactions:** Executed via `deleteTransaction(id)` in `useKingdomStore`. Safely removes the transaction record from both Supabase and the active ledger array.
+* **Profile Balance Hook:** When any transaction is added, updated, or deleted, corresponding gold and XP updates are synchronized to the player profile.
+
+
 ## 4. UI Constraints & The "Modern Dashboard" Layout
 
 * **Aesthetics:** We use Tailwind CSS to create a premium, dark, medieval-fantasy aesthetic. Use deep browns, golds (`#ffd700`), dark stones, and high-contrast borders. **Never** remove existing Tailwind classes unless explicitly instructed; always fix the logic but preserve the paint.
 * **The Single-File Mandate:** For rapid prototyping, all React components, layout, and logic requested must be output into a single, self-contained React file. DO NOT generate TypeScript (.ts or .tsx).
 * **Strict Layout (The "Modern Dashboard"):** The web app screen size must NEVER stretch or collapse based on content. It must permanently obey these constraints:
-  * **Outer Void:** Exactly 100% width and dynamic viewport height (`w-full h-dvh bg-black flex justify-center overflow-hidden`).
+* **Outer Void:** Exactly 100% width and dynamic viewport height (`w-full h-dvh bg-black flex justify-center overflow-hidden`).
   * **Inner Canvas:** Exactly 100% height of the void, up to a maximum of 1280px wide, perfectly centered (`relative w-full max-w-7xl h-full mx-auto ...`).
   * **Do not remove these wrappers** or modify their structural flex/height classes.
+
+### **The Reusable Modal System**
+
+To preserve the cinematic medieval atmosphere and maintain codebase cleanliness, we use a structured, layered Modal pattern:
+
+* **Universal Frame ([Modal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/Modal.jsx)):** Provides an atmospheric stone-board container (`bg-stone-950 border-2 border-amber-900/50`) complete with a medieval header, emoji icon support, tracking-widest uppercase title, subtitle, and a circular red close button. The body area is constrained to `max-h-[60vh] overflow-y-auto`.
+* **Horizontal Tabbed Navigation ([ModalTabmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/ModalTabmenus.jsx)):** Wraps the universal frame and renders a scrollable horizontal tab bar (`border-b border-amber-900/30`) to switch sub-panels dynamically (e.g., Profile vs. Preferences).
+* **Vertical Action Lists ([ModalSubmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/ModalSubmenus.jsx)):** Wraps the universal frame and renders uniform, list-style navigation buttons with hover scales (`hover:border-amber-700/80 hover:bg-stone-800`) for menu-driven routing.
+* **Modular View Controllers:** Files like [TreasuryController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/TreasuryController.jsx) and [SettingsController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/SettingsController.jsx) manage view state transitions independently, decoupling business flow from the layout rendering code.
 
 ## 5. Component Refactoring Directives
 

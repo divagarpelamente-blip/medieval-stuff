@@ -1,30 +1,57 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from "react";
+import { Toaster } from 'react-hot-toast';
 import { useKingdomStore } from './store/useKingdomStore';
-import MainMenuSandbox from './components/sandbox/MainMenuSandbox';
 
-/**
- * App Entry Point (Eldoria V2.0 Routing Shell)
- * 
- * Cleans up legacy UI structures, side navigations, and global headers.
- * Triggers the core state subscription listeners (auth pipelines) from the 
- * Zustand store, and presents <MainMenuSandbox /> as the primary full-screen component.
- */
-export default function App() {
+// Production Controllers (No Sandboxes)
+import TreasuryController from "./components/Modals/TreasuryController";
+
+function App() {
   const initAuth = useKingdomStore((state) => state.initAuth);
+  
+  // Central Command Hub Routing State
+  const [activeModule, setActiveModule] = useState('hub'); 
 
-  // Initialize Supabase Auth state synchronization on boot
+  // Boot up the Supabase Authentication pipeline on load
   useEffect(() => {
-    if (initAuth) {
-      const unsubscribe = initAuth();
-      return () => {
-        if (unsubscribe) unsubscribe();
-      };
+    const unsubscribe = initAuth();
+    return () => {
+      if (unsubscribe) unsubscribe();
     }
   }, [initAuth]);
 
   return (
-    <React.Fragment>
-      <MainMenuSandbox />
-    </React.Fragment>
+    <div className="w-full h-dvh bg-black flex flex-col justify-center items-center overflow-hidden font-sans text-stone-200">
+      
+      {/* Global Toast Notification Provider */}
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          style: {
+            background: '#1c1917', // stone-900
+            color: '#fcd34d',      // amber-300
+            border: '1px solid #78350f', // amber-900
+            fontFamily: 'serif',
+          },
+        }} 
+      />
+      
+      {/* --- MAIN COMMAND HUB ROUTING --- */}
+      {      activeModule === 'treasury' ? (
+        <TreasuryController onClose={() => setActiveModule('hub')} />
+      ) : (
+        <div className="text-center space-y-6 animate-fade-in">
+          <h1 className="text-4xl font-serif text-amber-500 tracking-widest uppercase">Eldoria Command Hub</h1>
+          <button 
+            onClick={() => setActiveModule('treasury')}
+            className="px-6 py-3 bg-stone-800 hover:bg-stone-700 text-amber-400 font-serif tracking-wide rounded border border-amber-900 transition shadow-lg cursor-pointer"
+          >
+            Enter Royal Treasury
+          </button>
+        </div>
+      )}
+
+    </div>
   );
 }
+
+export default App;

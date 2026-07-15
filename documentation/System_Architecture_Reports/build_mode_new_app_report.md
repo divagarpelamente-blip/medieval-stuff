@@ -22,6 +22,17 @@ Attach these files to provide layout, styling, and state model parameters.
 - [ ] **State & Matrix Selectors**
   * **File:** [client/src/store/useKingdomStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useKingdomStore.js)
   * **Rationale:** Details the Zustand store structure, containing the V2.0 gamification attributes (gold, gems, xp, level) and dynamic cascading matrix selectors.
+- [ ] **Atmospheric Medieval Modal System**
+  * **Files:**
+    * [client/src/components/Modals/Modal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/Modal.jsx) — Base frame layout and styling
+    * [client/src/components/Modals/ModalSubmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/ModalSubmenus.jsx) — Navigation list buttons wrapper
+    * [client/src/components/Modals/ModalTabmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/ModalTabmenus.jsx) — Tab-based layout switcher wrapper
+  * **Rationale:** Provides the modular UI component layer that handles atmospheric screen popups.
+- [ ] **Kingdom View Controllers**
+  * **Files:**
+    * [client/src/components/Modals/TreasuryController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/TreasuryController.jsx) — Handles financial menu state logic
+    * [client/src/components/Modals/SettingsController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/SettingsController.jsx) — Handles citadel preferences configuration tabs
+  * **Rationale:** Manages UI state transitions inside popups, decoupling routing from the main menu canvas.
 
 ---
 

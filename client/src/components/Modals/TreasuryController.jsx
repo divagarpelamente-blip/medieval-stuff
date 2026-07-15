@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import ModalSubmenus from '../Modals/ModalSubmenus';
 import Modal from '../Modals/Modal';
 
+// 1. Import our new Ledger System
+import LedgerModal from '../Modals/LedgerModal'; 
+
 /**
  * TreasuryController Component
  * 
@@ -43,6 +46,7 @@ export default function TreasuryController({ onClose }) {
     }
   ];
 
+  // --- STATE 1: THE MAIN MENU ---
   if (activeView === 'menu') {
     return (
       <ModalSubmenus 
@@ -55,7 +59,19 @@ export default function TreasuryController({ onClose }) {
     );
   }
 
-  // Active view metadata resolution
+  // --- STATE 2: THE GENERAL LEDGER (NEW) ---
+  if (activeView === 'ledger') {
+    return (
+      <LedgerModal 
+        // We pass a custom onClose that takes the user back to the Treasury Menu 
+        // instead of closing the whole module.
+        onClose={() => setActiveView('menu')} 
+      />
+    );
+  }
+
+  // --- STATE 3: PLACEHOLDER VIEWS ---
+  // Active view metadata resolution for undeveloped sections
   const currentViewMeta = viewMetadata[activeView];
 
   return (
@@ -63,7 +79,7 @@ export default function TreasuryController({ onClose }) {
       title={currentViewMeta?.title || 'Treasury Module'} 
       icon={currentViewMeta?.icon || '🏦'} 
       subtitle={`Royal Treasury - ${currentViewMeta?.title}`} 
-      onClose={onClose}
+      onClose={() => setActiveView('menu')}
     >
       <div className="flex flex-col items-center justify-center p-12 text-center opacity-50">
         <span className="text-4xl mb-4">🚧</span>
