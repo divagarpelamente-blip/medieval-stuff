@@ -39,11 +39,10 @@ export default function App() {
       )}
 
       {/* 
-        3. If the Treasury is open, render the Controller.
-        The onClose prop safely returns the user to the Main Menu.
+        3. Fixed overlay with p-8 guarantees the modal NEVER touches the screen edges.
       */}
       {isTreasuryOpen && (
-        <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black flex items-center justify-center p-8 z-50">
            <TreasuryController onClose={() => setIsTreasuryOpen(false)} />
         </div>
       )}

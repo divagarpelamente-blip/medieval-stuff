@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useKingdomStore } from "../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 
@@ -7,6 +7,13 @@ export default function LedgerTable({ onEditTransaction }) {
   const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
   const fetchTransactions = useKingdomStore((state) => state.fetchTransactions);
   const deleteTransaction = useKingdomStore((state) => state.deleteTransaction);
+
+  // --- ADD THIS BLOCK ---
+  // Fetch transactions from Supabase whenever the table mounts
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+  // ----------------------
 
   const handleDeleteClick = async (id) => {
     if (window.confirm("Are you sure you want to permanently delete this transaction?")) {
@@ -20,7 +27,7 @@ export default function LedgerTable({ onEditTransaction }) {
   };
 
   return (
-    <section className="bg-stone-950 border-2 border-amber-900/50 rounded-lg p-5 shadow-2xl relative overflow-hidden flex flex-col h-80">
+    <section className="bg-stone-950 border-2 border-amber-900/50 rounded-lg p-5 shadow-2xl relative flex flex-col">
 
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-base font-serif text-amber-400 tracking-wider flex items-center gap-2">
@@ -35,7 +42,7 @@ export default function LedgerTable({ onEditTransaction }) {
         </button>
       </div>
 
-      <div className="flex-1 bg-stone-900/50 rounded border border-amber-900/20 overflow-y-auto p-3 font-mono text-xs">
+      <div className="bg-stone-900/50 rounded border border-amber-900/20 p-3 font-mono text-xs">
         {isLedgerLoading && transactions.length === 0 ? (
           <div className="h-full flex items-center justify-center text-amber-500 animate-pulse">
             Loading transactions...

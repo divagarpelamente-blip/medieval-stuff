@@ -59,28 +59,29 @@ export default function TreasuryController({ onClose }) {
     );
   }
 
-  // --- STATE 2: THE GENERAL LEDGER ---
+// --- STATE 2: THE GENERAL LEDGER ---
   if (activeView === 'ledger') {
     return (
       <Modal 
         title="General Ledger" 
         icon="📖" 
         subtitle="Royal Treasury - General Ledger" 
-        maxWidth="max-w-7xl" // Expand modal width to support side-by-side layout
+        maxWidth="max-w-5xl" // Reduced width for a stacked layout
         onClose={() => {
           setActiveView('menu');
           setEditingTransaction(null);
         }}
       >
-        <div className="flex flex-col xl:flex-row gap-6 w-full">
-          {/* Left/Top: Form */}
+        {/* Removed xl:flex-row to force a permanent vertical stack */}
+        <div className="flex flex-col gap-6 w-full">
+          {/* Top: Form */}
           <div className="flex-1 w-full">
             <TransactionForm 
               editingTransaction={editingTransaction}
               onCancelEdit={() => setEditingTransaction(null)}
             />
           </div>
-          {/* Right/Bottom: Table */}
+          {/* Bottom: Table */}
           <div className="flex-1 w-full">
             <LedgerTable 
               onEditTransaction={(txn) => setEditingTransaction(txn)}

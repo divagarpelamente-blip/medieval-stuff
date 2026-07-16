@@ -3,14 +3,12 @@ import { useKingdomStore } from "../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 
 export default function TransactionForm({ editingTransaction, onCancelEdit }) {
-  // Store subscriptions
   const flatMatrix = useKingdomStore((state) => state.flatMatrix) || [];
   const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
   const fetchFlatMatrix = useKingdomStore((state) => state.fetchFlatMatrix);
   const addTransaction = useKingdomStore((state) => state.addTransaction);
   const updateTransaction = useKingdomStore((state) => state.updateTransaction);
 
-  // Core Financial Detail Local State
   const todayStr = new Date().toISOString().split('T')[0];
   const [amount, setAmount] = useState('');
   const [flow, setFlow] = useState('outflow');
@@ -18,24 +16,20 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
   const [description, setDescription] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('Completed');
 
-  // Exact Database Date Alignment States
   const [valueDate, setValueDate] = useState(todayStr);
   const [postingDate, setPostingDate] = useState(todayStr);
   const [paymentDate, setPaymentDate] = useState('');
 
-  // Cascading Matrix Fields Local State
   const [entity, setEntity] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedSubtype, setSelectedSubtype] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedAccountCode, setSelectedAccountCode] = useState('');
 
-  // Fetch dim_contas on mount
   useEffect(() => {
     fetchFlatMatrix();
   }, [fetchFlatMatrix]);
 
-  // Sync form state if an editing transaction is passed down
   useEffect(() => {
     if (editingTransaction) {
       setEntity(editingTransaction.entity || '');
@@ -54,11 +48,14 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
     }
   }, [editingTransaction, todayStr]);
 
-  // Unique Matrix Option Calculations
+  // Clean dynamic mapping (ignores bad data)
   const uniqueEntities = [...new Set(flatMatrix.map((row) => row.entity).filter(Boolean))].sort();
-  const uniqueTypes = [...new Set(flatMatrix.map((row) => row.type).filter(Boolean))].sort();
+  // Ensure we only use the 4 valid root types (handling singular/plural variations)
+  const validTypes = ['Assets', 'Asset', 'Liabilities', 'Liability', 'Income', 'Expense', 'Expenses'];
+  const uniqueTypes = [...new Set(flatMatrix.map((row) => row.type).filter(Boolean))]
+    .filter(type => validTypes.includes(type))
+    .sort();
 
-  // Cascading Selection Options derived dynamically from Flat Matrix
   const filteredSubtypes = selectedType
     ? [...new Set(flatMatrix.filter((row) => row.type === selectedType).map((row) => row.subtype).filter(Boolean))].sort()
     : [...new Set(flatMatrix.map((row) => row.subtype).filter(Boolean))].sort();
@@ -74,15 +71,12 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
     return true;
   });
 
-  // Source Accounts filter down dynamically to Assets to maintain double entry standard
   const assetSourceAccounts = flatMatrix.filter((row) => row.type === 'Assets');
 
-  // Dynamic Event Handlers
   const handleEntityChange = (e) => {
     const val = e.target.value;
     setEntity(val);
 
-    // Auto-fill logic
     if (val) {
       const match = flatMatrix.find((row) => row.entity === val);
       if (match) {
@@ -91,11 +85,8 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
         setSelectedCategory(match.category || '');
         setSelectedAccountCode(match.code || '');
 
-        if (match.type === 'Income' || match.type === 'Receivable') {
-          setFlow('inflow');
-        } else if (match.type === 'Expense' || match.type === 'Payable') {
-          setFlow('outflow');
-        }
+        if (match.type === 'Income') setFlow('inflow');
+        else if (match.type === 'Expense' || match.type === 'Expenses') setFlow('outflow');
       }
     }
   };
@@ -107,11 +98,8 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
     setSelectedCategory('');
     setSelectedAccountCode('');
 
-    if (val === 'Income' || val === 'Receivable') {
-      setFlow('inflow');
-    } else if (val === 'Expense' || val === 'Payable') {
-      setFlow('outflow');
-    }
+    if (val === 'Income') setFlow('inflow');
+    else if (val === 'Expense' || val === 'Expenses') setFlow('outflow');
   };
 
   const handleSubtypeChange = (e) => {
@@ -136,11 +124,8 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
       setSelectedCategory(match.category);
       if (!entity) setEntity(match.entity || '');
 
-      if (match.type === 'Income' || match.type === 'Receivable') {
-        setFlow('inflow');
-      } else if (match.type === 'Expense' || match.type === 'Payable') {
-        setFlow('outflow');
-      }
+      if (match.type === 'Income') setFlow('inflow');
+      else if (match.type === 'Expense' || match.type === 'Expenses') setFlow('outflow');
     }
   };
 
@@ -163,21 +148,16 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
+    if (!selectedType) {
+      toast.error('Constraint Violation: A valid Type is required.');
+      return;
+    }
     if (!selectedAccountCode) {
       toast.error('Select a valid Target Account code before submission.');
       return;
     }
     if (!amount || Number(amount) <= 0) {
       toast.error('Amount must be a positive value.');
-      return;
-    }
-
-    if (selectedType === 'Receivable' && flow !== 'inflow') {
-      toast.error("Constraint Violation: Receivables must have an 'inflow' direction.");
-      return;
-    }
-    if (selectedType === 'Payable' && flow !== 'outflow') {
-      toast.error("Constraint Violation: Payables must have an 'outflow' direction.");
       return;
     }
 
@@ -206,7 +186,6 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
         await addTransaction(payload);
         toast.success("Transaction Added");
       }
-
       resetForm();
     } catch (error) {
       toast.error(editingTransaction ? "Failed to update transaction." : "Failed to commit transaction.");
@@ -336,7 +315,7 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
             <select
               value={flow}
               onChange={(e) => setFlow(e.target.value)}
-              disabled={selectedType === 'Receivable' || selectedType === 'Payable' || selectedType === 'Income' || selectedType === 'Expense'}
+              disabled={selectedType === 'Income' || selectedType === 'Expense' || selectedType === 'Expenses'}
               className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition disabled:opacity-60"
             >
               <option value="outflow">Outflow</option>
