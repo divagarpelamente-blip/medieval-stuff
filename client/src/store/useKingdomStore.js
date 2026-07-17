@@ -2,6 +2,16 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 
+// Helper function to normalize transaction type to match the strict database check constraint
+const normalizeType = (type) => {
+  if (!type) return type;
+  const lower = type.trim().toLowerCase();
+  if (lower === 'expenses' || lower === 'expense') {
+    return 'Expense';
+  }
+  return type;
+};
+
 export const useKingdomStore = create((set, get) => ({
   // ==========================================
   // 1. CORE STATE
@@ -21,9 +31,17 @@ export const useKingdomStore = create((set, get) => ({
   lastCollectionTime: null,
 
   // Data State
-  flatMatrix: [], // Single Source of Truth for V2.0 COA
-  transactions: [], // Ledger Transaction State
+  flatMatrix: [], 
+  transactions: [], 
   accountBalances: [],
+
+  // Scalable Server-Side Dashboard Aggregations
+  dashboardMetrics: {
+    total_assets: 0,
+    total_liabilities: 0,
+    net_worth: 0,
+    net_vault_cash: 0
+  },
 
   // ==========================================
   // 2. AUTHENTICATION PIPELINE
@@ -34,6 +52,7 @@ export const useKingdomStore = create((set, get) => ({
         set({ user: session.user, email: session.user.email });
         await get().fetchKingdomData(session.user.id);
         await get().fetchFlatMatrix();
+        await get().fetchDashboardMetrics();
       } else {
         set({ user: null, email: 'guest@medieval.stuff' });
         get().resetStore();
@@ -78,7 +97,11 @@ export const useKingdomStore = create((set, get) => ({
 
   getTypes: () => {
     const matrix = get().flatMatrix || [];
-    const uniqueTypes = [...new Set(matrix.map(row => row.type).filter(Boolean))];
+    const uniqueTypes = [...new Set(matrix.map(row => {
+      const norm = normalizeType(row.type);
+      return norm;
+    }).filter(Boolean))];
+    
     const preferredOrder = ['Assets', 'Liabilities', 'Income', 'Expense', 'Receivable', 'Payable'];
     return uniqueTypes.sort((a, b) => {
       const idxA = preferredOrder.indexOf(a);
@@ -88,25 +111,60 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   // ==========================================
-  // 4. TRANSACTIONS PIPELINE (V2.0 STAGE 1)
+  // 4. BACKEND METRICS AGGREGATION RPC
   // ==========================================
-  fetchTransactions: async () => {
+  fetchDashboardMetrics: async () => {
+    const userId = get().user?.id || null;
+    try {
+      const { data, error } = await supabase
+        .rpc('get_dashboard_metrics', { p_profile_id: userId });
+
+      if (error) throw error;
+
+      if (data && data[0]) {
+        set({
+          dashboardMetrics: {
+            total_assets: Number(data[0].total_assets) || 0,
+            total_liabilities: Number(data[0].total_liabilities) || 0,
+            net_worth: Number(data[0].net_worth) || 0,
+            net_vault_cash: Number(data[0].net_vault_cash) || 0
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error invoking server-side metrics RPC:', err);
+    }
+  },
+
+  // ==========================================
+  // 5. TRANSACTIONS PIPELINE WITH PAGINATION
+  // ==========================================
+  fetchTransactions: async (limit = 50, offset = 0) => {
     set({ isLedgerLoading: true });
     try {
       const userId = get().user?.id;
       let query = supabase
         .from('transactions')
         .select('*')
-        .order('posting_date', { ascending: false });
+        .order('posting_date', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (userId) {
         query = query.eq('profile_id', userId);
+      } else {
+        query = query.is('profile_id', null);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      set({ transactions: data || [] });
+      if (offset === 0) {
+        set({ transactions: data || [] });
+      } else {
+        set((state) => ({
+          transactions: [...state.transactions, ...(data || [])]
+        }));
+      }
     } catch (err) {
       console.error('Failed to query ledger transactions:', err);
       toast.error('Failed to sync transactional scrolls.');
@@ -120,7 +178,6 @@ export const useKingdomStore = create((set, get) => ({
     try {
       const userId = get().user?.id;
       
-      // Exact column mapping strictly aligned with public.transactions schema
       const formattedPayload = {
         profile_id: userId || null,
         value_date: payload.value_date,
@@ -131,7 +188,7 @@ export const useKingdomStore = create((set, get) => ({
         source_account: payload.source_account || null,
         flow: payload.flow,
         payment_status: payload.payment_status || 'Completed',
-        type: payload.type,
+        type: normalizeType(payload.type),
         subtype: payload.subtype || null,
         category: payload.category || null,
         entity: payload.entity || null,
@@ -148,12 +205,14 @@ export const useKingdomStore = create((set, get) => ({
 
       toast.success('Transaction logged successfully.');
 
-      // State update: Prepend new transaction records into the active ledger array
       if (data && data[0]) {
         set((state) => ({
           transactions: [data[0], ...state.transactions]
         }));
       }
+
+      // Sync state and server metrics on success
+      await get().fetchDashboardMetrics();
 
       if (userId) {
         await get().fetchKingdomData(userId);
@@ -172,20 +231,34 @@ export const useKingdomStore = create((set, get) => ({
   updateTransaction: async (id, payload) => {
     set({ isLedgerLoading: true });
     try {
+      // Normalize type payload values to respect database constraints
+      const normalizedPayload = { ...payload };
+      if (payload.type) {
+        normalizedPayload.type = normalizeType(payload.type);
+      }
+
       const { data, error } = await supabase
         .from('transactions')
-        .update(payload)
+        .update(normalizedPayload)
         .eq('id', id)
         .select();
 
       if (error) throw error;
       
-      // Update the specific row in the UI instantly
       if (data && data[0]) {
         set((state) => ({
           transactions: state.transactions.map((t) => (t.id === id ? data[0] : t))
         }));
       }
+
+      // Sync state and server metrics on success
+      await get().fetchDashboardMetrics();
+
+      const userId = get().user?.id;
+      if (userId) {
+        await get().fetchKingdomData(userId);
+      }
+
       return { success: true, data };
     } catch (err) {
       console.error('Error updating transaction:', err);
@@ -205,10 +278,18 @@ export const useKingdomStore = create((set, get) => ({
 
       if (error) throw error;
 
-      // Remove the row from the UI instantly
       set((state) => ({
         transactions: state.transactions.filter((t) => t.id !== id)
       }));
+
+      // Sync state and server metrics on success
+      await get().fetchDashboardMetrics();
+
+      const userId = get().user?.id;
+      if (userId) {
+        await get().fetchKingdomData(userId);
+      }
+
       return { success: true };
     } catch (err) {
       console.error('Error deleting transaction:', err);
@@ -219,7 +300,7 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   // ==========================================
-  // 5. GAMIFICATION & PROFILES
+  // 6. GAMIFICATION & PROFILES
   // ==========================================
   fetchKingdomData: async (userId) => {
     set({ isLoading: true });
@@ -258,7 +339,13 @@ export const useKingdomStore = create((set, get) => ({
     lastCollectionTime: null,
     transactions: [],
     isLedgerLoading: false,
-    accountBalances: []
+    accountBalances: [],
+    dashboardMetrics: {
+      total_assets: 0,
+      total_liabilities: 0,
+      net_worth: 0,
+      net_vault_cash: 0
+    }
   })
 }));
 

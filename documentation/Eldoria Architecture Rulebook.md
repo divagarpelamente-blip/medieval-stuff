@@ -1,6 +1,6 @@
 # **🏰 Eldoria Architecture Rulebook & Refactoring Guide**
 
-**Version:** 2.0 (The Flat Matrix & 8-Digit COA Era) **Purpose:** This document is the absolute single source of truth for the Eldoria financial engine. All React components, Zustand stores, and database schemas MUST comply with the rules below.
+**Version:** 2.1 (Backend Scalability & Layout Fixes) **Purpose:** This document is the absolute single source of truth for the Eldoria financial engine. All React components, Zustand stores, and database schemas MUST comply with the rules below.
 
 ## **1\. The Core Paradigm: The Flat Matrix**
 
@@ -65,12 +65,15 @@ Every transaction requires a base target\_account (resolved from the Matrix). Tr
 | **New Loan (Debt)** | Inflow | Target Liability \+ Amount AND Source Asset \+ Amount |
 | **Debt Payment** | Outflow | Target Liability \- Amount AND Source Asset \- Amount |
 
-### **Balance & Net Worth Calculations (Single-Pass)**
-
-* **Total Assets:** Σ(Balances of all 1xxxxxxx accounts)  
-* **Total Liabilities:** Σ(Balances of all 2xxxxxxx accounts)  
-* **Net Worth:** Total Assets \- Total Liabilities  
-* **Net Vault Cash (HUD Gold):** Σ(Balances of 1101xxxx, 1102xxxx, and 1103xxxx)
+### **Balance & Net Worth Calculations (Server-Side Aggregation)**
+To ensure maximum scalability (10,000+ transactions), global financial metrics must **never** be calculated by iterating over local arrays in the browser. 
+* **Backend RPCs:** All top-level HUD metrics are calculated directly on the PostgreSQL server via Supabase RPCs (e.g., `get_dashboard_metrics`).
+* **The Math (Executed by DB):**
+  * **Total Assets:** Σ(Balances of all 1xxxxxxx accounts)
+  * **Total Liabilities:** Σ(Balances of all 2xxxxxxx accounts)
+  * **Net Worth:** Total Assets - Total Liabilities
+  * **Net Vault Cash (HUD Gold):** Σ(Balances of 1101xxxx, 1102xxxx, and 1103xxxx)
+* **Optimistic Syncing:** When a transaction is added, updated, or deleted, the frontend must silently re-invoke the RPC (`fetchDashboardMetrics()`) to keep the UI perfectly synchronized with the server.
 
 ### **Transaction Mutations & State Synchronization**
 
@@ -78,6 +81,10 @@ Every transaction requires a base target\_account (resolved from the Matrix). Tr
 * **Editing Transactions:** Managed dynamically in the UI form using an `editingId` to toggle edit/update mode. Invokes `updateTransaction(id, payload)` to update the record in Supabase and sync the local store state.
 * **Deleting Transactions:** Executed via `deleteTransaction(id)` in `useKingdomStore`. Safely removes the transaction record from both Supabase and the active ledger array.
 * **Profile Balance Hook:** When any transaction is added, updated, or deleted, corresponding gold and XP updates are synchronized to the player profile.
+
+### **Data Chunking & Ledger Queries**
+* **Strict Pagination:** The frontend must never fetch the entire `transactions` table into memory. All ledger queries must implement chunking (Limit and Offset) via `fetchTransactions(limit, offset)`.
+* **Server-Side Filtering:** Text searches and category filters must be passed to Supabase as query parameters (e.g., `.ilike()`) rather than filtering a massive array locally in React.
 
 
 ## 4. UI Constraints & The "Modern Dashboard" Layout
@@ -93,10 +100,15 @@ Every transaction requires a base target\_account (resolved from the Matrix). Tr
 
 To preserve the cinematic medieval atmosphere and maintain codebase cleanliness, we use a structured, layered Modal pattern:
 
-* **Universal Frame ([Modal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/Modal.jsx)):** Provides an atmospheric stone-board container (`bg-stone-950 border-2 border-amber-900/50`) complete with a medieval header, emoji icon support, tracking-widest uppercase title, subtitle, and a circular red close button. The body area is constrained to `max-h-[60vh] overflow-y-auto`.
+* **Universal Frame (Modal.jsx):** Provides an atmospheric stone-board container (`bg-stone-950 border-2 border-amber-900/50`) complete with a medieval header, emoji icon support, tracking-widest uppercase title, subtitle, and a circular red close button. 
+  * **Strict Flex Scrolling:** The outer wrapper must use `flex flex-col max-h-full`. The header must use `shrink-0`. The body area must use `min-h-0 overflow-y-auto scrollbar-thin` to guarantee perfect internal scrolling without squishing headers or breaking viewport bounds.
 * **Horizontal Tabbed Navigation ([ModalTabmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/ModalTabmenus.jsx)):** Wraps the universal frame and renders a scrollable horizontal tab bar (`border-b border-amber-900/30`) to switch sub-panels dynamically (e.g., Profile vs. Preferences).
 * **Vertical Action Lists ([ModalSubmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/ModalSubmenus.jsx)):** Wraps the universal frame and renders uniform, list-style navigation buttons with hover scales (`hover:border-amber-700/80 hover:bg-stone-800`) for menu-driven routing.
 * **Modular View Controllers:** Files like [TreasuryController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/TreasuryController.jsx) and [SettingsController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/SettingsController.jsx) manage view state transitions independently, decoupling business flow from the layout rendering code.
+
+### **Dashboards vs. Ledgers (Structural Purpose)**
+* **The Treasury Dashboard (Analytics):** A read-only, visual command center. Uses CSS grids to display Server-Side HUD Metrics and Charting Widgets (Recharts/Chart.js). No raw transaction tables or data-entry forms belong here.
+* **The General Ledger (Operations):** The operational workspace. Divided into an Archive Panel (paginated data tables, search filters) and a Terminal Form (double-entry logging, editing).
 
 ## 5. Component Refactoring Directives
 
