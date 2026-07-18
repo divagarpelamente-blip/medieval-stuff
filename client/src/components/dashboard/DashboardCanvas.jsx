@@ -9,8 +9,6 @@ import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
 
 // Custom modern wrapper that replaces the buggy 'WidthProvider'
-// This specifically watches the internal div, so when your sidebar
-// slides open, the grid instantly knows to resize!
 const ResponsiveGridLayout = (props) => {
   const [width, setWidth] = useState(1200);
   const containerRef = useRef(null);
@@ -28,8 +26,9 @@ const ResponsiveGridLayout = (props) => {
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full">
-      <Responsive width={width} {...props} />
+    <div ref={containerRef} className="w-full h-full relative min-h-[600px]">
+      {/* THE FIX: Stretch the grid naturally so the forbidden dead zone disappears! */}
+      <Responsive width={width} style={{ minHeight: '600px', minWidth: '100%', height: '100%' }} {...props} />
     </div>
   );
 };
@@ -42,6 +41,8 @@ export default function DashboardCanvas() {
     submenus,
     updateDraftLayout,
   } = useDashboardStore();
+
+  const ignoreLayoutChangeRef = useRef(false);
 
   // Determine current active workspace tab
   const activeTab = submenus.find((sub) => sub.isActive);
@@ -60,49 +61,20 @@ export default function DashboardCanvas() {
     updateDraftLayout(activeTabId, updated);
   };
 
-  // Drag and Drop implementation for HTML5 draggable elements
-  const handleDrop = (layout, layoutItem, event) => {
-    const widgetId = event.dataTransfer.getData('text/plain');
-    const widgetDef = WIDGET_REGISTRY[widgetId];
-    if (!widgetDef) return;
 
-    // Reject operation if limit is exceeded
-    if (currentLayout.length >= MAX_WIDGETS_PER_TAB) {
-      alert(`The vault space is full! Max Limit of ${MAX_WIDGETS_PER_TAB} active structures reached.`);
-      return;
-    }
-
-    // Guard against placing duplicate widgets on a single workspace
-    if (currentLayout.some((item) => item.i === widgetId)) {
-      alert('This active structure already exists within the ledger tab.');
-      return;
-    }
-
-    const newLayoutItem = {
-      i: widgetId,
-      x: layoutItem.x,
-      y: layoutItem.y,
-      w: widgetDef.layout.w,
-      h: widgetDef.layout.h,
-      minW: widgetDef.layout.minW,
-      maxW: widgetDef.layout.maxW,
-      minH: widgetDef.layout.minH,
-      maxH: widgetDef.layout.maxH,
-    };
-
-    const updatedLayout = [...currentLayout, newLayoutItem];
-    updateDraftLayout(activeTabId, updatedLayout);
-  };
 
   // Sync changes safely with the draft store
   const handleLayoutChange = (newLayout) => {
     if (!isEditingLayout) return;
+    if (ignoreLayoutChangeRef.current) return;
 
-    // Map updated positions into coordinates array
     const cleanedLayout = newLayout
-      .filter((item) => item.i !== 'dropping')
+      // Scrub any ghost dropping elements RGL leaves behind
+      .filter((item) => item.i !== 'dropping' && !item.i.includes('__dropping-elem__'))
       .map((item) => {
-        const originalDef = WIDGET_REGISTRY[item.i]?.layout || {};
+        // Look up limits using the base ID
+        const baseId = item.i.split('-')[0];
+        const originalDef = WIDGET_REGISTRY[baseId]?.layout || {};
         return {
           i: item.i,
           x: item.x,
@@ -116,9 +88,7 @@ export default function DashboardCanvas() {
         };
       });
 
-    // Guard against updates that exceed the limit
     if (cleanedLayout.length > MAX_WIDGETS_PER_TAB) return;
-
     updateDraftLayout(activeTabId, cleanedLayout);
   };
 
@@ -127,10 +97,9 @@ export default function DashboardCanvas() {
   const cols = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 1 };
 
   return (
-    <div className="flex-1 bg-stone-900/30 p-6 relative overflow-y-auto scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950">
-      {/* Structural Empty State Placeholder */}
+    <div className="flex-1 bg-stone-900/30 p-6 relative overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950">
       {currentLayout.length === 0 && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center pointer-events-none">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center pointer-events-none z-0">
           <LayoutGrid className="text-stone-700 w-16 h-16 stroke-[1] mb-3 animate-pulse" />
           <h3 className="font-serif text-sm font-bold text-stone-400 uppercase tracking-wider">
             Empty Workspace Grid
@@ -143,25 +112,31 @@ export default function DashboardCanvas() {
         </div>
       )}
 
-      {/* Grid Canvas Wrapper */}
-      <div className={isEditingLayout ? 'border border-dashed border-amber-500/20 rounded-xl p-2' : ''}>
+      <div className={`flex-1 w-full ${isEditingLayout ? 'border border-dashed border-amber-500/20 rounded-xl p-2 h-full min-h-[600px] relative z-10' : 'h-full min-h-[600px] relative z-10'}`}>
         <ResponsiveGridLayout
           className="layout"
-          layouts={{ lg: currentLayout }}
+          layouts={{
+            lg: currentLayout,
+            md: currentLayout,
+            sm: currentLayout,
+            xs: currentLayout,
+            xxs: currentLayout
+          }}
           breakpoints={breakpoints}
           cols={cols}
           rowHeight={80}
           isDraggable={isEditingLayout}
           isResizable={isEditingLayout}
-          isDroppable={isEditingLayout}
-          droppingItem={{ i: 'dropping', w: 4, h: 4 }}
-          onDrop={handleDrop}
+          isDroppable={false}
           onLayoutChange={handleLayoutChange}
           margin={[16, 16]}
           containerPadding={[0, 0]}
         >
           {currentLayout.map((item) => {
-            const widget = WIDGET_REGISTRY[item.i];
+            // THE FIX: Strip the timestamp suffix to locate the correct chart in the registry
+            const baseId = item.i.split('-')[0];
+            const widget = WIDGET_REGISTRY[baseId];
+            
             if (!widget) return <div key={item.i} className="hidden" />;
 
             const WidgetComponent = widget.component;
@@ -169,10 +144,11 @@ export default function DashboardCanvas() {
             return (
               <div
                 key={item.i}
-                className={`group relative rounded-xl overflow-hidden transition-shadow duration-200 ${isEditingLayout
+                className={`group relative rounded-xl overflow-hidden transition-shadow duration-200 ${
+                  isEditingLayout
                     ? 'border-2 border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_15px_rgba(245,158,11,0.15)] bg-stone-950/80 cursor-grab active:cursor-grabbing'
                     : 'bg-transparent'
-                  }`}
+                }`}
               >
                 {/* Embedded Active Widget */}
                 <div className="w-full h-full pointer-events-none select-none">

@@ -161,6 +161,65 @@ export const useDashboardStore = create((set, get) => ({
         isEditingLayout: false
       };
     });
+  },
+
+  /**
+   * Appends a widget directly to the active tab workspace at the bottom.
+   */
+  deployWidget: (tabId, widgetId, widgetDef) => {
+    const state = get();
+    const currentLayout = state.draftLayout[tabId] || [];
+
+    if (currentLayout.length >= MAX_WIDGETS_PER_TAB) {
+      alert(`The vault space is full! Max Limit of ${MAX_WIDGETS_PER_TAB} active structures reached.`);
+      return false;
+    }
+
+    const uniqueInstanceId = `${widgetId}-${Date.now()}`;
+    const w = widgetDef.layout.w;
+    const h = widgetDef.layout.h;
+    const cols = 12; // Standard Eldoria grid columns
+
+    let foundX = 0;
+    let foundY = 0;
+    let placed = false;
+
+    // Find first empty grid gap (top-to-bottom, left-to-right)
+    for (let y = 0; y < 200; y++) {
+      for (let x = 0; x <= cols - w; x++) {
+        let overlap = false;
+        for (const item of currentLayout) {
+          const overlapX = x < item.x + item.w && x + w > item.x;
+          const overlapY = y < item.y + item.h && y + h > item.y;
+          if (overlapX && overlapY) {
+            overlap = true;
+            break;
+          }
+        }
+        if (!overlap) {
+          foundX = x;
+          foundY = y;
+          placed = true;
+          break;
+        }
+      }
+      if (placed) break;
+    }
+
+    const newLayoutItem = {
+      i: uniqueInstanceId,
+      x: foundX,
+      y: foundY,
+      w,
+      h,
+      minW: widgetDef.layout.minW,
+      maxW: widgetDef.layout.maxW,
+      minH: widgetDef.layout.minH,
+      maxH: widgetDef.layout.maxH,
+    };
+
+    const updatedLayout = [...currentLayout, newLayoutItem];
+    return state.updateDraftLayout(tabId, updatedLayout);
   }
 }));
 

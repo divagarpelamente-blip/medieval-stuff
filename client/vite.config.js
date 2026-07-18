@@ -7,5 +7,8 @@ export default defineConfig({
   base: './',
   server: {
     open: 'msedge'
+  },
+  define: {
+    'process.env': {}
   }
 })

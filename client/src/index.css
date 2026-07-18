@@ -6,10 +6,15 @@ body {
   color: #fff;
 }
 
-/* Force the React mount point to fill the viewport */
 #root {
   min-height: 100dvh;
   width: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* Force the React Grid Layout container to stretch so drops are registered */
+.react-grid-layout {
+  min-height: 600px !important;
+  min-width: 100%;
 }

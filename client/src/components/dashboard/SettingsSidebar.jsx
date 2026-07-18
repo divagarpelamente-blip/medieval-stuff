@@ -35,6 +35,7 @@ export default function SettingsSidebar() {
     updateSubmenuName,
     setActiveSubmenu,
     updateDraftLayout,
+    deployWidget,
   } = useDashboardStore();
 
   const [editingTabId, setEditingTabId] = useState(null);
@@ -55,11 +56,6 @@ export default function SettingsSidebar() {
   const handleSaveRename = (tabId) => {
     updateSubmenuName(tabId, tempName);
     setEditingTabId(null);
-  };
-
-  const handleDragStart = (event, widgetKey) => {
-    event.dataTransfer.setData('text/plain', widgetKey);
-    event.dataTransfer.effectAllowed = 'move';
   };
 
   return (
@@ -86,11 +82,10 @@ export default function SettingsSidebar() {
                 <div
                   key={tab.id}
                   onClick={() => tab.isVisible && setActiveSubmenu(tab.id)}
-                  className={`p-2.5 rounded border transition-all duration-150 cursor-pointer flex flex-col gap-1.5 ${
-                    tab.isActive
-                      ? 'bg-amber-950/20 border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.05)]'
-                      : 'bg-stone-900/10 border-stone-800/80 hover:border-stone-700/60'
-                  } ${!tab.isVisible ? 'opacity-50' : ''}`}
+                  className={`p-2.5 rounded border transition-all duration-150 cursor-pointer flex flex-col gap-1.5 ${tab.isActive
+                    ? 'bg-amber-950/20 border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.05)]'
+                    : 'bg-stone-900/10 border-stone-800/80 hover:border-stone-700/60'
+                    } ${!tab.isVisible ? 'opacity-50' : ''}`}
                 >
                   <div className="flex items-center justify-between w-full">
                     {/* Inline Renaming Input */}
@@ -170,29 +165,28 @@ export default function SettingsSidebar() {
             Widget Manifest
           </div>
           <p className="text-[10px] text-stone-500 -mt-1 leading-relaxed">
-            Drag these items onto the grid workspace canvas to place them.
+            Click on these structures to deploy them to the workspace.
           </p>
 
           <div className="flex flex-col gap-2.5">
             {Object.entries(WIDGET_REGISTRY).map(([key, widget]) => (
-              <div
+              <button
                 key={key}
-                draggable
-                onDragStart={(e) => handleDragStart(e, key)}
-                className="p-3 rounded bg-stone-900/60 border border-stone-800/80 hover:border-amber-900/50 hover:bg-stone-900/80 transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1 shadow-md select-none group"
+                onClick={() => deployWidget(activeTabId, key, widget)}
+                className="w-full text-left p-3 rounded bg-stone-900/60 border border-stone-800/80 hover:border-amber-500/40 hover:bg-stone-900/80 transition-all cursor-pointer flex flex-col gap-1 shadow-md select-none group focus:outline-none"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between w-full">
                   <h4 className="font-serif text-xs font-bold text-amber-500 group-hover:text-amber-400">
                     {widget.name}
                   </h4>
-                  <span className="text-[8px] bg-amber-950/40 border border-amber-900/30 text-amber-500 font-mono px-1 rounded">
-                    W:{widget.layout.w} H:{widget.layout.h}
+                  <span className="text-[8px] bg-amber-950/40 border border-amber-900/30 text-amber-500 font-mono px-1.5 py-0.5 rounded">
+                    Deploy
                   </span>
                 </div>
                 <p className="text-[10px] text-stone-400 leading-normal">
-                  Reflects ledger records onto visual charts.
+                  Reflects ledger records onto visual charts. Size: {widget.layout.w}x{widget.layout.h}
                 </p>
-              </div>
+              </button>
             ))}
           </div>
         </section>
