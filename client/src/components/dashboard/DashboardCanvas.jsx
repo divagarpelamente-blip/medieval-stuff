@@ -8,7 +8,7 @@ import { WIDGET_REGISTRY } from './widgetRegistry';
 import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
 
-// Custom modern wrapper that replaces the buggy 'WidthProvider'
+// Custom wrapper that manages responsive dimensions
 const ResponsiveGridLayout = (props) => {
   const [width, setWidth] = useState(1200);
   const containerRef = useRef(null);
@@ -27,11 +27,45 @@ const ResponsiveGridLayout = (props) => {
 
   return (
     <div ref={containerRef} className="w-full h-full relative min-h-[600px]">
-      {/* THE FIX: Stretch the grid naturally so the forbidden dead zone disappears! */}
       <Responsive width={width} style={{ minHeight: '600px', minWidth: '100%', height: '100%' }} {...props} />
     </div>
   );
 };
+
+// High-fidelity dark fantasy skeleton grid displayed during database hydration
+function DashboardSkeleton() {
+  return (
+    <div className="flex-grow bg-stone-900/30 p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
+        {[1, 2, 3].map((idx) => (
+          <div 
+            key={idx} 
+            className="rounded-xl border border-amber-900/10 bg-stone-950/40 p-4 flex flex-col justify-between h-[240px]"
+          >
+            {/* Header Skeleton */}
+            <div className="flex items-center justify-between border-b border-amber-900/10 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-amber-900/40 animate-ping" />
+                <div className="h-3 w-28 bg-stone-800 rounded" />
+              </div>
+              <div className="h-4 w-12 bg-stone-800/85 rounded" />
+            </div>
+            {/* Simulated Line Chart / Metric Plot */}
+            <div className="flex-grow flex items-end gap-3 mt-4 mb-2 justify-center px-4">
+              <div className="h-[25%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
+              <div className="h-[45%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
+              <div className="h-[60%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
+              <div className="h-[75%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
+              <div className="h-[40%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
+            </div>
+            {/* Card Footer */}
+            <div className="h-2 w-20 bg-stone-800/60 rounded mt-2" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardCanvas() {
   const {
@@ -40,39 +74,32 @@ export default function DashboardCanvas() {
     draftLayout,
     submenus,
     updateDraftLayout,
+    isLoading,
   } = useDashboardStore();
 
   const ignoreLayoutChangeRef = useRef(false);
 
-  // Determine current active workspace tab
   const activeTab = submenus.find((sub) => sub.isActive);
   const activeTabId = activeTab ? activeTab.id : 'tab_1';
 
-  // Pull correct active data layout
   const currentLayout = useMemo(() => {
     return isEditingLayout
       ? draftLayout[activeTabId] || []
       : savedLayout[activeTabId] || [];
   }, [isEditingLayout, draftLayout, savedLayout, activeTabId]);
 
-  // Remove a widget from the layout configuration
   const handleRemoveWidget = (widgetKey) => {
     const updated = currentLayout.filter((item) => item.i !== widgetKey);
     updateDraftLayout(activeTabId, updated);
   };
 
-
-
-  // Sync changes safely with the draft store
   const handleLayoutChange = (newLayout) => {
     if (!isEditingLayout) return;
     if (ignoreLayoutChangeRef.current) return;
 
     const cleanedLayout = newLayout
-      // Scrub any ghost dropping elements RGL leaves behind
       .filter((item) => item.i !== 'dropping' && !item.i.includes('__dropping-elem__'))
       .map((item) => {
-        // Look up limits using the base ID
         const baseId = item.i.split('-')[0];
         const originalDef = WIDGET_REGISTRY[baseId]?.layout || {};
         return {
@@ -92,12 +119,25 @@ export default function DashboardCanvas() {
     updateDraftLayout(activeTabId, cleanedLayout);
   };
 
-  // Layout responsiveness configuration breakpoints
   const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
   const cols = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 1 };
 
+  // Render medieval loading simulation skeleton during active hydration cycles
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
-    <div className="flex-1 bg-stone-900/30 p-6 relative overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950">
+    <div 
+      className="flex-1 bg-stone-900/30 p-6 relative overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950"
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDragEnter={(e) => {
+        e.preventDefault();
+      }}
+    >
       {currentLayout.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center pointer-events-none z-0">
           <LayoutGrid className="text-stone-700 w-16 h-16 stroke-[1] mb-3 animate-pulse" />
@@ -133,7 +173,6 @@ export default function DashboardCanvas() {
           containerPadding={[0, 0]}
         >
           {currentLayout.map((item) => {
-            // THE FIX: Strip the timestamp suffix to locate the correct chart in the registry
             const baseId = item.i.split('-')[0];
             const widget = WIDGET_REGISTRY[baseId];
             

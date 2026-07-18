@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { MAX_WIDGETS_PER_TAB, DEFAULT_PRESET } from '../config/dashboard.config';
+import { useKingdomStore } from './useKingdomStore';
 
-// Primary submenu template array
 const INITIAL_SUBMENUS = [
   { id: 'tab_1', name: 'Royal Treasury', isVisible: true, isActive: true },
   { id: 'tab_2', name: 'Campaign Ledger', isVisible: false, isActive: false },
@@ -16,9 +16,10 @@ export const useDashboardStore = create((set, get) => ({
   // CORE STATE
   // ==========================================
   isEditingLayout: false,
+  isLoading: false,
+  isSaving: false,
   submenus: INITIAL_SUBMENUS,
   
-  // Layout records structured as: { tab_id: [ GridItemObjects ] }
   savedLayout: {
     tab_1: [...DEFAULT_PRESET],
     tab_2: [],
@@ -28,7 +29,6 @@ export const useDashboardStore = create((set, get) => ({
     tab_6: [],
   },
   
-  // Clone record used as a local sandbox before committing changes
   draftLayout: {
     tab_1: [...DEFAULT_PRESET],
     tab_2: [],
@@ -39,24 +39,132 @@ export const useDashboardStore = create((set, get) => ({
   },
 
   // ==========================================
+  // DATABASE PERSISTENCE & HYDRATION
+  // ==========================================
+
+  /**
+   * Syncs custom layout configuration files down from the active Supabase ledger profile.
+   * Gracefully loads fallback maps if remote storage records are unreachable.
+   */
+  hydrateLayouts: async () => {
+    set({ isLoading: true });
+    try {
+      const kingdomStore = useKingdomStore.getState();
+      const supabase = kingdomStore?.supabase;
+      const profile = kingdomStore?.profile;
+
+      let loadedPayload = null;
+
+      // 1. Attempt connection fetch from Supabase Profiles Table
+      if (supabase && profile?.id) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('dashboard_layouts')
+          .eq('id', profile.id)
+          .single();
+        
+        if (!error && data?.dashboard_layouts) {
+          loadedPayload = data.dashboard_layouts;
+        }
+      }
+
+      // 2. Client fallback cache lookup if database payload is empty
+      if (!loadedPayload) {
+        const localCache = localStorage.getItem('eldoria_dashboard_layouts');
+        if (localCache) {
+          try {
+            loadedPayload = JSON.parse(localCache);
+          } catch (e) {
+            console.warn("Corrupted client database caches skipped during layout mapping:", e);
+          }
+        }
+      }
+
+      // 3. Setup structural boundaries over restored objects
+      if (loadedPayload) {
+        const { savedLayout, submenus } = loadedPayload;
+        
+        const finalSaved = {
+          tab_1: savedLayout?.tab_1 || [...DEFAULT_PRESET],
+          tab_2: savedLayout?.tab_2 || [],
+          tab_3: savedLayout?.tab_3 || [],
+          tab_4: savedLayout?.tab_4 || [],
+          tab_5: savedLayout?.tab_5 || [],
+          tab_6: savedLayout?.tab_6 || [],
+        };
+
+        set({
+          savedLayout: finalSaved,
+          draftLayout: JSON.parse(JSON.stringify(finalSaved)),
+          submenus: submenus || INITIAL_SUBMENUS,
+        });
+      }
+    } catch (err) {
+      console.error("Hydration process encountered an error, falling back to local layout configuration:", err);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  /**
+   * Overrides local state with the sandbox draft layout and commits updates to Supabase.
+   */
+  saveDraftToProduction: async () => {
+    set({ isSaving: true });
+    const state = get();
+    const committedDraft = JSON.parse(JSON.stringify(state.draftLayout));
+    const committedSubmenus = JSON.parse(JSON.stringify(state.submenus));
+
+    const payload = {
+      savedLayout: committedDraft,
+      submenus: committedSubmenus,
+    };
+
+    // Fast-path client updates
+    try {
+      localStorage.setItem('eldoria_dashboard_layouts', JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Client layout sync rejected by device constraints:", e);
+    }
+
+    // Remote persistence write back
+    try {
+      const kingdomStore = useKingdomStore.getState();
+      const supabase = kingdomStore?.supabase;
+      const profile = kingdomStore?.profile;
+
+      if (supabase && profile?.id) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ dashboard_layouts: payload })
+          .eq('id', profile.id);
+
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error("Supabase failed to archive remote changes, offline backup preserved:", err);
+    } finally {
+      set({
+        savedLayout: committedDraft,
+        isEditingLayout: false,
+        isSaving: false,
+      });
+    }
+  },
+
+  // ==========================================
   // EDIT STATE STANCE SHIFT ACTIONS
   // ==========================================
   
-  /**
-   * Switches the active layout editor stance.
-   * If transitioning into edit mode, saves an isolated copy of current state to the sandbox.
-   */
   toggleEditMode: (active) => {
     set((state) => {
       if (active) {
-        // Clone savedLayout into draftLayout
         const deepClonedSaved = JSON.parse(JSON.stringify(state.savedLayout));
         return {
           isEditingLayout: true,
           draftLayout: deepClonedSaved
         };
       } else {
-        // Nullify draft layout tracking without saving changes
         return {
           isEditingLayout: false,
           draftLayout: JSON.parse(JSON.stringify(state.savedLayout))
@@ -65,13 +173,9 @@ export const useDashboardStore = create((set, get) => ({
     });
   },
 
-  /**
-   * Modifies components located inside the draft tab zone, validating limits.
-   */
   updateDraftLayout: (tabId, nextLayout) => {
     if (!Array.isArray(nextLayout)) return false;
 
-    // Enforce the strict MAX_WIDGETS_PER_TAB layout safety boundary
     if (nextLayout.length > MAX_WIDGETS_PER_TAB) {
       console.warn(`Grid action denied: Exceeds absolute cap of ${MAX_WIDGETS_PER_TAB} active widgets.`);
       return false;
@@ -90,9 +194,6 @@ export const useDashboardStore = create((set, get) => ({
   // SUBMENU UTILITIES
   // ==========================================
 
-  /**
-   * Swaps the active submenu space.
-   */
   setActiveSubmenu: (tabId) => {
     set((state) => ({
       submenus: state.submenus.map((sub) => ({
@@ -102,10 +203,6 @@ export const useDashboardStore = create((set, get) => ({
     }));
   },
 
-  /**
-   * Flips visibility toggle for submenus.
-   * If a hidden tab becomes visible, loads baseline layout to its sandbox profile.
-   */
   toggleSubmenuVisibility: (tabId) => {
     set((state) => {
       const updatedSubmenus = state.submenus.map((sub) => {
@@ -118,7 +215,6 @@ export const useDashboardStore = create((set, get) => ({
       const wasInvisible = state.submenus.find((s) => s.id === tabId)?.isVisible === false;
       const nextDraft = { ...state.draftLayout };
 
-      // Initialize empty dashboard tabs with the Standard 1 preset template
       if (wasInvisible && (!nextDraft[tabId] || nextDraft[tabId].length === 0)) {
         nextDraft[tabId] = [...DEFAULT_PRESET];
       }
@@ -130,9 +226,6 @@ export const useDashboardStore = create((set, get) => ({
     });
   },
 
-  /**
-   * Overrides localized text tag of a submenu.
-   */
   updateSubmenuName: (tabId, newName) => {
     if (!newName || typeof newName !== 'string') return;
     
@@ -147,25 +240,9 @@ export const useDashboardStore = create((set, get) => ({
   },
 
   // ==========================================
-  // STAGE SYNCHRONIZATION
+  // WIDGET PLACEMENT ENGINE
   // ==========================================
 
-  /**
-   * Commits the draft sandbox to active production.
-   */
-  saveDraftToProduction: () => {
-    set((state) => {
-      const committedDraft = JSON.parse(JSON.stringify(state.draftLayout));
-      return {
-        savedLayout: committedDraft,
-        isEditingLayout: false
-      };
-    });
-  },
-
-  /**
-   * Appends a widget directly to the active tab workspace at the bottom.
-   */
   deployWidget: (tabId, widgetId, widgetDef) => {
     const state = get();
     const currentLayout = state.draftLayout[tabId] || [];
@@ -178,13 +255,12 @@ export const useDashboardStore = create((set, get) => ({
     const uniqueInstanceId = `${widgetId}-${Date.now()}`;
     const w = widgetDef.layout.w;
     const h = widgetDef.layout.h;
-    const cols = 12; // Standard Eldoria grid columns
+    const cols = 12;
 
     let foundX = 0;
     let foundY = 0;
     let placed = false;
 
-    // Find first empty grid gap (top-to-bottom, left-to-right)
     for (let y = 0; y < 200; y++) {
       for (let x = 0; x <= cols - w; x++) {
         let overlap = false;

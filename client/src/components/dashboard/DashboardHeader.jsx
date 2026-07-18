@@ -1,21 +1,22 @@
 import React from 'react';
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { Sliders, Check, X } from 'lucide-react';
+import { Sliders, Check, X, Loader2 } from 'lucide-react';
 
 export default function DashboardHeader() {
   const {
     isEditingLayout,
     submenus,
     toggleEditMode,
-    saveDraftToProduction
+    saveDraftToProduction,
+    isLoading,
+    isSaving,
   } = useDashboardStore();
 
-  // Find currently active workspace tab
   const activeTab = submenus.find((sub) => sub.isActive);
   const activeTabName = activeTab ? activeTab.name : 'Royal Treasury';
 
   return (
-    <header className="w-full h-16 shrink-0 bg-stone-950 border-b border-amber-900/40 px-6 flex items-center justify-between z-30 shadow-lg">
+    <header className="w-full h-16 shrink-0 bg-stone-950 border-b border-amber-900/40 px-6 flex items-center justify-between z-30 shadow-lg select-none">
       {/* Title / Identity Reads */}
       <div className="flex items-center gap-3">
         <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
@@ -35,12 +36,21 @@ export default function DashboardHeader() {
 
       {/* Control Buttons */}
       <div className="flex items-center gap-3">
+        {/* Loader Display */}
+        {(isLoading || isSaving) && (
+          <div className="flex items-center gap-2 text-stone-400 font-mono text-xs border border-stone-800/80 px-2 py-1.5 rounded bg-stone-900/20 mr-2">
+            <Loader2 className="animate-spin text-amber-500" size={14} />
+            <span>{isLoading ? 'Reading Scrolls...' : 'Sealing Ledger...'}</span>
+          </div>
+        )}
+
         {isEditingLayout ? (
           <>
             {/* Cancel Changes */}
             <button
               onClick={() => toggleEditMode(false)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded border border-rose-900/40 bg-rose-950/20 text-xs font-serif font-bold tracking-wide text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-all duration-200"
+              disabled={isSaving || isLoading}
+              className="flex items-center gap-1.5 px-4 py-2 rounded border border-rose-900/40 bg-rose-950/20 text-xs font-serif font-bold tracking-wide text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
               <X size={14} />
               Dismiss Draft
@@ -49,7 +59,8 @@ export default function DashboardHeader() {
             {/* Commit Changes */}
             <button
               onClick={() => saveDraftToProduction()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded border border-emerald-900/50 bg-emerald-950/30 text-xs font-serif font-bold tracking-wide text-emerald-400 hover:bg-emerald-950/50 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all duration-200 animate-bounce"
+              disabled={isSaving || isLoading}
+              className="flex items-center gap-1.5 px-4 py-2 rounded border border-emerald-900/50 bg-emerald-950/30 text-xs font-serif font-bold tracking-wide text-emerald-400 hover:bg-emerald-950/50 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
               <Check size={14} />
               Seal Layout
@@ -59,7 +70,8 @@ export default function DashboardHeader() {
           /* Configure Layout */
           <button
             onClick={() => toggleEditMode(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded border border-amber-900/50 bg-stone-900/40 text-xs font-serif font-bold tracking-wide text-amber-400 hover:bg-stone-900/80 hover:text-amber-300 hover:shadow-[0_0_8px_rgba(245,158,11,0.2)] transition-all duration-200"
+            disabled={isLoading || isSaving}
+            className="flex items-center gap-1.5 px-4 py-2 rounded border border-amber-900/50 bg-stone-900/40 text-xs font-serif font-bold tracking-wide text-amber-400 hover:bg-stone-900/80 hover:text-amber-300 hover:shadow-[0_0_8px_rgba(245,158,11,0.2)] transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
           >
             <Sliders size={14} />
             Configure Workspace
