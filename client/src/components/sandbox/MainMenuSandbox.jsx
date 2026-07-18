@@ -1,3 +1,4 @@
+import DashboardSandbox from './dashboardSandbox';
 import React, { useState, useEffect } from 'react';
 import { useKingdomStore } from '../../store/useKingdomStore';
 import Modal from '../Modals/Modal';
@@ -44,15 +45,15 @@ export default function MainMenuSandbox() {
     /* ==========================================
         1. THE OUTER VOID (Strict Full Screen bg-black)
         ========================================== */
-    <div 
+    <div
       className="w-full h-dvh flex justify-center overflow-hidden bg-black"
-      style={{ 
-        backgroundImage: `radial-gradient(ellipse at center, rgba(12, 10, 9, 0.4) 0%, rgba(9, 8, 8, 0.95) 100%), url(${bgImage})`, 
-        backgroundSize: 'cover', 
-        backgroundPosition: 'center' 
+      style={{
+        backgroundImage: `radial-gradient(ellipse at center, rgba(12, 10, 9, 0.4) 0%, rgba(9, 8, 8, 0.95) 100%), url(${bgImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
       }}
     >
-      
+
       {/* ==========================================
           2. THE INNER CANVAS (Centered Transparent Core)
           ========================================== */}
@@ -67,9 +68,9 @@ export default function MainMenuSandbox() {
                 SLEEK FLOATING DOCK MENU (Active === null)
                ========================================== */
             <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in">
-              
+
               {/* 1. Quests Button */}
-              <button 
+              <button
                 onClick={() => setActiveModal('quests')}
                 title="Quests"
                 className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
@@ -78,7 +79,7 @@ export default function MainMenuSandbox() {
               </button>
 
               {/* 2. Achievements Button */}
-              <button 
+              <button
                 onClick={() => setActiveModal('achievements')}
                 title="Achievements"
                 className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
@@ -87,7 +88,7 @@ export default function MainMenuSandbox() {
               </button>
 
               {/* 3. Treasury Button */}
-              <button 
+              <button
                 onClick={() => setActiveModal('treasury')}
                 title="Treasury"
                 className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
@@ -96,7 +97,7 @@ export default function MainMenuSandbox() {
               </button>
 
               {/* 4. Dashboard Button */}
-              <button 
+              <button
                 onClick={() => setActiveModal('dashboard')}
                 title="Dashboard"
                 className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
@@ -105,7 +106,7 @@ export default function MainMenuSandbox() {
               </button>
 
               {/* 5. Settings Button */}
-              <button 
+              <button
                 onClick={() => setActiveModal('settings')}
                 title="Settings"
                 className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
@@ -115,14 +116,13 @@ export default function MainMenuSandbox() {
 
             </div>
           ) : activeModal === 'treasury' ? (
-            /* ==========================================
-                ROYAL TREASURY MODULE CONTROLLER
-               ========================================== */
             <TreasuryController onClose={() => setActiveModal(null)} />
+          ) : activeModal === 'dashboard' ? (
+            /* LAUNCH THE NEW V2.1 DASHBOARD ENGINE */
+            <div className="absolute inset-0 z-50 bg-stone-950">
+              <DashboardSandbox />
+            </div>
           ) : activeModal === 'settings' ? (
-            /* ==========================================
-                CITADEL CONFIGURATIONS CONTROLLER
-               ========================================== */
             <SettingsController onClose={() => setActiveModal(null)} />
           ) : (
             /* ==========================================

@@ -1,0 +1,167 @@
+import { create } from 'zustand';
+import { MAX_WIDGETS_PER_TAB, DEFAULT_PRESET } from '../config/dashboard.config';
+
+// Primary submenu template array
+const INITIAL_SUBMENUS = [
+  { id: 'tab_1', name: 'Royal Treasury', isVisible: true, isActive: true },
+  { id: 'tab_2', name: 'Campaign Ledger', isVisible: false, isActive: false },
+  { id: 'tab_3', name: 'Citadel Reserves', isVisible: false, isActive: false },
+  { id: 'tab_4', name: 'Merchant Guild', isVisible: false, isActive: false },
+  { id: 'tab_5', name: 'Vassal Tributes', isVisible: false, isActive: false },
+  { id: 'tab_6', name: 'War Fund', isVisible: false, isActive: false },
+];
+
+export const useDashboardStore = create((set, get) => ({
+  // ==========================================
+  // CORE STATE
+  // ==========================================
+  isEditingLayout: false,
+  submenus: INITIAL_SUBMENUS,
+  
+  // Layout records structured as: { tab_id: [ GridItemObjects ] }
+  savedLayout: {
+    tab_1: [...DEFAULT_PRESET],
+    tab_2: [],
+    tab_3: [],
+    tab_4: [],
+    tab_5: [],
+    tab_6: [],
+  },
+  
+  // Clone record used as a local sandbox before committing changes
+  draftLayout: {
+    tab_1: [...DEFAULT_PRESET],
+    tab_2: [],
+    tab_3: [],
+    tab_4: [],
+    tab_5: [],
+    tab_6: [],
+  },
+
+  // ==========================================
+  // EDIT STATE STANCE SHIFT ACTIONS
+  // ==========================================
+  
+  /**
+   * Switches the active layout editor stance.
+   * If transitioning into edit mode, saves an isolated copy of current state to the sandbox.
+   */
+  toggleEditMode: (active) => {
+    set((state) => {
+      if (active) {
+        // Clone savedLayout into draftLayout
+        const deepClonedSaved = JSON.parse(JSON.stringify(state.savedLayout));
+        return {
+          isEditingLayout: true,
+          draftLayout: deepClonedSaved
+        };
+      } else {
+        // Nullify draft layout tracking without saving changes
+        return {
+          isEditingLayout: false,
+          draftLayout: JSON.parse(JSON.stringify(state.savedLayout))
+        };
+      }
+    });
+  },
+
+  /**
+   * Modifies components located inside the draft tab zone, validating limits.
+   */
+  updateDraftLayout: (tabId, nextLayout) => {
+    if (!Array.isArray(nextLayout)) return false;
+
+    // Enforce the strict MAX_WIDGETS_PER_TAB layout safety boundary
+    if (nextLayout.length > MAX_WIDGETS_PER_TAB) {
+      console.warn(`Grid action denied: Exceeds absolute cap of ${MAX_WIDGETS_PER_TAB} active widgets.`);
+      return false;
+    }
+
+    set((state) => ({
+      draftLayout: {
+        ...state.draftLayout,
+        [tabId]: nextLayout
+      }
+    }));
+    return true;
+  },
+
+  // ==========================================
+  // SUBMENU UTILITIES
+  // ==========================================
+
+  /**
+   * Swaps the active submenu space.
+   */
+  setActiveSubmenu: (tabId) => {
+    set((state) => ({
+      submenus: state.submenus.map((sub) => ({
+        ...sub,
+        isActive: sub.id === tabId
+      }))
+    }));
+  },
+
+  /**
+   * Flips visibility toggle for submenus.
+   * If a hidden tab becomes visible, loads baseline layout to its sandbox profile.
+   */
+  toggleSubmenuVisibility: (tabId) => {
+    set((state) => {
+      const updatedSubmenus = state.submenus.map((sub) => {
+        if (sub.id === tabId) {
+          return { ...sub, isVisible: !sub.isVisible };
+        }
+        return sub;
+      });
+
+      const wasInvisible = state.submenus.find((s) => s.id === tabId)?.isVisible === false;
+      const nextDraft = { ...state.draftLayout };
+
+      // Initialize empty dashboard tabs with the Standard 1 preset template
+      if (wasInvisible && (!nextDraft[tabId] || nextDraft[tabId].length === 0)) {
+        nextDraft[tabId] = [...DEFAULT_PRESET];
+      }
+
+      return {
+        submenus: updatedSubmenus,
+        draftLayout: nextDraft
+      };
+    });
+  },
+
+  /**
+   * Overrides localized text tag of a submenu.
+   */
+  updateSubmenuName: (tabId, newName) => {
+    if (!newName || typeof newName !== 'string') return;
+    
+    set((state) => ({
+      submenus: state.submenus.map((sub) => {
+        if (sub.id === tabId) {
+          return { ...sub, name: newName.trim() };
+        }
+        return sub;
+      })
+    }));
+  },
+
+  // ==========================================
+  // STAGE SYNCHRONIZATION
+  // ==========================================
+
+  /**
+   * Commits the draft sandbox to active production.
+   */
+  saveDraftToProduction: () => {
+    set((state) => {
+      const committedDraft = JSON.parse(JSON.stringify(state.draftLayout));
+      return {
+        savedLayout: committedDraft,
+        isEditingLayout: false
+      };
+    });
+  }
+}));
+
+export default useDashboardStore;

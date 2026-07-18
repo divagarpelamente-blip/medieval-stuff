@@ -1,125 +1,130 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  Legend
+  ResponsiveContainer
 } from 'recharts';
-import useKingdomStore from '../../store/useKingdomStore';
+import { useKingdomStore } from '../../store/useKingdomStore';
 import { generateCashFlowData } from '../../utils/chartAnalytics';
 
-export default function CashFlowChart() {
-  const { transactions } = useKingdomStore();
-  const data = generateCashFlowData(transactions);
+export default function CashFlowChart({ transactions }) {
+  const storeTransactions = useKingdomStore((state) => state.transactions || []);
+  const activeTransactions = transactions || storeTransactions;
 
-  // Calculate historical averages for HUD metric badges
-  const avgIncome = data.length 
-    ? data.reduce((sum, item) => sum + item.income, 0) / data.length 
-    : 0;
-  const avgExpense = data.length 
-    ? data.reduce((sum, item) => sum + item.expenses, 0) / data.length 
-    : 0;
+  const data = useMemo(() => {
+    return generateCashFlowData(activeTransactions);
+  }, [activeTransactions]);
+
+  // Calculate averages for treasury metrics
+  const stats = useMemo(() => {
+    if (!data.length) return { avgIncome: 0, avgExpense: 0 };
+    const totalIncome = data.reduce((sum, d) => sum + d.income, 0);
+    const totalExpense = data.reduce((sum, d) => sum + d.expenses, 0);
+    return {
+      avgIncome: totalIncome / data.length,
+      avgExpense: totalExpense / data.length,
+    };
+  }, [data]);
+
+  const formatGP = (val) => `${Number(val).toLocaleString()} GP`;
 
   return (
-    <div className="bg-stone-900/40 border border-amber-900/30 rounded-lg p-4 flex flex-col h-full">
-      {/* Header Container */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
+    <div className="w-full h-full min-h-[380px] rounded-xl border border-amber-900/40 bg-stone-950 p-6 flex flex-col gap-6 shadow-2xl">
+      {/* Chart Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="font-serif text-amber-400 text-sm tracking-wider uppercase">
-            Cash Flow Analytics
+          <h3 className="text-lg font-serif font-bold tracking-wide text-amber-500 uppercase">
+            Treasury Cash Flow
           </h3>
-          <p className="text-[10px] text-stone-500 font-mono mt-0.5">
-            Chronological Inflow vs Outflow Ledger Summary
+          <p className="text-xs text-stone-400 mt-1">
+            Chronological log of inflows vs outflows over the past cycles
           </p>
         </div>
 
-        {/* Quick Analytics Badges */}
-        <div className="flex items-center gap-2 font-mono text-[10px]">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-950/40 border border-emerald-900/30 text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Avg Inflow: {Math.round(avgIncome).toLocaleString()}g
+        {/* Tactical Badges */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-emerald-950/40 border border-emerald-900/50 text-xs font-semibold text-emerald-400 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Avg Inflow: {formatGP(stats.avgIncome.toFixed(0))}
           </div>
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-rose-950/40 border border-rose-900/30 text-rose-400">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-rose-950/40 border border-rose-900/50 text-xs font-semibold text-rose-400 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            Avg Outflow: {Math.round(avgExpense).toLocaleString()}g
+            Avg Outflow: {formatGP(stats.avgExpense.toFixed(0))}
           </div>
         </div>
       </div>
 
-      {/* Recharts Container */}
-      <div className="flex-1 min-h-0 w-full mt-4">
+      {/* Recharts Area Container */}
+      <div className="flex-1 w-full min-h-[240px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid 
-              strokeDasharray="3 3" 
-              stroke="#451a03" 
-              opacity={0.4} 
-              vertical={false} 
-            />
+          <AreaChart data={data} margin={{ top: 10, right: 5, left: -15, bottom: 0 }}>
+            <defs>
+              <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+
+            <CartesianGrid stroke="#292524" strokeDasharray="3 3" vertical={false} />
 
             <XAxis
               dataKey="name"
-              stroke="#a8a29e"
-              fontSize={10}
-              fontFamily="monospace"
-              tickLine={false}
+              tick={{ fontSize: 11, fill: '#a8a29e', fontWeight: 500 }}
               axisLine={false}
-              tickMargin={8}
+              tickLine={false}
+              tickMargin={12}
             />
-
             <YAxis
-              stroke="#a8a29e"
-              fontSize={10}
-              fontFamily="monospace"
-              tickLine={false}
+              tick={{ fontSize: 11, fill: '#a8a29e', fontWeight: 500 }}
               axisLine={false}
-              tickFormatter={(val) => `${val}g`}
+              tickLine={false}
+              tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
               tickMargin={8}
             />
 
             <Tooltip
               contentStyle={{
-                backgroundColor: '#0c0a09',
-                borderColor: '#78350f',
-                borderRadius: '0.375rem',
-                fontFamily: 'monospace',
-                fontSize: '11px',
-                color: '#a8a29e'
+                background: '#0c0a09',
+                border: '1px solid rgba(146, 64, 14, 0.5)',
+                borderRadius: '8px',
+                fontSize: '12px',
+                color: '#f5f5f4',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
               }}
-              itemStyle={{ padding: '2px 0' }}
+              labelStyle={{ fontWeight: 700, color: '#f59e0b', marginBottom: '4px' }}
               formatter={(value, name) => [
-                `${Number(value).toLocaleString()} g`,
-                name === 'income' ? 'Income' : 'Expenses'
+                formatGP(value),
+                name === 'income' ? 'Inflows' : 'Outflows',
               ]}
             />
 
-            <Legend 
-              wrapperStyle={{ 
-                fontSize: '10px', 
-                fontFamily: 'monospace', 
-                paddingTop: '10px' 
-              }} 
-              iconSize={8}
-            />
-
-            <Bar
+            <Area
+              type="monotone"
               dataKey="income"
-              fill="#10b981"
-              name="Income"
-              radius={[4, 4, 0, 0]}
+              stroke="#10b981"
+              strokeWidth={2.5}
+              fill="url(#incomeGrad)"
+              dot={{ fill: '#10b981', r: 4, strokeWidth: 1, stroke: '#0c0a09' }}
+              activeDot={{ r: 6, fill: '#10b981', strokeWidth: 0 }}
             />
-
-            <Bar
+            <Area
+              type="monotone"
               dataKey="expenses"
-              fill="#f43f5e"
-              name="Expenses"
-              radius={[4, 4, 0, 0]}
+              stroke="#f43f5e"
+              strokeWidth={2.5}
+              fill="url(#expenseGrad)"
+              dot={{ fill: '#f43f5e', r: 4, strokeWidth: 1, stroke: '#0c0a09' }}
+              activeDot={{ r: 6, strokeWidth: 0 }}
             />
-          </BarChart>
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>

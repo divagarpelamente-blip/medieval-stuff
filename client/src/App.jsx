@@ -1,43 +1,36 @@
-import React, { useState, useEffect } from 'react'; 
-import { useKingdomStore } from './store/useKingdomStore'; 
-import MainMenuSandbox from './components/sandbox/MainMenuSandbox'; 
-import DashboardSandbox from './components/sandbox/dashboardSandbox';
-import TreasuryController from './components/Modals/TreasuryController';
+import React, { useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useKingdomStore } from './store/useKingdomStore';
+// POINT TO THE CINEMATIC MENU:
+import MainMenuSandbox from "./components/sandbox/MainMenuSandbox"; 
+import DashboardSandbox from "./components/sandbox/DashboardSandbox"; 
 
-/**
- * App Entry Point (Eldoria V2.0 Routing Shell)
- * Cleans up legacy UI structures, side navigations, and global headers.
- * Triggers the core state subscription listeners (auth pipelines) from the
- * Zustand store, and presents as the primary full-screen component.
- */
-export default function App() { 
-  const initAuth = useKingdomStore((state) => state.initAuth);
-  const [isTreasuryOpen, setIsTreasuryOpen] = useState(false);
 
-  // Initialize Supabase Auth state synchronization on boot
-  useEffect(() => { 
-    if (initAuth) { 
-      const unsubscribe = initAuth(); 
-      return () => { 
-        if (unsubscribe) unsubscribe(); 
-      }; 
-    } 
-  }, [initAuth]);
 
-  // Early Return Method: Direct injection for mounting the V2.0 Dashboard Sandbox
-  return <DashboardSandbox />;
+// Instantiate the TanStack Query Client outside the component to prevent cache resets
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  },
+});
 
-  return ( 
-    <React.Fragment> 
-      {!isTreasuryOpen && ( 
-        <MainMenuSandbox onOpenTreasury={() => setIsTreasuryOpen(true)} /> 
-      )}
+export default function App() {
+  const initialize = useKingdomStore((state) => state.initialize);
 
-      {isTreasuryOpen && (
-        <div className="fixed inset-0 bg-black flex items-center justify-center p-8 z-50">
-           <TreasuryController onClose={() => setIsTreasuryOpen(false)} />
-        </div>
-      )}
-    </React.Fragment>
-  ); 
+  useEffect(() => {
+    if (initialize) {
+      initialize();
+    }
+  }, [initialize]);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <div className="min-h-screen bg-stone-950 text-stone-200 antialiased selection:bg-amber-900 selection:text-amber-100">
+        <DashboardSandbox />
+      </div>
+    </QueryClientProvider>
+  );
 }
