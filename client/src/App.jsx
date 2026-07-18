@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'; 
 import { useKingdomStore } from './store/useKingdomStore'; 
 import MainMenuSandbox from './components/sandbox/MainMenuSandbox'; 
+import DashboardSandbox from './components/sandbox/dashboardSandbox';
 import TreasuryController from './components/Modals/TreasuryController';
 
 /**
@@ -23,14 +24,15 @@ export default function App() {
     } 
   }, [initAuth]);
 
+  // Early Return Method: Direct injection for mounting the V2.0 Dashboard Sandbox
+  return <DashboardSandbox />;
+
   return ( 
     <React.Fragment> 
-      {/* Renders the Main Menu when the treasury is closed */}
       {!isTreasuryOpen && ( 
         <MainMenuSandbox onOpenTreasury={() => setIsTreasuryOpen(true)} /> 
       )}
 
-      {/* Renders the Treasury Modal over a black void when opened */}
       {isTreasuryOpen && (
         <div className="fixed inset-0 bg-black flex items-center justify-center p-8 z-50">
            <TreasuryController onClose={() => setIsTreasuryOpen(false)} />
