@@ -1,4 +1,4 @@
-import DashboardSandbox from './dashboardSandbox';
+import DashboardSandbox from './DashboardSandbox';
 import React, { useState, useEffect } from 'react';
 import { useKingdomStore } from '../../store/useKingdomStore';
 import Modal from '../Modals/Modal';
