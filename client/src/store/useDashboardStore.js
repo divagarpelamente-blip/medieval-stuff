@@ -3,7 +3,8 @@ import { MAX_WIDGETS_PER_TAB, DEFAULT_PRESET } from '../config/dashboard.config'
 import { useKingdomStore } from './useKingdomStore';
 
 const INITIAL_SUBMENUS = [
-  { id: 'tab_1', name: 'Royal Treasury', isVisible: true, isActive: true },
+  { id: 'insights', name: 'Insights', isVisible: true, isActive: true },
+  { id: 'tab_1', name: 'Royal Treasury', isVisible: true, isActive: false },
   { id: 'tab_2', name: 'Campaign Ledger', isVisible: false, isActive: false },
   { id: 'tab_3', name: 'Citadel Reserves', isVisible: false, isActive: false },
   { id: 'tab_4', name: 'Merchant Guild', isVisible: false, isActive: false },
@@ -21,6 +22,7 @@ export const useDashboardStore = create((set, get) => ({
   submenus: INITIAL_SUBMENUS,
   
   savedLayout: {
+    insights: [...DEFAULT_PRESET],
     tab_1: [...DEFAULT_PRESET],
     tab_2: [],
     tab_3: [],
@@ -30,6 +32,7 @@ export const useDashboardStore = create((set, get) => ({
   },
   
   draftLayout: {
+    insights: [...DEFAULT_PRESET],
     tab_1: [...DEFAULT_PRESET],
     tab_2: [],
     tab_3: [],
@@ -85,6 +88,7 @@ export const useDashboardStore = create((set, get) => ({
         const { savedLayout, submenus } = loadedPayload;
         
         const finalSaved = {
+          insights: savedLayout?.insights || [...DEFAULT_PRESET],
           tab_1: savedLayout?.tab_1 || [...DEFAULT_PRESET],
           tab_2: savedLayout?.tab_2 || [],
           tab_3: savedLayout?.tab_3 || [],
@@ -93,10 +97,32 @@ export const useDashboardStore = create((set, get) => ({
           tab_6: savedLayout?.tab_6 || [],
         };
 
+        // INTELLIGENT MERGING LOGIC: Safeguard new hardcoded tabs from stale cache overrides
+        const mergedSubmenus = INITIAL_SUBMENUS.map((defaultTab) => {
+          const cachedTab = Array.isArray(submenus) ? submenus.find((s) => s.id === defaultTab.id) : null;
+          if (cachedTab) {
+            return {
+              ...defaultTab,
+              name: cachedTab.name || defaultTab.name,
+              isVisible: cachedTab.isVisible !== undefined ? cachedTab.isVisible : defaultTab.isVisible,
+            };
+          }
+          return defaultTab;
+        });
+
+        // Resolve single active tab mapping cleanly to prevent duplicate or dead active selections
+        const cachedActiveTab = Array.isArray(submenus) ? submenus.find((s) => s.isActive && s.isVisible) : null;
+        const activeId = cachedActiveTab ? cachedActiveTab.id : 'insights';
+
+        const finalSubmenus = mergedSubmenus.map((tab) => ({
+          ...tab,
+          isActive: tab.id === activeId,
+        }));
+
         set({
           savedLayout: finalSaved,
           draftLayout: JSON.parse(JSON.stringify(finalSaved)),
-          submenus: submenus || INITIAL_SUBMENUS,
+          submenus: finalSubmenus,
         });
       }
     } catch (err) {

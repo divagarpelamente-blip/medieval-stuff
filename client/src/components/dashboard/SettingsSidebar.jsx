@@ -43,7 +43,7 @@ export default function SettingsSidebar() {
 
   // Find active tab ID
   const activeTab = submenus.find((sub) => sub.isActive);
-  const activeTabId = activeTab ? activeTab.id : 'tab_1';
+  const activeTabId = activeTab ? activeTab.id : 'insights';
 
   // Return empty block on desktop if edit stance is off
   if (!isEditingLayout) return null;
@@ -59,7 +59,7 @@ export default function SettingsSidebar() {
   };
 
   return (
-    <aside className="w-80 h-[calc(100dvh-4rem)] bg-stone-950 border-l border-amber-900/40 flex flex-col z-20 shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950">
+    <aside className="w-80 h-[calc(100dvh-4rem)] bg-stone-950 border-r border-amber-900/40 flex flex-col z-20 shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950">
       <div className="p-4 bg-stone-900/20 border-b border-amber-900/20 flex items-center gap-2">
         <SlidersHorizontal className="text-amber-500" size={16} />
         <h2 className="font-serif text-sm font-bold tracking-wider text-amber-500 uppercase">
@@ -78,6 +78,8 @@ export default function SettingsSidebar() {
           <div className="flex flex-col gap-2">
             {submenus.map((tab) => {
               const isEditingName = editingTabId === tab.id;
+              const isProtected = tab.id === 'insights' || tab.id === 'tab_1';
+
               return (
                 <div
                   key={tab.id}
@@ -121,12 +123,16 @@ export default function SettingsSidebar() {
                           <Pencil size={12} />
                         </button>
                       )}
-                      <button
-                        onClick={() => toggleSubmenuVisibility(tab.id)}
-                        className="text-stone-500 hover:text-amber-500 transition-colors"
-                      >
-                        {tab.isVisible ? <Eye size={13} /> : <EyeOff size={13} />}
-                      </button>
+                      
+                      {/* Hide visibility controls entirely if the ledger tab is protected */}
+                      {!isProtected && (
+                        <button
+                          onClick={() => toggleSubmenuVisibility(tab.id)}
+                          className="text-stone-500 hover:text-amber-500 transition-colors"
+                        >
+                          {tab.isVisible ? <Eye size={13} /> : <EyeOff size={13} />}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

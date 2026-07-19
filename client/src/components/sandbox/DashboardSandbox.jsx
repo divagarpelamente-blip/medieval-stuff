@@ -20,18 +20,13 @@ export default function DashboardSandbox() {
       {/* Flexible Workspace Containment Box */}
       <div className="relative flex flex-1 overflow-hidden min-h-0">
         
-        {/* Grid Canvas Canvas (Fluidly resizes when drawer slides open) */}
-        <main className="flex-1 overflow-y-auto p-4 bg-stone-900/50 flex flex-col min-h-0">
-          <DashboardCanvas />
-        </main>
-        
-        {/* Dynamic Slide Drawer Sidepanel (Slides out smoothly using transitions) */}
+        {/* Dynamic Slide Drawer Sidepanel (Rendered first to mount on the left side) */}
         <aside 
           className={`
             transition-all duration-300 ease-in-out
-            absolute inset-y-0 right-0 lg:relative
-            ${isEditingLayout ? 'w-80 translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'}
-            bg-stone-900 border-l border-amber-900/30 shadow-2xl z-40 overflow-hidden shrink-0
+            absolute inset-y-0 left-0 lg:relative
+            ${isEditingLayout ? 'w-80 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0'}
+            bg-stone-900 border-r border-amber-900/30 shadow-2xl z-40 overflow-hidden shrink-0
           `}
         >
           {/* Inner content wrapper with a fixed width to prevent layout collapsing */}
@@ -39,6 +34,11 @@ export default function DashboardSandbox() {
             <SettingsSidebar />
           </div>
         </aside>
+
+        {/* Grid Canvas Workspace */}
+        <main className="flex-1 overflow-y-auto p-4 bg-stone-900/50 flex flex-col min-h-0">
+          <DashboardCanvas />
+        </main>
 
       </div>
     </div>
