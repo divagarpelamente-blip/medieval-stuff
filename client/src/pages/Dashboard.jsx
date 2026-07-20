@@ -25,8 +25,11 @@ export default function Dashboard() {
           className={`
             transition-all duration-300 ease-in-out
             absolute inset-y-0 left-0 lg:relative
-            ${isEditingLayout ? 'w-80 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0'}
-            bg-stone-900 border-r border-amber-900/30 shadow-2xl z-40 overflow-hidden shrink-0
+            ${isEditingLayout 
+              ? 'w-80 translate-x-0 border-r border-amber-900/30 shadow-2xl' 
+              : 'w-0 -translate-x-full lg:translate-x-0 border-none shadow-none'
+            }
+            bg-stone-900 z-40 overflow-hidden shrink-0
           `}
         >
           {/* Inner content wrapper with a fixed width to prevent layout collapsing */}

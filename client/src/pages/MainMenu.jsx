@@ -29,6 +29,18 @@ export default function MainMenu() {
     }
   }, [fetchChartOfAccounts]);
 
+  // Window Close Event Listener for nested dashboard controllers
+  useEffect(() => {
+    const handleCloseDashboard = () => {
+      setActiveModal(null);
+    };
+
+    window.addEventListener('close-dashboard', handleCloseDashboard);
+    return () => {
+      window.removeEventListener('close-dashboard', handleCloseDashboard);
+    };
+  }, []);
+
   // Unified metadata dictionary for modal header configuration
   const modalMetadata = {
     quests: { icon: '⚔️', title: 'Quests', subtitle: 'Sovereign objectives and campaigns' },

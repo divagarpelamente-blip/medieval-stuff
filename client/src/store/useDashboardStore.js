@@ -16,11 +16,12 @@ export const useDashboardStore = create((set, get) => ({
   isEditingLayout: false,
   isLoading: false,
   isSaving: false,
+  hasUnsavedChanges: false,
   submenus: INITIAL_SUBMENUS,
   
   savedLayout: {
-    insights: [...DEFAULT_PRESET],
-    tab_1: [...DEFAULT_PRESET],
+    insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
     tab_2: [],
     tab_3: [],
     tab_4: [],
@@ -29,8 +30,8 @@ export const useDashboardStore = create((set, get) => ({
   },
   
   draftLayout: {
-    insights: [...DEFAULT_PRESET],
-    tab_1: [...DEFAULT_PRESET],
+    insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
     tab_2: [],
     tab_3: [],
     tab_4: [],
@@ -81,8 +82,8 @@ export const useDashboardStore = create((set, get) => ({
         const { savedLayout, submenus } = loadedPayload;
         
         const finalSaved = {
-          insights: savedLayout?.insights || [...DEFAULT_PRESET],
-          tab_1: savedLayout?.tab_1 || [...DEFAULT_PRESET],
+          insights: savedLayout?.insights || JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          tab_1: savedLayout?.tab_1 || JSON.parse(JSON.stringify(DEFAULT_PRESET)),
           tab_2: savedLayout?.tab_2 || [],
           tab_3: savedLayout?.tab_3 || [],
           tab_4: savedLayout?.tab_4 || [],
@@ -119,18 +120,20 @@ export const useDashboardStore = create((set, get) => ({
           savedLayout: finalSaved,
           draftLayout: JSON.parse(JSON.stringify(finalSaved)),
           submenus: finalSubmenus,
+          hasUnsavedChanges: false,
         });
       } else {
         // Safe Reset/Instantiation fallback block if store contains no layout configurations
         const defaultLayout = {
-          insights: [...DEFAULT_PRESET],
-          tab_1: [...DEFAULT_PRESET],
+          insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
           tab_2: [], tab_3: [], tab_4: [], tab_5: [], tab_6: [],
         };
         set({
           savedLayout: defaultLayout,
           draftLayout: JSON.parse(JSON.stringify(defaultLayout)),
           submenus: INITIAL_SUBMENUS,
+          hasUnsavedChanges: false,
         });
       }
     } catch (err) {
@@ -140,7 +143,7 @@ export const useDashboardStore = create((set, get) => ({
     }
   },
 
-  saveDraftToProduction: async () => {
+  saveDraftToProduction: async (keepEditing = false) => {
     set({ isSaving: true });
     const state = get();
     const committedDraft = JSON.parse(JSON.stringify(state.draftLayout));
@@ -175,8 +178,9 @@ export const useDashboardStore = create((set, get) => ({
     } finally {
       set({
         savedLayout: committedDraft,
-        isEditingLayout: false,
+        isEditingLayout: keepEditing ? state.isEditingLayout : false,
         isSaving: false,
+        hasUnsavedChanges: false, // Reset track state on DB sync success
       });
     }
   },
@@ -184,17 +188,21 @@ export const useDashboardStore = create((set, get) => ({
   toggleEditMode: (active) => {
     set((state) => ({
       isEditingLayout: !!active,
-      draftLayout: JSON.parse(JSON.stringify(state.savedLayout))
+      draftLayout: JSON.parse(JSON.stringify(state.savedLayout)),
+      hasUnsavedChanges: false // Reset when starting a fresh edit session or discarding draft
     }));
   },
 
   updateDraftLayout: (tabId, nextLayout) => {
+    // STANCE LOCKS REMOVED: Unconditionally allow coordinate adjustments in draft layouts
     if (!Array.isArray(nextLayout) || nextLayout.length > MAX_WIDGETS_PER_TAB) return false;
+    
     set((state) => ({
       draftLayout: {
         ...state.draftLayout,
         [tabId]: nextLayout
-      }
+      },
+      hasUnsavedChanges: true
     }));
     return true;
   },
@@ -224,12 +232,13 @@ export const useDashboardStore = create((set, get) => ({
       const nextDraft = { ...state.draftLayout };
 
       if (wasInvisible && (!nextDraft[tabId] || nextDraft[tabId].length === 0)) {
-        nextDraft[tabId] = [...DEFAULT_PRESET];
+        nextDraft[tabId] = JSON.parse(JSON.stringify(DEFAULT_PRESET));
       }
 
       return {
         submenus: updatedSubmenus,
-        draftLayout: nextDraft
+        draftLayout: nextDraft,
+        hasUnsavedChanges: true
       };
     });
   },
@@ -242,7 +251,8 @@ export const useDashboardStore = create((set, get) => ({
           return { ...sub, name: newName.trim() };
         }
         return sub;
-      })
+      }),
+      hasUnsavedChanges: true
     }));
   },
 
@@ -297,6 +307,7 @@ export const useDashboardStore = create((set, get) => ({
     };
 
     const updatedLayout = [...currentLayout, newLayoutItem];
+    set({ hasUnsavedChanges: true });
     return state.updateDraftLayout(tabId, updatedLayout);
   }
 }));

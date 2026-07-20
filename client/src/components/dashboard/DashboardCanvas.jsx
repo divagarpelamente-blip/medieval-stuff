@@ -8,9 +8,9 @@ import { TREASURY_WIDGETS } from './treasuryRegistry';
 import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
 
-// Custom wrapper that manages responsive dimensions
+// Custom wrapper that manages scaling transitions via CSS zoom matrix
 const ResponsiveGridLayout = (props) => {
-  const [width, setWidth] = useState(1200);
+  const [scale, setScale] = useState(1);
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -18,7 +18,11 @@ const ResponsiveGridLayout = (props) => {
 
     const observer = new ResizeObserver((entries) => {
       const newWidth = entries[0].contentRect.width;
-      if (newWidth > 0) setWidth(newWidth);
+      if (newWidth > 0) {
+        // Strict boundary: clamp scaling factors to 1.0 maximum to prevent scaling artifacts
+        const calculatedScale = Math.min(newWidth / 1200, 1.0);
+        setScale(calculatedScale);
+      }
     });
 
     observer.observe(containerRef.current);
@@ -26,8 +30,23 @@ const ResponsiveGridLayout = (props) => {
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-full relative min-h-[600px]">
-      <Responsive width={width} style={{ minHeight: '600px', minWidth: '100%', height: '100%' }} {...props} />
+    <div ref={containerRef} className="w-full h-full relative min-h-[600px] overflow-hidden">
+      {/* Fixed-width layout scaling box */}
+      <div 
+        style={{ 
+          transform: `scale(${scale})`, 
+          transformOrigin: 'top left', 
+          width: '1200px',
+          height: `${100 / scale}%` 
+        }}
+        className="absolute top-0 left-0"
+      >
+        <Responsive 
+          width={1200} 
+          style={{ minHeight: '600px', minWidth: '100%', height: '100%' }} 
+          {...props} 
+        />
+      </div>
     </div>
   );
 };
@@ -75,6 +94,7 @@ export default function DashboardCanvas() {
     submenus,
     updateDraftLayout,
     isLoading,
+    saveDraftToProduction,
   } = useDashboardStore();
 
   const ignoreLayoutChangeRef = useRef(false);
@@ -94,8 +114,9 @@ export default function DashboardCanvas() {
   };
 
   const handleLayoutChange = (newLayout) => {
-    if (!isEditingLayout) return;
+    // STANCE LOCKS REMOVED: Always allow coordinate adjustment calculations
     if (ignoreLayoutChangeRef.current) return;
+    if (isLoading) return;
 
     const cleanedLayout = newLayout
       .filter((item) => item.i !== 'dropping' && !item.i.includes('__dropping-elem__'))
@@ -165,10 +186,12 @@ export default function DashboardCanvas() {
           breakpoints={breakpoints}
           cols={cols}
           rowHeight={80}
-          isDraggable={isEditingLayout}
-          isResizable={isEditingLayout}
+          isDraggable={true} // Unlocked unconditionally
+          isResizable={true} // Unlocked unconditionally
           isDroppable={false}
           onLayoutChange={handleLayoutChange}
+          onDragStop={() => saveDraftToProduction(true)}     // Commit drag configurations to DB dynamically
+          onResizeStop={() => saveDraftToProduction(true)}   // Commit resize configurations to DB dynamically
           margin={[16, 16]}
           containerPadding={[0, 0]}
         >
@@ -188,12 +211,12 @@ export default function DashboardCanvas() {
                     : 'bg-transparent'
                   }`}
               >
-                {/* Embedded Active Widget */}
-                <div className="w-full h-full pointer-events-none select-none">
+                {/* Embedded Active Widget - Pointer events enabled only when viewing for visualization interaction */}
+                <div className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}>
                   <WidgetComponent />
                 </div>
 
-                {/* Edit Controls HUD Overlay */}
+                {/* Edit Controls HUD Overlay - Safe check preserved: Dismantle buttons render only when options drawer is open */}
                 {isEditingLayout && (
                   <button
                     onClick={(e) => {
