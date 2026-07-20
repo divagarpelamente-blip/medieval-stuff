@@ -1,25 +1,25 @@
-import DashboardSandbox from './DashboardSandbox';
 import React, { useState, useEffect } from 'react';
-import { useKingdomStore } from '../../store/useKingdomStore';
-import Modal from '../Modals/Modal';
-import TreasuryController from '../Modals/TreasuryController';
-import SettingsController from '../Modals/SettingsController';
-import bgImage from '../../assets/Medieval_Town_Backround.jfif';
+import { useKingdomStore } from '../store/useKingdomStore';
+import Dashboard from './Dashboard';
+import Modal from '../components/Modals/Modal';
+import TreasuryController from '../components/Modals/TreasuryController';
+import SettingsController from '../components/Modals/SettingsController';
+import bgImage from '../assets/Medieval_Town_Backround.jfif';
 
 /**
- * MainMenuSandbox Component (V2.0 Core Shell)
+ * MainMenu Component (V2.0 Core Shell)
  * 
  * Acting as the primary cinematic landing and routing shell of Eldoria V2.0.
  * Restricts viewport bounds to a strict, non-collapsible "Modern Dashboard" wrapper.
  * Spans the background image across the outer dynamic height void to prevent distortion,
  * and hosts the modular controllers inside the centered inner canvas.
  */
-export default function MainMenuSandbox() {
+export default function MainMenu() {
   // --- Zustand Store Connections ---
   const store = useKingdomStore();
   const fetchChartOfAccounts = store?.fetchChartOfAccounts;
 
-  // --- Sandbox Component UI States ---
+  // --- Component UI States ---
   const [activeModal, setActiveModal] = useState(null); // 'quests' | 'achievements' | 'treasury' | 'dashboard' | 'settings' | null
 
   // Bootstrap Chart of Accounts Flat Matrix upon interface mount
@@ -46,7 +46,7 @@ export default function MainMenuSandbox() {
         1. THE OUTER VOID (Strict Full Screen bg-black)
         ========================================== */
     <div
-      className="w-full h-dvh flex justify-center overflow-hidden bg-black"
+      className="w-full h-dvh bg-black flex justify-center overflow-hidden"
       style={{
         backgroundImage: `radial-gradient(ellipse at center, rgba(12, 10, 9, 0.4) 0%, rgba(9, 8, 8, 0.95) 100%), url(${bgImage})`,
         backgroundSize: 'cover',
@@ -68,8 +68,6 @@ export default function MainMenuSandbox() {
                 SLEEK FLOATING DOCK MENU (Active === null)
                ========================================== */
             <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in">
-
-              {/* 1. Quests Button */}
               <button
                 onClick={() => setActiveModal('quests')}
                 title="Quests"
@@ -77,8 +75,6 @@ export default function MainMenuSandbox() {
               >
                 ⚔️
               </button>
-
-              {/* 2. Achievements Button */}
               <button
                 onClick={() => setActiveModal('achievements')}
                 title="Achievements"
@@ -86,8 +82,6 @@ export default function MainMenuSandbox() {
               >
                 🏆
               </button>
-
-              {/* 3. Treasury Button */}
               <button
                 onClick={() => setActiveModal('treasury')}
                 title="Treasury"
@@ -95,8 +89,6 @@ export default function MainMenuSandbox() {
               >
                 🏦
               </button>
-
-              {/* 4. Dashboard Button */}
               <button
                 onClick={() => setActiveModal('dashboard')}
                 title="Dashboard"
@@ -104,8 +96,6 @@ export default function MainMenuSandbox() {
               >
                 🏰
               </button>
-
-              {/* 5. Settings Button */}
               <button
                 onClick={() => setActiveModal('settings')}
                 title="Settings"
@@ -113,20 +103,19 @@ export default function MainMenuSandbox() {
               >
                 ⚙️
               </button>
-
             </div>
           ) : activeModal === 'treasury' ? (
             <TreasuryController onClose={() => setActiveModal(null)} />
           ) : activeModal === 'dashboard' ? (
-            /* LAUNCH THE NEW V2.1 DASHBOARD ENGINE */
+            /* LAUNCH THE NEW V2.1 DASHBOARD ENGINE IN PRODUCTION MODE */
             <div className="absolute inset-0 z-50 bg-stone-950">
-              <DashboardSandbox />
+              <Dashboard />
             </div>
           ) : activeModal === 'settings' ? (
             <SettingsController onClose={() => setActiveModal(null)} />
           ) : (
             /* ==========================================
-                MODULAR FALLBACK OVERLAY (Quests, Achievements, Dashboard)
+                MODULAR FALLBACK OVERLAY (Quests, Achievements)
                ========================================== */
             <Modal
               icon={currentMeta?.icon}
@@ -134,7 +123,6 @@ export default function MainMenuSandbox() {
               subtitle={currentMeta?.subtitle}
               onClose={() => setActiveModal(null)}
             >
-              {/* Standard Placeholder Body */}
               <div className="flex flex-col items-center justify-center p-12 text-center opacity-50">
                 <span className="text-4xl mb-4">🚧</span>
                 <p className="text-stone-400 font-sans tracking-widest uppercase">

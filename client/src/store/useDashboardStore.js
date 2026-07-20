@@ -13,9 +13,6 @@ const INITIAL_SUBMENUS = [
 ];
 
 export const useDashboardStore = create((set, get) => ({
-  // ==========================================
-  // CORE STATE
-  // ==========================================
   isEditingLayout: false,
   isLoading: false,
   isSaving: false,
@@ -41,14 +38,6 @@ export const useDashboardStore = create((set, get) => ({
     tab_6: [],
   },
 
-  // ==========================================
-  // DATABASE PERSISTENCE & HYDRATION
-  // ==========================================
-
-  /**
-   * Syncs custom layout configuration files down from the active Supabase ledger profile.
-   * Gracefully loads fallback maps if remote storage records are unreachable.
-   */
   hydrateLayouts: async () => {
     set({ isLoading: true });
     try {
@@ -57,22 +46,26 @@ export const useDashboardStore = create((set, get) => ({
       const profile = kingdomStore?.profile;
 
       let loadedPayload = null;
+      let databaseQuerySucceeded = false;
 
-      // 1. Attempt connection fetch from Supabase Profiles Table
+      // 1. Primary Sync from Supabase profiles schema
       if (supabase && profile?.id) {
         const { data, error } = await supabase
           .from('profiles')
           .select('dashboard_layouts')
           .eq('id', profile.id)
-          .single();
+          .maybeSingle();
         
-        if (!error && data?.dashboard_layouts) {
-          loadedPayload = data.dashboard_layouts;
+        if (!error) {
+          databaseQuerySucceeded = true;
+          if (data?.dashboard_layouts) {
+            loadedPayload = data.dashboard_layouts;
+          }
         }
       }
 
-      // 2. Client fallback cache lookup if database payload is empty
-      if (!loadedPayload) {
+      // 2. Local Fallback Cache (only leveraged if database retrieval failed or profile id is unresolvable)
+      if (!databaseQuerySucceeded && !loadedPayload) {
         const localCache = localStorage.getItem('eldoria_dashboard_layouts');
         if (localCache) {
           try {
@@ -83,7 +76,7 @@ export const useDashboardStore = create((set, get) => ({
         }
       }
 
-      // 3. Setup structural boundaries over restored objects
+      // 3. Setup structural boundaries over restored or default objects
       if (loadedPayload) {
         const { savedLayout, submenus } = loadedPayload;
         
@@ -97,22 +90,25 @@ export const useDashboardStore = create((set, get) => ({
           tab_6: savedLayout?.tab_6 || [],
         };
 
-        // INTELLIGENT MERGING LOGIC: Safeguard new hardcoded tabs from stale cache overrides
+        // Enforce structural visibility integrity on primary default panels
         const mergedSubmenus = INITIAL_SUBMENUS.map((defaultTab) => {
           const cachedTab = Array.isArray(submenus) ? submenus.find((s) => s.id === defaultTab.id) : null;
           if (cachedTab) {
+            const isProtected = defaultTab.id === 'insights' || defaultTab.id === 'tab_1';
             return {
               ...defaultTab,
               name: cachedTab.name || defaultTab.name,
-              isVisible: cachedTab.isVisible !== undefined ? cachedTab.isVisible : defaultTab.isVisible,
+              isVisible: isProtected ? true : (cachedTab.isVisible !== undefined ? cachedTab.isVisible : defaultTab.isVisible),
             };
           }
           return defaultTab;
         });
 
-        // Resolve single active tab mapping cleanly to prevent duplicate or dead active selections
+        // Safe Active Submenu evaluation
         const cachedActiveTab = Array.isArray(submenus) ? submenus.find((s) => s.isActive && s.isVisible) : null;
-        const activeId = cachedActiveTab ? cachedActiveTab.id : 'insights';
+        let activeId = cachedActiveTab ? cachedActiveTab.id : 'insights';
+        const isValidId = INITIAL_SUBMENUS.some(tab => tab.id === activeId);
+        if (!isValidId) activeId = 'insights';
 
         const finalSubmenus = mergedSubmenus.map((tab) => ({
           ...tab,
@@ -124,17 +120,26 @@ export const useDashboardStore = create((set, get) => ({
           draftLayout: JSON.parse(JSON.stringify(finalSaved)),
           submenus: finalSubmenus,
         });
+      } else {
+        // Safe Reset/Instantiation fallback block if store contains no layout configurations
+        const defaultLayout = {
+          insights: [...DEFAULT_PRESET],
+          tab_1: [...DEFAULT_PRESET],
+          tab_2: [], tab_3: [], tab_4: [], tab_5: [], tab_6: [],
+        };
+        set({
+          savedLayout: defaultLayout,
+          draftLayout: JSON.parse(JSON.stringify(defaultLayout)),
+          submenus: INITIAL_SUBMENUS,
+        });
       }
     } catch (err) {
-      console.error("Hydration process encountered an error, falling back to local layout configuration:", err);
+      console.error("Hydration process encountered an error, falling back to baseline defaults:", err);
     } finally {
       set({ isLoading: false });
     }
   },
 
-  /**
-   * Overrides local state with the sandbox draft layout and commits updates to Supabase.
-   */
   saveDraftToProduction: async () => {
     set({ isSaving: true });
     const state = get();
@@ -146,14 +151,12 @@ export const useDashboardStore = create((set, get) => ({
       submenus: committedSubmenus,
     };
 
-    // Fast-path client updates
     try {
       localStorage.setItem('eldoria_dashboard_layouts', JSON.stringify(payload));
     } catch (e) {
-      console.warn("Client layout sync rejected by device constraints:", e);
+      console.warn("Client layout sync rejected by local device constraints:", e);
     }
 
-    // Remote persistence write back
     try {
       const kingdomStore = useKingdomStore.getState();
       const supabase = kingdomStore?.supabase;
@@ -177,36 +180,16 @@ export const useDashboardStore = create((set, get) => ({
       });
     }
   },
-
-  // ==========================================
-  // EDIT STATE STANCE SHIFT ACTIONS
-  // ==========================================
   
   toggleEditMode: (active) => {
-    set((state) => {
-      if (active) {
-        const deepClonedSaved = JSON.parse(JSON.stringify(state.savedLayout));
-        return {
-          isEditingLayout: true,
-          draftLayout: deepClonedSaved
-        };
-      } else {
-        return {
-          isEditingLayout: false,
-          draftLayout: JSON.parse(JSON.stringify(state.savedLayout))
-        };
-      }
-    });
+    set((state) => ({
+      isEditingLayout: !!active,
+      draftLayout: JSON.parse(JSON.stringify(state.savedLayout))
+    }));
   },
 
   updateDraftLayout: (tabId, nextLayout) => {
-    if (!Array.isArray(nextLayout)) return false;
-
-    if (nextLayout.length > MAX_WIDGETS_PER_TAB) {
-      console.warn(`Grid action denied: Exceeds absolute cap of ${MAX_WIDGETS_PER_TAB} active widgets.`);
-      return false;
-    }
-
+    if (!Array.isArray(nextLayout) || nextLayout.length > MAX_WIDGETS_PER_TAB) return false;
     set((state) => ({
       draftLayout: {
         ...state.draftLayout,
@@ -215,10 +198,6 @@ export const useDashboardStore = create((set, get) => ({
     }));
     return true;
   },
-
-  // ==========================================
-  // SUBMENU UTILITIES
-  // ==========================================
 
   setActiveSubmenu: (tabId) => {
     set((state) => ({
@@ -230,6 +209,9 @@ export const useDashboardStore = create((set, get) => ({
   },
 
   toggleSubmenuVisibility: (tabId) => {
+    // STRICT TOGGLE PROTECTION: insights and tab_1 must remain visible
+    if (tabId === 'insights' || tabId === 'tab_1') return;
+
     set((state) => {
       const updatedSubmenus = state.submenus.map((sub) => {
         if (sub.id === tabId) {
@@ -254,7 +236,6 @@ export const useDashboardStore = create((set, get) => ({
 
   updateSubmenuName: (tabId, newName) => {
     if (!newName || typeof newName !== 'string') return;
-    
     set((state) => ({
       submenus: state.submenus.map((sub) => {
         if (sub.id === tabId) {
@@ -265,16 +246,11 @@ export const useDashboardStore = create((set, get) => ({
     }));
   },
 
-  // ==========================================
-  // WIDGET PLACEMENT ENGINE
-  // ==========================================
-
   deployWidget: (tabId, widgetId, widgetDef) => {
     const state = get();
     const currentLayout = state.draftLayout[tabId] || [];
 
     if (currentLayout.length >= MAX_WIDGETS_PER_TAB) {
-      alert(`The vault space is full! Max Limit of ${MAX_WIDGETS_PER_TAB} active structures reached.`);
       return false;
     }
 

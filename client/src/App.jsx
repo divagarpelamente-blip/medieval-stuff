@@ -1,11 +1,7 @@
 import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useKingdomStore } from './store/useKingdomStore';
-// POINT TO THE CINEMATIC MENU:
-import MainMenuSandbox from "./components/sandbox/MainMenuSandbox"; 
-import DashboardSandbox from "./components/sandbox/DashboardSandbox"; 
-
-
+import MainMenu from "./pages/MainMenu"; 
 
 // Instantiate the TanStack Query Client outside the component to prevent cache resets
 const queryClient = new QueryClient({
@@ -18,18 +14,24 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
-  const initialize = useKingdomStore((state) => state.initialize);
+  const initAuth = useKingdomStore((state) => state.initAuth);
 
   useEffect(() => {
-    if (initialize) {
-      initialize();
+    if (initAuth) {
+      const unsubscribe = initAuth();
+      // Clean up subscription listener on unmount
+      return () => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      };
     }
-  }, [initialize]);
+  }, [initAuth]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-stone-950 text-stone-200 antialiased selection:bg-amber-900 selection:text-amber-100">
-        <DashboardSandbox />
+        <MainMenu />
       </div>
     </QueryClientProvider>
   );

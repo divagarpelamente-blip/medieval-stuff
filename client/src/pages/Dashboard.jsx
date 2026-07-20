@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import DashboardHeader from '../dashboard/DashboardHeader';
-import DashboardCanvas from '../dashboard/DashboardCanvas';
-import SettingsSidebar from '../dashboard/SettingsSidebar';
-import { useDashboardStore } from '../../store/useDashboardStore';
+import DashboardHeader from '../components/dashboard/DashboardHeader';
+import DashboardCanvas from '../components/dashboard/DashboardCanvas';
+import SettingsSidebar from '../components/dashboard/SettingsSidebar';
+import { useDashboardStore } from '../store/useDashboardStore';
 
-export default function DashboardSandbox() {
+export default function Dashboard() {
   const { isEditingLayout, hydrateLayouts } = useDashboardStore();
 
   // Initialize and hydrate configurations on mount
