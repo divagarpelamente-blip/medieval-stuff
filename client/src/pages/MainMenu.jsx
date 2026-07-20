@@ -57,12 +57,12 @@ export default function MainMenu() {
       {/* ==========================================
           2. THE INNER CANVAS (Centered Transparent Core)
           ========================================== */}
-      <div className="relative w-full max-w-7xl h-full mx-auto text-stone-100 flex flex-col justify-between font-serif overflow-x-hidden overflow-y-auto">
+      <div className="relative w-full max-w-7xl h-full mx-auto text-stone-100 flex flex-col justify-between font-serif overflow-hidden">
 
         {/* ==========================================
             3. MAIN ROUTING VIEWPORT (Center-Bottom Anchoring)
             ========================================== */}
-        <main className="flex-grow flex flex-col items-center justify-end px-4 pb-16 z-10">
+        <main className="flex-grow flex flex-col items-center justify-end px-4 pb-16 z-10 w-full min-h-0">
           {activeModal === null ? (
             /* ==========================================
                 SLEEK FLOATING DOCK MENU (Active === null)
@@ -108,7 +108,7 @@ export default function MainMenu() {
             <TreasuryController onClose={() => setActiveModal(null)} />
           ) : activeModal === 'dashboard' ? (
             /* LAUNCH THE NEW V2.1 DASHBOARD ENGINE IN PRODUCTION MODE */
-            <div className="absolute inset-0 z-50 bg-stone-950">
+            <div className="absolute inset-0 z-50 bg-stone-950 w-full h-full">
               <Dashboard />
             </div>
           ) : activeModal === 'settings' ? (

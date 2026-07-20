@@ -13,7 +13,7 @@ export default function Dashboard() {
   }, [hydrateLayouts]);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-stone-950 text-stone-200 overflow-hidden font-sans">
+    <div className="flex flex-col h-full w-full bg-stone-950 text-stone-200 overflow-hidden font-sans">
       {/* Top Header Row (Remains fully pinned and stable across sidepanel shifts) */}
       <DashboardHeader />
       
