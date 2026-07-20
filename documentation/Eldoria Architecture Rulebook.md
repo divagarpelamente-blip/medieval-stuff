@@ -76,7 +76,8 @@ Every transaction requires a base `target_account` (resolved from the Matrix). T
 
 ### **Balance & Net Worth Calculations (Server-Side Aggregation)**
 
-To ensure maximum scalability (10,000+ transactions), global financial metrics must **never** be calculated by iterating over local arrays in the browser. 
+To ensure maximum scalability (10,000+ transactions), global financial metrics must **never** be calculated by iterating over local arrays in the browser.
+
 * **Backend RPCs:** All top-level HUD metrics are calculated directly on the PostgreSQL server via Supabase RPCs (e.g., `get_dashboard_metrics`).
 * **The Math (Executed by DB):**
   * **Total Assets:** Σ(Balances of all 1xxxxxxx accounts)
@@ -93,11 +94,13 @@ To ensure maximum scalability (10,000+ transactions), global financial metrics m
 * **Profile Balance Hook:** When any transaction is added, updated, or deleted, corresponding gold and XP updates are synchronized to the player profile.
 
 ### **Ledger Data Constraints**
+
 * **Strict Pagination:** The frontend must never fetch the entire `transactions` table into memory. All ledger queries must implement chunking (Limit and Offset) via `fetchTransactions(limit, offset)`.
 * **Server-Side Filtering:** Text searches and category filters must be passed to Supabase as query parameters (e.g., `.ilike()`) rather than filtering a massive array locally in React.
 
 ### **Intelligent Hydration & Cache Merging**
-* **Default Structure Protection:** During layout hydration (`hydrateLayouts`), the store must safeguard hardcoded tabs from stale client/database cache overrides. 
+
+* **Default Structure Protection:** During layout hydration (`hydrateLayouts`), the store must safeguard hardcoded tabs from stale client/database cache overrides.
 * **Merge Strategy:** The system must map the `INITIAL_SUBMENUS` defaults first, overlaying user modifications (custom name, visibility toggles) from database profiles (`dashboard_layouts` payload) only when matching IDs are present. Missing or newly introduced default tabs must remain active and fully visible.
 * **Active Tab Resolution:** If the active tab state becomes corrupted or maps to an invisible/legacy tab, the system must cleanly default active focus to `'insights'`.
 
@@ -141,6 +144,7 @@ Core system tabs are protected to safeguard essential layouts.
 Widgets are decoupled into domains (e.g. `treasuryRegistry.js` exposing `TREASURY_WIDGETS`) rather than global generic files.
 
 * **Metadata Properties:** Each widget registry entry must define a domain and structural category:
+
   ```javascript
   cash_flow_chart: {
     id: 'cash_flow_chart',
@@ -151,6 +155,7 @@ Widgets are decoupled into domains (e.g. `treasuryRegistry.js` exposing `TREASUR
     layout: { w: 5, h: 3, minW: 3, maxW: 12, minH: 2, maxH: 6 }
   }
   ```
+
 * **Sidebar Category Filters:** Sidebar widget menus must expose category/division filters (e.g., Overview, Analytical Curves, Ledger Breakdowns) matching these metadata records.
 * **Deployment Visuals:** Widgets display in lists showing metadata footprint details (e.g. `5x3`) and a visual action preview trigger on the right side containing a quick deploy Plus (`+`) button.
 
@@ -194,6 +199,7 @@ When fixing legacy components, enforce these rules:
 The following table documents primary files in the workspace along with their functional descriptions within the Eldoria ecosystem:
 
 ### **Root & Configuration Files**
+
 | File Name | Description |
 | :--- | :--- |
 | [package.json](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/package.json) | Manages application metadata, scripts (like `npm run dev`), and dependencies. |
@@ -202,6 +208,7 @@ The following table documents primary files in the workspace along with their fu
 | [SANDBOX_GUIDE.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/SANDBOX_GUIDE.md) | Guide outlining instructions for navigating and running sandbox environments. |
 
 ### **Store & Application Entry**
+
 | File Name | Description |
 | :--- | :--- |
 | [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx) | Root React component managing routing and screen toggling (Login, Main Menu, Isometric Map, Dashboard Sandbox). |
@@ -211,12 +218,14 @@ The following table documents primary files in the workspace along with their fu
 | [useKingdomStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useKingdomStore.js) | Zustand store holding general kingdom states (user profile details, Supabase client reference, active tabs). |
 
 ### **Sandbox Containers**
+
 | File Name | Description |
 | :--- | :--- |
 | [DashboardSandbox.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/DashboardSandbox.jsx) | Sandbox workspace wrapper that binds the Dashboard Canvas, Settings Sidebar, and Header. |
 | [MainMenuSandbox.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/MainMenuSandbox.jsx) | Main menu interface directing users to medieval modules (Ledger, Treasury, Map, Settings, Dashboard). |
 
 ### **Dashboard Components**
+
 | File Name | Description |
 | :--- | :--- |
 | [DashboardCanvas.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/DashboardCanvas.jsx) | Workspace grid rendering deployed charts with resize and drag-and-drop actions. |
@@ -228,6 +237,7 @@ The following table documents primary files in the workspace along with their fu
 | [AssetAllocationChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/AssetAllocationChart.jsx) | Pie/donut breakdown charting gold allocation across accounts. |
 
 ### **Medieval Map & Modals**
+
 | File Name | Description |
 | :--- | :--- |
 | [IsometricMap.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/common/IsometricMap.jsx) | Interactive game screen mapping town zones (Huts, Townhall, Guild, Tavern, Treasury) to modal views. |
@@ -239,6 +249,7 @@ The following table documents primary files in the workspace along with their fu
 | [SettingsController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Modals/SettingsController.jsx) | Settings menu overlay mapping profiles, database controls, and options. |
 
 ### **Hooks, Utilities, & Localization**
+
 | File Name | Description |
 | :--- | :--- |
 | [dashboard.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/dashboard.config.js) | Houses dashboard constants (e.g., maximum widgets per tab, initial layout coordinates). |
