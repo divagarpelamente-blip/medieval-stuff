@@ -4,7 +4,7 @@ import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { WIDGET_REGISTRY } from './widgetRegistry';
+import { TREASURY_WIDGETS } from './treasuryRegistry';
 import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
 
@@ -38,8 +38,8 @@ function DashboardSkeleton() {
     <div className="flex-grow bg-stone-900/30 p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
         {[1, 2, 3].map((idx) => (
-          <div 
-            key={idx} 
+          <div
+            key={idx}
             className="rounded-xl border border-amber-900/10 bg-stone-950/40 p-4 flex flex-col justify-between h-[240px]"
           >
             {/* Header Skeleton */}
@@ -101,7 +101,7 @@ export default function DashboardCanvas() {
       .filter((item) => item.i !== 'dropping' && !item.i.includes('__dropping-elem__'))
       .map((item) => {
         const baseId = item.i.split('-')[0];
-        const originalDef = WIDGET_REGISTRY[baseId]?.layout || {};
+        const originalDef = TREASURY_WIDGETS[baseId]?.layout || {};
         return {
           i: item.i,
           x: item.x,
@@ -128,7 +128,7 @@ export default function DashboardCanvas() {
   }
 
   return (
-    <div 
+    <div
       className="flex-1 bg-stone-900/30 p-6 relative overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950"
       onDragOver={(e) => {
         e.preventDefault();
@@ -174,8 +174,8 @@ export default function DashboardCanvas() {
         >
           {currentLayout.map((item) => {
             const baseId = item.i.split('-')[0];
-            const widget = WIDGET_REGISTRY[baseId];
-            
+            const widget = TREASURY_WIDGETS[baseId];
+
             if (!widget) return <div key={item.i} className="hidden" />;
 
             const WidgetComponent = widget.component;
@@ -183,11 +183,10 @@ export default function DashboardCanvas() {
             return (
               <div
                 key={item.i}
-                className={`group relative rounded-xl overflow-hidden transition-shadow duration-200 ${
-                  isEditingLayout
+                className={`group relative rounded-xl overflow-hidden transition-shadow duration-200 ${isEditingLayout
                     ? 'border-2 border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_15px_rgba(245,158,11,0.15)] bg-stone-950/80 cursor-grab active:cursor-grabbing'
                     : 'bg-transparent'
-                }`}
+                  }`}
               >
                 {/* Embedded Active Widget */}
                 <div className="w-full h-full pointer-events-none select-none">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { WIDGET_REGISTRY } from './widgetRegistry';
+import { TREASURY_WIDGETS } from './treasuryRegistry';
 import { DEFAULT_PRESET } from '../../config/dashboard.config';
 import { Eye, EyeOff, Pencil, Check, Layers, Grid, SlidersHorizontal, Plus } from 'lucide-react';
 
@@ -45,7 +45,10 @@ export default function SettingsSidebar() {
   const [activeSection, setActiveSection] = useState(null); // 'ledgers' | 'presets' | 'widgets' | null
 
   // 2. Category Filtering State
-  const [widgetCategory, setWidgetCategory] = useState('All'); // 'All' | 'Analytics' | 'Treasury'
+  const [widgetCategory, setWidgetCategory] = useState('All'); // 'All' | 'overview' | 'chart' | 'ledger'
+
+  // Decouple registry state for DDD support
+  const activeRegistry = TREASURY_WIDGETS;
 
   // Find active tab ID
   const activeTab = submenus.find((sub) => sub.isActive);
@@ -69,12 +72,10 @@ export default function SettingsSidebar() {
     setActiveSection((prev) => (prev === section ? null : section));
   };
 
-  // Filter widgets by defined metadata category maps
-  const filteredWidgets = Object.entries(WIDGET_REGISTRY).filter(([key, widget]) => {
+  // Filter registry entries based on the metadata properties
+  const filteredWidgets = Object.entries(activeRegistry).filter(([key, widget]) => {
     if (widgetCategory === 'All') return true;
-    if (widgetCategory === 'Analytics' && (key === 'cash_flow_chart' || key === 'net_worth_chart')) return true;
-    if (widgetCategory === 'Treasury' && key === 'asset_allocation_chart') return true;
-    return false;
+    return widget.category === widgetCategory;
   });
 
   return (
@@ -236,16 +237,17 @@ export default function SettingsSidebar() {
                 {/* Category Filtering Selector Dropdown */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[9px] text-stone-500 uppercase tracking-widest font-mono">
-                    Filter Category
+                    Filter Division
                   </label>
                   <select
                     value={widgetCategory}
                     onChange={(e) => setWidgetCategory(e.target.value)}
                     className="bg-stone-900 text-stone-200 border border-amber-900/30 rounded px-2 py-1.5 text-xs font-serif outline-none focus:border-amber-500/50 transition-colors"
                   >
-                    <option value="All">All Widgets</option>
-                    <option value="Analytics">Analytics Division</option>
-                    <option value="Treasury">Citadel Treasury</option>
+                    <option value="All">All Assets</option>
+                    <option value="overview">Overview Division</option>
+                    <option value="chart">Analytical Curves</option>
+                    <option value="ledger">Ledger Breakdowns</option>
                   </select>
                 </div>
 

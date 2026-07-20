@@ -3,14 +3,17 @@ import NetWorthChart from './NetWorthChart';
 import AssetAllocationChart from './AssetAllocationChart';
 
 /**
- * Eldoria V2.1 Grid-Ready Widget Registry
- * Maps components with sensible min/max constraints and fallback dimensional bounds.
+ * Eldoria V2.1 Domain-Ready Widget Registry: Treasury Assets
+ * Maps components with sensible min/max constraints, fallback dimensional bounds,
+ * and DDD metadata for dynamic sidebar rendering.
  */
-export const WIDGET_REGISTRY = {
+export const TREASURY_WIDGETS = {
   cash_flow_chart: {
     id: 'cash_flow_chart',
     name: 'Treasury Cash Flow Curve',
     component: CashFlowChart,
+    domain: 'treasury',
+    category: 'chart',
     layout: {
       w: 5,
       h: 3,
@@ -24,6 +27,8 @@ export const WIDGET_REGISTRY = {
     id: 'net_worth_chart',
     name: 'Net Treasury Reserves Trend',
     component: NetWorthChart,
+    domain: 'treasury',
+    category: 'overview',
     layout: {
       w: 5,
       h: 3,
@@ -37,6 +42,8 @@ export const WIDGET_REGISTRY = {
     id: 'asset_allocation_chart',
     name: 'Asset Allocation breakdown',
     component: AssetAllocationChart,
+    domain: 'treasury',
+    category: 'ledger',
     layout: {
       w: 3,
       h: 3,
@@ -48,4 +55,4 @@ export const WIDGET_REGISTRY = {
   },
 };
 
-export default WIDGET_REGISTRY;
+export default TREASURY_WIDGETS;
