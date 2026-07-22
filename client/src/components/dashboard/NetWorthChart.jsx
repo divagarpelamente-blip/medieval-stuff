@@ -19,7 +19,20 @@ export default function NetWorthChart({ transactions }) {
     return generateNetTrendData(activeTransactions);
   }, [activeTransactions]);
 
+  // Calculate current final net worth balance from the chronological series
+  const currentNet = useMemo(() => {
+    if (!data || !data.length) return 0;
+    return data[data.length - 1].net;
+  }, [data]);
+
   const formatGP = (val) => `${Number(val).toLocaleString()} GP`;
+  
+  // Format localized absolute values and append Deficit indicator if below zero
+  const formatAbsoluteGP = (val) => {
+    const num = Number(val);
+    const formatted = Math.abs(num).toLocaleString();
+    return num < 0 ? `${formatted} GP (Deficit)` : `${formatted} GP`;
+  };
 
   return (
     <div className="w-full h-full min-h-[380px] rounded-xl border border-amber-900/40 bg-stone-950 p-6 flex flex-col gap-6 shadow-2xl">
@@ -27,17 +40,18 @@ export default function NetWorthChart({ transactions }) {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-serif font-bold tracking-wide text-amber-500 uppercase">
-            Net Treasury Curve
+            Asset Growth Trend
           </h3>
           <p className="text-xs text-stone-400 mt-1">
-            Chronological trend of total capital reserves
+            Tracks the total accumulated balance and financial position.
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded bg-amber-950/30 border border-amber-900/30">
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400">
-            Reserves Trend
-          </span>
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Dynamic computed current balance badge */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-amber-950/40 border border-amber-900/40 text-xs font-semibold text-amber-400 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Current Position: {formatAbsoluteGP(currentNet)}
+          </div>
         </div>
       </div>
 
@@ -78,7 +92,7 @@ export default function NetWorthChart({ transactions }) {
                 boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
                 padding: '10px 14px',
               }}
-              formatter={(value) => [formatGP(value), 'Net Position']}
+              formatter={(value) => [formatAbsoluteGP(value), 'Net Position']}
               labelStyle={{ fontWeight: 700, color: '#f59e0b', marginBottom: '4px' }}
             />
 

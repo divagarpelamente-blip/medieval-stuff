@@ -38,22 +38,22 @@ export default function CashFlowChart({ transactions }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-serif font-bold tracking-wide text-amber-500 uppercase">
-            Treasury Cash Flow
+            Income vs Expenses
           </h3>
           <p className="text-xs text-stone-400 mt-1">
-            Chronological log of inflows vs outflows over the past cycles
+            Historical evolution of all Income vs Expenses
           </p>
         </div>
 
-        {/* Tactical Badges */}
+        {/* Tactical Badges - Uses absolute values for presentation readability */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-emerald-950/40 border border-emerald-900/50 text-xs font-semibold text-emerald-400 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Avg Inflow: {formatGP(stats.avgIncome.toFixed(0))}
+            Avg Inflow: {Number(Math.abs(stats.avgIncome).toFixed(0)).toLocaleString()}
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-rose-950/40 border border-rose-900/50 text-xs font-semibold text-rose-400 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            Avg Outflow: {formatGP(stats.avgExpense.toFixed(0))}
+            Avg Outflow: {Number(Math.abs(stats.avgExpense).toFixed(0)).toLocaleString()}
           </div>
         </div>
       </div>
@@ -101,7 +101,7 @@ export default function CashFlowChart({ transactions }) {
               }}
               labelStyle={{ fontWeight: 700, color: '#f59e0b', marginBottom: '4px' }}
               formatter={(value, name) => [
-                formatGP(value),
+                formatGP(Math.abs(value)),
                 name === 'income' ? 'Inflows' : 'Outflows',
               ]}
             />

@@ -2,6 +2,10 @@ import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useKingdomStore } from './store/useKingdomStore';
 import MainMenu from "./pages/MainMenu"; 
+import DashboardWidgetsSandbox from "./components/sandbox/dashboard-widgets-sandbox";
+
+// Manual development toggle constant
+const ENABLE_SANDBOX_MODE = true;
 
 // Instantiate the TanStack Query Client outside the component to prevent cache resets
 const queryClient = new QueryClient({
@@ -27,6 +31,15 @@ export default function App() {
       };
     }
   }, [initAuth]);
+
+  // Early Return Bypass for isolated widget testing
+  if (ENABLE_SANDBOX_MODE) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <DashboardWidgetsSandbox />
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

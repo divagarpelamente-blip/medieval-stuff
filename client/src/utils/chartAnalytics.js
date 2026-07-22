@@ -1,37 +1,51 @@
 /**
- * Eldoria V2.1 Charting & Analytics Utilities
- * Provides data transformation helpers for Recharts visualizations.
+ * Eldoria V2.4 Double-Entry Charting & Analytics Utilities
+ * Provides mathematically accurate ledger aggregations using double-entry logic.
  */
 
 /**
  * Transforms an array of transactions into chronological monthly cash flow data.
- * Merges inflows as income and outflows as expenses, ignoring neutral flows.
+ * Anchors directly to account prefix classes (7xxxxxxx for Income, 6xxxxxxx for Expenses).
  * 
- * @param {Array} transactions - Raw ledger transactions from the store.
- * @returns {Array} Formatted data array for Bar charts: [{ name: 'Jan 2026', income: 1500, expenses: 800 }]
+ * @param {Array} transactions - Raw double-entry ledger transactions.
+ * @returns {Array} Formatted data array: [{ name: 'Jan 2026', income: 1500, expenses: -800 }]
  */
 export function generateCashFlowData(transactions) {
   if (!Array.isArray(transactions)) return [];
   const monthlyMap = {};
 
   transactions.forEach((transaction) => {
-    if (!transaction.posting_date) return;
-    
-    // Extract YYYY-MM prefix for accurate sorting and grouping
-    const monthKey = transaction.posting_date.slice(0, 7); 
+    const dateStr = transaction.posting_date || transaction.date;
+    if (!dateStr || dateStr.length < 7) return;
+
+    // Extract YYYY-MM key
+    const monthKey = dateStr.slice(0, 7);
     if (!monthlyMap[monthKey]) {
       monthlyMap[monthKey] = { income: 0, expenses: 0 };
     }
 
     const amount = Number(transaction.amount) || 0;
-    if (transaction.flow === 'inflow') {
-      monthlyMap[monthKey].income += amount;
-    } else if (transaction.flow === 'outflow') {
-      monthlyMap[monthKey].expenses += amount;
+    const source = transaction.source_account || '';
+    const target = transaction.target_account || '';
+
+    // 1. Income calculations (anchored directly to prefix '7')
+    if (source.startsWith('7')) {
+      monthlyMap[monthKey].income += amount; // Standard Income generation
+    }
+    if (target.startsWith('7')) {
+      monthlyMap[monthKey].income -= amount; // Income reversal
+    }
+
+    // 2. Expense calculations (anchored directly to prefix '6' and plotted below the zero line)
+    if (target.startsWith('6')) {
+      monthlyMap[monthKey].expenses -= amount; // Standard Expense occurrence
+    }
+    if (source.startsWith('6')) {
+      monthlyMap[monthKey].expenses += amount; // Expense refund
     }
   });
 
-  // Sort chronologically by the YYYY-MM keys before converting to display names
+  // Sort chronologically by YYYY-MM keys before converting to human-readable month names
   return Object.entries(monthlyMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([monthKey, data]) => {
@@ -48,33 +62,47 @@ export function generateCashFlowData(transactions) {
 }
 
 /**
- * Transforms an array of transactions into a cumulative net trend trendline.
- * Calculates net change per month (inflows minus outflows).
+ * Transforms an array of transactions into a chronological net trend of overall Net Worth.
+ * Accurately processes Assets (1xxxxxxx) and Liabilities (2xxxxxxx) to output net balances.
  * 
- * @param {Array} transactions - Raw ledger transactions from the store.
- * @returns {Array} Formatted data array for Line/Area charts: [{ month: 'Jan 2026', net: 700 }]
+ * @param {Array} transactions - Raw double-entry ledger transactions.
+ * @returns {Array} Formatted data array: [{ month: 'Jan 2026', net: 700 }]
  */
 export function generateNetTrendData(transactions) {
   if (!Array.isArray(transactions)) return [];
   const monthlyMap = {};
 
   transactions.forEach((transaction) => {
-    if (!transaction.posting_date) return;
+    const dateStr = transaction.posting_date || transaction.date;
+    if (!dateStr || dateStr.length < 7) return;
 
-    const monthKey = transaction.posting_date.slice(0, 7);
+    const monthKey = dateStr.slice(0, 7);
     if (!monthlyMap[monthKey]) {
       monthlyMap[monthKey] = { net: 0 };
     }
 
     const amount = Number(transaction.amount) || 0;
-    if (transaction.flow === 'inflow') {
+    const source = transaction.source_account || '';
+    const target = transaction.target_account || '';
+
+    // Assets ('1')
+    if (target.startsWith('1')) {
       monthlyMap[monthKey].net += amount;
-    } else if (transaction.flow === 'outflow') {
+    }
+    if (source.startsWith('1')) {
       monthlyMap[monthKey].net -= amount;
+    }
+
+    // Liabilities ('2')
+    if (target.startsWith('2')) {
+      monthlyMap[monthKey].net -= amount; // Taking on debt decreases net worth
+    }
+    if (source.startsWith('2')) {
+      monthlyMap[monthKey].net += amount; // Paying off debt increases net worth
     }
   });
 
-  // Sort chronologically by the YYYY-MM keys before converting to display names
+  // Sort chronologically by YYYY-MM keys before converting to display labels
   return Object.entries(monthlyMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([monthKey, data]) => {
@@ -90,34 +118,46 @@ export function generateNetTrendData(transactions) {
 }
 
 /**
- * Groups and sums transactions of a specific type (e.g. Expenses, Assets) by category.
- * Filters transactions using target_account prefixes matching the 8-digit COA rules.
+ * Groups and sums transactions of a specific class (e.g. Expenses '6', Assets '1') by category.
+ * Enforces dual-condition calculation mapping rules while discarding net-zero internal transfers.
  * 
- * @param {Array} transactions - Raw ledger transactions from the store.
- * @param {string} targetPrefix - The starting digit prefix (e.g., '6' for Expenses, '1' for Assets).
- * @returns {Array} Formatted data array for Pie/Donut charts: [{ name: 'Taxes', value: 450 }] sorted descending.
+ * @param {Array} transactions - Raw double-entry ledger transactions.
+ * @param {string} targetPrefix - The starting 8-digit COA prefix (e.g., '6' or '1').
+ * @returns {Array} Formatted category data: [{ name: 'Utilities', value: 450 }] sorted descending.
  */
 export function generateCategoryBreakdown(transactions, targetPrefix) {
   if (!Array.isArray(transactions) || !targetPrefix) return [];
   const categoryMap = {};
 
   transactions.forEach((transaction) => {
-    const accountCode = transaction.target_account;
-    
-    // Check if target account code matches the specified 8-digit prefix class
-    if (!accountCode || !accountCode.startsWith(targetPrefix)) return;
+    const source = transaction.source_account || '';
+    const target = transaction.target_account || '';
+
+    const sourceMatch = source.startsWith(targetPrefix);
+    const targetMatch = target.startsWith(targetPrefix);
+
+    // Skip internal transfers (net-zero change for the targetPrefix class overall)
+    if (sourceMatch && targetMatch) return;
 
     const category = transaction.category || 'Uncategorized';
     const amount = Number(transaction.amount) || 0;
 
-    categoryMap[category] = (categoryMap[category] || 0) + amount;
+    // Target match increases (+) the class balance
+    if (targetMatch) {
+      categoryMap[category] = (categoryMap[category] || 0) + amount;
+    }
+    // Source match decreases (-) the class balance
+    if (sourceMatch) {
+      categoryMap[category] = (categoryMap[category] || 0) - amount;
+    }
   });
 
-  // Convert map to sorting-friendly array and sort descending
+  // Map to format list, filter exact zeros, and sort descending
   return Object.entries(categoryMap)
     .map(([name, value]) => ({
       name,
       value: Number(value.toFixed(2))
     }))
+    .filter((item) => item.value !== 0)
     .sort((a, b) => b.value - a.value);
 }
