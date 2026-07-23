@@ -1,6 +1,6 @@
 # **🏰 Eldoria Architecture Rulebook & Refactoring Guide**
 
-**Version:** 2.2 (Domain-Driven Design, Left-Side Sidebar, and Cache Safeguards)  
+**Version:** 2.4 (Double-Entry Chart Analytics, Below-Zero Expense Plotting, and Liability Trend Integration)  
 **Purpose:** This document is the absolute single source of truth for the Eldoria financial engine. All React components, Zustand stores, and database schemas MUST comply with the rules below.
 
 ---
@@ -232,9 +232,9 @@ The following table documents primary files in the workspace along with their fu
 | [SettingsSidebar.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/SettingsSidebar.jsx) | Customization sidebar managing visible ledgers, preset grids, and widget deployments. |
 | [DashboardHeader.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/DashboardHeader.jsx) | Top bar containing Edit, Save/Cancel, and Exit options for the sandbox. |
 | [treasuryRegistry.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/treasuryRegistry.js) | Maps chart widget identifiers to React components, layout boundaries, and DDD domains. |
-| [CashFlowChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/CashFlowChart.jsx) | Line graph widget displaying the influx and outflow curves of treasury gold. |
-| [NetWorthChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/NetWorthChart.jsx) | Bar/area trend widget mapping overall treasury reserves and historical net balance. |
-| [AssetAllocationChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/AssetAllocationChart.jsx) | Pie/donut breakdown charting gold allocation across accounts. |
+| [CashFlowChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/CashFlowChart.jsx) | Area chart widget displaying the historical evolution of all Income vs Expenses. |
+| [NetWorthChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/NetWorthChart.jsx) | Area trend widget displaying the chronological evolution of Net Worth (Assets - Liabilities). |
+| [AssetAllocationChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/AssetAllocationChart.jsx) | Donut/Pie breakdown charting gold/asset allocation across accounts. |
 
 ### **Medieval Map & Modals**
 
@@ -255,5 +255,26 @@ The following table documents primary files in the workspace along with their fu
 | [dashboard.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/dashboard.config.js) | Houses dashboard constants (e.g., maximum widgets per tab, initial layout coordinates). |
 | [useDashboardData.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/hooks/useDashboardData.js) | Custom React hook parsing raw Supabase ledger tables into formatted statistics. |
 | [supabaseClient.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/lib/supabaseClient.js) | Initializes Supabase connection using active environment keys. |
-| [chartAnalytics.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/utils/chartAnalytics.js) | Mathematical logic for aggregating historical cash trends and allocation metrics. |
+| [chartAnalytics.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/utils/chartAnalytics.js) | Mathematical logic for aggregating double-entry cash trends, category breakdowns, and Net Worth history. |
 | [locales/](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/utils/locales/) | Directory containing internationalization translation maps (`en`, `de`, `es`, `fr`, `pt-BR`). |
+
+---
+
+## **8. Double-Entry Charting & Analytics Specifications**
+
+To maintain perfect accounting integrity, all charting modules must use precise double-entry aggregation rules from `chartAnalytics.js` rather than naive transaction tag filters:
+
+### **8.1. Income vs Expenses Charting (`generateCashFlowData`)**
+*   **Income Calculations:** Anchored to accounts prefix class `7`. An income event increases income balance (`income += amount`) when it originates as a source (`source.startsWith('7')`), and decreases it (reversal) if it targets income (`target.startsWith('7')`).
+*   **Expense Calculations:** Anchored to accounts prefix class `6`. Plotted directly below the zero line for high-contrast visual segregation. An expense occurrence decreases the value (`expenses -= amount`) when it targets an expense account (`target.startsWith('6')`), and increases it (refund/cancellation) when it originates from one (`source.startsWith('6')`).
+*   **Presentation Readability:** To maximize user clarity, front-facing charts (like `CashFlowChart.jsx`) must display absolute values (`Math.abs()`) in summaries, hover tooltips, and badges, while plotting expenses on negative coordinates in the area chart.
+
+### **8.2. Net Worth Trend Calculations (`generateNetTrendData`)**
+*   **Asset impact ('1'):** Additions to asset targets (`target.startsWith('1')`) increase net worth (`net += amount`), whereas withdrawals/deductions from asset sources (`source.startsWith('1')`) decrease it (`net -= amount`).
+*   **Liability impact ('2'):** Taking on new debt statement targets (`target.startsWith('2')`) decreases overall net worth (`net -= amount`), whereas paying off/reducing liability sources (`source.startsWith('2')`) increases overall net worth (`net += amount`).
+*   **Deficit Indicator:** If the cumulative net worth trend falls below zero, a dynamic indicator must append a `(Deficit)` label suffix alongside the absolute value presentation.
+
+### **8.3. Dual-Condition Category Breakdown (`generateCategoryBreakdown`)**
+*   **Net-Zero Cancellations:** Calculations must skip internal transfers where both the source and target accounts start with the same class prefix (e.g. transferring from Checking `1101xxxx` to Savings `1102xxxx` is a net-zero asset change and must be excluded from category breakdowns).
+*   **Balance Aggregation:** Adds amount to category total if `target` matches prefix, and subtracts if `source` matches prefix. Zeros are filtered out to keep charts clean.
+

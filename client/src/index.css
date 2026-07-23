@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @source "./src"; /* Or wherever your component folder is */
 
+:root {
+  --gold: #ffd700;
+  --wood: #5d4037;
+  --stone: #455a64;
+  --tudor-brown: #4b2c20;
+  --tudor-cream: #faf4e5;
+  --leather-border: #8b4513;
+  --parchment-bg: #f4e4bc;
+}
+
+
 body {
   background-color: #000;
   color: #fff;

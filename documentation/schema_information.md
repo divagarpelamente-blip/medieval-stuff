@@ -1,4 +1,4 @@
-# 🗄️ Eldoria V2.0 Database Schema Information
+# 🗄️ Eldoria V2.4 Database Schema Information
 
 This document outlines the schema details, constraint validations, indexes, and triggers for the core database tables in Eldoria.
 
@@ -6,8 +6,11 @@ This document outlines the schema details, constraint validations, indexes, and 
 erDiagram
     profiles {
         uuid id PK
-        string gold
-        string xp
+        bigint gold
+        bigint gems
+        bigint xp
+        bigint level
+        varchar_50 role
     }
     dim_contas {
         varchar_8 code PK
@@ -98,21 +101,37 @@ The transactional ledger table containing all double-entry coin movements and ac
 | `origin` | `text` | Yes | *None* | Channel source of import. |
 | `description` | `text` | Yes | *None* | Explanatory note for the transaction. |
 
-### Constraints
 * **`transactions_pkey`**: Primary key constraint on `id`.
 * **`transactions_profile_id_fkey`**: Foreign key pointing to `profiles(id)` with cascading delete.
 * **`transactions_amount_check`**: CHECK constraint verifying that `amount >= 0`.
 * **`transactions_flow_check`**: CHECK constraint restricting values to `'inflow'`, `'outflow'`, or `'neutral'`.
 * **`transactions_payment_status_check`**: CHECK constraint restricting values to `'Pending'` or `'Completed'`.
-* **`transactions_type_check`**: CHECK constraint restricting transaction types to: `'Assets'`, `'Liabilities'`, `'Income'`, `'Expense'`, `'Receivable'`, or `'Payable'`.
+* **`transactions_type_check`**: CHECK constraint restricting transaction types to: `'Assets'`, `'Liabilities'`, `'Income'`, `'Expense'`, `'Expenses'`, `'Receivable'`, or `'Payable'`.
 * **`check_double_entry_integrity`**: CHECK constraint enforcing logical consistency between transaction `type` and currency `flow`:
   * If `type` = `'Receivable'`, `flow` must be `'inflow'`.
   * If `type` = `'Payable'`, `flow` must be `'outflow'`.
-  * Allows `'Income'`, `'Expense'`, and `'Liabilities'` types dynamically.
+  * Allows `'Income'`, `'Expense'`, `'Expenses'`, and `'Liabilities'` types dynamically.
 
 ---
 
-## 3. Indexes
+## 3. Table: `public.profiles` (User Kingdom Profile)
+
+Stores gamification progress and player statistics synced dynamically with treasury events.
+
+### Column Definitions
+| Column Name | Data Type | Nullable | Default | Description / Constraints |
+| :--- | :--- | :--- | :--- | :--- |
+| **`id`** (PK) | `uuid` | No | *None* | Primary Key. Maps to Supabase auth user reference. |
+| `gold` | `bigint` | Yes | `0` | Dynamic coin balance from transaction completions. |
+| `gems` | `bigint` | Yes | `100` | Vault premium currency level. |
+| `xp` | `bigint` | Yes | `0` | Experience points compiled from active accounting operations. |
+| `level` | `bigint` | Yes | `1` | Computed level calculated from accumulated XP points. |
+| `role` | `character varying(50)` | Yes | `'lord'` | Assigned authorization profile (e.g. `'lord'`, `'steward'`). |
+
+
+---
+
+## 4. Indexes
 All indexes are deployed in the `pg_default` tablespace to speed up analytical lookups:
 
 1. **`idx_transactions_profile_id`**: B-Tree index on `profile_id`. Speeds up query loads for specific user sessions.
@@ -121,7 +140,7 @@ All indexes are deployed in the `pg_default` tablespace to speed up analytical l
 
 ---
 
-## 4. Triggers & Stored Functions
+## 5. Triggers & Stored Functions
 
 ### `tr_pre_transaction_inserted`
 * **Execution Phase**: `BEFORE INSERT OR UPDATE ON public.transactions FOR EACH ROW`
@@ -135,7 +154,7 @@ All indexes are deployed in the `pg_default` tablespace to speed up analytical l
 
 ---
 
-## 5. Row Level Security (RLS)
+## 6. Row Level Security (RLS)
 
 To secure user ledger items, Row Level Security is enabled on the `public.transactions` table. Users must be authenticated and are restricted to operations where their authenticated user ID matches the transaction's `profile_id`.
 
