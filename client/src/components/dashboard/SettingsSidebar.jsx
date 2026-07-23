@@ -79,11 +79,11 @@ export default function SettingsSidebar() {
   });
 
   return (
-    <aside className="w-80 h-[calc(100dvh-4rem)] bg-stone-950 border-r border-amber-900/40 flex flex-col z-20 shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950">
+    <aside className="w-80 h-[calc(100dvh-4rem)] bg-[#faf4e5] border-r border-[#8b4513]/25 flex flex-col z-20 shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-[#8b4513]/50 scrollbar-track-[#faf4e5]">
       {/* Title Header Row */}
-      <div className="p-4 bg-stone-900/20 border-b border-amber-900/20 flex items-center gap-2">
-        <SlidersHorizontal className="text-amber-500" size={16} />
-        <h2 className="font-serif text-sm font-bold tracking-wider text-amber-500 uppercase">
+      <div className="p-4 bg-[#f4e4bc] border-b border-[#8b4513]/25 flex items-center gap-2">
+        <SlidersHorizontal className="text-[#5d4037]" size={16} />
+        <h2 className="font-serif text-sm font-bold tracking-wider text-[#4b2c20] uppercase">
           Workspace Sandbox
         </h2>
       </div>
@@ -96,13 +96,13 @@ export default function SettingsSidebar() {
           <section className="flex flex-col gap-3">
             <button
               onClick={() => handleToggleSection('ledgers')}
-              className="w-full flex items-center justify-between text-stone-300 font-serif text-xs font-semibold tracking-wider uppercase border-b border-stone-800 pb-2 hover:text-amber-500 transition-colors focus:outline-none"
+              className="w-full flex items-center justify-between text-[#4b2c20] font-serif text-xs font-bold tracking-wider uppercase border-b border-[#8b4513]/25 pb-2 hover:text-[#8b4513] transition-colors focus:outline-none"
             >
               <div className="flex items-center gap-1.5">
-                <Layers size={14} className="text-amber-600" />
+                <Layers size={14} className="text-[#5d4037]" />
                 <span>Active Ledgers</span>
               </div>
-              <span className="text-[9px] text-stone-500 font-mono">
+              <span className="text-[9px] text-[#5d4037] font-mono">
                 {activeSection === 'ledgers' ? '[- COLLAPSE]' : '[+ EXPAND]'}
               </span>
             </button>
@@ -119,8 +119,8 @@ export default function SettingsSidebar() {
                       onClick={() => tab.isVisible && setActiveSubmenu(tab.id)}
                       className={`p-2.5 rounded border transition-all duration-150 cursor-pointer flex flex-col gap-1.5 ${
                         tab.isActive
-                          ? 'bg-amber-950/20 border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.05)]'
-                          : 'bg-stone-900/10 border-stone-800/80 hover:border-stone-700/60'
+                          ? 'bg-[#f4e4bc] border-[#5d4037] shadow-sm'
+                          : 'bg-[#faf4e5]/60 border-[#8b4513]/15 hover:border-[#8b4513]/30'
                       } ${!tab.isVisible ? 'opacity-50' : ''}`}
                     >
                       <div className="flex items-center justify-between w-full">
@@ -131,18 +131,18 @@ export default function SettingsSidebar() {
                               type="text"
                               value={tempName}
                               onChange={(e) => setTempName(e.target.value)}
-                              className="bg-stone-900 text-stone-100 font-serif text-xs px-2 py-1 rounded border border-amber-900/50 outline-none w-full"
+                              className="bg-[#faf4e5] text-[#4b2c20] font-serif text-xs px-2 py-1 rounded border border-[#8b4513]/40 outline-none w-full"
                               maxLength={25}
                             />
                             <button
                               onClick={() => handleSaveRename(tab.id)}
-                              className="p-1 text-emerald-400 hover:text-emerald-300"
+                              className="p-1 text-[#047857] hover:text-[#047857]/70"
                             >
                               <Check size={14} />
                             </button>
                           </div>
                         ) : (
-                          <span className="font-serif text-xs font-bold text-stone-200">
+                          <span className="font-serif text-xs font-bold text-[#4b2c20]">
                             {tab.name}
                           </span>
                         )}
@@ -152,7 +152,7 @@ export default function SettingsSidebar() {
                           {tab.isVisible && !isEditingName && (
                             <button
                               onClick={() => handleStartRename(tab)}
-                              className="text-stone-500 hover:text-amber-500 transition-colors"
+                              className="text-[#5d4037] hover:text-[#8b4513] transition-colors"
                             >
                               <Pencil size={12} />
                             </button>
@@ -162,7 +162,7 @@ export default function SettingsSidebar() {
                           {!isProtected && (
                             <button
                               onClick={() => toggleSubmenuVisibility(tab.id)}
-                              className="text-stone-500 hover:text-amber-500 transition-colors"
+                              className="text-[#5d4037] hover:text-[#8b4513] transition-colors"
                             >
                               {tab.isVisible ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
@@ -184,13 +184,13 @@ export default function SettingsSidebar() {
           <section className="flex flex-col gap-3">
             <button
               onClick={() => handleToggleSection('presets')}
-              className="w-full flex items-center justify-between text-stone-300 font-serif text-xs font-semibold tracking-wider uppercase border-b border-stone-800 pb-2 hover:text-amber-500 transition-colors focus:outline-none"
+              className="w-full flex items-center justify-between text-[#4b2c20] font-serif text-xs font-bold tracking-wider uppercase border-b border-[#8b4513]/25 pb-2 hover:text-[#8b4513] transition-colors focus:outline-none"
             >
               <div className="flex items-center gap-1.5">
-                <Grid size={14} className="text-amber-600" />
+                <Grid size={14} className="text-[#5d4037]" />
                 <span>Grid Preset Blueprints</span>
               </div>
-              <span className="text-[9px] text-stone-500 font-mono">
+              <span className="text-[9px] text-[#5d4037] font-mono">
                 {activeSection === 'presets' ? '[- COLLAPSE]' : '[+ EXPAND]'}
               </span>
             </button>
@@ -201,10 +201,10 @@ export default function SettingsSidebar() {
                   <button
                     key={key}
                     onClick={() => updateDraftLayout(activeTabId, item.layout)}
-                    className="w-full text-left p-2.5 rounded bg-stone-900/40 border border-amber-900/20 text-stone-300 hover:border-amber-500/40 hover:bg-stone-900/70 transition-all font-mono text-[11px] font-semibold flex items-center justify-between"
+                    className="w-full text-left p-2.5 rounded bg-[#faf4e5]/60 border border-[#8b4513]/20 text-[#4b2c20] hover:border-[#5d4037] hover:bg-[#f4e4bc] transition-all font-serif text-xs font-bold flex items-center justify-between"
                   >
                     <span>{item.name}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-amber-600 font-sans">
+                    <span className="text-[9px] uppercase tracking-wider text-[#5d4037] font-sans">
                       Deploy
                     </span>
                   </button>
@@ -221,13 +221,13 @@ export default function SettingsSidebar() {
           <section className="flex flex-col gap-3">
             <button
               onClick={() => handleToggleSection('widgets')}
-              className="w-full flex items-center justify-between text-stone-300 font-serif text-xs font-semibold tracking-wider uppercase border-b border-stone-800 pb-2 hover:text-amber-500 transition-colors focus:outline-none"
+              className="w-full flex items-center justify-between text-[#4b2c20] font-serif text-xs font-bold tracking-wider uppercase border-b border-[#8b4513]/25 pb-2 hover:text-[#8b4513] transition-colors focus:outline-none"
             >
               <div className="flex items-center gap-1.5">
-                <Grid size={14} className="text-amber-600" />
+                <Grid size={14} className="text-[#5d4037]" />
                 <span>Widget Manifest</span>
               </div>
-              <span className="text-[9px] text-stone-500 font-mono">
+              <span className="text-[9px] text-[#5d4037] font-mono">
                 {activeSection === 'widgets' ? '[- COLLAPSE]' : '[+ EXPAND]'}
               </span>
             </button>
@@ -236,13 +236,13 @@ export default function SettingsSidebar() {
               <div className="flex flex-col gap-3 mt-1">
                 {/* Category Filtering Selector Dropdown */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[9px] text-stone-500 uppercase tracking-widest font-mono">
+                  <label className="text-[9px] text-[#5d4037] uppercase tracking-widest font-mono">
                     Filter Division
                   </label>
                   <select
                     value={widgetCategory}
                     onChange={(e) => setWidgetCategory(e.target.value)}
-                    className="bg-stone-900 text-stone-200 border border-amber-900/30 rounded px-2 py-1.5 text-xs font-serif outline-none focus:border-amber-500/50 transition-colors"
+                    className="bg-[#faf4e5] text-[#4b2c20] border border-[#8b4513]/30 rounded px-2 py-1.5 text-xs font-serif outline-none focus:border-[#5d4037] transition-colors"
                   >
                     <option value="All">All Assets</option>
                     <option value="overview">Overview Division</option>
@@ -256,17 +256,17 @@ export default function SettingsSidebar() {
                   {filteredWidgets.map(([key, widget]) => (
                     <div
                       key={key}
-                      className="w-full p-3 rounded bg-stone-900/60 border border-stone-800/80 hover:border-amber-500/30 transition-all flex items-center justify-between gap-4 group"
+                      className="w-full p-3 rounded bg-[#faf4e5]/80 border border-[#8b4513]/20 hover:border-[#5d4037] transition-all flex items-center justify-between gap-4 group shadow-sm"
                     >
                       {/* Left Side details */}
                       <div className="flex-1 flex flex-col gap-1 select-none">
-                        <h4 className="font-serif text-xs font-bold text-amber-500 group-hover:text-amber-400 transition-colors">
+                        <h4 className="font-serif text-xs font-bold text-[#4b2c20] group-hover:text-[#8b4513] transition-colors">
                           {widget.name}
                         </h4>
-                        <p className="text-[10px] text-stone-400 leading-normal">
+                        <p className="text-[10px] text-[#5d4037] leading-normal font-serif italic">
                           Reflects ledger records onto visual charts.
                         </p>
-                        <span className="text-[9px] text-stone-500 font-mono mt-0.5">
+                        <span className="text-[9px] text-[#455a64] font-mono mt-0.5">
                           Size Footprint: {widget.layout.w}x{widget.layout.h}
                         </span>
                       </div>
@@ -274,20 +274,20 @@ export default function SettingsSidebar() {
                       {/* Right Side visual preview box placeholder */}
                       <div
                         onClick={() => deployWidget(activeTabId, key, widget)}
-                        className="relative w-20 h-16 shrink-0 bg-stone-950/80 border border-stone-850 rounded hover:border-amber-500/40 transition-all cursor-pointer overflow-hidden flex items-center justify-center group/preview"
+                        className="relative w-20 h-16 shrink-0 bg-[#f4e4bc] border border-[#8b4513]/30 rounded hover:border-[#5d4037] transition-all cursor-pointer overflow-hidden flex items-center justify-center group/preview"
                         title="Deploy Structure to Workspace"
                       >
-                        <span className="text-[8px] font-mono text-stone-700 group-hover/preview:text-amber-900/30 transition-colors select-none tracking-widest uppercase">
+                        <span className="text-[8px] font-mono text-[#5d4037] group-hover/preview:text-[#4b2c20] transition-colors select-none tracking-widest uppercase">
                           ⚜️ {widget.layout.w}x{widget.layout.h}
                         </span>
 
                         {/* Absolutely Positioned deployment trigger Plus button */}
                         <button
                           onClick={(e) => {
-                            e.stopPropagation(); // Avoid double deploy event bubble
+                            e.stopPropagation(); 
                             deployWidget(activeTabId, key, widget);
                           }}
-                          className="absolute top-1 right-1 p-0.5 rounded bg-stone-900 border border-amber-900/30 text-amber-500 hover:bg-amber-500 hover:text-stone-950 hover:border-transparent transition-all"
+                          className="absolute top-1 right-1 p-0.5 rounded bg-[#faf4e5] border border-[#8b4513]/30 text-[#5d4037] hover:bg-[#5d4037] hover:text-[#f4e4bc] hover:border-transparent transition-all"
                           title="Deploy"
                         >
                           <Plus size={10} className="stroke-[3]" />
@@ -297,7 +297,7 @@ export default function SettingsSidebar() {
                   ))}
 
                   {filteredWidgets.length === 0 && (
-                    <p className="text-center text-[11px] text-stone-600 font-serif italic py-4">
+                    <p className="text-center text-[11px] text-[#5d4037] font-serif italic py-4">
                       No structures matching criteria
                     </p>
                   )}

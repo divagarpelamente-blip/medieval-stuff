@@ -63,19 +63,19 @@ export default function DashboardHeader() {
   };
 
   return (
-    <header className="w-full h-16 shrink-0 bg-stone-950 border-b border-amber-900/40 px-6 flex items-center justify-between z-30 shadow-lg select-none">
+    <header className="w-full h-16 shrink-0 bg-[#faf4e5]/90 backdrop-blur-sm border-b border-[#8b4513]/25 px-6 flex items-center justify-between z-30 shadow-sm select-none">
       {/* Left/Center Section: Title, Sliders Trigger, Submenus Tab Row Grid */}
       <div className="flex items-center gap-6 overflow-hidden flex-grow mr-4">
         {/* Global Title Reading Area */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
-          <span className="font-serif text-sm font-bold tracking-widest text-stone-300 uppercase">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#ffd700] animate-pulse shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
+          <span className="font-serif text-sm font-bold tracking-widest text-[#4b2c20] uppercase">
             Citadel Command
           </span>
         </div>
 
         {/* Separator Line */}
-        <div className="h-6 w-px bg-stone-850/80 shrink-0" />
+        <div className="h-6 w-px bg-[#8b4513]/20 shrink-0" />
 
         {/* Configuration symbol to the left of the tab navigation */}
         <button
@@ -84,11 +84,11 @@ export default function DashboardHeader() {
           title={isEditingLayout ? "Exit Configuration Mode" : "Configure Workspace Layout"}
           className={`p-1.5 rounded border transition-all duration-200 cursor-pointer focus:outline-none disabled:opacity-40 disabled:pointer-events-none shrink-0 ${
             isEditingLayout
-              ? 'border-amber-500/50 bg-amber-950/20 text-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse'
-              : 'border-stone-850 bg-stone-900/40 text-stone-400 hover:text-stone-200 hover:border-stone-700/60'
+              ? 'border-[#8b4513]/50 bg-[#f4e4bc] text-[#8b4513] shadow-[0_0_8px_rgba(139,69,19,0.4)] animate-pulse'
+              : 'border-[#8b4513]/20 bg-[#faf4e5] text-[#5d4037] hover:text-[#4b2c20] hover:border-[#8b4513]/40'
           }`}
         >
-          <Sliders size={20} className={isEditingLayout ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]' : ''} />
+          <Sliders size={20} className={isEditingLayout ? 'drop-shadow-[0_0_8px_rgba(139,69,19,0.5)]' : ''} />
         </button>
 
         {/* Resilient fixed-width navigation container protecting buttons from wrapping or clipping */}
@@ -107,7 +107,7 @@ export default function DashboardHeader() {
                 <div
                   key={tab.id}
                   title={`${tab.name} is sealed. Render active in the Sidebar configurations.`}
-                  className="opacity-35 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase cursor-not-allowed text-stone-600 font-bold select-none shrink-0 flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
+                  className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase cursor-not-allowed text-[#8b4513]/70 font-bold select-none shrink-0 flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
                 >
                   <span>🔒</span>
                   <span className="whitespace-nowrap overflow-hidden text-ellipsis">{tab.name}</span>
@@ -122,8 +122,8 @@ export default function DashboardHeader() {
                 disabled={isLoading || isSaving}
                 className={`px-3 py-1 rounded font-serif text-[9px] font-bold tracking-wider uppercase border transition-all duration-150 cursor-pointer disabled:pointer-events-none shrink-0 text-center flex items-center justify-center whitespace-nowrap overflow-hidden text-ellipsis ${
                   isActive
-                    ? 'bg-amber-950/30 border-amber-500/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.15)]'
-                    : 'border-transparent text-stone-400 hover:text-stone-200 hover:bg-stone-900/30'
+                    ? 'bg-[#f4e4bc] border-[#5d4037]/60 text-[#4b2c20] shadow-[0_0_8px_rgba(93,64,55,0.15)]'
+                    : 'border-transparent text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#f4e4bc]/50'
                 }`}
               >
                 <span className="whitespace-nowrap overflow-hidden text-ellipsis">{tab.name}</span>
@@ -137,8 +137,8 @@ export default function DashboardHeader() {
       <div className="flex items-center gap-2 shrink-0">
         {/* Persistent Loader Overlay */}
         {(isLoading || isSaving) && (
-          <div className="flex items-center gap-2 text-stone-400 font-mono text-xs border border-stone-800/80 px-2 py-1.5 rounded bg-stone-900/20">
-            <Loader2 className="animate-spin text-amber-500" size={14} />
+          <div className="flex items-center gap-2 text-[#5d4037] font-mono text-xs border border-[#8b4513]/20 px-2 py-1.5 rounded bg-[#f4e4bc]">
+            <Loader2 className="animate-spin text-[#8b4513]" size={14} />
             <span>{isLoading ? 'Hydrating...' : 'Archiving...'}</span>
           </div>
         )}
@@ -149,7 +149,7 @@ export default function DashboardHeader() {
             <button
               onClick={handleDismissDraft}
               disabled={isSaving || isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-rose-900/40 bg-rose-950/20 text-xs font-serif font-bold tracking-wide text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#be123c]/40 bg-[#be123c]/10 text-xs font-serif font-bold tracking-wide text-[#be123c] hover:bg-[#be123c]/20 hover:text-[#9f1239] transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
               <X size={14} />
               Dismiss Draft
@@ -159,7 +159,7 @@ export default function DashboardHeader() {
             <button
               onClick={() => saveDraftToProduction()}
               disabled={isSaving || isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-emerald-900/50 bg-emerald-950/30 text-xs font-serif font-bold tracking-wide text-emerald-400 hover:bg-emerald-950/50 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#047857]/40 bg-[#047857]/10 text-xs font-serif font-bold tracking-wide text-[#047857] hover:bg-[#047857]/20 hover:text-[#065f46] hover:shadow-[0_0_12px_rgba(4,120,87,0.2)] transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
               <Check size={14} />
               Seal Layout
@@ -171,7 +171,7 @@ export default function DashboardHeader() {
         <button
           onClick={handleExitDashboard}
           title="Exit Command Dashboard"
-          className="w-8 h-8 rounded-full bg-red-600 hover:bg-red-500 border border-red-700 text-yellow-400 hover:text-yellow-300 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-md cursor-pointer shrink-0 ml-1.5"
+          className="w-8 h-8 rounded-full bg-[#be123c] hover:bg-[#9f1239] border border-[#7f1d1d] text-[#ffd700] hover:text-[#fde047] flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-md cursor-pointer shrink-0 ml-1.5"
         >
           <X size={15} className="stroke-[3]" />
         </button>

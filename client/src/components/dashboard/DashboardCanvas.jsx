@@ -8,7 +8,6 @@ import { TREASURY_WIDGETS } from './treasuryRegistry';
 import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
 
-// Custom wrapper that manages scaling transitions via CSS zoom matrix
 const ResponsiveGridLayout = (props) => {
   const [scale, setScale] = useState(1);
   const containerRef = useRef(null);
@@ -19,7 +18,6 @@ const ResponsiveGridLayout = (props) => {
     const observer = new ResizeObserver((entries) => {
       const newWidth = entries[0].contentRect.width;
       if (newWidth > 0) {
-        // Strict boundary: clamp scaling factors to 1.0 maximum to prevent scaling artifacts
         const calculatedScale = Math.min(newWidth / 1200, 1.0);
         setScale(calculatedScale);
       }
@@ -31,7 +29,6 @@ const ResponsiveGridLayout = (props) => {
 
   return (
     <div ref={containerRef} className="w-full h-full relative min-h-[600px] overflow-hidden">
-      {/* Fixed-width layout scaling box */}
       <div 
         style={{ 
           transform: `scale(${scale})`, 
@@ -51,34 +48,34 @@ const ResponsiveGridLayout = (props) => {
   );
 };
 
-// High-fidelity dark fantasy skeleton grid displayed during database hydration
+// Parchment-themed skeleton for loading states
 function DashboardSkeleton() {
   return (
-    <div className="flex-grow bg-stone-900/30 p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none">
+    <div 
+      className="flex-grow p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none"
+      style={{ backgroundColor: '#e8dcb8' }}
+    >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
         {[1, 2, 3].map((idx) => (
           <div
             key={idx}
-            className="rounded-xl border border-amber-900/10 bg-stone-950/40 p-4 flex flex-col justify-between h-[240px]"
+            className="rounded-xl border border-[#8b4513]/20 bg-[#faf4e5]/60 p-4 flex flex-col justify-between h-[240px]"
           >
-            {/* Header Skeleton */}
-            <div className="flex items-center justify-between border-b border-amber-900/10 pb-2">
+            <div className="flex items-center justify-between border-b border-[#8b4513]/10 pb-2">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-amber-900/40 animate-ping" />
-                <div className="h-3 w-28 bg-stone-800 rounded" />
+                <div className="w-3 h-3 rounded-full bg-[#8b4513]/30 animate-ping" />
+                <div className="h-3 w-28 bg-[#d1c0a8] rounded" />
               </div>
-              <div className="h-4 w-12 bg-stone-800/85 rounded" />
+              <div className="h-4 w-12 bg-[#d1c0a8] rounded" />
             </div>
-            {/* Simulated Line Chart / Metric Plot */}
             <div className="flex-grow flex items-end gap-3 mt-4 mb-2 justify-center px-4">
-              <div className="h-[25%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
-              <div className="h-[45%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
-              <div className="h-[60%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
-              <div className="h-[75%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
-              <div className="h-[40%] w-full bg-stone-900/60 rounded border-t border-amber-900/10" />
+              <div className="h-[25%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
+              <div className="h-[45%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
+              <div className="h-[60%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
+              <div className="h-[75%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
+              <div className="h-[40%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
             </div>
-            {/* Card Footer */}
-            <div className="h-2 w-20 bg-stone-800/60 rounded mt-2" />
+            <div className="h-2 w-20 bg-[#d1c0a8]/80 rounded mt-2" />
           </div>
         ))}
       </div>
@@ -114,7 +111,6 @@ export default function DashboardCanvas() {
   };
 
   const handleLayoutChange = (newLayout) => {
-    // STANCE LOCKS REMOVED: Always allow coordinate adjustment calculations
     if (ignoreLayoutChangeRef.current) return;
     if (isLoading) return;
 
@@ -143,14 +139,21 @@ export default function DashboardCanvas() {
   const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
   const cols = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 1 };
 
-  // Render medieval loading simulation skeleton during active hydration cycles
   if (isLoading) {
     return <DashboardSkeleton />;
   }
 
   return (
     <div
-      className="flex-1 bg-stone-900/30 p-6 relative overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-amber-950 scrollbar-track-stone-950"
+      className="flex-1 p-6 relative overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-[#8b4513]/60 scrollbar-track-[#e8dcb8]"
+      style={{
+        backgroundColor: '#e8dcb8',
+        backgroundImage: `
+          radial-gradient(circle at 50% 50%, transparent 30%, rgba(139, 69, 19, 0.15) 80%, rgba(75, 44, 32, 0.4) 100%),
+          linear-gradient(to right, rgba(75, 44, 32, 0.15) 0%, transparent 4%, transparent 96%, rgba(75, 44, 32, 0.15) 100%)
+        `,
+        boxShadow: 'inset 0 0 60px rgba(75, 44, 32, 0.4), inset 0 0 15px rgba(0,0,0,0.3)'
+      }}
       onDragOver={(e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
@@ -161,11 +164,11 @@ export default function DashboardCanvas() {
     >
       {currentLayout.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center pointer-events-none z-0">
-          <LayoutGrid className="text-stone-700 w-16 h-16 stroke-[1] mb-3 animate-pulse" />
-          <h3 className="font-serif text-sm font-bold text-stone-400 uppercase tracking-wider">
+          <LayoutGrid className="text-[#8b4513]/40 w-16 h-16 stroke-[1] mb-3 animate-pulse" />
+          <h3 className="font-serif text-sm font-bold text-[#4b2c20] uppercase tracking-wider">
             Empty Workspace Grid
           </h3>
-          <p className="text-xs text-stone-600 max-w-sm mt-1 leading-normal">
+          <p className="text-xs text-[#5d4037] max-w-sm mt-1 leading-normal font-serif">
             {isEditingLayout
               ? "Drag and drop components from the manifest on the right onto this canvas to place widgets."
               : "Reforge layout in Workspace Configs to deploy visual analytical widgets."}
@@ -173,7 +176,7 @@ export default function DashboardCanvas() {
         </div>
       )}
 
-      <div className={`flex-1 w-full ${isEditingLayout ? 'border border-dashed border-amber-500/20 rounded-xl p-2 h-full min-h-[600px] relative z-10' : 'h-full min-h-[600px] relative z-10'}`}>
+      <div className={`flex-1 w-full ${isEditingLayout ? 'border-[2px] border-dashed border-[#8b4513]/40 rounded-xl p-2 h-full min-h-[600px] relative z-10' : 'h-full min-h-[600px] relative z-10'}`}>
         <ResponsiveGridLayout
           className="layout"
           layouts={{
@@ -186,12 +189,12 @@ export default function DashboardCanvas() {
           breakpoints={breakpoints}
           cols={cols}
           rowHeight={80}
-          isDraggable={true} // Unlocked unconditionally
-          isResizable={true} // Unlocked unconditionally
+          isDraggable={true}
+          isResizable={true}
           isDroppable={false}
           onLayoutChange={handleLayoutChange}
-          onDragStop={() => saveDraftToProduction(true)}     // Commit drag configurations to DB dynamically
-          onResizeStop={() => saveDraftToProduction(true)}   // Commit resize configurations to DB dynamically
+          onDragStop={() => saveDraftToProduction(true)}
+          onResizeStop={() => saveDraftToProduction(true)}
           margin={[16, 16]}
           containerPadding={[0, 0]}
         >
@@ -206,24 +209,22 @@ export default function DashboardCanvas() {
             return (
               <div
                 key={item.i}
-                className={`group relative rounded-xl overflow-hidden transition-shadow duration-200 ${isEditingLayout
-                    ? 'border-2 border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_15px_rgba(245,158,11,0.15)] bg-stone-950/80 cursor-grab active:cursor-grabbing'
-                    : 'bg-transparent'
+                className={`group relative rounded-xl overflow-hidden transition-all duration-200 flex flex-col ${isEditingLayout
+                    ? 'border-2 border-[#8b4513]/50 hover:border-[#5d4037] hover:shadow-[0_0_15px_rgba(139,69,19,0.2)] bg-[#faf4e5]/90 cursor-grab active:cursor-grabbing'
+                    : 'bg-[#faf4e5] border border-[#8b4513]/30 shadow-[0_8px_15px_rgba(75,44,32,0.1)]'
                   }`}
               >
-                {/* Embedded Active Widget - Pointer events enabled only when viewing for visualization interaction */}
                 <div className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}>
                   <WidgetComponent />
                 </div>
 
-                {/* Edit Controls HUD Overlay - Safe check preserved: Dismantle buttons render only when options drawer is open */}
                 {isEditingLayout && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemoveWidget(item.i);
                     }}
-                    className="absolute top-2.5 right-2.5 z-10 p-1.5 rounded-full bg-rose-950/80 border border-rose-900/60 text-rose-400 hover:text-stone-100 hover:bg-rose-900 hover:scale-105 shadow-md cursor-pointer pointer-events-auto transition-all"
+                    className="absolute top-2.5 right-2.5 z-10 p-1.5 rounded-full bg-[#4b2c20] border border-[#2a1711] text-[#f4e4bc] hover:bg-[#8b4513] hover:scale-105 shadow-md cursor-pointer pointer-events-auto transition-all"
                     title="Dismantle Structure"
                   >
                     <X size={12} />
