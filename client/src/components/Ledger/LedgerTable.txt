@@ -10,10 +10,10 @@ export default function LedgerTable({ onEditTransaction }) {
 
   const user = useKingdomStore((state) => state.user);
 
-  // --- UPDATED BLOCK ---
-  // Fetch a much larger batch of transactions (1000) so widgets have enough data
+  // --- ADD THIS BLOCK ---
+  // Fetch transactions from Supabase whenever the table mounts or user session loads
   useEffect(() => {
-    fetchTransactions(1000, 0);
+    fetchTransactions();
   }, [fetchTransactions, user?.id]);
   // ----------------------
 
@@ -28,11 +28,6 @@ export default function LedgerTable({ onEditTransaction }) {
     }
   };
 
-  // Safe handler for the Load More button using current array length as the offset
-  const handleLoadMore = () => {
-    fetchTransactions(1000, transactions.length);
-  };
-
   return (
     <section className="bg-stone-950 border-2 border-amber-900/50 rounded-lg p-5 shadow-2xl relative flex flex-col">
 
@@ -41,8 +36,7 @@ export default function LedgerTable({ onEditTransaction }) {
           Ledger Transaction Log
         </h2>
         <button
-          // Fixed the React event bug by wrapping in an arrow function
-          onClick={() => fetchTransactions(1000, 0)} 
+          onClick={fetchTransactions}
           disabled={isLedgerLoading}
           className="px-4 py-1.5 bg-amber-950 hover:bg-amber-900 border border-amber-600/50 rounded text-amber-200 text-xs tracking-wider uppercase font-semibold transition disabled:opacity-50"
         >
@@ -90,18 +84,6 @@ export default function LedgerTable({ onEditTransaction }) {
                 </div>
               </div>
             ))}
-            
-            {/* Added Load More Button */}
-            <div className="flex justify-center mt-4 pt-2">
-              <button
-                onClick={handleLoadMore}
-                disabled={isLedgerLoading}
-                className="px-6 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-600/50 rounded text-stone-300 text-xs tracking-wider uppercase font-bold transition disabled:opacity-50"
-              >
-                {isLedgerLoading ? 'Loading...' : 'Load Older Records'}
-              </button>
-            </div>
-
           </div>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-stone-500 text-center">

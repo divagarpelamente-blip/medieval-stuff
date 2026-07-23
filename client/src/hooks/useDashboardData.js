@@ -6,18 +6,19 @@ import {
   generateCategoryBreakdown
 } from '../utils/chartAnalytics';
 
+import { useKingdomStore } from '../store/useKingdomStore';
+
 /**
  * Root query fetching raw transaction scrolls for the active profile session.
- * Cached globally under the ['ledger-transactions'] key.
+ * Cached globally under the ['ledger-transactions', userId] key.
  */
 export function useRawTransactionsQuery() {
-  return useQuery({
-    queryKey: ['ledger-transactions'],
-    queryFn: async () => {
-      // Access auth session to isolate user space
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id || null;
+  const user = useKingdomStore((state) => state.user);
+  const userId = user?.id || null;
 
+  return useQuery({
+    queryKey: ['ledger-transactions', userId],
+    queryFn: async () => {
       let query = supabase
         .from('transactions')
         .select('*')
@@ -81,6 +82,9 @@ export function useNetTrendQuery() {
  */
 export function useAssetAllocationQuery() {
   const { data: rawTransactions, ...rest } = useRawTransactionsQuery();
+
+  // 🛑 THE AUDIT LOG: Grab the very first transaction to see its shape
+  console.log("AUDIT REPORT - Transaction Shape:", rawTransactions[0]);
 
   return {
     ...rest,

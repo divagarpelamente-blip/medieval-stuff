@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { TREASURY_WIDGETS } from './treasuryRegistry';
 import { DEFAULT_PRESET } from '../../config/dashboard.config';
-import { Eye, EyeOff, Pencil, Check, Layers, Grid, SlidersHorizontal, Plus } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Check, Layers, Grid, SlidersHorizontal, Plus, Search } from 'lucide-react';
 
 // Alternative presets for layout injection
 const EXTRA_PRESETS = {
@@ -44,8 +44,9 @@ export default function SettingsSidebar() {
   // 1. Isolated Accordion Menu State
   const [activeSection, setActiveSection] = useState(null); // 'ledgers' | 'presets' | 'widgets' | null
 
-  // 2. Category Filtering State
+  // 2. Category & Search Filtering State
   const [widgetCategory, setWidgetCategory] = useState('All'); // 'All' | 'overview' | 'chart' | 'ledger'
+  const [searchQuery, setSearchQuery] = useState(''); 
 
   // Decouple registry state for DDD support
   const activeRegistry = TREASURY_WIDGETS;
@@ -72,10 +73,13 @@ export default function SettingsSidebar() {
     setActiveSection((prev) => (prev === section ? null : section));
   };
 
-  // Filter registry entries based on the metadata properties
+  // Filter registry entries based on the category AND search query
   const filteredWidgets = Object.entries(activeRegistry).filter(([key, widget]) => {
-    if (widgetCategory === 'All') return true;
-    return widget.category === widgetCategory;
+    const matchesCategory = widgetCategory === 'All' || widget.category === widgetCategory;
+    const matchesSearch = widget.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          widget.description.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesCategory && matchesSearch;
   });
 
   return (
@@ -234,6 +238,21 @@ export default function SettingsSidebar() {
 
             {activeSection === 'widgets' && (
               <div className="flex flex-col gap-3 mt-1">
+                
+                {/* Search Input Field */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                    <Search size={14} className="text-[#8b4513]/60" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search manifest..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-[#faf4e5] text-[#4b2c20] border border-[#8b4513]/30 rounded-md pl-8 pr-3 py-1.5 text-xs font-serif outline-none focus:border-[#5d4037] hover:border-[#8b4513]/50 transition-colors placeholder:text-[#8b4513]/40 shadow-sm"
+                  />
+                </div>
+
                 {/* Category Filtering Selector Dropdown */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[9px] text-[#5d4037] uppercase tracking-widest font-mono">
@@ -242,9 +261,9 @@ export default function SettingsSidebar() {
                   <select
                     value={widgetCategory}
                     onChange={(e) => setWidgetCategory(e.target.value)}
-                    className="bg-[#faf4e5] text-[#4b2c20] border border-[#8b4513]/30 rounded px-2 py-1.5 text-xs font-serif outline-none focus:border-[#5d4037] transition-colors"
+                    className="bg-[#faf4e5] text-[#4b2c20] border border-[#8b4513]/30 rounded px-2 py-1.5 text-xs font-serif outline-none focus:border-[#5d4037] hover:border-[#8b4513]/50 transition-colors shadow-sm"
                   >
-                    <option value="All">All Assets</option>
+                    <option value="All">All Widgets</option>
                     <option value="overview">Overview Division</option>
                     <option value="chart">Analytical Curves</option>
                     <option value="ledger">Ledger Breakdowns</option>
@@ -264,7 +283,7 @@ export default function SettingsSidebar() {
                           {widget.name}
                         </h4>
                         <p className="text-[10px] text-[#5d4037] leading-normal font-serif italic">
-                          Reflects ledger records onto visual charts.
+                          {widget.description || "Reflects ledger records onto visual charts."}
                         </p>
                         <span className="text-[9px] text-[#455a64] font-mono mt-0.5">
                           Size Footprint: {widget.layout.w}x{widget.layout.h}

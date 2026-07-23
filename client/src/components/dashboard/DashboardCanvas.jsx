@@ -40,7 +40,8 @@ const ResponsiveGridLayout = (props) => {
       >
         <Responsive 
           width={1200} 
-          style={{ minHeight: '600px', minWidth: '100%', height: '100%' }} 
+          style={{ minHeight: '600px', minWidth: '100%', height: '100%' }}
+          transformScale={scale} 
           {...props} 
         />
       </div>
@@ -192,6 +193,7 @@ export default function DashboardCanvas() {
           isDraggable={true}
           isResizable={true}
           isDroppable={false}
+          draggableCancel=".cancel-drag"
           onLayoutChange={handleLayoutChange}
           onDragStop={() => saveDraftToProduction(true)}
           onResizeStop={() => saveDraftToProduction(true)}
@@ -221,10 +223,13 @@ export default function DashboardCanvas() {
                 {isEditingLayout && (
                   <button
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       handleRemoveWidget(item.i);
                     }}
-                    className="absolute top-2.5 right-2.5 z-10 p-1.5 rounded-full bg-[#4b2c20] border border-[#2a1711] text-[#f4e4bc] hover:bg-[#8b4513] hover:scale-105 shadow-md cursor-pointer pointer-events-auto transition-all"
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="cancel-drag absolute top-2.5 right-2.5 z-10 p-1.5 rounded-full bg-[#4b2c20] border border-[#2a1711] text-[#f4e4bc] hover:bg-[#8b4513] hover:scale-105 shadow-md cursor-pointer pointer-events-auto transition-all"
                     title="Dismantle Structure"
                   >
                     <X size={12} />

@@ -43,28 +43,35 @@ export const useKingdomStore = create((set, get) => ({
     net_vault_cash: 0
   },
 
-  // ==========================================
+ // ==========================================
   // 2. AUTHENTICATION PIPELINE
   // ==========================================
   initAuth: () => {
     const loadSessionUser = async (session) => {
       if (session?.user) {
+        // 1. Lock the user into state FIRST
         set({ user: session.user, email: session.user.email });
+        
+        // 2. Safely hydrate the dashboard now that the user ID is confirmed
         await get().fetchKingdomData(session.user.id);
         await get().fetchFlatMatrix();
         await get().fetchDashboardMetrics();
+        
+        // ADDED: Hydrate store transactions immediately so widgets have data
+        await get().fetchTransactions();
       } else {
+        // Purge state if no valid session is found (e.g., logged out)
         set({ user: null, email: 'guest@medieval.stuff' });
         get().resetStore();
       }
     };
 
-    // Initial check
+    // Initial check on app mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       loadSessionUser(session);
     });
 
-    // Listen for changes (login/logout)
+    // Listen for changes (login/logout/token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       loadSessionUser(session);
     });
@@ -110,11 +117,19 @@ export const useKingdomStore = create((set, get) => ({
     });
   },
 
-  // ==========================================
+// ==========================================
   // 4. BACKEND METRICS AGGREGATION RPC
   // ==========================================
   fetchDashboardMetrics: async () => {
     const userId = get().user?.id || null;
+
+
+    // THE GUARD CLAUSE: Abort if no user exists or if it's the fallback UUID
+    if (!userId || userId === '00000000-0000-0000-0000-000000000000') {
+      console.warn("Hydration paused: Waiting for secure auth handshake.");
+      return; 
+    }
+
     try {
       const { data, error } = await supabase
         .rpc('get_dashboard_metrics', { p_profile_id: userId });
