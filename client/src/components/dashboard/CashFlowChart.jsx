@@ -59,7 +59,7 @@ export default function CashFlowChart({ transactions }) {
       </div>
 
       {/* Recharts Area Container */}
-      <div className="flex-1 w-full min-h-[240px]">
+      <div className="flex-1 w-full min-h-0 overflow-hidden relative">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 10, right: 5, left: -15, bottom: 0 }}>
             <defs>
