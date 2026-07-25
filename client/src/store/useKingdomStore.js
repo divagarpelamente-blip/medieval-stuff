@@ -7,7 +7,7 @@ const normalizeType = (type) => {
   if (!type) return type;
   const lower = type.trim().toLowerCase();
   if (lower === 'expenses' || lower === 'expense') {
-    return 'Expense';
+    return 'Expenses';
   }
   return type;
 };
@@ -21,6 +21,7 @@ export const useKingdomStore = create((set, get) => ({
   role: 'lord',
   isLoading: false,
   isLedgerLoading: false,
+  isAnalyticsLoading: false,
   
   // Gamification State
   gold: 0,
@@ -43,7 +44,16 @@ export const useKingdomStore = create((set, get) => ({
     net_vault_cash: 0
   },
 
- // ==========================================
+  // NEW: State for the aggregated views (Phase 1 Database Optimization)
+  analytics: {
+    monthly: [],
+    category: [],
+    entity: [],
+    cumulative: [],
+    daily: []
+  },
+
+  // ==========================================
   // 2. AUTHENTICATION PIPELINE
   // ==========================================
   initAuth: () => {
@@ -57,8 +67,9 @@ export const useKingdomStore = create((set, get) => ({
         await get().fetchFlatMatrix();
         await get().fetchDashboardMetrics();
         
-        // ADDED: Hydrate store transactions immediately so widgets have data
+        // Hydrate store transactions and the new optimized analytics views
         await get().fetchTransactions();
+        await get().fetchAnalytics(); 
       } else {
         // Purge state if no valid session is found (e.g., logged out)
         set({ user: null, email: 'guest@medieval.stuff' });
@@ -109,7 +120,7 @@ export const useKingdomStore = create((set, get) => ({
       return norm;
     }).filter(Boolean))];
     
-    const preferredOrder = ['Assets', 'Liabilities', 'Income', 'Expense', 'Receivable', 'Payable'];
+    const preferredOrder = ['Assets', 'Liabilities', 'Income', 'Expenses', 'Receivable', 'Payable'];
     return uniqueTypes.sort((a, b) => {
       const idxA = preferredOrder.indexOf(a);
       const idxB = preferredOrder.indexOf(b);
@@ -117,14 +128,12 @@ export const useKingdomStore = create((set, get) => ({
     });
   },
 
-// ==========================================
-  // 4. BACKEND METRICS AGGREGATION RPC
+  // ==========================================
+  // 4. BACKEND METRICS & ANALYTICS RPC
   // ==========================================
   fetchDashboardMetrics: async () => {
     const userId = get().user?.id || null;
 
-
-    // THE GUARD CLAUSE: Abort if no user exists or if it's the fallback UUID
     if (!userId || userId === '00000000-0000-0000-0000-000000000000') {
       console.warn("Hydration paused: Waiting for secure auth handshake.");
       return; 
@@ -151,8 +160,45 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
+  // NEW: Fetch all optimized views in parallel
+  fetchAnalytics: async () => {
+    const userId = get().user?.id;
+    if (!userId) return;
+
+    set({ isAnalyticsLoading: true });
+    try {
+      const [
+        { data: monthly },
+        { data: category },
+        { data: entity },
+        { data: cumulative },
+        { data: daily }
+      ] = await Promise.all([
+        supabase.from('vw_monthly_analytics').select('*').order('month_date', { ascending: true }),
+        supabase.from('vw_category_balances').select('*'),
+        supabase.from('vw_entity_exposure').select('*'),
+        supabase.from('vw_cumulative_trends').select('*').order('month_date', { ascending: true }),
+        supabase.from('vw_daily_analytics').select('*').order('day_date', { ascending: true })
+      ]);
+
+      set({
+        analytics: {
+          monthly: monthly || [],
+          category: category || [],
+          entity: entity || [],
+          cumulative: cumulative || [],
+          daily: daily || []
+        }
+      });
+    } catch (err) {
+      console.error('Failed to fetch optimized analytics views:', err);
+    } finally {
+      set({ isAnalyticsLoading: false });
+    }
+  },
+
   // ==========================================
-  // 5. TRANSACTIONS PIPELINE WITH PAGINATION
+  // 5. TRANSACTIONS PIPELINE WITH OPTIMISTIC UI
   // ==========================================
   fetchTransactions: async (limit = 50, offset = 0) => {
     set({ isLedgerLoading: true });
@@ -189,28 +235,35 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   addTransaction: async (payload) => {
-    set({ isLedgerLoading: true });
-    try {
-      const userId = get().user?.id;
+    const userId = get().user?.id;
       
-      const formattedPayload = {
-        profile_id: userId || null,
-        value_date: payload.value_date,
-        posting_date: payload.posting_date,
-        payment_date: payload.payment_date || null,
-        amount: Number(payload.amount),
-        target_account: payload.target_account,
-        source_account: payload.source_account || null,
-        flow: payload.flow,
-        payment_status: payload.payment_status || 'Completed',
-        type: normalizeType(payload.type),
-        subtype: payload.subtype || null,
-        category: payload.category || null,
-        entity: payload.entity || null,
-        description: payload.description || '',
-        origin: payload.origin || 'Web Client'
-      };
+    const formattedPayload = {
+      profile_id: userId || null,
+      value_date: payload.value_date,
+      posting_date: payload.posting_date,
+      payment_date: payload.payment_date || null,
+      amount: Number(payload.amount),
+      target_account: payload.target_account,
+      source_account: payload.source_account || null,
+      flow: payload.flow,
+      payment_status: payload.payment_status || 'Completed',
+      type: normalizeType(payload.type),
+      subtype: payload.subtype || null,
+      category: payload.category || null,
+      entity: payload.entity || null,
+      description: payload.description || '',
+      origin: payload.origin || 'Web Client'
+    };
 
+    // OPTIMISTIC UI: Create a fake transaction and inject it instantly
+    const tempId = `temp-${Date.now()}`;
+    const optimisticTx = { ...formattedPayload, id: tempId };
+    
+    set((state) => ({
+      transactions: [optimisticTx, ...state.transactions]
+    }));
+
+    try {
       const { data, error } = await supabase
         .from('transactions')
         .insert([formattedPayload])
@@ -220,33 +273,34 @@ export const useKingdomStore = create((set, get) => ({
 
       toast.success('Transaction logged successfully.');
 
+      // Replace the temp ID with the real database transaction
       if (data && data[0]) {
         set((state) => ({
-          transactions: [data[0], ...state.transactions]
+          transactions: state.transactions.map(t => t.id === tempId ? data[0] : t)
         }));
       }
 
-      // Sync state and server metrics on success
-      await get().fetchDashboardMetrics();
-
-      if (userId) {
-        await get().fetchKingdomData(userId);
-      }
-
+      // Sync state and optimized views in the background
+      get().fetchDashboardMetrics();
+      get().fetchAnalytics();
+      
       return { success: true, data };
     } catch (err) {
       console.error('Failed to add transaction:', err);
+      
+      // OPTIMISTIC UI REVERT: Remove the fake transaction on failure
+      set((state) => ({
+        transactions: state.transactions.filter(t => t.id !== tempId)
+      }));
+      
       toast.error(`Ledger Error: ${err.message || err}`);
       return { success: false, error: err };
-    } finally {
-      set({ isLedgerLoading: false });
     }
   },
 
   updateTransaction: async (id, payload) => {
     set({ isLedgerLoading: true });
     try {
-      // Normalize type payload values to respect database constraints
       const normalizedPayload = { ...payload };
       if (payload.type) {
         normalizedPayload.type = normalizeType(payload.type);
@@ -267,12 +321,8 @@ export const useKingdomStore = create((set, get) => ({
       }
 
       // Sync state and server metrics on success
-      await get().fetchDashboardMetrics();
-
-      const userId = get().user?.id;
-      if (userId) {
-        await get().fetchKingdomData(userId);
-      }
+      get().fetchDashboardMetrics();
+      get().fetchAnalytics();
 
       return { success: true, data };
     } catch (err) {
@@ -284,7 +334,12 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   deleteTransaction: async (id) => {
-    set({ isLedgerLoading: true });
+    // OPTIMISTIC UI: Remove it immediately before DB confirms
+    const previousTransactions = get().transactions;
+    set((state) => ({
+      transactions: state.transactions.filter((t) => t.id !== id)
+    }));
+
     try {
       const { error } = await supabase
         .from('transactions')
@@ -293,24 +348,17 @@ export const useKingdomStore = create((set, get) => ({
 
       if (error) throw error;
 
-      set((state) => ({
-        transactions: state.transactions.filter((t) => t.id !== id)
-      }));
-
       // Sync state and server metrics on success
-      await get().fetchDashboardMetrics();
-
-      const userId = get().user?.id;
-      if (userId) {
-        await get().fetchKingdomData(userId);
-      }
+      get().fetchDashboardMetrics();
+      get().fetchAnalytics();
 
       return { success: true };
     } catch (err) {
       console.error('Error deleting transaction:', err);
+      // REVERT: Put it back if it failed
+      set({ transactions: previousTransactions });
+      toast.error('Failed to delete transaction.');
       throw err;
-    } finally {
-      set({ isLedgerLoading: false });
     }
   },
 
@@ -354,12 +402,20 @@ export const useKingdomStore = create((set, get) => ({
     lastCollectionTime: null,
     transactions: [],
     isLedgerLoading: false,
+    isAnalyticsLoading: false,
     accountBalances: [],
     dashboardMetrics: {
       total_assets: 0,
       total_liabilities: 0,
       net_worth: 0,
       net_vault_cash: 0
+    },
+    analytics: {
+      monthly: [],
+      category: [],
+      entity: [],
+      cumulative: [],
+      daily: []
     }
   })
 }));

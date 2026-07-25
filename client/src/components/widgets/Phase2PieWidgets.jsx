@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useKingdomStore } from '../../store/useKingdomStore';
-import { generateCategoryBreakdown, generateDebtHorizonBreakdown } from '../../utils/chartAnalytics';
+import { generateCategoryBreakdown } from '../../utils/chartAnalytics';
 
 // Monochromatic Slate Palette
 const PIE_COLORS = ['#111827', '#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db'];
@@ -10,6 +10,24 @@ const formatValue = (val) => {
   const num = Number(val) || 0;
   const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+const calculateDebtHorizon = (transactions) => {
+  let shortTerm = 0;
+  let longTerm = 0;
+  
+  transactions.forEach(t => {
+    const amount = Number(t.amount) || 0;
+    if (t.target_account?.startsWith('21')) shortTerm += amount;
+    if (t.source_account?.startsWith('21')) shortTerm -= amount;
+    if (t.target_account?.startsWith('22')) longTerm += amount;
+    if (t.source_account?.startsWith('22')) longTerm -= amount;
+  });
+  
+  return [
+    { name: 'Short-Term Debt', value: Number(shortTerm.toFixed(2)) },
+    { name: 'Long-Term Debt', value: Number(longTerm.toFixed(2)) }
+  ].filter(item => item.value > 0);
 };
 
 const PieChartCard = ({ title, subtitle, data, isDonut = false }) => (
@@ -54,44 +72,44 @@ const PieChartCard = ({ title, subtitle, data, isDonut = false }) => (
 );
 
 // Exports
-export const IncomeCategoryWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '7', 'category'), [activeTx]);
+export const IncomeCategoryWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Income', 'category'), [categoryView]);
   return <PieChartCard data={data} isDonut={true} subtitle="Revenue distribution overview" title="Income by Category"/>;
 };
 
-export const IncomeTypeWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '7', 'subtype'), [activeTx]);
+export const IncomeTypeWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Income', 'subtype'), [categoryView]);
   return <PieChartCard data={data} subtitle="Earned vs automated revenue" title="Active vs. Passive Income"/>;
 };
 
-export const ExpenseCategoryWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '6', 'category'), [activeTx]);
+export const ExpenseCategoryWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Expenses', 'category'), [categoryView]);
   return <PieChartCard data={data} isDonut={true} subtitle="High-level spending distribution" title="Expenses by Category"/>;
 };
 
-export const ExpenseSubtypeWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '6', 'subtype'), [activeTx]);
+export const ExpenseSubtypeWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Expenses', 'subtype'), [categoryView]);
   return <PieChartCard data={data} isDonut={true} subtitle="Detailed operational breakdown" title="Expenses by Subtype"/>;
 };
 
-export const AssetAllocationWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '1', 'subtype'), [activeTx]);
+export const AssetAllocationWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Assets', 'subtype'), [categoryView]);
   return <PieChartCard data={data} subtitle="Wealth breakdown by class" title="Asset Allocation"/>;
 };
 
-export const LiabilitiesSubtypeWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '2', 'subtype'), [activeTx]);
+export const LiabilitiesSubtypeWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Liabilities', 'subtype'), [categoryView]);
   return <PieChartCard data={data} isDonut={true} subtitle="Debt category distribution" title="Liabilities by Subtype"/>;
 };
 
-export const DebtHorizonWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateDebtHorizonBreakdown(activeTx), [activeTx]);
+export const DebtHorizonWidget = () => {
+  const activeTx = useKingdomStore(s => s.transactions || []);
+  const data = useMemo(() => calculateDebtHorizon(activeTx), [activeTx]);
   return <PieChartCard data={data} subtitle="Immediate vs macro obligations" title="Short vs. Long-Term Debt"/>;
 };

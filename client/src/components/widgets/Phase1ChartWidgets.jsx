@@ -24,10 +24,10 @@ const TrendChartCard = ({ title, subtitle, data, dataKey, xAxisKey, color, isNeg
               <stop offset="95%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#f3f4f6" strokeDasharray="3 3" vertical={false}/>
+          <CartesianGrid stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey={xAxisKey} axisLine={false} tickLine={false} tickMargin={10} tick={{ fontSize: 11, fill: '#9ca3af' }} />
           <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-          <Tooltip 
+          <Tooltip
             formatter={(value) => [formatValue(isNegative ? Math.abs(value) : value), title]}
             contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
             labelStyle={{ fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}
@@ -39,38 +39,38 @@ const TrendChartCard = ({ title, subtitle, data, dataKey, xAxisKey, color, isNeg
   </div>
 );
 
-export const IncomeTrendWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore((state) => state.transactions || []);
-  const data = useMemo(() => generateCashFlowData(activeTx), [activeTx]);
-  return <TrendChartCard color="#10b981" data={data} dataKey="income" subtitle="Historical monthly revenue velocity" title="Income Trend" xAxisKey="name"/>;
+export const IncomeTrendWidget = () => {
+  const monthlyView = useKingdomStore((state) => state.analytics?.monthly || []);
+  const data = useMemo(() => generateCashFlowData(monthlyView), [monthlyView]);
+  return <TrendChartCard color="#10b981" data={data} dataKey="income" subtitle="Historical monthly revenue velocity" title="Income Trend" xAxisKey="name" />;
 };
 
-export const ExpenseTrendWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore((state) => state.transactions || []);
-  const data = useMemo(() => generateCashFlowData(activeTx), [activeTx]);
-  return <TrendChartCard color="#f43f5e" data={data} dataKey="expenses" isNegative={true} subtitle="Historical monthly outflow patterns" title="Expense Trend" xAxisKey="name"/>;
+export const ExpenseTrendWidget = () => {
+  const monthlyView = useKingdomStore((state) => state.analytics?.monthly || []);
+  const data = useMemo(() => generateCashFlowData(monthlyView), [monthlyView]);
+  return <TrendChartCard color="#f43f5e" data={data} dataKey="expenses" isNegative={true} subtitle="Historical monthly outflow patterns" title="Expense Trend" xAxisKey="name" />;
 };
 
-export const CumulativeCashFlowWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore((state) => state.transactions || []);
-  const data = useMemo(() => generateCumulativeCashFlowData(activeTx), [activeTx]);
-  return <TrendChartCard color="#3b82f6" data={data} dataKey="cumulative" subtitle="Running net-flow balance trajectory" title="Cumulative Cash Flow" xAxisKey="name"/>;
+export const CumulativeCashFlowWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateCumulativeCashFlowData(cumulativeView), [cumulativeView]);
+  return <TrendChartCard color="#3b82f6" data={data} dataKey="cumulative" subtitle="Running net-flow balance trajectory" title="Cumulative Cash Flow" xAxisKey="name" />;
 };
 
-export const AssetGrowthTrendWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore((state) => state.transactions || []);
-  const data = useMemo(() => generateNetTrendData(activeTx), [activeTx]);
-  return <TrendChartCard color="#6366f1" data={data} dataKey="assets" subtitle="Historical growth of gross assets" title="Asset Growth Trend" xAxisKey="month"/>;
+export const AssetGrowthTrendWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateNetTrendData(cumulativeView), [cumulativeView]);
+  return <TrendChartCard color="#6366f1" data={data} dataKey="assets" subtitle="Historical growth of gross assets" title="Asset Growth Trend" xAxisKey="month" />;
 };
 
-export const DebtTrendWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore((state) => state.transactions || []);
-  const data = useMemo(() => generateNetTrendData(activeTx), [activeTx]);
-  return <TrendChartCard color="#f97316" data={data} dataKey="liabilities" subtitle="Historical debt accumulation and reduction" title="Debt Trend" xAxisKey="month"/>;
+export const DebtTrendWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateNetTrendData(cumulativeView), [cumulativeView]);
+  return <TrendChartCard color="#f97316" data={data} dataKey="liabilities" subtitle="Historical debt accumulation and reduction" title="Debt Trend" xAxisKey="month" />;
 };
 
-export const NetWorthTrendWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore((state) => state.transactions || []);
-  const data = useMemo(() => generateNetTrendData(activeTx), [activeTx]);
-  return <TrendChartCard color="#111827" data={data} dataKey="net" subtitle="Global net wealth trajectory" title="Net Worth Trend" xAxisKey="month"/>;
+export const NetWorthTrendWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateNetTrendData(cumulativeView), [cumulativeView]);
+  return <TrendChartCard color="#111827" data={data} dataKey="net" subtitle="Global net wealth trajectory" title="Net Worth Trend" xAxisKey="month" />;
 };

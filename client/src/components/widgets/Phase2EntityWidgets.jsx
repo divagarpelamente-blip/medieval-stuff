@@ -1,12 +1,37 @@
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useKingdomStore } from '../../store/useKingdomStore';
-import { generateCategoryBreakdown, getLargestTransactions, getTopAccountsByBalance } from '../../utils/chartAnalytics';
+import { getEntityExposure } from '../../utils/chartAnalytics';
 
 const formatValue = (val) => {
   const num = Number(val) || 0;
   const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+// Auxiliares locais para tabelas que precisam da lista crua
+const getLargestTx = (txs, targetType) => {
+  return txs.filter(t => t.type === targetType).sort((a,b) => b.amount - a.amount).slice(0, 10);
+};
+
+const getTopAccounts = (txs) => {
+  const balances = {};
+  const entities = {};
+  txs.forEach(t => {
+    const amt = Number(t.amount)||0;
+    if(t.target_account?.startsWith('1')) {
+      balances[t.target_account] = (balances[t.target_account]||0) + amt;
+      entities[t.target_account] = t.entity || t.target_account;
+    }
+    if(t.source_account?.startsWith('1')) {
+      balances[t.source_account] = (balances[t.source_account]||0) - amt;
+      entities[t.source_account] = t.entity || t.source_account;
+    }
+  });
+  return Object.entries(balances)
+    .map(([account, balance]) => ({account, entity: entities[account], balance}))
+    .filter(a => a.balance > 0)
+    .sort((a,b) => b.balance - a.balance).slice(0,5);
 };
 
 // Generic Monochromatic Bar Chart Card
@@ -63,29 +88,29 @@ const TableCard = ({ title, subtitle, headers, children }) => (
   </div>
 );
 
-// Exports: Bar Charts
-export const IncomeEntityWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '7', 'entity').slice(0, 10), [activeTx]);
+// Exports: Bar Charts (Using optimized Views)
+export const IncomeEntityWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Income', 10), [entityView]);
   return <BarChartCard data={data} subtitle="Top 10 revenue sources" title="Income by Entity"/>;
 };
 
-export const EntityExposureWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '1', 'entity').slice(0, 10), [activeTx]);
+export const EntityExposureWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Assets', 10), [entityView]);
   return <BarChartCard data={data} subtitle="Asset concentration across institutions" title="Entity Exposure (Risk)"/>;
 };
 
-export const DebtCreditorWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '2', 'entity').slice(0, 10), [activeTx]);
+export const DebtCreditorWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Liabilities', 10), [entityView]);
   return <BarChartCard data={data} subtitle="Concentration of owed liabilities" title="Debt by Creditor"/>;
 };
 
-// Exports: Tables
-export const TopMerchantsWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => generateCategoryBreakdown(activeTx, '6', 'entity').slice(0, 10), [activeTx]);
+// Exports: Tables (Still using views or local transaction parsing)
+export const TopMerchantsWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Expenses', 10), [entityView]);
   return (
     <TableCard headers={['Merchant', 'Total Spent']} subtitle="Highest cumulative spending destinations" title="Top 10 Merchants">
       {data.map((row, i) => (
@@ -98,9 +123,9 @@ export const TopMerchantsWidget = ({ transactions }) => {
   );
 };
 
-export const LargestTransactionsWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => getLargestTransactions(activeTx, '6', 10), [activeTx]);
+export const LargestTransactionsWidget = () => {
+  const activeTx = useKingdomStore(s => s.transactions || []);
+  const data = useMemo(() => getLargestTx(activeTx, 'Expenses'), [activeTx]);
   return (
     <TableCard headers={['Date', 'Entity', 'Amount']} subtitle="Single highest-impact expenses" title="Largest Transactions">
       {data.map((row, i) => (
@@ -114,9 +139,9 @@ export const LargestTransactionsWidget = ({ transactions }) => {
   );
 };
 
-export const TopAccountsWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => getTopAccountsByBalance(activeTx, 5), [activeTx]);
+export const TopAccountsWidget = () => {
+  const activeTx = useKingdomStore(s => s.transactions || []);
+  const data = useMemo(() => getTopAccounts(activeTx), [activeTx]);
   return (
     <TableCard headers={['Code', 'Institution', 'Current Balance']} subtitle="Largest capital reserves by balance" title="Top 5 Accounts">
       {data.map((row, i) => (

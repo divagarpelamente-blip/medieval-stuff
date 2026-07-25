@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { useKingdomStore } from '../../store/useKingdomStore';
-import { calculateFilteredKPIs } from '../../utils/chartAnalytics';
 
 const formatValue = (val) => {
   const num = Number(val) || 0;
@@ -26,14 +25,40 @@ const FilteredKpiCard = ({ title, subtitle, value, tag }) => (
   </div>
 );
 
-export const CostOfDebtWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const kpis = useMemo(() => calculateFilteredKPIs(activeTx), [activeTx]);
-  return <FilteredKpiCard subtitle="Interest expenses paid" tag="[69020003]" title="Cost of Debt" value={formatValue(kpis.costOfDebt)}/>;
+export const CostOfDebtWidget = () => {
+  const activeTx = useKingdomStore(s => s.transactions || []);
+  
+  const costOfDebt = useMemo(() => {
+    let total = 0;
+    activeTx.forEach(t => {
+      const amt = Number(t.amount) || 0;
+      if (t.target_account === '69020003') total += amt;
+      if (t.source_account === '69020003') total -= amt;
+    });
+    return total;
+  }, [activeTx]);
+
+  return <FilteredKpiCard subtitle="Interest expenses paid" tag="[69020003]" title="Cost of Debt" value={formatValue(costOfDebt)}/>;
 };
 
-export const YieldAssetsWidget = ({ transactions }) => {
-  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
-  const kpis = useMemo(() => calculateFilteredKPIs(activeTx), [activeTx]);
-  return <FilteredKpiCard subtitle="Yield-bearing vs sterile assets" tag="Class [1] - Cash" title="Income-Generating Assets" value={formatValue(kpis.yieldAssets)}/>;
+export const YieldAssetsWidget = () => {
+  const activeTx = useKingdomStore(s => s.transactions || []);
+  
+  const yieldAssets = useMemo(() => {
+    let total = 0;
+    activeTx.forEach(t => {
+      const target = t.target_account || '';
+      const source = t.source_account || '';
+      const amt = Number(t.amount) || 0;
+      
+      const isYieldTarget = target.startsWith('1') && !target.startsWith('1101') && !target.startsWith('1103');
+      const isYieldSource = source.startsWith('1') && !source.startsWith('1101') && !source.startsWith('1103');
+      
+      if (isYieldTarget) total += amt;
+      if (isYieldSource) total -= amt;
+    });
+    return total;
+  }, [activeTx]);
+
+  return <FilteredKpiCard subtitle="Yield-bearing vs sterile assets" tag="Class [1] - Cash" title="Income-Generating Assets" value={formatValue(yieldAssets)}/>;
 };

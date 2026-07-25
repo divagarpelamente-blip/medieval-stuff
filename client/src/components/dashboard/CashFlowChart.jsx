@@ -11,13 +11,14 @@ import {
 import { useKingdomStore } from '../../store/useKingdomStore';
 import { generateCashFlowData } from '../../utils/chartAnalytics';
 
-export default function CashFlowChart({ transactions }) {
-  const storeTransactions = useKingdomStore((state) => state.transactions || []);
-  const activeTransactions = transactions || storeTransactions;
+export default function CashFlowChart() {
+  // 1. Agora puxamos exclusivamente a view mensal otimizada, ignorando as transações brutas
+  const monthlyView = useKingdomStore((state) => state.analytics?.monthly || []);
 
+  // 2. O utilitário agora apenas mapeia os dados, sem fazer loops infinitos
   const data = useMemo(() => {
-    return generateCashFlowData(activeTransactions);
-  }, [activeTransactions]);
+    return generateCashFlowData(monthlyView);
+  }, [monthlyView]);
 
   // Calculate averages for treasury metrics
   const stats = useMemo(() => {
