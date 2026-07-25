@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useKingdomStore } from "../../store/useKingdomStore";
+import { useKingdomStore } from "../../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 
 export default function LedgerTable({ onEditTransaction }) {
@@ -42,7 +42,7 @@ export default function LedgerTable({ onEditTransaction }) {
         </h2>
         <button
           // Fixed the React event bug by wrapping in an arrow function
-          onClick={() => fetchTransactions(1000, 0)} 
+          onClick={() => fetchTransactions(1000, 0)}
           disabled={isLedgerLoading}
           className="px-4 py-1.5 bg-amber-950 hover:bg-amber-900 border border-amber-600/50 rounded text-amber-200 text-xs tracking-wider uppercase font-semibold transition disabled:opacity-50"
         >
@@ -90,7 +90,7 @@ export default function LedgerTable({ onEditTransaction }) {
                 </div>
               </div>
             ))}
-            
+
             {/* Added Load More Button */}
             <div className="flex justify-center mt-4 pt-2">
               <button

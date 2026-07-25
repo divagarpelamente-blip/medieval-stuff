@@ -1,46 +1,46 @@
 // Add these imports at the top of your file
-import CashFlowChart from './CashFlowChart';
-import NetWorthChart from './NetWorthChart';
-import AssetAllocationChart from './AssetAllocationChart';
+import CashFlowChart from '../components/widgets/CashFlowChart';
+import NetWorthChart from '../components/widgets/NetWorthChart';
+import AssetAllocationChart from '../components/widgets/AssetAllocationChart';
 
 // ==========================================
 // PHASE 1 IMPORTS
 // ==========================================
-import { 
-  TotalIncomeWidget, TotalExpensesWidget, NetCashFlowWidget, 
-  TotalAssetsWidget, ImmediateLiquidityWidget, TotalInvestmentsWidget, 
-  TotalLiabilitiesWidget, NetWorthWidget 
-} from '../widgets/Phase1KpiWidgets';
+import {
+  TotalIncomeWidget, TotalExpensesWidget, NetCashFlowWidget,
+  TotalAssetsWidget, ImmediateLiquidityWidget, TotalInvestmentsWidget,
+  TotalLiabilitiesWidget, NetWorthWidget
+} from '../components/widgets/Phase1KpiWidgets';
 
-import { 
-  IncomeTrendWidget, ExpenseTrendWidget, CumulativeCashFlowWidget, 
-  AssetGrowthTrendWidget, DebtTrendWidget, NetWorthTrendWidget 
-} from '../widgets/Phase1ChartWidgets';
+import {
+  IncomeTrendWidget, ExpenseTrendWidget, CumulativeCashFlowWidget,
+  AssetGrowthTrendWidget, DebtTrendWidget, NetWorthTrendWidget
+} from '../components/widgets/Phase1ChartWidgets';
 
 // ==========================================
 // PHASE 2 IMPORTS
 // ==========================================
-import { 
-  IncomeCategoryWidget, IncomeTypeWidget, ExpenseCategoryWidget, 
-  ExpenseSubtypeWidget, AssetAllocationWidget, LiabilitiesSubtypeWidget, DebtHorizonWidget 
-} from '../widgets/Phase2PieWidgets';
+import {
+  IncomeCategoryWidget, IncomeTypeWidget, ExpenseCategoryWidget,
+  ExpenseSubtypeWidget, AssetAllocationWidget, LiabilitiesSubtypeWidget, DebtHorizonWidget
+} from '../components/widgets/Phase2PieWidgets';
 
-import { 
+import {
   IncomeEntityWidget, EntityExposureWidget, DebtCreditorWidget,
-  TopMerchantsWidget, LargestTransactionsWidget, TopAccountsWidget 
-} from '../widgets/Phase2EntityWidgets';
+  TopMerchantsWidget, LargestTransactionsWidget, TopAccountsWidget
+} from '../components/widgets/Phase2EntityWidgets';
 
 // ==========================================
 // PHASE 3 & 4 IMPORTS
 // ==========================================
-import { 
+import {
   AvgMonthlyExpenseWidget, AvgDailyExpenseWidget, SurvivalMonthsWidget,
   SavingsRateWidget, BurnRateWidget, DtiRatioWidget, DebtRatioWidget,
   WealthVarianceWidget, ExpenseVarianceWidget
-} from '../widgets/Phase3RatioWidgets';
+} from '../components/widgets/Phase3RatioWidgets';
 
-import { CostOfDebtWidget, YieldAssetsWidget } from '../widgets/Phase3FilteredWidgets';
-import { RecentTransactionsWidget, InternalTransfersWidget } from '../widgets/Phase4LedgerWidgets';
+import { CostOfDebtWidget, YieldAssetsWidget } from '../components/widgets/Phase3FilteredWidgets';
+import { RecentTransactionsWidget, InternalTransfersWidget } from '../components/widgets/Phase4LedgerWidgets';
 
 // ==========================================
 // PRODUCTION REGISTRY EXPORT
@@ -99,26 +99,26 @@ export const TREASURY_WIDGETS = {
   table_internal_transfers: { name: "Internal Transfers", component: InternalTransfersWidget, description: "Table of internal vault movements.", category: "ledger", layout: { w: 4, h: 3, minW: 3, maxW: 6, minH: 3, maxH: 5 } },
 
   // --- NEW CHARTS MATCHING THE REGISTRY STRUCTURE ---
-  cash_flow_chart: { 
-    name: "Cash Flow Trend", 
-    component: CashFlowChart, 
-    description: "Visualizes income vs expenses over time.", 
-    category: "charts", 
-    layout: { w: 4, h: 3, minW: 3, maxW: 6, minH: 3, maxH: 5 } 
+  cash_flow_chart: {
+    name: "Cash Flow Trend",
+    component: CashFlowChart,
+    description: "Visualizes income vs expenses over time.",
+    category: "charts",
+    layout: { w: 4, h: 3, minW: 3, maxW: 6, minH: 3, maxH: 5 }
   },
-  net_worth_chart: { 
-    name: "Net Worth Trend", 
-    component: NetWorthChart, 
-    description: "Tracks cumulative asset value.", 
-    category: "charts", 
-    layout: { w: 4, h: 3, minW: 3, maxW: 6, minH: 3, maxH: 5 } 
+  net_worth_chart: {
+    name: "Net Worth Trend",
+    component: NetWorthChart,
+    description: "Tracks cumulative asset value.",
+    category: "charts",
+    layout: { w: 4, h: 3, minW: 3, maxW: 6, minH: 3, maxH: 5 }
   },
-  asset_allocation_chart: { 
-    name: "Asset Allocation", 
-    component: AssetAllocationChart, 
-    description: "Current distribution of assets.", 
-    category: "charts", 
+  asset_allocation_chart: {
+    name: "Asset Allocation",
+    component: AssetAllocationChart,
+    description: "Current distribution of assets.",
+    category: "charts",
     // Foi alterado o minW: 2 e minH: 2
-    layout: { w: 4, h: 3, minW: 2, maxW: 6, minH: 2, maxH: 5 } 
+    layout: { w: 4, h: 3, minW: 2, maxW: 6, minH: 2, maxH: 5 }
   }
 };

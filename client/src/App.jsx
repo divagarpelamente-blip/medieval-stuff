@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useKingdomStore } from './store/useKingdomStore';
-import MainMenu from "./pages/MainMenu"; 
+import MainMenu from "./pages/MainMenu";
 import DashboardWidgetsSandbox from "./components/sandbox/dashboard-widgets-sandbox";
 
 const queryClient = new QueryClient({

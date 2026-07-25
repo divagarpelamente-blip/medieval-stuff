@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useKingdomStore } from "../../store/useKingdomStore";
+import { useKingdomStore } from "../../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 
 export default function TransactionForm({ editingTransaction, onCancelEdit }) {

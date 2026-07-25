@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
-import CashFlowChart from '../dashboard/CashFlowChart';
-import NetWorthChart from '../dashboard/NetWorthChart';
-import AssetAllocationChart from '../dashboard/AssetAllocationChart';
-import { 
-  TotalIncomeWidget, TotalExpensesWidget, NetCashFlowWidget, 
-  TotalAssetsWidget, ImmediateLiquidityWidget, TotalInvestmentsWidget, 
-  TotalLiabilitiesWidget, NetWorthWidget 
+import CashFlowChart from '../widgets/CashFlowChart';
+import NetWorthChart from '../widgets/NetWorthChart';
+import AssetAllocationChart from '../widgets/AssetAllocationChart';
+import {
+  TotalIncomeWidget, TotalExpensesWidget, NetCashFlowWidget,
+  TotalAssetsWidget, ImmediateLiquidityWidget, TotalInvestmentsWidget,
+  TotalLiabilitiesWidget, NetWorthWidget
 } from '../widgets/Phase1KpiWidgets';
-import { 
-  IncomeTrendWidget, ExpenseTrendWidget, CumulativeCashFlowWidget, 
-  AssetGrowthTrendWidget, DebtTrendWidget, NetWorthTrendWidget 
+import {
+  IncomeTrendWidget, ExpenseTrendWidget, CumulativeCashFlowWidget,
+  AssetGrowthTrendWidget, DebtTrendWidget, NetWorthTrendWidget
 } from '../widgets/Phase1ChartWidgets';
-import { 
-  IncomeCategoryWidget, IncomeTypeWidget, ExpenseCategoryWidget, 
-  ExpenseSubtypeWidget, AssetAllocationWidget, LiabilitiesSubtypeWidget, DebtHorizonWidget 
+import {
+  IncomeCategoryWidget, IncomeTypeWidget, ExpenseCategoryWidget,
+  ExpenseSubtypeWidget, AssetAllocationWidget, LiabilitiesSubtypeWidget, DebtHorizonWidget
 } from '../widgets/Phase2PieWidgets';
-import { 
+import {
   IncomeEntityWidget, EntityExposureWidget, DebtCreditorWidget,
-  TopMerchantsWidget, LargestTransactionsWidget, TopAccountsWidget 
+  TopMerchantsWidget, LargestTransactionsWidget, TopAccountsWidget
 } from '../widgets/Phase2EntityWidgets';
-import { 
+import {
   AvgMonthlyExpenseWidget, AvgDailyExpenseWidget, SurvivalMonthsWidget,
   SavingsRateWidget, BurnRateWidget, DtiRatioWidget, DebtRatioWidget,
   WealthVarianceWidget, ExpenseVarianceWidget

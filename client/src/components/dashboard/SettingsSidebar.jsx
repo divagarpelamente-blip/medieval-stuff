@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { TREASURY_WIDGETS } from './treasuryRegistry';
+import { TREASURY_WIDGETS } from '../../config/treasuryRegistry';
 import { DEFAULT_PRESET } from '../../config/dashboard.config';
 import { Eye, EyeOff, Pencil, Check, Layers, Grid, SlidersHorizontal, Plus, Search } from 'lucide-react';
 
@@ -39,10 +39,10 @@ export default function SettingsSidebar() {
 
   const [editingTabId, setEditingTabId] = useState(null);
   const [tempName, setTempName] = useState('');
-  
+
   const [activeSection, setActiveSection] = useState(null);
-  const [widgetCategory, setWidgetCategory] = useState('All'); 
-  const [searchQuery, setSearchQuery] = useState(''); 
+  const [widgetCategory, setWidgetCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const activeRegistry = TREASURY_WIDGETS;
 
@@ -67,9 +67,9 @@ export default function SettingsSidebar() {
 
   const filteredWidgets = Object.entries(activeRegistry).filter(([key, widget]) => {
     const matchesCategory = widgetCategory === 'All' || widget.category === widgetCategory;
-    const matchesSearch = widget.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          widget.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
+    const matchesSearch = widget.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      widget.description.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchesCategory && matchesSearch;
   });
 

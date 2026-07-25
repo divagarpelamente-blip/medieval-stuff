@@ -1,5 +1,5 @@
 import React from 'react';
-import ModalTabmenus from '../Modals/ModalTabmenus';
+import ModalTabmenus from '../../ui/ModalTabmenus';
 
 /**
  * SettingsController Component

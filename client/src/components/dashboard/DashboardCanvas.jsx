@@ -4,7 +4,7 @@ import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { TREASURY_WIDGETS } from './treasuryRegistry';
+import { TREASURY_WIDGETS } from '../../config/treasuryRegistry';
 import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
 
@@ -29,20 +29,20 @@ const ResponsiveGridLayout = (props) => {
 
   return (
     <div ref={containerRef} className="w-full h-full relative min-h-[600px] overflow-hidden">
-      <div 
-        style={{ 
-          transform: `scale(${scale})`, 
-          transformOrigin: 'top left', 
+      <div
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
           width: '1200px',
-          height: `${100 / scale}%` 
+          height: `${100 / scale}%`
         }}
         className="absolute top-0 left-0"
       >
-        <Responsive 
-          width={1200} 
+        <Responsive
+          width={1200}
           style={{ minHeight: '600px', minWidth: '100%', height: '100%' }}
-          transformScale={scale} 
-          {...props} 
+          transformScale={scale}
+          {...props}
         />
       </div>
     </div>
@@ -52,7 +52,7 @@ const ResponsiveGridLayout = (props) => {
 // Parchment-themed skeleton for loading states
 function DashboardSkeleton() {
   return (
-    <div 
+    <div
       className="flex-grow p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none"
       style={{ backgroundColor: '#e8dcb8' }}
     >
@@ -212,8 +212,8 @@ export default function DashboardCanvas() {
               <div
                 key={item.i}
                 className={`group relative rounded-xl overflow-hidden transition-all duration-200 flex flex-col ${isEditingLayout
-                    ? 'border-2 border-[#8b4513]/50 hover:border-[#5d4037] hover:shadow-[0_0_15px_rgba(139,69,19,0.2)] bg-[#faf4e5]/90 cursor-grab active:cursor-grabbing'
-                    : 'bg-[#faf4e5] border border-[#8b4513]/30 shadow-[0_8px_15px_rgba(75,44,32,0.1)]'
+                  ? 'border-2 border-[#8b4513]/50 hover:border-[#5d4037] hover:shadow-[0_0_15px_rgba(139,69,19,0.2)] bg-[#faf4e5]/90 cursor-grab active:cursor-grabbing'
+                  : 'bg-[#faf4e5] border border-[#8b4513]/30 shadow-[0_8px_15px_rgba(75,44,32,0.1)]'
                   }`}
               >
                 <div className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}>
@@ -227,7 +227,7 @@ export default function DashboardCanvas() {
                       e.stopPropagation();
                       handleRemoveWidget(item.i);
                     }}
-                    onMouseDown={(e) => e.stopPropagation()} 
+                    onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                     className="cancel-drag absolute top-2.5 right-2.5 z-10 p-1.5 rounded-full bg-[#4b2c20] border border-[#2a1711] text-[#f4e4bc] hover:bg-[#8b4513] hover:scale-105 shadow-md cursor-pointer pointer-events-auto transition-all"
                     title="Dismantle Structure"

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
-import Dashboard from './Dashboard';
-import Modal from '../components/Modals/Modal';
-import TreasuryController from '../components/Modals/TreasuryController';
-import SettingsController from '../components/Modals/SettingsController';
+import Dashboard from '../pages/Dashboard';
+import Modal from '../components/ui/Modal';
+import TreasuryController from '../components/features/Ledger/TreasuryController';
+import SettingsController from '../components/features/settings/SettingsController';
 import bgImage from '../assets/Medieval_Town_Backround.jfif';
 
 /**
@@ -18,7 +18,7 @@ export default function MainMenu() {
   const store = useKingdomStore();
   const fetchChartOfAccounts = store?.fetchChartOfAccounts;
 
-  const [activeModal, setActiveModal] = useState(null); 
+  const [activeModal, setActiveModal] = useState(null);
 
   useEffect(() => {
     if (fetchChartOfAccounts) {
