@@ -15,21 +15,17 @@ import bgImage from '../assets/Medieval_Town_Backround.jfif';
  * and hosts the modular controllers inside the centered inner canvas.
  */
 export default function MainMenu() {
-  // --- Zustand Store Connections ---
   const store = useKingdomStore();
   const fetchChartOfAccounts = store?.fetchChartOfAccounts;
 
-  // --- Component UI States ---
-  const [activeModal, setActiveModal] = useState(null); // 'quests' | 'achievements' | 'treasury' | 'dashboard' | 'settings' | null
+  const [activeModal, setActiveModal] = useState(null); 
 
-  // Bootstrap Chart of Accounts Flat Matrix upon interface mount
   useEffect(() => {
     if (fetchChartOfAccounts) {
       fetchChartOfAccounts();
     }
   }, [fetchChartOfAccounts]);
 
-  // Window Close Event Listener for nested dashboard controllers
   useEffect(() => {
     const handleCloseDashboard = () => {
       setActiveModal(null);
@@ -41,7 +37,6 @@ export default function MainMenu() {
     };
   }, []);
 
-  // Unified metadata dictionary for modal header configuration
   const modalMetadata = {
     quests: { icon: '⚔️', title: 'Quests', subtitle: 'Sovereign objectives and campaigns' },
     achievements: { icon: '🏆', title: 'Achievements', subtitle: 'Unveiled royal milestones' },
@@ -50,13 +45,9 @@ export default function MainMenu() {
     settings: { icon: '⚙️', title: 'Settings', subtitle: 'Citadel identity configurations' }
   };
 
-  // Resolve current active metadata dynamically
   const currentMeta = activeModal ? modalMetadata[activeModal] : null;
 
   return (
-    /* ==========================================
-        1. THE OUTER VOID (Strict Full Screen bg-black)
-        ========================================== */
     <div
       className="w-full h-dvh bg-black flex justify-center overflow-hidden"
       style={{
@@ -65,86 +56,34 @@ export default function MainMenu() {
         backgroundPosition: 'center'
       }}
     >
-
-      {/* ==========================================
-          2. THE INNER CANVAS (Centered Transparent Core)
-          ========================================== */}
       <div className="relative w-full max-w-7xl h-full mx-auto text-stone-100 flex flex-col justify-between font-serif overflow-hidden">
-
-        {/* ==========================================
-            3. MAIN ROUTING VIEWPORT (Center-Bottom Anchoring)
-            ========================================== */}
         <main className="flex-grow flex flex-col items-center justify-end px-4 pb-16 z-10 w-full min-h-0">
           {activeModal === null ? (
-            /* ==========================================
-                SLEEK FLOATING DOCK MENU (Active === null)
-               ========================================== */
             <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in">
-              <button
-                onClick={() => setActiveModal('quests')}
-                title="Quests"
-                className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
-              >
-                ⚔️
-              </button>
-              <button
-                onClick={() => setActiveModal('achievements')}
-                title="Achievements"
-                className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
-              >
-                🏆
-              </button>
-              <button
-                onClick={() => setActiveModal('treasury')}
-                title="Treasury"
-                className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
-              >
-                🏦
-              </button>
-              <button
-                onClick={() => setActiveModal('dashboard')}
-                title="Dashboard"
-                className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
-              >
-                🏰
-              </button>
-              <button
-                onClick={() => setActiveModal('settings')}
-                title="Settings"
-                className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none"
-              >
-                ⚙️
-              </button>
+              <button onClick={() => setActiveModal('quests')} title="Quests" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">⚔️</button>
+              <button onClick={() => setActiveModal('achievements')} title="Achievements" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏆</button>
+              <button onClick={() => setActiveModal('treasury')} title="Treasury" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏦</button>
+              <button onClick={() => setActiveModal('dashboard')} title="Dashboard" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏰</button>
+              <button onClick={() => setActiveModal('settings')} title="Settings" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">⚙️</button>
             </div>
           ) : activeModal === 'treasury' ? (
             <TreasuryController onClose={() => setActiveModal(null)} />
           ) : activeModal === 'dashboard' ? (
-            /* LAUNCH THE NEW V2.1 DASHBOARD ENGINE IN PRODUCTION MODE */
-            <div className="absolute inset-0 z-50 bg-stone-950 w-full h-full">
+            /* LAUNCH THE NEW V2.1 DASHBOARD ENGINE IN PRODUCTION MODE - FIXED MARGINS */
+            <div className="absolute top-4 bottom-4 left-2 right-2 md:top-8 md:bottom-8 md:left-6 md:right-6 z-50 bg-stone-950 rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(0,0,0,0.95)] border border-amber-900/60">
               <Dashboard />
             </div>
           ) : activeModal === 'settings' ? (
             <SettingsController onClose={() => setActiveModal(null)} />
           ) : (
-            /* ==========================================
-                MODULAR FALLBACK OVERLAY (Quests, Achievements)
-               ========================================== */
-            <Modal
-              icon={currentMeta?.icon}
-              title={currentMeta?.title}
-              subtitle={currentMeta?.subtitle}
-              onClose={() => setActiveModal(null)}
-            >
+            <Modal icon={currentMeta?.icon} title={currentMeta?.title} subtitle={currentMeta?.subtitle} onClose={() => setActiveModal(null)}>
               <div className="flex flex-col items-center justify-center p-12 text-center opacity-50">
                 <span className="text-4xl mb-4">🚧</span>
-                <p className="text-stone-400 font-sans tracking-widest uppercase">
-                  This area will be defined later
-                </p>
+                <p className="text-stone-400 font-sans tracking-widest uppercase">This area will be defined later</p>
               </div>
             </Modal>
           )}
         </main>
-
       </div>
     </div>
   );

@@ -3,7 +3,6 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 import { useKingdomStore } from '../../store/useKingdomStore';
 import { generateCategoryBreakdown } from '../../utils/chartAnalytics';
 
-// Monochromatic Slate Palette
 const PIE_COLORS = ['#111827', '#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db'];
 
 const formatValue = (val) => {
@@ -36,9 +35,9 @@ const PieChartCard = ({ title, subtitle, data, isDonut = false }) => (
       <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
       <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
     </div>
-    <div className="flex-1 w-full relative min-h-[200px]">
+    <div className="flex-1 w-full min-h-0 overflow-hidden relative">
       {data.length > 0 ? (
-        <ResponsiveContainer height="100%" width="100%">
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie 
               cx="50%" 
@@ -71,7 +70,6 @@ const PieChartCard = ({ title, subtitle, data, isDonut = false }) => (
   </div>
 );
 
-// Exports
 export const IncomeCategoryWidget = () => {
   const categoryView = useKingdomStore(s => s.analytics?.category || []);
   const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Income', 'category'), [categoryView]);

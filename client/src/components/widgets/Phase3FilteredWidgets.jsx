@@ -26,39 +26,26 @@ const FilteredKpiCard = ({ title, subtitle, value, tag }) => (
 );
 
 export const CostOfDebtWidget = () => {
-  const activeTx = useKingdomStore(s => s.transactions || []);
+  const balances = useKingdomStore(s => s.analytics?.balances || []);
   
   const costOfDebt = useMemo(() => {
-    let total = 0;
-    activeTx.forEach(t => {
-      const amt = Number(t.amount) || 0;
-      if (t.target_account === '69020003') total += amt;
-      if (t.source_account === '69020003') total -= amt;
-    });
-    return total;
-  }, [activeTx]);
+    // Procura o saldo total acumulado na conta específica de custo da dívida
+    const targetAcc = balances.find(b => b.account === '69020003');
+    return targetAcc ? targetAcc.balance : 0;
+  }, [balances]);
 
   return <FilteredKpiCard subtitle="Interest expenses paid" tag="[69020003]" title="Cost of Debt" value={formatValue(costOfDebt)}/>;
 };
 
 export const YieldAssetsWidget = () => {
-  const activeTx = useKingdomStore(s => s.transactions || []);
+  const balances = useKingdomStore(s => s.analytics?.balances || []);
   
   const yieldAssets = useMemo(() => {
-    let total = 0;
-    activeTx.forEach(t => {
-      const target = t.target_account || '';
-      const source = t.source_account || '';
-      const amt = Number(t.amount) || 0;
-      
-      const isYieldTarget = target.startsWith('1') && !target.startsWith('1101') && !target.startsWith('1103');
-      const isYieldSource = source.startsWith('1') && !source.startsWith('1101') && !source.startsWith('1103');
-      
-      if (isYieldTarget) total += amt;
-      if (isYieldSource) total -= amt;
-    });
-    return total;
-  }, [activeTx]);
+    // Soma os saldos de todas as contas de Ativo ('1') ignorando dinheiro estéril ('1101', '1103')
+    return balances
+      .filter(b => b.account && b.account.startsWith('1') && !b.account.startsWith('1101') && !b.account.startsWith('1103'))
+      .reduce((sum, b) => sum + Number(b.balance), 0);
+  }, [balances]);
 
   return <FilteredKpiCard subtitle="Yield-bearing vs sterile assets" tag="Class [1] - Cash" title="Income-Generating Assets" value={formatValue(yieldAssets)}/>;
 };

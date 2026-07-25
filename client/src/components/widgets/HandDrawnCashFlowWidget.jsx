@@ -13,8 +13,8 @@ export default function HandDrawnCashFlowWidget() {
         <h3 className="text-2xl font-bold tracking-widest uppercase">Income vs Expenses</h3>
         <p className="text-sm">~ A Charcoal Record of the Royal Vault ~</p>
       </div>
-      <div className="flex-1 w-full min-h-[250px] relative">
-        <ResponsiveContainer height="100%" width="100%">
+      <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+        <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <filter id="pencil" x="-20%" y="-20%" width="140%" height="140%">

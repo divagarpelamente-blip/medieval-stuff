@@ -13,6 +13,7 @@ export const DEFAULT_PRESET = [
     x: 0, 
     y: 0, 
     w: 5, 
+    
     h: 3, 
     minW: 3, 
     maxW: 12, 

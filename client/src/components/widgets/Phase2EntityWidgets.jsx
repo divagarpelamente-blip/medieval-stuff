@@ -9,41 +9,19 @@ const formatValue = (val) => {
   return num < 0 ? `(${formattedNum})` : formattedNum;
 };
 
-// Auxiliares locais para tabelas que precisam da lista crua
 const getLargestTx = (txs, targetType) => {
   return txs.filter(t => t.type === targetType).sort((a,b) => b.amount - a.amount).slice(0, 10);
 };
 
-const getTopAccounts = (txs) => {
-  const balances = {};
-  const entities = {};
-  txs.forEach(t => {
-    const amt = Number(t.amount)||0;
-    if(t.target_account?.startsWith('1')) {
-      balances[t.target_account] = (balances[t.target_account]||0) + amt;
-      entities[t.target_account] = t.entity || t.target_account;
-    }
-    if(t.source_account?.startsWith('1')) {
-      balances[t.source_account] = (balances[t.source_account]||0) - amt;
-      entities[t.source_account] = t.entity || t.source_account;
-    }
-  });
-  return Object.entries(balances)
-    .map(([account, balance]) => ({account, entity: entities[account], balance}))
-    .filter(a => a.balance > 0)
-    .sort((a,b) => b.balance - a.balance).slice(0,5);
-};
-
-// Generic Monochromatic Bar Chart Card
 const BarChartCard = ({ title, subtitle, data }) => (
   <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
     <div className="mb-4">
       <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
       <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
     </div>
-    <div className="flex-1 w-full min-h-[200px]">
+    <div className="flex-1 w-full min-h-0 overflow-hidden relative">
       {data.length > 0 ? (
-        <ResponsiveContainer height="100%" width="100%">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 5, right: 40, left: 15, bottom: 5 }}>
             <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false}/>
             <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
@@ -64,7 +42,6 @@ const BarChartCard = ({ title, subtitle, data }) => (
   </div>
 );
 
-// Generic Monochromatic Table Card
 const TableCard = ({ title, subtitle, headers, children }) => (
   <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm overflow-hidden">
     <div className="mb-4 shrink-0">
@@ -88,7 +65,6 @@ const TableCard = ({ title, subtitle, headers, children }) => (
   </div>
 );
 
-// Exports: Bar Charts (Using optimized Views)
 export const IncomeEntityWidget = () => {
   const entityView = useKingdomStore(s => s.analytics?.entity || []);
   const data = useMemo(() => getEntityExposure(entityView, 'Income', 10), [entityView]);
@@ -107,7 +83,6 @@ export const DebtCreditorWidget = () => {
   return <BarChartCard data={data} subtitle="Concentration of owed liabilities" title="Debt by Creditor"/>;
 };
 
-// Exports: Tables (Still using views or local transaction parsing)
 export const TopMerchantsWidget = () => {
   const entityView = useKingdomStore(s => s.analytics?.entity || []);
   const data = useMemo(() => getEntityExposure(entityView, 'Expenses', 10), [entityView]);
@@ -127,7 +102,7 @@ export const LargestTransactionsWidget = () => {
   const activeTx = useKingdomStore(s => s.transactions || []);
   const data = useMemo(() => getLargestTx(activeTx, 'Expenses'), [activeTx]);
   return (
-    <TableCard headers={['Date', 'Entity', 'Amount']} subtitle="Single highest-impact expenses" title="Largest Transactions">
+    <TableCard headers={['Date', 'Entity', 'Amount']} subtitle="Largest expenses in recent history" title="Largest Transactions">
       {data.map((row, i) => (
         <tr key={i} className="hover:bg-gray-50 transition-colors">
           <td className="py-3 text-gray-500 text-xs">{row.posting_date}</td>
@@ -140,8 +115,24 @@ export const LargestTransactionsWidget = () => {
 };
 
 export const TopAccountsWidget = () => {
-  const activeTx = useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => getTopAccounts(activeTx), [activeTx]);
+  const balances = useKingdomStore(s => s.analytics?.balances || []);
+  const flatMatrix = useKingdomStore(s => s.flatMatrix || []);
+
+  const data = useMemo(() => {
+    return balances
+      .filter(b => b.account && b.account.startsWith('1') && b.balance > 0)
+      .map(b => {
+        const matrixInfo = flatMatrix.find(m => m.code === b.account) || {};
+        return {
+          account: b.account,
+          entity: matrixInfo.entity || matrixInfo.account_name || b.account,
+          balance: b.balance
+        };
+      })
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 5);
+  }, [balances, flatMatrix]);
+
   return (
     <TableCard headers={['Code', 'Institution', 'Current Balance']} subtitle="Largest capital reserves by balance" title="Top 5 Accounts">
       {data.map((row, i) => (

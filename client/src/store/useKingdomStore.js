@@ -44,13 +44,14 @@ export const useKingdomStore = create((set, get) => ({
     net_vault_cash: 0
   },
 
-  // NEW: State for the aggregated views (Phase 1 Database Optimization)
+  // State for the aggregated views (Phase 1 Database Optimization)
   analytics: {
     monthly: [],
     category: [],
     entity: [],
     cumulative: [],
-    daily: []
+    daily: [],
+    balances: [] // NOVA ADIÇÃO: Armazena os saldos reais das contas
   },
 
   // ==========================================
@@ -59,30 +60,24 @@ export const useKingdomStore = create((set, get) => ({
   initAuth: () => {
     const loadSessionUser = async (session) => {
       if (session?.user) {
-        // 1. Lock the user into state FIRST
         set({ user: session.user, email: session.user.email });
         
-        // 2. Safely hydrate the dashboard now that the user ID is confirmed
         await get().fetchKingdomData(session.user.id);
         await get().fetchFlatMatrix();
         await get().fetchDashboardMetrics();
         
-        // Hydrate store transactions and the new optimized analytics views
         await get().fetchTransactions();
         await get().fetchAnalytics(); 
       } else {
-        // Purge state if no valid session is found (e.g., logged out)
         set({ user: null, email: 'guest@medieval.stuff' });
         get().resetStore();
       }
     };
 
-    // Initial check on app mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       loadSessionUser(session);
     });
 
-    // Listen for changes (login/logout/token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       loadSessionUser(session);
     });
@@ -160,7 +155,6 @@ export const useKingdomStore = create((set, get) => ({
     }
   },
 
-  // NEW: Fetch all optimized views in parallel
   fetchAnalytics: async () => {
     const userId = get().user?.id;
     if (!userId) return;
@@ -172,13 +166,15 @@ export const useKingdomStore = create((set, get) => ({
         { data: category },
         { data: entity },
         { data: cumulative },
-        { data: daily }
+        { data: daily },
+        { data: balances } // NOVA ADIÇÃO: Fetch dos saldos
       ] = await Promise.all([
         supabase.from('vw_monthly_analytics').select('*').order('month_date', { ascending: true }),
         supabase.from('vw_category_balances').select('*'),
         supabase.from('vw_entity_exposure').select('*'),
         supabase.from('vw_cumulative_trends').select('*').order('month_date', { ascending: true }),
-        supabase.from('vw_daily_analytics').select('*').order('day_date', { ascending: true })
+        supabase.from('vw_daily_analytics').select('*').order('day_date', { ascending: true }),
+        supabase.from('vw_account_balances').select('*') // O novo endpoint da base de dados
       ]);
 
       set({
@@ -187,7 +183,8 @@ export const useKingdomStore = create((set, get) => ({
           category: category || [],
           entity: entity || [],
           cumulative: cumulative || [],
-          daily: daily || []
+          daily: daily || [],
+          balances: balances || []
         }
       });
     } catch (err) {
@@ -255,7 +252,6 @@ export const useKingdomStore = create((set, get) => ({
       origin: payload.origin || 'Web Client'
     };
 
-    // OPTIMISTIC UI: Create a fake transaction and inject it instantly
     const tempId = `temp-${Date.now()}`;
     const optimisticTx = { ...formattedPayload, id: tempId };
     
@@ -273,14 +269,12 @@ export const useKingdomStore = create((set, get) => ({
 
       toast.success('Transaction logged successfully.');
 
-      // Replace the temp ID with the real database transaction
       if (data && data[0]) {
         set((state) => ({
           transactions: state.transactions.map(t => t.id === tempId ? data[0] : t)
         }));
       }
 
-      // Sync state and optimized views in the background
       get().fetchDashboardMetrics();
       get().fetchAnalytics();
       
@@ -288,7 +282,6 @@ export const useKingdomStore = create((set, get) => ({
     } catch (err) {
       console.error('Failed to add transaction:', err);
       
-      // OPTIMISTIC UI REVERT: Remove the fake transaction on failure
       set((state) => ({
         transactions: state.transactions.filter(t => t.id !== tempId)
       }));
@@ -320,7 +313,6 @@ export const useKingdomStore = create((set, get) => ({
         }));
       }
 
-      // Sync state and server metrics on success
       get().fetchDashboardMetrics();
       get().fetchAnalytics();
 
@@ -334,7 +326,6 @@ export const useKingdomStore = create((set, get) => ({
   },
 
   deleteTransaction: async (id) => {
-    // OPTIMISTIC UI: Remove it immediately before DB confirms
     const previousTransactions = get().transactions;
     set((state) => ({
       transactions: state.transactions.filter((t) => t.id !== id)
@@ -348,14 +339,12 @@ export const useKingdomStore = create((set, get) => ({
 
       if (error) throw error;
 
-      // Sync state and server metrics on success
       get().fetchDashboardMetrics();
       get().fetchAnalytics();
 
       return { success: true };
     } catch (err) {
       console.error('Error deleting transaction:', err);
-      // REVERT: Put it back if it failed
       set({ transactions: previousTransactions });
       toast.error('Failed to delete transaction.');
       throw err;
@@ -415,7 +404,8 @@ export const useKingdomStore = create((set, get) => ({
       category: [],
       entity: [],
       cumulative: [],
-      daily: []
+      daily: [],
+      balances: []
     }
   })
 }));

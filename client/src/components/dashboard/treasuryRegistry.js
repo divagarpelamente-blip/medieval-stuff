@@ -118,6 +118,7 @@ export const TREASURY_WIDGETS = {
     component: AssetAllocationChart, 
     description: "Current distribution of assets.", 
     category: "charts", 
-    layout: { w: 4, h: 3, minW: 3, maxW: 6, minH: 3, maxH: 5 } 
+    // Foi alterado o minW: 2 e minH: 2
+    layout: { w: 4, h: 3, minW: 2, maxW: 6, minH: 2, maxH: 5 } 
   }
 };
