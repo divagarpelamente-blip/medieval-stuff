@@ -4,10 +4,10 @@ import { useKingdomStore } from '../../store/useKingdomStore';
 const formatValue = (val, isPercentage = false, suffix = '', isDelta = false) => {
   const num = Number(val) || 0;
   const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
+  
   let baseStr = num < 0 ? `(${formattedNum})` : formattedNum;
   if (isDelta && num > 0) baseStr = `+${baseStr}`;
-
+  
   let finalStr = baseStr;
   if (isPercentage) finalStr += '%';
   if (suffix) finalStr += ` ${suffix}`;
@@ -35,74 +35,82 @@ const RatioCard = ({ title, subtitle, valueStr, tag }) => (
 
 // Engine de cálculo centralizado para as rácios da Fase 3
 const useAllRatios = () => {
-  const activeTx = useKingdomStore(s => s.transactions || []);
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const monthlyView = useKingdomStore(s => s.analytics?.monthly || []);
+  const cumulativeView = useKingdomStore(s => s.analytics?.cumulative || []);
   const metrics = useKingdomStore(s => s.dashboardMetrics);
 
   return useMemo(() => {
+    // 1. Aggregate Global Totals (Full History)
     let totalIncome = 0;
     let totalExpenses = 0;
-    let debtOutflows = 0;
-
-    const monthlyMap = {};
-    const netMap = {};
-
-    activeTx.forEach(t => {
-      const amt = Number(t.amount) || 0;
-      const target = t.target_account || '';
-      const source = t.source_account || '';
-      const month = t.posting_date?.slice(0, 7) || 'Unknown';
-
-      if (!monthlyMap[month]) monthlyMap[month] = { exp: 0 };
-      if (!netMap[month]) netMap[month] = { net: 0 };
-
-      if (t.type === 'Income') totalIncome += amt;
-      if (t.type === 'Expenses') {
-        totalExpenses += amt;
-        monthlyMap[month].exp += amt;
-      }
-
-      // Debt outflow: source is asset ('1'), target is debt ('2')
-      if (source.startsWith('1') && target.startsWith('2')) debtOutflows += amt;
-
-      // Net worth trends (to calculate delta)
-      if (target.startsWith('1')) netMap[month].net += amt;
-      if (source.startsWith('1')) netMap[month].net -= amt;
-      if (target.startsWith('2')) netMap[month].net -= amt;
-      if (source.startsWith('2')) netMap[month].net += amt;
+    
+    categoryView.forEach(row => {
+      const amt = Number(row.total_volume) || 0;
+      if (row.type === 'Income') totalIncome += amt;
+      if (row.type === 'Expenses') totalExpenses += amt;
     });
 
-    const activeMonthsCount = Object.keys(monthlyMap).length || 1;
+    // 2. Period-over-Period (PoP) Expense Variance
+    const expByMonth = {};
+    monthlyView.forEach(row => {
+      if (row.type === 'Expenses') {
+        expByMonth[row.month_date] = Number(row.total_amount);
+      }
+    });
+    
+    const sortedExpMonths = Object.keys(expByMonth).sort();
+    let expenseVariancePop = 0;
+    
+    if (sortedExpMonths.length >= 2) {
+      const currentMonth = sortedExpMonths[sortedExpMonths.length - 1];
+      const priorMonth = sortedExpMonths[sortedExpMonths.length - 2];
+      
+      const currentExp = expByMonth[currentMonth] || 0;
+      const priorExp = expByMonth[priorMonth] || 0;
+      
+      expenseVariancePop = priorExp > 0 ? ((currentExp - priorExp) / priorExp) * 100 : 0;
+    }
+
+    // 3. Month-over-Month Wealth Variance
+    const netByMonth = {};
+    cumulativeView.forEach(row => {
+      const date = row.month_date;
+      const amt = Number(row.cumulative_amount) || 0;
+      if (!netByMonth[date]) netByMonth[date] = 0;
+      
+      if (row.type === 'Assets') netByMonth[date] += amt;
+      if (row.type === 'Liabilities') netByMonth[date] -= amt;
+    });
+
+    const sortedNetMonths = Object.keys(netByMonth).sort();
+    let monthlyWealthVariance = 0;
+    
+    if (sortedNetMonths.length >= 2) {
+      const currentMonth = sortedNetMonths[sortedNetMonths.length - 1];
+      const priorMonth = sortedNetMonths[sortedNetMonths.length - 2];
+      monthlyWealthVariance = (netByMonth[currentMonth] || 0) - (netByMonth[priorMonth] || 0);
+    }
+
+    // 4. Compute Final Ratios
+    const activeMonthsCount = sortedExpMonths.length || 1;
     const avgMonthlyExpense = totalExpenses / activeMonthsCount;
-    const avgDailyExpense = totalExpenses / (activeMonthsCount * 30.44);
+    const avgDailyExpense = avgMonthlyExpense / 30.44;
 
     const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
     const burnRate = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
-    const dtiRatio = totalIncome > 0 ? (debtOutflows / totalIncome) * 100 : 0;
     const debtRatio = metrics.total_assets > 0 ? (metrics.total_liabilities / metrics.total_assets) * 100 : 0;
     const survivalMonths = avgMonthlyExpense > 0 ? (metrics.net_vault_cash || 0) / avgMonthlyExpense : 0;
-
-    // Variances based on sorted chronologic trends
-    const sortedMonths = Object.keys(monthlyMap).sort();
-    let expenseVariancePop = 0;
-    let monthlyWealthVariance = 0;
-
-    if (sortedMonths.length >= 2) {
-      const currentMonth = sortedMonths[sortedMonths.length - 1];
-      const priorMonth = sortedMonths[sortedMonths.length - 2];
-
-      const currentExp = monthlyMap[currentMonth].exp;
-      const priorExp = monthlyMap[priorMonth].exp;
-      expenseVariancePop = priorExp > 0 ? ((currentExp - priorExp) / priorExp) * 100 : 0;
-
-      monthlyWealthVariance = netMap[currentMonth].net - netMap[priorMonth].net;
-    }
+    
+    // DTI Ratio defaults to 0 unless explicit debt payments are tracked
+    const dtiRatio = 0; 
 
     return {
       avgMonthlyExpense, avgDailyExpense, survivalMonths,
       savingsRate, burnRate, dtiRatio, debtRatio,
       monthlyWealthVariance, expenseVariancePop
     };
-  }, [activeTx, metrics]);
+  }, [categoryView, monthlyView, cumulativeView, metrics]);
 };
 
 // HOC to inject data
@@ -112,7 +120,7 @@ const withRatioData = (kpiKey, title, subtitle, tag, options = {}) => {
     const rawValue = ratios[kpiKey] || 0;
     const valueStr = formatValue(rawValue, options.isPercentage, options.suffix, options.isDelta);
 
-    return <RatioCard subtitle={subtitle} tag={tag} title={title} valueStr={valueStr} />;
+    return <RatioCard subtitle={subtitle} tag={tag} title={title} valueStr={valueStr}/>;
   };
 };
 
