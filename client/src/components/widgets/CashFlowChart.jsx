@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useKingdomStore } from '../../store/useKingdomStore';
 import { generateCashFlowData } from '../../utils/chartAnalytics';
@@ -22,21 +22,50 @@ export default function CashFlowChart() {
 
   const formatGP = (val) => `${Number(val).toLocaleString()} GP`;
 
+  // Spatial Sensor Logic
+  const containerRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width < 350 || entry.contentRect.height < 280) {
+          setIsCompact(true);
+        } else {
+          setIsCompact(false);
+        }
+      }
+    });
+
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="w-full h-full min-h-[380px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Income vs Expenses</h3>
-          <p className="text-xs text-gray-400 mt-1">Historical evolution of all Income vs Expenses</p>
+    <div 
+      ref={containerRef}
+      className={`w-full h-full min-h-0 flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-all duration-200 ${isCompact ? 'p-3 gap-2' : 'p-6 gap-6'}`}
+    >
+      <div className={`flex ${isCompact ? 'flex-row items-center' : 'flex-col sm:flex-row sm:items-center'} justify-between ${isCompact ? 'gap-2' : 'gap-4'} shrink-0`}>
+        <div className="shrink-0 overflow-hidden pr-2">
+          <h3 className={`font-sans font-semibold tracking-wide text-gray-500 uppercase truncate ${isCompact ? 'text-[10px] mb-0' : 'text-sm'}`}>
+            Income vs Expenses
+          </h3>
+          {!isCompact && (
+            <p className="text-xs text-gray-400 mt-1 truncate">Historical evolution of all Income vs Expenses</p>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-600 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Avg Inflow: {Number(Math.abs(stats.avgIncome).toFixed(0)).toLocaleString()}
+        
+        <div className={`flex items-center ${isCompact ? 'gap-1.5' : 'gap-3'} shrink-0`}>
+          <div className={`flex items-center gap-1.5 rounded bg-emerald-50 border border-emerald-200 font-semibold text-emerald-600 font-mono ${isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-3 py-1.5 text-xs'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            {!isCompact && <span>Avg Inflow:</span>}
+            {Number(Math.abs(stats.avgIncome).toFixed(0)).toLocaleString()}
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-600 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            Avg Outflow: {Number(Math.abs(stats.avgExpense).toFixed(0)).toLocaleString()}
+          <div className={`flex items-center gap-1.5 rounded bg-rose-50 border border-rose-200 font-semibold text-rose-600 font-mono ${isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-3 py-1.5 text-xs'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+            {!isCompact && <span>Avg Outflow:</span>}
+            {Number(Math.abs(stats.avgExpense).toFixed(0)).toLocaleString()}
           </div>
         </div>
       </div>

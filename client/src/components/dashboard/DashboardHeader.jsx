@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // FIX: Imported useEffect
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { Sliders, Check, X, Loader2 } from 'lucide-react';
 
@@ -14,7 +14,6 @@ export default function DashboardHeader() {
     setActiveSubmenu
   } = useDashboardStore();
 
-  // Inject a blank spacer cell at index 3 to force a clean 3-top, 4-bottom wrap sequence
   const gridItems = React.useMemo(() => {
     const items = [...submenus];
     if (items.length >= 3) {
@@ -23,7 +22,6 @@ export default function DashboardHeader() {
     return items;
   }, [submenus]);
 
-  // Intercept configuration mode toggling (Sliders Trigger)
   const handleToggleEditMode = async () => {
     if (isEditingLayout && hasUnsavedChanges) {
       const confirmSave = window.confirm(
@@ -36,7 +34,6 @@ export default function DashboardHeader() {
     toggleEditMode(!isEditingLayout);
   };
 
-  // Intercept manual draft discarding
   const handleDismissDraft = async () => {
     if (isEditingLayout && hasUnsavedChanges) {
       const confirmSave = window.confirm(
@@ -49,7 +46,6 @@ export default function DashboardHeader() {
     toggleEditMode(false);
   };
 
-  // Intercept circular exit controller clicks - Unconditionally prompt on exit
   const handleExitDashboard = async () => {
     const confirmSave = window.confirm(
       "Do you want to save your current layout before exiting?\n\nPress OK to Save and Exit, or Cancel to discard changes and exit."
@@ -62,11 +58,30 @@ export default function DashboardHeader() {
     window.dispatchEvent(new CustomEvent('close-dashboard'));
   };
 
+  /* FIX: New Listener Hook for Escape and Outside Clicks */
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleExitDashboard();
+      }
+    };
+
+    const handleOutsideClick = () => {
+      handleExitDashboard();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('trigger-dashboard-exit', handleOutsideClick);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('trigger-dashboard-exit', handleOutsideClick);
+    };
+  }, [isEditingLayout, hasUnsavedChanges]); // Binds to latest state
+
   return (
     <header className="w-full h-16 shrink-0 bg-[#faf4e5]/90 backdrop-blur-sm border-b border-[#8b4513]/25 px-6 flex items-center justify-between z-30 shadow-sm select-none">
-      {/* Left/Center Section: Title, Sliders Trigger, Submenus Tab Row Grid */}
       <div className="flex items-center gap-6 overflow-hidden flex-grow mr-4">
-        {/* Global Title Reading Area */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="w-2.5 h-2.5 rounded-full bg-[#ffd700] animate-pulse shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
           <span className="font-serif text-sm font-bold tracking-widest text-[#4b2c20] uppercase">
@@ -74,10 +89,8 @@ export default function DashboardHeader() {
           </span>
         </div>
 
-        {/* Separator Line */}
         <div className="h-6 w-px bg-[#8b4513]/20 shrink-0" />
 
-        {/* Configuration symbol to the left of the tab navigation */}
         <button
           onClick={handleToggleEditMode}
           disabled={isLoading || isSaving}
@@ -91,10 +104,8 @@ export default function DashboardHeader() {
           <Sliders size={20} className={isEditingLayout ? 'drop-shadow-[0_0_8px_rgba(139,69,19,0.5)]' : ''} />
         </button>
 
-        {/* Resilient fixed-width navigation container protecting buttons from wrapping or clipping */}
         <nav className="grid grid-cols-4 gap-2 w-[640px] shrink-0 py-0.5">
           {gridItems.map((tab) => {
-            // Render an empty grid spacer to naturally separate top row and bottom row
             if (tab.isSpacer) {
               return <div key={tab.id} className="col-span-1" />;
             }
@@ -133,9 +144,7 @@ export default function DashboardHeader() {
         </nav>
       </div>
 
-      {/* Right-Hand Controls Action Container */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Persistent Loader Overlay */}
         {(isLoading || isSaving) && (
           <div className="flex items-center gap-2 text-[#5d4037] font-mono text-xs border border-[#8b4513]/20 px-2 py-1.5 rounded bg-[#f4e4bc]">
             <Loader2 className="animate-spin text-[#8b4513]" size={14} />
@@ -145,7 +154,6 @@ export default function DashboardHeader() {
 
         {isEditingLayout && (
           <>
-            {/* Cancel Changes */}
             <button
               onClick={handleDismissDraft}
               disabled={isSaving || isLoading}
@@ -155,7 +163,6 @@ export default function DashboardHeader() {
               Dismiss Draft
             </button>
 
-            {/* Commit Changes */}
             <button
               onClick={() => saveDraftToProduction()}
               disabled={isSaving || isLoading}
@@ -167,7 +174,6 @@ export default function DashboardHeader() {
           </>
         )}
 
-        {/* Circular Exit Control Button: Red background with centered yellow 'X' */}
         <button
           onClick={handleExitDashboard}
           title="Exit Command Dashboard"

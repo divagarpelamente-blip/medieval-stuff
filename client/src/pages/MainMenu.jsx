@@ -9,21 +9,17 @@ import bgImage from '../assets/Medieval_Town_Backround.jfif';
 /**
  * MainMenu Component (V2.0 Core Shell)
  * 
- * Acting as the primary cinematic landing and routing shell of Eldoria V2.0.
- * Restricts viewport bounds to a strict, non-collapsible "Modern Dashboard" wrapper.
- * Spans the background image across the outer dynamic height void to prevent distortion,
- * and hosts the modular controllers inside the centered inner canvas.
+ * Simulated Device Wrapper (Landscape Only).
+ * Forces the UI into iPad (Tablet) or iPhone (Phone) horizontal aspect ratios.
  */
 export default function MainMenu() {
   const store = useKingdomStore();
-  
-  // FIX: Updated to match the actual function name in useKingdomStore.js
   const fetchFlatMatrix = store?.fetchFlatMatrix;
 
   const [activeModal, setActiveModal] = useState(null);
+  const [viewMode, setViewMode] = useState('tablet'); // Initialize default to Tablet
 
   useEffect(() => {
-    // FIX: Replaced fetchChartOfAccounts with fetchFlatMatrix
     if (fetchFlatMatrix) {
       fetchFlatMatrix();
     }
@@ -50,19 +46,72 @@ export default function MainMenu() {
 
   const currentMeta = activeModal ? modalMetadata[activeModal] : null;
 
+  // Resolves the CSS boundaries for the simulated device screen (Horizontal/Landscape)
+  const getViewClasses = () => {
+    switch (viewMode) {
+      case 'phone': 
+        // iPhone Landscape standard bounds
+        return 'w-full max-w-[844px] h-[390px] max-h-[95dvh] border-y-4 border-x-[16px] rounded-[2.5rem] border-stone-900 shadow-[0_0_80px_rgba(0,0,0,0.8)]';
+      case 'tablet': 
+      default: 
+        // iPad Landscape standard bounds
+        return 'w-full max-w-[1180px] h-[820px] max-h-[95dvh] border-y-4 border-x-[16px] rounded-3xl border-stone-900 shadow-[0_0_80px_rgba(0,0,0,0.8)]';
+    }
+  };
+
   return (
-    <div
-      className="w-full h-dvh bg-black flex justify-center overflow-hidden"
-      style={{
-        backgroundImage: `radial-gradient(ellipse at center, rgba(12, 10, 9, 0.4) 0%, rgba(9, 8, 8, 0.95) 100%), url(${bgImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
-      }}
-    >
-      <div className="relative w-full max-w-7xl h-full mx-auto text-stone-100 flex flex-col justify-between font-serif overflow-hidden">
+    // Outer Monitor Void
+    <div className="w-full h-dvh bg-stone-950 flex items-center justify-center overflow-hidden">
+      
+      {/* Simulated Device Screen (Using @container for future widget queries) */}
+      <div 
+        className={`relative mx-auto text-stone-100 flex flex-col justify-between font-serif overflow-hidden transition-all duration-500 ease-in-out @container ${getViewClasses()}`}
+        style={{
+          backgroundImage: `radial-gradient(ellipse at center, rgba(12, 10, 9, 0.4) 0%, rgba(9, 8, 8, 0.95) 100%), url(${bgImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        
+        {/* Avatar & View Toggle HUD - Hidden when a module is open */}
+        {activeModal === null && (
+          <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4">
+            {/* Avatar Profile Row */}
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-stone-800 border-2 border-amber-600/60 shadow-[0_0_15px_rgba(217,119,6,0.3)] flex items-center justify-center overflow-hidden">
+                <img 
+                  src="https://api.dicebear.com/7.x/adventurer/svg?seed=Proudmore&backgroundColor=transparent" 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover scale-110" 
+                />
+              </div>
+              <span className="font-black text-amber-50 tracking-widest uppercase text-sm drop-shadow-md">
+                Proudmore
+              </span>
+            </div>
+            
+            {/* Viewport Simulation Controls */}
+            <div className="flex bg-stone-900/80 p-1 rounded-lg border border-amber-900/40 backdrop-blur-sm shadow-lg">
+              {['tablet', 'phone'].map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded transition-colors ${
+                    viewMode === mode 
+                      ? 'bg-amber-700/80 text-amber-100 font-bold shadow-inner' 
+                      : 'text-stone-400 hover:text-amber-200 hover:bg-stone-800/80'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <main className="flex-grow flex flex-col items-center justify-end px-4 pb-16 z-10 w-full min-h-0">
           {activeModal === null ? (
-            <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in">
+            <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in flex-wrap">
               <button onClick={() => setActiveModal('quests')} title="Quests" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">⚔️</button>
               <button onClick={() => setActiveModal('achievements')} title="Achievements" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏆</button>
               <button onClick={() => setActiveModal('treasury')} title="Treasury" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏦</button>
@@ -72,9 +121,17 @@ export default function MainMenu() {
           ) : activeModal === 'treasury' ? (
             <TreasuryController onClose={() => setActiveModal(null)} />
           ) : activeModal === 'dashboard' ? (
-            /* LAUNCH THE NEW V2.1 DASHBOARD ENGINE IN PRODUCTION MODE - FIXED MARGINS */
-            <div className="absolute top-4 bottom-4 left-2 right-2 md:top-8 md:bottom-8 md:left-6 md:right-6 z-50 bg-stone-950 rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(0,0,0,0.95)] border border-amber-900/60">
-              <Dashboard />
+            /* Dashboard Clickable Backdrop Wrapper */
+            <div 
+              className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => window.dispatchEvent(new CustomEvent('trigger-dashboard-exit'))}
+            >
+              <div 
+                className="absolute top-4 bottom-4 left-2 right-2 md:top-6 md:bottom-6 md:left-6 md:right-6 bg-stone-950 rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(0,0,0,0.95)] border border-amber-900/60"
+                onClick={(e) => e.stopPropagation()} /* Prevents clicks inside the dashboard from closing it */
+              >
+                <Dashboard />
+              </div>
             </div>
           ) : activeModal === 'settings' ? (
             <SettingsController onClose={() => setActiveModal(null)} />
@@ -87,6 +144,7 @@ export default function MainMenu() {
             </Modal>
           )}
         </main>
+
       </div>
     </div>
   );

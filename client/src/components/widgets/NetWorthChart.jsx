@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useKingdomStore } from '../../store/useKingdomStore';
 import { generateNetTrendData } from '../../utils/chartAnalytics';
@@ -21,17 +21,45 @@ export default function NetWorthChart() {
     return num < 0 ? `${formatted} GP (Deficit)` : `${formatted} GP`;
   };
 
+  // Spatial Sensor Logic
+  const containerRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width < 350 || entry.contentRect.height < 280) {
+          setIsCompact(true);
+        } else {
+          setIsCompact(false);
+        }
+      }
+    });
+
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="w-full h-full min-h-[380px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Asset Growth Trend</h3>
-          <p className="text-xs text-gray-400 mt-1">Tracks the total accumulated balance and financial position.</p>
+    <div 
+      ref={containerRef}
+      className={`w-full h-full min-h-0 flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-all duration-200 ${isCompact ? 'p-3 gap-2' : 'p-6 gap-6'}`}
+    >
+      <div className={`flex ${isCompact ? 'flex-row items-center' : 'flex-col sm:flex-row sm:items-center'} justify-between ${isCompact ? 'gap-2' : 'gap-4'} shrink-0`}>
+        <div className="shrink-0 overflow-hidden pr-2">
+          <h3 className={`font-sans font-semibold tracking-wide text-gray-500 uppercase truncate ${isCompact ? 'text-[10px] mb-0' : 'text-sm'}`}>
+            Asset Growth Trend
+          </h3>
+          {!isCompact && (
+            <p className="text-xs text-gray-400 mt-1 truncate">Tracks the total accumulated balance and financial position.</p>
+          )}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-600 animate-pulse" />
-            Current Position: {formatAbsoluteGP(currentNet)}
+        
+        <div className={`flex items-center ${isCompact ? 'gap-1.5' : 'gap-3'} shrink-0`}>
+          <div className={`flex items-center gap-1.5 rounded bg-gray-100 border border-gray-200 font-semibold text-gray-700 font-mono ${isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-3 py-1.5 text-xs'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-600 animate-pulse shrink-0" />
+            {!isCompact && <span>Current Position:</span>}
+            {formatAbsoluteGP(currentNet)}
           </div>
         </div>
       </div>
