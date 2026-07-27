@@ -1,0 +1,62 @@
+Architecture Flow: Data Entry to Dashboard Display
+This document outlines the intended lifecycle of a transaction within the application, utilizing Zustand for state management and Supabase for backend processing.
+
+1. Application Initialization (The Ignition)
+The flow begins the moment the user opens the application, before the dashboard is even rendered.
+
+Mounting: App.jsx is rendered.
+
+Auth Handshake: App.jsx calls initAuth() from useKingdomStore.
+
+Session Validation: Zustand asks Supabase for the current active session.
+
+Data Hydration: Once the user.id is confirmed, initAuth automatically triggers a batch of fetch requests:
+
+fetchTransactions() (Gets raw ledger data)
+
+fetchDashboardMetrics() (Gets top-level KPIs via RPC)
+
+fetchAnalytics() (Gets pre-calculated chart data from Views)
+
+fetchKingdomData() (Gets Gamification stats)
+
+UI Unblocking: Only after the user is validated does App.jsx allow the Dashboard component to render.
+
+2. Data Entry & Optimistic UI (The Input)
+When the user submits a new transaction via the UI (e.g., clicking "Add Transaction").
+
+Payload Creation: The UI sends the raw data (amount, type, category, etc.) to the addTransaction function in useKingdomStore.
+
+Optimistic Update: Zustand immediately creates a temporary ID for the transaction and injects it into the local state (transactions array) so the UI feels instant.
+
+Database Insertion: Zustand sends a POST request to the Supabase transactions table.
+
+Critical Rule: The payload attaches the user.id as the profile_id.
+
+Data Sync: Upon successful database insertion, addTransaction forces the application to fetch the latest server-side aggregations by triggering:
+
+fetchDashboardMetrics()
+
+fetchAnalytics()
+
+3. Server-Side Aggregation (The Engine)
+Once the raw transaction hits the database, the frontend does not do the math. The database handles the heavy lifting.
+
+Row Level Security (RLS): Supabase intercepts the query. It checks if the profile_id on the transaction matches the authenticated user requesting it. If it doesn't, Supabase hides the row entirely.
+
+RPC Calculation: The get_dashboard_metrics Remote Procedure Call calculates total_assets, total_liabilities, and net_worth directly on the server for that specific user.
+
+SQL Views: The database automatically updates its materialized views or standard views (e.g., vw_monthly_analytics, vw_category_balances, vw_account_balances) based on the new raw data.
+
+4. Dashboard Rendering (The Output)
+How the visual components consume the prepared data.
+
+Dashboard Mounts: Dashboard.jsx renders the layout shell and calls hydrateLayouts() to position the widgets on the grid.
+
+Widget Subscription: Individual widgets inside DashboardCanvas (e.g., a Bar Chart or a KPI Card) subscribe to specific slices of the Zustand store.
+
+A KPI widget reads from state.dashboardMetrics.total_assets.
+
+A Chart widget reads from state.analytics.monthly.
+
+Reactive UI: Because the components are hooked into Zustand, any time fetchAnalytics() finishes pulling new data from Supabase, the store updates, and the widgets instantly re-render with the new numbers.

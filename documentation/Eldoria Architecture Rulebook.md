@@ -119,4 +119,17 @@ Gamification updates (Ouro, XP, Levels) are processed securely in the background
 * **Supabase Webhooks**: Configured to capture new insertions into the `transactions` table.
 * **Edge Functions**: A Deno Edge Function (`process-gamification`) handles calculations server-side, verifying data, calculating modifiers, and securely updating profiles via the `increment_gamification_stats` RPC using an admin key.
 
+---
+
+## **6. Dashboard Layout Persistence & RLS Requirements**
+
+### **Layout Configurations**
+* **Primary Sync**: Dashboard preferences and drag-and-drop coordinate arrays are stored inside the `dashboard_layouts` jsonb column in `public.profiles`.
+* **Local Fallback**: If the user's connection to Supabase fails or a profile cannot be resolved, the application must fall back to a localized storage cache (`localStorage` item `eldoria_dashboard_layouts`) to prevent blank layouts.
+
+### **RLS & Seeding Dependencies**
+* **Chart of Accounts (`dim_contas`)**: Requires RLS select policies that permit authenticated or anonymous read access so the application can populate initial menus and dropdowns.
+* **Transaction Safety**: Because the `transactions` table enforces foreign keys on `target_account` and `source_account` pointing to `dim_contas.code`, the Chart of Accounts must be pre-populated (seeded) in the database before transactions can be successfully logged.
+
+
 

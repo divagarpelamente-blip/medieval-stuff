@@ -11,6 +11,7 @@ erDiagram
         bigint xp
         bigint level
         varchar_50 role
+        jsonb dashboard_layouts
     }
     dim_contas {
         varchar_8 code PK
@@ -101,7 +102,18 @@ The transactional ledger table containing all double-entry coin movements and ac
 
 ## 3. Table: `public.profiles` (User Kingdom Profile)
 
-Stores gamification progress and player statistics synced dynamically with treasury events.
+Stores gamification progress and player statistics synced dynamically with treasury events, as well as layout preferences.
+
+### Column Definitions
+| Column Name | Data Type | Nullable | Default | Description / Constraints |
+| :--- | :--- | :--- | :--- | :--- |
+| **`id`** (PK) | `uuid` | No | *None* | Primary Key. References the authenticated user auth.uid(). |
+| `gold` | `bigint` | No | `0` | Player's accumulated gold coins. |
+| `gems` | `bigint` | No | `100` | Player's accumulated gems. |
+| `xp` | `bigint` | No | `0` | Player's accumulated experience points. |
+| `level` | `bigint` | No | `1` | Player's calculated level. |
+| `role` | `character varying(50)` | No | `'lord'` | Role in the kingdom (e.g. `'lord'`). |
+| `dashboard_layouts` | `jsonb` | Yes | *None* | JSON object storing layout and submenu preferences for the dashboard. |
 
 ---
 
@@ -111,23 +123,27 @@ To optimize frontend performance, heavy double-entry calculations are moved serv
 
 ### `vw_monthly_analytics`
 *   **Purpose**: Groups and sums cash inflows and outflows per month.
-*   **Columns**: `month_date` (Date), `type` (Normalized Type), `total_amount` (Numeric).
+*   **Columns**: `profile_id` (UUID), `month_date` (Date), `type` (Normalized Type), `total_amount` (Numeric).
 
 ### `vw_cumulative_trends`
 *   **Purpose**: Tracks running totals of assets, liabilities, and cumulative flow balances.
-*   **Columns**: `month_date` (Date), `type` (Assets/Liabilities/Income/Expenses), `cumulative_amount` (Numeric).
+*   **Columns**: `profile_id` (UUID), `month_date` (Date), `type` (Assets/Liabilities/Income/Expenses), `cumulative_amount` (Numeric).
 
 ### `vw_category_balances`
 *   **Purpose**: Groups transactional volumes of specific classes by category or subtype.
-*   **Columns**: `type` (Assets/Liabilities/Income/Expenses), `category` (Text), `total_volume` (Numeric).
+*   **Columns**: `profile_id` (UUID), `type` (Assets/Liabilities/Income/Expenses), `category` (Text), `total_volume` (Numeric).
 
 ### `vw_entity_exposure`
 *   **Purpose**: Lists asset and expense concentration balances grouped by counterparty.
-*   **Columns**: `type` (Assets/Expenses), `entity` (Text), `total_volume` (Numeric), `transaction_count` (BigInt).
+*   **Columns**: `profile_id` (UUID), `type` (Assets/Expenses), `entity` (Text), `total_volume` (Numeric), `transaction_count` (BigInt).
 
 ### `vw_daily_analytics`
 *   **Purpose**: Groups transactional events per single day.
-*   **Columns**: `day_date` (Date), `type` (Text), `total_amount` (Numeric).
+*   **Columns**: `profile_id` (UUID), `day_date` (Date), `type` (Text), `total_amount` (Numeric).
+
+### `vw_account_balances`
+*   **Purpose**: Dynamically computes balances for each account and registers them under RLS policies.
+*   **Columns**: `profile_id` (UUID), `account_code` (Text), `account_name` (Text), `balance` (Numeric).
 
 ---
 

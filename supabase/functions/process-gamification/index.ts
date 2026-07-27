@@ -1,3 +1,4 @@
+// 1. Corrected Deno URL Imports
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -5,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const GOLD_MULTIPLIER = 0.1; // Ex: 10% do valor da transação vira ouro
 const XP_PER_TRANSACTION = 50; 
 
-serve(async (req) => {
+serve(async (req: Request) => {
   try {
     // 1. Receber o payload do Webhook (A nova transação)
     const payload = await req.json();
@@ -18,7 +19,7 @@ serve(async (req) => {
     // 2. Inicializar cliente Supabase com permissões de Admin (Service Role)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // 3. Calcular recompensas
@@ -41,7 +42,8 @@ Deno.env.get('SERVICE_ROLE_KEY') ?? ''
 
   } catch (error) {
     console.error("Gamification error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { "Content-Type": "application/json" },
       status: 500,
     });

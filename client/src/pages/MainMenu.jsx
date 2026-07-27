@@ -16,15 +16,18 @@ import bgImage from '../assets/Medieval_Town_Backround.jfif';
  */
 export default function MainMenu() {
   const store = useKingdomStore();
-  const fetchChartOfAccounts = store?.fetchChartOfAccounts;
+  
+  // FIX: Updated to match the actual function name in useKingdomStore.js
+  const fetchFlatMatrix = store?.fetchFlatMatrix;
 
   const [activeModal, setActiveModal] = useState(null);
 
   useEffect(() => {
-    if (fetchChartOfAccounts) {
-      fetchChartOfAccounts();
+    // FIX: Replaced fetchChartOfAccounts with fetchFlatMatrix
+    if (fetchFlatMatrix) {
+      fetchFlatMatrix();
     }
-  }, [fetchChartOfAccounts]);
+  }, [fetchFlatMatrix]);
 
   useEffect(() => {
     const handleCloseDashboard = () => {

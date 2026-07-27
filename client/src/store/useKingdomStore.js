@@ -167,14 +167,14 @@ export const useKingdomStore = create((set, get) => ({
         { data: entity },
         { data: cumulative },
         { data: daily },
-        { data: balances } // NOVA ADIÇÃO: Fetch dos saldos
+        { data: balances }
       ] = await Promise.all([
-        supabase.from('vw_monthly_analytics').select('*').order('month_date', { ascending: true }),
-        supabase.from('vw_category_balances').select('*'),
-        supabase.from('vw_entity_exposure').select('*'),
-        supabase.from('vw_cumulative_trends').select('*').order('month_date', { ascending: true }),
-        supabase.from('vw_daily_analytics').select('*').order('day_date', { ascending: true }),
-        supabase.from('vw_account_balances').select('*') // O novo endpoint da base de dados
+        supabase.from('vw_monthly_analytics').select('*').eq('profile_id', userId).order('month_date', { ascending: true }),
+        supabase.from('vw_category_balances').select('*').eq('profile_id', userId),
+        supabase.from('vw_entity_exposure').select('*').eq('profile_id', userId),
+        supabase.from('vw_cumulative_trends').select('*').eq('profile_id', userId).order('month_date', { ascending: true }),
+        supabase.from('vw_daily_analytics').select('*').eq('profile_id', userId).order('day_date', { ascending: true }),
+        supabase.from('vw_account_balances').select('*').eq('profile_id', userId)
       ]);
 
       set({

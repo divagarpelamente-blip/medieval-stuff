@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { MAX_WIDGETS_PER_TAB, DEFAULT_PRESET } from '../config/dashboard.config';
 import { useKingdomStore } from './useKingdomStore';
+import { supabase } from '../lib/supabaseClient'; // ADDED: Import Supabase client directly
 
 const INITIAL_SUBMENUS = [
   { id: 'insights', name: 'Insights', isVisible: true, isActive: true },
@@ -43,18 +44,17 @@ export const useDashboardStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const kingdomStore = useKingdomStore.getState();
-      const supabase = kingdomStore?.supabase;
-      const profile = kingdomStore?.profile;
+      const user = kingdomStore?.user; // FIXED: Extract user instead of undefined profile/supabase
 
       let loadedPayload = null;
       let databaseQuerySucceeded = false;
 
       // 1. Primary Sync from Supabase profiles schema
-      if (supabase && profile?.id) {
+      if (user?.id) {
         const { data, error } = await supabase
           .from('profiles')
           .select('dashboard_layouts')
-          .eq('id', profile.id)
+          .eq('id', user.id)
           .maybeSingle();
         
         if (!error) {
@@ -162,14 +162,13 @@ export const useDashboardStore = create((set, get) => ({
 
     try {
       const kingdomStore = useKingdomStore.getState();
-      const supabase = kingdomStore?.supabase;
-      const profile = kingdomStore?.profile;
+      const user = kingdomStore?.user; // FIXED: Extract user properly
 
-      if (supabase && profile?.id) {
+      if (user?.id) {
         const { error } = await supabase
           .from('profiles')
           .update({ dashboard_layouts: payload })
-          .eq('id', profile.id);
+          .eq('id', user.id);
 
         if (error) throw error;
       }

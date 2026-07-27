@@ -7,20 +7,21 @@ import { useDashboardStore } from '../store/useDashboardStore';
 export default function Dashboard() {
   const { isEditingLayout, hydrateLayouts } = useDashboardStore();
 
-  // Initialize and hydrate configurations on mount
+  // Apenas hidrata a posição dos cartões na grelha.
+  // (O carregamento dos dados das tabelas acontece no App.jsx em segurança)
   useEffect(() => {
     hydrateLayouts();
   }, [hydrateLayouts]);
 
   return (
     <div className="flex flex-col h-full w-full bg-stone-950 text-stone-200 overflow-hidden font-sans">
-      {/* Top Header Row (Remains fully pinned and stable across sidepanel shifts) */}
+      {/* Top Header Row */}
       <DashboardHeader />
       
       {/* Flexible Workspace Containment Box */}
       <div className="relative flex flex-1 overflow-hidden min-h-0">
         
-        {/* Dynamic Slide Drawer Sidepanel (Rendered first to mount on the left side) */}
+        {/* Dynamic Slide Drawer Sidepanel */}
         <aside 
           className={`
             transition-all duration-300 ease-in-out
@@ -32,7 +33,6 @@ export default function Dashboard() {
             bg-stone-900 z-40 overflow-hidden shrink-0
           `}
         >
-          {/* Inner content wrapper with a fixed width to prevent layout collapsing */}
           <div className="w-80 h-full">
             <SettingsSidebar />
           </div>
