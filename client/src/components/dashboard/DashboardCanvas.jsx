@@ -5,8 +5,12 @@ import 'react-resizable/css/styles.css';
 
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { TREASURY_WIDGETS } from '../../config/treasuryRegistry';
+import { INTERACTIVE_WIDGETS } from '../../config/interactiveRegistry';
 import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
+
+// Merge both registries so the canvas knows how to render any dropped ID
+const ALL_WIDGETS = { ...TREASURY_WIDGETS, ...INTERACTIVE_WIDGETS };
 
 const ResponsiveGridLayout = (props) => {
   const [scale, setScale] = useState(1);
@@ -62,14 +66,12 @@ export default function DashboardCanvas() {
 
   const ignoreLayoutChangeRef = useRef(false);
 
-  // FIX: Properly identify the active tab using the isActive boolean flag
   const currentSubmenu = useMemo(() => {
     return submenus.find((s) => s.isActive) || submenus.find((s) => s.id === 'insights');
   }, [submenus]);
 
   const activeTabId = currentSubmenu ? currentSubmenu.id : 'insights';
 
-  // Strictly isolate currentLayout to the activeTabId
   const currentLayout = useMemo(() => {
     if (isEditingLayout) {
       return Array.isArray(draftLayout[activeTabId]) ? draftLayout[activeTabId] : [];
@@ -91,7 +93,7 @@ export default function DashboardCanvas() {
       .filter((item) => item.i !== 'dropping' && !item.i.includes('__dropping-elem__'))
       .map((item) => {
         const baseId = item.i.split('-')[0];
-        const originalDef = TREASURY_WIDGETS[baseId]?.layout || TREASURY_WIDGETS[item.i]?.layout || {};
+        const originalDef = ALL_WIDGETS[baseId]?.layout || ALL_WIDGETS[item.i]?.layout || {};
         return {
           i: item.i,
           x: item.x,
@@ -170,7 +172,7 @@ export default function DashboardCanvas() {
         >
           {currentLayout.map((item) => {
             const baseId = item.i.split('-')[0];
-            const widget = TREASURY_WIDGETS[baseId] || TREASURY_WIDGETS[item.i];
+            const widget = ALL_WIDGETS[baseId] || ALL_WIDGETS[item.i];
 
             if (!widget) return <div key={item.i} className="hidden" />;
 

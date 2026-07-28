@@ -1,0 +1,299 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useInteractiveStore } from '../../store/useInteractiveStore';
+import { useInteractiveData } from '../../hooks/useInteractiveData';
+import { Loader2, XCircle } from 'lucide-react';
+
+const formatValue = (val) => {
+  const num = Number(val) || 0;
+  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+const FilterBadge = ({ label, onClear }) => (
+  <div className="inline-flex items-center gap-1 bg-amber-900/20 border border-amber-700/50 text-amber-700 px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider ml-2">
+    {label}
+    <button onClick={onClear} className="hover:text-amber-500"><XCircle size={10} /></button>
+  </div>
+);
+
+// Helper Hook to detect if a widget is compressed in the grid (e.g., height: 1 or 2)
+const useWidgetResize = (heightThreshold = 120) => {
+  const [isCompact, setIsCompact] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setIsCompact(entry.contentRect.height < heightThreshold);
+      }
+    });
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [heightThreshold]);
+
+  return { ref, isCompact };
+};
+
+// ==========================================
+// WIDGET 1: Date Range Picker
+// ==========================================
+export const InteractiveDateFilter = () => {
+  const { filters, setFilter } = useInteractiveStore();
+  const { ref, isCompact } = useWidgetResize(110);
+
+  return (
+    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center ${isCompact ? 'p-3' : 'p-5'}`}>
+      {!isCompact && <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-4 shrink-0">Timeframe</h3>}
+      <div className="flex gap-4">
+        <div className="flex-1 flex flex-col gap-1">
+          {!isCompact && <label className="text-[10px] uppercase font-bold text-gray-400">Start Date</label>}
+          <input 
+            type="date" 
+            value={filters.startDate || ''} 
+            onChange={(e) => setFilter('startDate', e.target.value || null)}
+            className="w-full border border-gray-300 rounded p-2 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+          />
+        </div>
+        <div className="flex-1 flex flex-col gap-1">
+          {!isCompact && <label className="text-[10px] uppercase font-bold text-gray-400">End Date</label>}
+          <input 
+            type="date" 
+            value={filters.endDate || ''} 
+            onChange={(e) => setFilter('endDate', e.target.value || null)}
+            className="w-full border border-gray-300 rounded p-2 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// WIDGET 2: Granularity Selector
+// ==========================================
+export const InteractiveGranularity = () => {
+  const { filters, setFilter } = useInteractiveStore();
+  const { ref, isCompact } = useWidgetResize(110);
+  const options = ['Weekly', 'Monthly', 'Quarterly', 'Yearly', 'All Time'];
+
+  return (
+    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+      {!isCompact && <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-4 shrink-0">Grouping</h3>}
+      <div className="flex flex-wrap gap-2 overflow-y-auto">
+        {options.map(opt => (
+          <button
+            key={opt}
+            onClick={() => setFilter('granularity', opt)}
+            className={`flex-1 px-3 py-1.5 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors border whitespace-nowrap min-w-[80px] ${
+              filters.granularity === opt 
+                ? 'bg-amber-900 text-amber-100 border-amber-950 shadow-inner' 
+                : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// WIDGET 3: Payment Status Summary
+// ==========================================
+export const InteractiveStatus = () => {
+  const { data, isLoading } = useInteractiveData();
+  const { filters, setFilter } = useInteractiveStore();
+  const { ref, isCompact } = useWidgetResize(130);
+  
+  const statusData = data?.status_summary || [];
+
+  return (
+    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+      {!isCompact && (
+        <div className="flex items-center mb-4 shrink-0">
+          <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Payment Status</h3>
+          {filters.statusFilter && <FilterBadge label={filters.statusFilter} onClear={() => setFilter('statusFilter', null)} />}
+        </div>
+      )}
+      
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" /></div>
+      ) : (
+        <div className={`flex-1 flex ${isCompact ? 'flex-row' : 'flex-col'} gap-2 justify-center`}>
+          {['Pending', 'Completed'].map(status => {
+            const sum = statusData.find(d => d.name === status)?.value || 0;
+            const isActive = filters.statusFilter === status;
+            return (
+              <button 
+                key={status}
+                onClick={() => setFilter('statusFilter', isActive ? null : status)}
+                className={`flex-1 flex ${isCompact ? 'flex-col justify-center' : 'items-center justify-between'} p-2 rounded-lg border transition-all ${
+                  isActive ? 'border-amber-600 bg-amber-50 ring-1 ring-amber-600' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                }`}
+              >
+                <span className={`font-serif font-bold text-gray-700 ${isCompact ? 'text-[10px] uppercase mb-1' : 'text-sm'}`}>{status}</span>
+                <span className={`font-mono font-bold text-gray-900 ${isCompact ? 'text-sm' : ''}`}>{formatValue(sum)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// WIDGET 4: Arrear Breakdown (Single Row Config)
+// ==========================================
+export const InteractiveArrear = () => {
+  const { data, isLoading } = useInteractiveData();
+  const { filters, setFilter } = useInteractiveStore();
+  const { ref, isCompact } = useWidgetResize(110);
+  
+  const arrearData = data?.arrear_summary || [];
+  
+  const arrearOrder = [
+    { id: 'not yet due', label: 'Not Yet Due', color: 'border-blue-200 bg-blue-50 text-blue-800' },
+    { id: 'due', label: 'Due (< 7 Days)', color: 'border-amber-200 bg-amber-50 text-amber-800' },
+    { id: 'pay today', label: 'Pay Today', color: 'border-orange-300 bg-orange-100 text-orange-900' },
+    { id: 'overdue', label: 'Overdue', color: 'border-red-200 bg-red-50 text-red-800' },
+    { id: 'paid on time', label: 'Paid On Time', color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
+    { id: 'paid overdue', label: 'Paid Overdue', color: 'border-purple-200 bg-purple-50 text-purple-800' }
+  ];
+
+  return (
+    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+      {!isCompact && (
+        <div className="flex items-center mb-4 shrink-0">
+          <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Aging & Arrears</h3>
+          {filters.arrearFilter && <FilterBadge label={filters.arrearFilter} onClear={() => setFilter('arrearFilter', null)} />}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" /></div>
+      ) : (
+        // Changed to a single row flex container
+        <div className="flex-1 flex flex-row items-stretch gap-2 overflow-x-auto custom-scrollbar-subtle pb-1">
+          {arrearOrder.map(arr => {
+            const sum = arrearData.find(d => d.name === arr.id)?.value || 0;
+            const isActive = filters.arrearFilter === arr.id;
+            return (
+              <button 
+                key={arr.id}
+                onClick={() => setFilter('arrearFilter', isActive ? null : arr.id)}
+                className={`flex-1 flex flex-col items-center justify-center p-2 rounded border transition-all whitespace-nowrap min-w-[100px] ${arr.color} ${
+                  isActive ? 'ring-2 ring-offset-1 ring-gray-400 scale-[0.98]' : 'hover:brightness-95'
+                }`}
+              >
+                <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-1">{arr.label}</span>
+                <span className="font-mono font-bold text-sm">{formatValue(sum)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// WIDGET 5: Category Breakdown
+// ==========================================
+export const InteractiveCategory = () => {
+  const { data, isLoading } = useInteractiveData();
+  const { filters, setFilter } = useInteractiveStore();
+  
+  const categoryData = data?.category_summary || [];
+
+  return (
+    <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <div className="flex items-center mb-4 shrink-0">
+        <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Volume by Category</h3>
+        {filters.categoryFilter && <FilterBadge label={filters.categoryFilter} onClear={() => setFilter('categoryFilter', null)} />}
+      </div>
+
+      <div className="flex-1 w-full min-h-0 relative">
+        {isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" /></div>
+        ) : categoryData.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={categoryData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+              <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false}/>
+              <XAxis type="number" hide />
+              <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
+              <Tooltip 
+                formatter={(value) => [formatValue(value), 'Amount']}
+                contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                cursor={{ fill: '#f3f4f6' }}
+              />
+              <Bar 
+                dataKey="value" 
+                radius={[0, 4, 4, 0]} 
+                barSize={20}
+                onClick={(entry) => setFilter('categoryFilter', entry.name === filters.categoryFilter ? null : entry.name)}
+              >
+                {categoryData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={filters.categoryFilter === entry.name ? '#d97706' : '#4b5563'} 
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 italic font-mono">No data matches filters.</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// WIDGET 6: Filtered Ledger Table
+// ==========================================
+export const InteractiveLedger = () => {
+  const { data, isLoading } = useInteractiveData();
+  const ledgerData = data?.ledger || [];
+
+  return (
+    <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-5 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Filtered Ledger</h3>
+        <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500">{ledgerData.length} Rows</span>
+      </div>
+
+      <div className="flex-1 overflow-auto pr-2 relative">
+        {isLoading && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10"><Loader2 className="animate-spin text-amber-600" /></div>}
+        <table className="w-full text-left border-collapse whitespace-nowrap">
+          <thead className="sticky top-0 bg-white z-0">
+            <tr>
+              <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Post Date</th>
+              <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Due Date</th>
+              <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Category</th>
+              <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="text-xs divide-y divide-gray-100 font-mono">
+            {ledgerData.map((row, i) => (
+              <tr key={i} className="hover:bg-amber-50/50 transition-colors">
+                <td className="py-2.5 text-gray-500">{row.posting_date}</td>
+                <td className="py-2.5 text-gray-500">{row.value_date}</td>
+                <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[120px]">{row.category}</td>
+                <td className="py-2.5 text-right font-bold text-gray-900">{formatValue(row.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!isLoading && ledgerData.length === 0 && (
+          <div className="mt-8 text-center text-xs text-gray-400 italic">No records found for current filters.</div>
+        )}
+      </div>
+    </div>
+  );
+};
