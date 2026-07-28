@@ -4,6 +4,7 @@ import {
   InteractiveStatus,
   InteractiveArrear,
   InteractiveCategory,
+  InteractiveEntity, // NEW
   InteractiveLedger
 } from '../components/widgets/InteractiveAPARWidgets';
 
@@ -13,7 +14,7 @@ export const INTERACTIVE_WIDGETS = {
     component: InteractiveDateFilter, 
     description: "Sets the global start and end date boundaries for interactive dashboards.", 
     category: "interactive", 
-    layout: { w: 4, h: 2, minW: 3, maxW: 12, minH: 1, maxH: 3 } 
+    layout: { w: 5, h: 2, minW: 4, maxW: 8, minH: 1, maxH: 3 } 
   },
   inter_granularity: { 
     name: "Granularity Selector", 
@@ -40,6 +41,13 @@ export const INTERACTIVE_WIDGETS = {
     name: "Interactive Category Flow", 
     component: InteractiveCategory, 
     description: "Clickable bar chart that filters the dashboard by specific category volumes.", 
+    category: "interactive", 
+    layout: { w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 } 
+  },
+  inter_entity: { 
+    name: "Interactive Entity Flow", 
+    component: InteractiveEntity, 
+    description: "Clickable bar chart that filters the dashboard by specific entity volumes.", 
     category: "interactive", 
     layout: { w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 } 
   },

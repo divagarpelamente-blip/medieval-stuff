@@ -9,7 +9,6 @@ import { INTERACTIVE_WIDGETS } from '../../config/interactiveRegistry';
 import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
 import { X, LayoutGrid } from 'lucide-react';
 
-// Merge both registries so the canvas knows how to render any dropped ID
 const ALL_WIDGETS = { ...TREASURY_WIDGETS, ...INTERACTIVE_WIDGETS };
 
 const ResponsiveGridLayout = (props) => {
@@ -163,7 +162,8 @@ export default function DashboardCanvas() {
           isDraggable={true}
           isResizable={true}
           isDroppable={false}
-          draggableCancel=".cancel-drag"
+          // EXTENDED DRAGGABLE CANCEL: Forces grid-layout to completely ignore buttons, inputs, tables, and charts when clicked
+          draggableCancel="button, input, select, textarea, table, svg, canvas, .cancel-drag"
           onLayoutChange={handleLayoutChange}
           onDragStop={() => saveDraftToProduction(true)}
           onResizeStop={() => saveDraftToProduction(true)}
@@ -182,10 +182,14 @@ export default function DashboardCanvas() {
               <div
                 key={item.i}
                 className={`group relative rounded-xl overflow-hidden transition-all duration-200 flex flex-col ${isEditingLayout
-                  ? 'border-2 border-[#8b4513]/50 hover:border-[#5d4037] hover:shadow-[0_0_15px_rgba(139,69,19,0.2)] bg-[#faf4e5]/90 cursor-grab active:cursor-grabbing'
+                  ? 'border-2 border-[#8b4513]/50 hover:border-[#5d4037] hover:shadow-[0_0_15px_rgba(139,69,19,0.2)] bg-[#faf4e5]/95 cursor-grab active:cursor-grabbing'
                   : 'bg-[#faf4e5] border border-[#8b4513]/30 shadow-[0_8px_15px_rgba(75,44,32,0.1)]'
                   }`}
               >
+                {/* 
+                  When editing layout, we allow grabbing the card background. 
+                  When NOT editing layout, pointer events pass straight through to the widget contents.
+                */}
                 <div className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}>
                   <WidgetComponent />
                 </div>

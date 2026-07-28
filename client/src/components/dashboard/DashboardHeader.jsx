@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react'; // FIX: Imported useEffect
+import React, { useEffect } from 'react';
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { Sliders, Check, X, Loader2 } from 'lucide-react';
+import { useInteractiveStore } from '../../store/useInteractiveStore'; // <-- NEW IMPORT
+import { Sliders, Check, X, Loader2, FilterX } from 'lucide-react'; // <-- ADDED FilterX
 
 export default function DashboardHeader() {
   const {
@@ -13,6 +14,9 @@ export default function DashboardHeader() {
     isSaving,
     setActiveSubmenu
   } = useDashboardStore();
+
+  // NEW: Grab the global clear filters function
+  const clearFilters = useInteractiveStore((state) => state.clearFilters);
 
   const gridItems = React.useMemo(() => {
     const items = [...submenus];
@@ -58,7 +62,6 @@ export default function DashboardHeader() {
     window.dispatchEvent(new CustomEvent('close-dashboard'));
   };
 
-  /* FIX: New Listener Hook for Escape and Outside Clicks */
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -77,7 +80,7 @@ export default function DashboardHeader() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('trigger-dashboard-exit', handleOutsideClick);
     };
-  }, [isEditingLayout, hasUnsavedChanges]); // Binds to latest state
+  }, [isEditingLayout, hasUnsavedChanges]);
 
   return (
     <header className="w-full h-16 shrink-0 bg-[#faf4e5]/90 backdrop-blur-sm border-b border-[#8b4513]/25 px-6 flex items-center justify-between z-30 shadow-sm select-none">
@@ -91,6 +94,7 @@ export default function DashboardHeader() {
 
         <div className="h-6 w-px bg-[#8b4513]/20 shrink-0" />
 
+        {/* LAYOUT CONFIGURE BUTTON */}
         <button
           onClick={handleToggleEditMode}
           disabled={isLoading || isSaving}
@@ -102,6 +106,15 @@ export default function DashboardHeader() {
           }`}
         >
           <Sliders size={20} className={isEditingLayout ? 'drop-shadow-[0_0_8px_rgba(139,69,19,0.5)]' : ''} />
+        </button>
+
+        {/* NEW: GLOBAL CLEAR FILTERS BUTTON */}
+        <button
+          onClick={clearFilters}
+          title="Clear All Interactive Filters"
+          className="p-1.5 rounded border border-[#8b4513]/20 bg-[#faf4e5] text-[#5d4037] hover:text-[#4b2c20] hover:border-[#8b4513]/40 transition-all duration-200 cursor-pointer focus:outline-none shrink-0 cancel-drag"
+        >
+          <FilterX size={20} />
         </button>
 
         <nav className="grid grid-cols-4 gap-2 w-[640px] shrink-0 py-0.5">
@@ -120,7 +133,7 @@ export default function DashboardHeader() {
                   title={`${tab.name} is sealed. Render active in the Sidebar configurations.`}
                   className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase cursor-not-allowed text-[#8b4513]/70 font-bold select-none shrink-0 flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
                 >
-                  <span>🔒</span>
+                  <span>ðŸ”’</span>
                   <span className="whitespace-nowrap overflow-hidden text-ellipsis">{tab.name}</span>
                 </div>
               );

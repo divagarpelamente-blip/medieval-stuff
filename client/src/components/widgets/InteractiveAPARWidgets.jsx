@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useInteractiveStore } from '../../store/useInteractiveStore';
 import { useInteractiveData } from '../../hooks/useInteractiveData';
-import { Loader2, XCircle } from 'lucide-react';
+import { Loader2, FilterX } from 'lucide-react';
 
 const formatValue = (val) => {
   const num = Number(val) || 0;
@@ -10,14 +10,16 @@ const formatValue = (val) => {
   return num < 0 ? `(${formattedNum})` : formattedNum;
 };
 
-const FilterBadge = ({ label, onClear }) => (
-  <div className="inline-flex items-center gap-1 bg-amber-900/20 border border-amber-700/50 text-amber-700 px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider ml-2">
-    {label}
-    <button onClick={onClear} className="hover:text-amber-500"><XCircle size={10} /></button>
-  </div>
+const LocalClearBtn = ({ onClear }) => (
+  <button 
+    onClick={(e) => { e.stopPropagation(); onClear(); }} 
+    className="cancel-drag absolute top-2 right-2 p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors [&>*]:pointer-events-none"
+    title="Clear Widget Filter"
+  >
+    <FilterX size={14} />
+  </button>
 );
 
-// Helper Hook to detect if a widget is compressed in the grid (e.g., height: 1 or 2)
 const useWidgetResize = (heightThreshold = 120) => {
   const [isCompact, setIsCompact] = useState(false);
   const ref = useRef(null);
@@ -37,23 +39,36 @@ const useWidgetResize = (heightThreshold = 120) => {
 };
 
 // ==========================================
-// WIDGET 1: Date Range Picker
+// WIDGET 1: Date Range & Month Picker
 // ==========================================
 export const InteractiveDateFilter = () => {
   const { filters, setFilter } = useInteractiveStore();
   const { ref, isCompact } = useWidgetResize(110);
+  
+  const hasFilter = filters.startDate || filters.endDate || filters.monthFilter;
 
   return (
-    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center ${isCompact ? 'p-3' : 'p-5'}`}>
+    <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center ${isCompact ? 'p-3' : 'p-5'}`}>
+      {hasFilter && <LocalClearBtn onClear={() => { setFilter('startDate', null); setFilter('endDate', null); setFilter('monthFilter', null); }} />}
+      
       {!isCompact && <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-4 shrink-0">Timeframe</h3>}
-      <div className="flex gap-4">
+      <div className="flex gap-4 pr-6">
+        <div className="flex-[0.8] flex flex-col gap-1 border-r border-gray-200 pr-4">
+          {!isCompact && <label className="text-[10px] uppercase font-bold text-gray-400">Select Month</label>}
+          <input 
+            type="month" 
+            value={filters.monthFilter || ''} 
+            onChange={(e) => setFilter('monthFilter', e.target.value || null)}
+            className="cancel-drag w-full border border-gray-300 rounded p-2 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+          />
+        </div>
         <div className="flex-1 flex flex-col gap-1">
           {!isCompact && <label className="text-[10px] uppercase font-bold text-gray-400">Start Date</label>}
           <input 
             type="date" 
             value={filters.startDate || ''} 
             onChange={(e) => setFilter('startDate', e.target.value || null)}
-            className="w-full border border-gray-300 rounded p-2 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+            className="cancel-drag w-full border border-gray-300 rounded p-2 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
           />
         </div>
         <div className="flex-1 flex flex-col gap-1">
@@ -62,7 +77,7 @@ export const InteractiveDateFilter = () => {
             type="date" 
             value={filters.endDate || ''} 
             onChange={(e) => setFilter('endDate', e.target.value || null)}
-            className="w-full border border-gray-300 rounded p-2 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+            className="cancel-drag w-full border border-gray-300 rounded p-2 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
           />
         </div>
       </div>
@@ -79,14 +94,14 @@ export const InteractiveGranularity = () => {
   const options = ['Weekly', 'Monthly', 'Quarterly', 'Yearly', 'All Time'];
 
   return (
-    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+    <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
       {!isCompact && <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-4 shrink-0">Grouping</h3>}
       <div className="flex flex-wrap gap-2 overflow-y-auto">
         {options.map(opt => (
           <button
             key={opt}
             onClick={() => setFilter('granularity', opt)}
-            className={`flex-1 px-3 py-1.5 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors border whitespace-nowrap min-w-[80px] ${
+            className={`cancel-drag [&>*]:pointer-events-none flex-1 px-3 py-1.5 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors border whitespace-nowrap min-w-[80px] ${
               filters.granularity === opt 
                 ? 'bg-amber-900 text-amber-100 border-amber-950 shadow-inner' 
                 : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
@@ -111,18 +126,19 @@ export const InteractiveStatus = () => {
   const statusData = data?.status_summary || [];
 
   return (
-    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+    <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+      {filters.statusFilter && <LocalClearBtn onClear={() => setFilter('statusFilter', null)} />}
+      
       {!isCompact && (
         <div className="flex items-center mb-4 shrink-0">
           <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Payment Status</h3>
-          {filters.statusFilter && <FilterBadge label={filters.statusFilter} onClear={() => setFilter('statusFilter', null)} />}
         </div>
       )}
       
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" /></div>
       ) : (
-        <div className={`flex-1 flex ${isCompact ? 'flex-row' : 'flex-col'} gap-2 justify-center`}>
+        <div className={`flex-1 flex ${isCompact ? 'flex-row' : 'flex-col'} gap-2 justify-center pr-6`}>
           {['Pending', 'Completed'].map(status => {
             const sum = statusData.find(d => d.name === status)?.value || 0;
             const isActive = filters.statusFilter === status;
@@ -130,8 +146,8 @@ export const InteractiveStatus = () => {
               <button 
                 key={status}
                 onClick={() => setFilter('statusFilter', isActive ? null : status)}
-                className={`flex-1 flex ${isCompact ? 'flex-col justify-center' : 'items-center justify-between'} p-2 rounded-lg border transition-all ${
-                  isActive ? 'border-amber-600 bg-amber-50 ring-1 ring-amber-600' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                className={`cancel-drag [&>*]:pointer-events-none flex-1 flex ${isCompact ? 'flex-col justify-center' : 'items-center justify-between'} p-2 rounded-lg border transition-all ${
+                  isActive ? 'border-amber-600 bg-amber-50 ring-1 ring-amber-600' : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
                 }`}
               >
                 <span className={`font-serif font-bold text-gray-700 ${isCompact ? 'text-[10px] uppercase mb-1' : 'text-sm'}`}>{status}</span>
@@ -146,7 +162,7 @@ export const InteractiveStatus = () => {
 };
 
 // ==========================================
-// WIDGET 4: Arrear Breakdown (Single Row Config)
+// WIDGET 4: Arrear Breakdown
 // ==========================================
 export const InteractiveArrear = () => {
   const { data, isLoading } = useInteractiveData();
@@ -165,19 +181,19 @@ export const InteractiveArrear = () => {
   ];
 
   return (
-    <div ref={ref} className={`w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+    <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-5'}`}>
+      {filters.arrearFilter && <LocalClearBtn onClear={() => setFilter('arrearFilter', null)} />}
+      
       {!isCompact && (
         <div className="flex items-center mb-4 shrink-0">
           <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Aging & Arrears</h3>
-          {filters.arrearFilter && <FilterBadge label={filters.arrearFilter} onClear={() => setFilter('arrearFilter', null)} />}
         </div>
       )}
 
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" /></div>
       ) : (
-        // Changed to a single row flex container
-        <div className="flex-1 flex flex-row items-stretch gap-2 overflow-x-auto custom-scrollbar-subtle pb-1">
+        <div className="flex-1 flex flex-row items-stretch gap-2 overflow-x-auto custom-scrollbar-subtle pb-1 pr-6">
           {arrearOrder.map(arr => {
             const sum = arrearData.find(d => d.name === arr.id)?.value || 0;
             const isActive = filters.arrearFilter === arr.id;
@@ -185,8 +201,8 @@ export const InteractiveArrear = () => {
               <button 
                 key={arr.id}
                 onClick={() => setFilter('arrearFilter', isActive ? null : arr.id)}
-                className={`flex-1 flex flex-col items-center justify-center p-2 rounded border transition-all whitespace-nowrap min-w-[100px] ${arr.color} ${
-                  isActive ? 'ring-2 ring-offset-1 ring-gray-400 scale-[0.98]' : 'hover:brightness-95'
+                className={`cancel-drag [&>*]:pointer-events-none flex-1 flex flex-col items-center justify-center p-2 rounded border transition-all whitespace-nowrap min-w-[100px] ${arr.color} ${
+                  isActive ? 'ring-2 ring-offset-1 ring-gray-400' : 'hover:brightness-95'
                 }`}
               >
                 <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-1">{arr.label}</span>
@@ -210,13 +226,14 @@ export const InteractiveCategory = () => {
   const categoryData = data?.category_summary || [];
 
   return (
-    <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+    <div className="relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      {filters.categoryFilter && <LocalClearBtn onClear={() => setFilter('categoryFilter', null)} />}
+      
       <div className="flex items-center mb-4 shrink-0">
         <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Volume by Category</h3>
-        {filters.categoryFilter && <FilterBadge label={filters.categoryFilter} onClear={() => setFilter('categoryFilter', null)} />}
       </div>
 
-      <div className="flex-1 w-full min-h-0 relative">
+      <div className="flex-1 w-full min-h-0 relative cancel-drag">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" /></div>
         ) : categoryData.length > 0 ? (
@@ -255,6 +272,61 @@ export const InteractiveCategory = () => {
 };
 
 // ==========================================
+// WIDGET 7: NEW Entity Breakdown
+// ==========================================
+export const InteractiveEntity = () => {
+  const { data, isLoading } = useInteractiveData();
+  const { filters, setFilter } = useInteractiveStore();
+  
+  const entityData = data?.entity_summary || [];
+
+  return (
+    <div className="relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      {filters.entityFilter && <LocalClearBtn onClear={() => setFilter('entityFilter', null)} />}
+      
+      <div className="flex items-center mb-4 shrink-0">
+        <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Volume by Entity</h3>
+      </div>
+
+      <div className="flex-1 w-full min-h-0 relative cancel-drag">
+        {isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" /></div>
+        ) : entityData.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={entityData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+              <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false}/>
+              <XAxis type="number" hide />
+              <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
+              <Tooltip 
+                formatter={(value) => [formatValue(value), 'Amount']}
+                contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                cursor={{ fill: '#f3f4f6' }}
+              />
+              <Bar 
+                dataKey="value" 
+                radius={[0, 4, 4, 0]} 
+                barSize={20}
+                onClick={(entry) => setFilter('entityFilter', entry.name === filters.entityFilter ? null : entry.name)}
+              >
+                {entityData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={filters.entityFilter === entry.name ? '#047857' : '#9ca3af'} 
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 italic font-mono">No data matches filters.</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
 // WIDGET 6: Filtered Ledger Table
 // ==========================================
 export const InteractiveLedger = () => {
@@ -268,13 +340,14 @@ export const InteractiveLedger = () => {
         <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500">{ledgerData.length} Rows</span>
       </div>
 
-      <div className="flex-1 overflow-auto pr-2 relative">
+      <div className="flex-1 overflow-auto pr-2 relative cancel-drag">
         {isLoading && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10"><Loader2 className="animate-spin text-amber-600" /></div>}
         <table className="w-full text-left border-collapse whitespace-nowrap">
           <thead className="sticky top-0 bg-white z-0">
             <tr>
               <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Post Date</th>
               <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Due Date</th>
+              <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Entity</th>
               <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Category</th>
               <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase text-right">Amount</th>
             </tr>
@@ -284,7 +357,8 @@ export const InteractiveLedger = () => {
               <tr key={i} className="hover:bg-amber-50/50 transition-colors">
                 <td className="py-2.5 text-gray-500">{row.posting_date}</td>
                 <td className="py-2.5 text-gray-500">{row.value_date}</td>
-                <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[120px]">{row.category}</td>
+                <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[100px]">{row.entity || '-'}</td>
+                <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[100px]">{row.category}</td>
                 <td className="py-2.5 text-right font-bold text-gray-900">{formatValue(row.amount)}</td>
               </tr>
             ))}
