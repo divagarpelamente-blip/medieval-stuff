@@ -1,7 +1,9 @@
+// client/src/components/dashboard/DashboardHeader.jsx
+
 import React, { useEffect } from 'react';
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { useInteractiveStore } from '../../store/useInteractiveStore'; // <-- NEW IMPORT
-import { Sliders, Check, X, Loader2, FilterX } from 'lucide-react'; // <-- ADDED FilterX
+import { useInteractiveStore } from '../../store/useInteractiveStore';
+import { Sliders, Check, X, Loader2, FilterX } from 'lucide-react';
 
 export default function DashboardHeader() {
   const {
@@ -15,15 +17,10 @@ export default function DashboardHeader() {
     setActiveSubmenu
   } = useDashboardStore();
 
-  // NEW: Grab the global clear filters function
   const clearFilters = useInteractiveStore((state) => state.clearFilters);
 
   const gridItems = React.useMemo(() => {
-    const items = [...submenus];
-    if (items.length >= 3) {
-      items.splice(3, 0, { id: 'grid-alignment-spacer', isSpacer: true });
-    }
-    return items;
+    return [...submenus];
   }, [submenus]);
 
   const handleToggleEditMode = async () => {
@@ -94,7 +91,6 @@ export default function DashboardHeader() {
 
         <div className="h-6 w-px bg-[#8b4513]/20 shrink-0" />
 
-        {/* LAYOUT CONFIGURE BUTTON */}
         <button
           onClick={handleToggleEditMode}
           disabled={isLoading || isSaving}
@@ -108,7 +104,6 @@ export default function DashboardHeader() {
           <Sliders size={20} className={isEditingLayout ? 'drop-shadow-[0_0_8px_rgba(139,69,19,0.5)]' : ''} />
         </button>
 
-        {/* NEW: GLOBAL CLEAR FILTERS BUTTON */}
         <button
           onClick={clearFilters}
           title="Clear All Interactive Filters"
@@ -117,7 +112,7 @@ export default function DashboardHeader() {
           <FilterX size={20} />
         </button>
 
-        <nav className="grid grid-cols-4 gap-2 w-[640px] shrink-0 py-0.5">
+        <nav className="grid grid-cols-4 gap-1.5 w-full max-w-[640px] shrink-0 py-0.5">
           {gridItems.map((tab) => {
             if (tab.isSpacer) {
               return <div key={tab.id} className="col-span-1" />;
@@ -133,7 +128,7 @@ export default function DashboardHeader() {
                   title={`${tab.name} is sealed. Render active in the Sidebar configurations.`}
                   className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase cursor-not-allowed text-[#8b4513]/70 font-bold select-none shrink-0 flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
                 >
-                  <span>ðŸ”’</span>
+                  <span>🔒</span>
                   <span className="whitespace-nowrap overflow-hidden text-ellipsis">{tab.name}</span>
                 </div>
               );

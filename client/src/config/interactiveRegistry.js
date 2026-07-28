@@ -1,10 +1,12 @@
+// client/src/config/interactiveRegistry.js
+
 import {
   InteractiveDateFilter,
   InteractiveGranularity,
   InteractiveStatus,
   InteractiveArrear,
   InteractiveCategory,
-  InteractiveEntity, // NEW
+  InteractiveEntity,
   InteractiveLedger
 } from '../components/widgets/InteractiveAPARWidgets';
 

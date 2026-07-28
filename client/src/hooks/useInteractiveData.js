@@ -1,4 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+// client/src/hooks/useInteractiveData.js
+
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useInteractiveStore } from '../store/useInteractiveStore';
 import { useKingdomStore } from '../store/useKingdomStore';
@@ -14,7 +16,6 @@ export function useInteractiveData() {
 
       const clientToday = new Date().toISOString().split('T')[0];
 
-      // Strict || null enforcement prevents empty strings ("") from crashing the SQL RPC
       const { data, error } = await supabase.rpc('get_interactive_dashboard', {
         p_profile_id: user.id,
         p_client_today: clientToday,
@@ -36,5 +37,6 @@ export function useInteractiveData() {
     },
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5, 
+    placeholderData: keepPreviousData, // STOPS DOM DESTRUCTION
   });
 }

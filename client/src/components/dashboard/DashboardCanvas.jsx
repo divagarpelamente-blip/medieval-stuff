@@ -31,7 +31,14 @@ const ResponsiveGridLayout = (props) => {
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-full relative min-h-[600px] overflow-hidden">
+    <div 
+      ref={containerRef} 
+      className="w-full h-full relative min-h-[600px] overflow-hidden"
+      onScroll={(e) => {
+        e.currentTarget.scrollTop = 0;
+        e.currentTarget.scrollLeft = 0;
+      }}
+    >
       <div
         style={{
           transform: `scale(${scale})`,
@@ -78,6 +85,14 @@ export default function DashboardCanvas() {
     return Array.isArray(savedLayout[activeTabId]) ? savedLayout[activeTabId] : [];
   }, [isEditingLayout, draftLayout, savedLayout, activeTabId]);
 
+  const layouts = useMemo(() => ({
+    lg: currentLayout,
+    md: currentLayout,
+    sm: currentLayout,
+    xs: currentLayout,
+    xxs: currentLayout
+  }), [currentLayout]);
+
   const handleRemoveWidget = (widgetKey) => {
     const updated = currentLayout.filter((item) => item.i !== widgetKey);
     updateDraftLayout(activeTabId, updated);
@@ -85,6 +100,7 @@ export default function DashboardCanvas() {
   };
 
   const handleLayoutChange = (newLayout) => {
+    if (!isEditingLayout) return;
     if (ignoreLayoutChangeRef.current) return;
     if (isLoading) return;
 
@@ -121,7 +137,11 @@ export default function DashboardCanvas() {
 
   return (
     <div
-      className="flex-1 p-6 relative overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-[#8b4513]/60 scrollbar-track-[#e8dcb8]"
+      /* 
+       * PERMANENT FIX: overflow-y-scroll overflow-x-hidden forces the scrollbar track to remain visible.
+       * This stops tooltips from flashing the scrollbar and triggering the 15px layout jitter loop.
+       */
+      className="flex-1 p-6 relative overflow-y-scroll overflow-x-hidden flex flex-col scrollbar-thin scrollbar-thumb-[#8b4513]/60 scrollbar-track-[#e8dcb8]"
       style={{
         backgroundColor: '#e8dcb8',
         backgroundImage: `
@@ -149,20 +169,13 @@ export default function DashboardCanvas() {
         <ResponsiveGridLayout
           key={`${activeTabId}-${currentLayout.length}`}
           className="layout"
-          layouts={{
-            lg: currentLayout,
-            md: currentLayout,
-            sm: currentLayout,
-            xs: currentLayout,
-            xxs: currentLayout
-          }}
+          layouts={layouts}
           breakpoints={breakpoints}
           cols={cols}
           rowHeight={80}
-          isDraggable={true}
-          isResizable={true}
+          isDraggable={isEditingLayout}
+          isResizable={isEditingLayout}
           isDroppable={false}
-          // EXTENDED DRAGGABLE CANCEL: Forces grid-layout to completely ignore buttons, inputs, tables, and charts when clicked
           draggableCancel="button, input, select, textarea, table, svg, canvas, .cancel-drag"
           onLayoutChange={handleLayoutChange}
           onDragStop={() => saveDraftToProduction(true)}
@@ -181,16 +194,25 @@ export default function DashboardCanvas() {
             return (
               <div
                 key={item.i}
-                className={`group relative rounded-xl overflow-hidden transition-all duration-200 flex flex-col ${isEditingLayout
+                className={`group relative rounded-xl overflow-hidden transition-[border-color,box-shadow,background-color] duration-200 flex flex-col ${isEditingLayout
                   ? 'border-2 border-[#8b4513]/50 hover:border-[#5d4037] hover:shadow-[0_0_15px_rgba(139,69,19,0.2)] bg-[#faf4e5]/95 cursor-grab active:cursor-grabbing'
                   : 'bg-[#faf4e5] border border-[#8b4513]/30 shadow-[0_8px_15px_rgba(75,44,32,0.1)]'
                   }`}
               >
-                {/* 
-                  When editing layout, we allow grabbing the card background. 
-                  When NOT editing layout, pointer events pass straight through to the widget contents.
-                */}
-                <div className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}>
+                {/* Pointer-events-none drops an invisible shield over the widget during Edit Mode, preventing filter misclicks */}
+                <div 
+                  className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}
+                  onMouseDown={(e) => {
+                    if (!isEditingLayout) {
+                      e.stopPropagation();
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (!isEditingLayout) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
                   <WidgetComponent />
                 </div>
 

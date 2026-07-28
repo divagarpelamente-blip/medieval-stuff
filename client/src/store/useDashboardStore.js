@@ -1,10 +1,23 @@
+// client/src/store/useDashboardStore.js
+
 import { create } from 'zustand';
 import { MAX_WIDGETS_PER_TAB, DEFAULT_PRESET } from '../config/dashboard.config';
 import { useKingdomStore } from './useKingdomStore';
 import { supabase } from '../lib/supabaseClient';
 
+const DEFAULT_INTERACTIVE_PRESET = [
+  { i: 'inter_granularity-1', x: 0, y: 0, w: 4, h: 1, minW: 3, maxW: 12, minH: 1, maxH: 3 },
+  { i: 'inter_date_picker-1', x: 4, y: 0, w: 4, h: 1, minW: 4, maxW: 8, minH: 1, maxH: 3 },
+  { i: 'inter_status-1', x: 8, y: 0, w: 4, h: 1, minW: 3, maxW: 12, minH: 1, maxH: 4 },
+  { i: 'inter_arrear-1', x: 0, y: 1, w: 12, h: 1, minW: 6, maxW: 12, minH: 1, maxH: 4 },
+  { i: 'inter_category-1', x: 0, y: 2, w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 },
+  { i: 'inter_entity-1', x: 4, y: 2, w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 },
+  { i: 'inter_ledger-1', x: 8, y: 2, w: 4, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 8 }
+];
+
 const INITIAL_SUBMENUS = [
   { id: 'insights', name: 'Insights', isVisible: true, isActive: true },
+  { id: 'apar_interactive', name: 'AP/AR Command', isVisible: true, isActive: false },
   { id: 'tab_1', name: 'Royal Treasury', isVisible: true, isActive: false },
   { id: 'tab_2', name: 'Campaign Ledger', isVisible: false, isActive: false },
   { id: 'tab_3', name: 'Citadel Reserves', isVisible: false, isActive: false },
@@ -22,6 +35,7 @@ export const useDashboardStore = create((set, get) => ({
   
   savedLayout: {
     insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    apar_interactive: JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
     tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
     tab_2: [],
     tab_3: [],
@@ -32,6 +46,7 @@ export const useDashboardStore = create((set, get) => ({
   
   draftLayout: {
     insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    apar_interactive: JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
     tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
     tab_2: [],
     tab_3: [],
@@ -80,6 +95,9 @@ export const useDashboardStore = create((set, get) => ({
         
         const finalSaved = {
           insights: savedLayout?.insights ? JSON.parse(JSON.stringify(savedLayout.insights)) : JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          apar_interactive: (savedLayout?.apar_interactive && !savedLayout.apar_interactive.some(item => item.i === 'inter_date_picker-1' && item.w < 4)) 
+            ? JSON.parse(JSON.stringify(savedLayout.apar_interactive)) 
+            : JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
           tab_1: savedLayout?.tab_1 ? JSON.parse(JSON.stringify(savedLayout.tab_1)) : JSON.parse(JSON.stringify(DEFAULT_PRESET)),
           tab_2: savedLayout?.tab_2 ? JSON.parse(JSON.stringify(savedLayout.tab_2)) : [],
           tab_3: savedLayout?.tab_3 ? JSON.parse(JSON.stringify(savedLayout.tab_3)) : [],
@@ -91,7 +109,7 @@ export const useDashboardStore = create((set, get) => ({
         const mergedSubmenus = INITIAL_SUBMENUS.map((defaultTab) => {
           const cachedTab = Array.isArray(submenus) ? submenus.find((s) => s.id === defaultTab.id) : null;
           if (cachedTab) {
-            const isProtected = defaultTab.id === 'insights' || defaultTab.id === 'tab_1';
+            const isProtected = defaultTab.id === 'insights' || defaultTab.id === 'tab_1' || defaultTab.id === 'apar_interactive';
             return {
               ...defaultTab,
               name: cachedTab.name || defaultTab.name,
@@ -120,6 +138,7 @@ export const useDashboardStore = create((set, get) => ({
       } else {
         const defaultLayout = {
           insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          apar_interactive: JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
           tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
           tab_2: [], tab_3: [], tab_4: [], tab_5: [], tab_6: [],
         };
@@ -209,7 +228,7 @@ export const useDashboardStore = create((set, get) => ({
   },
 
   toggleSubmenuVisibility: (tabId) => {
-    if (tabId === 'insights' || tabId === 'tab_1') return;
+    if (tabId === 'insights' || tabId === 'tab_1' || tabId === 'apar_interactive') return;
 
     set((state) => {
       const updatedSubmenus = state.submenus.map((sub) => {
@@ -249,7 +268,6 @@ export const useDashboardStore = create((set, get) => ({
 
   deployWidget: (tabId, widgetId, widgetDef) => {
     const state = get();
-    // Deep clone the existing layout for this specific tab only
     const currentLayout = Array.isArray(state.draftLayout[tabId]) 
       ? JSON.parse(JSON.stringify(state.draftLayout[tabId])) 
       : [];
@@ -308,7 +326,6 @@ export const useDashboardStore = create((set, get) => ({
 
     const updatedLayout = [...currentLayout, newLayoutItem];
     
-    // Update ONLY the draftLayout for this specific tabId
     set((prevState) => ({
       draftLayout: {
         ...prevState.draftLayout,
