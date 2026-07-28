@@ -55,7 +55,6 @@ export default function DashboardCanvas() {
     savedLayout,
     draftLayout,
     submenus,
-    activeSubmenuId,
     updateDraftLayout,
     isLoading,
     saveDraftToProduction,
@@ -63,17 +62,20 @@ export default function DashboardCanvas() {
 
   const ignoreLayoutChangeRef = useRef(false);
 
+  // FIX: Properly identify the active tab using the isActive boolean flag
   const currentSubmenu = useMemo(() => {
-    return submenus.find((s) => s.id === activeSubmenuId) || submenus[0];
-  }, [submenus, activeSubmenuId]);
+    return submenus.find((s) => s.isActive) || submenus.find((s) => s.id === 'insights');
+  }, [submenus]);
 
-  const activeTabId = currentSubmenu ? currentSubmenu.id : 'tab_1';
+  const activeTabId = currentSubmenu ? currentSubmenu.id : 'insights';
 
+  // Strictly isolate currentLayout to the activeTabId
   const currentLayout = useMemo(() => {
-    return isEditingLayout
-      ? draftLayout[activeTabId] || currentSubmenu?.layout || []
-      : savedLayout[activeTabId] || currentSubmenu?.layout || [];
-  }, [isEditingLayout, draftLayout, savedLayout, activeTabId, currentSubmenu]);
+    if (isEditingLayout) {
+      return Array.isArray(draftLayout[activeTabId]) ? draftLayout[activeTabId] : [];
+    }
+    return Array.isArray(savedLayout[activeTabId]) ? savedLayout[activeTabId] : [];
+  }, [isEditingLayout, draftLayout, savedLayout, activeTabId]);
 
   const handleRemoveWidget = (widgetKey) => {
     const updated = currentLayout.filter((item) => item.i !== widgetKey);
@@ -186,7 +188,6 @@ export default function DashboardCanvas() {
                   <WidgetComponent />
                 </div>
 
-                {/* RESTORED: Red 'X' Delete Button */}
                 {isEditingLayout && (
                   <button
                     onClick={(e) => {

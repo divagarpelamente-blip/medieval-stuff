@@ -79,13 +79,13 @@ export const useDashboardStore = create((set, get) => ({
         const { savedLayout, submenus } = loadedPayload;
         
         const finalSaved = {
-          insights: savedLayout?.insights || JSON.parse(JSON.stringify(DEFAULT_PRESET)),
-          tab_1: savedLayout?.tab_1 || JSON.parse(JSON.stringify(DEFAULT_PRESET)),
-          tab_2: savedLayout?.tab_2 || [],
-          tab_3: savedLayout?.tab_3 || [],
-          tab_4: savedLayout?.tab_4 || [],
-          tab_5: savedLayout?.tab_5 || [],
-          tab_6: savedLayout?.tab_6 || [],
+          insights: savedLayout?.insights ? JSON.parse(JSON.stringify(savedLayout.insights)) : JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          tab_1: savedLayout?.tab_1 ? JSON.parse(JSON.stringify(savedLayout.tab_1)) : JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          tab_2: savedLayout?.tab_2 ? JSON.parse(JSON.stringify(savedLayout.tab_2)) : [],
+          tab_3: savedLayout?.tab_3 ? JSON.parse(JSON.stringify(savedLayout.tab_3)) : [],
+          tab_4: savedLayout?.tab_4 ? JSON.parse(JSON.stringify(savedLayout.tab_4)) : [],
+          tab_5: savedLayout?.tab_5 ? JSON.parse(JSON.stringify(savedLayout.tab_5)) : [],
+          tab_6: savedLayout?.tab_6 ? JSON.parse(JSON.stringify(savedLayout.tab_6)) : [],
         };
 
         const mergedSubmenus = INITIAL_SUBMENUS.map((defaultTab) => {
@@ -192,7 +192,7 @@ export const useDashboardStore = create((set, get) => ({
     set((state) => ({
       draftLayout: {
         ...state.draftLayout,
-        [tabId]: nextLayout
+        [tabId]: JSON.parse(JSON.stringify(nextLayout))
       },
       hasUnsavedChanges: true
     }));
@@ -220,7 +220,7 @@ export const useDashboardStore = create((set, get) => ({
       });
 
       const wasInvisible = state.submenus.find((s) => s.id === tabId)?.isVisible === false;
-      const nextDraft = { ...state.draftLayout };
+      const nextDraft = JSON.parse(JSON.stringify(state.draftLayout));
 
       if (wasInvisible && (!nextDraft[tabId] || nextDraft[tabId].length === 0)) {
         nextDraft[tabId] = JSON.parse(JSON.stringify(DEFAULT_PRESET));
@@ -249,7 +249,10 @@ export const useDashboardStore = create((set, get) => ({
 
   deployWidget: (tabId, widgetId, widgetDef) => {
     const state = get();
-    const currentLayout = Array.isArray(state.draftLayout[tabId]) ? state.draftLayout[tabId] : [];
+    // Deep clone the existing layout for this specific tab only
+    const currentLayout = Array.isArray(state.draftLayout[tabId]) 
+      ? JSON.parse(JSON.stringify(state.draftLayout[tabId])) 
+      : [];
 
     if (currentLayout.length >= MAX_WIDGETS_PER_TAB) {
       console.warn("Max widgets per tab limit reached.");
@@ -305,15 +308,12 @@ export const useDashboardStore = create((set, get) => ({
 
     const updatedLayout = [...currentLayout, newLayoutItem];
     
-    // Also mirror layout update into submenus structure if required by canvas bindings
+    // Update ONLY the draftLayout for this specific tabId
     set((prevState) => ({
       draftLayout: {
         ...prevState.draftLayout,
         [tabId]: updatedLayout
       },
-      submenus: prevState.submenus.map(sub => 
-        sub.id === tabId ? { ...sub, layout: updatedLayout } : sub
-      ),
       hasUnsavedChanges: true
     }));
 
