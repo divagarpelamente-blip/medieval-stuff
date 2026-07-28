@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { MAX_WIDGETS_PER_TAB, DEFAULT_PRESET } from '../config/dashboard.config';
 import { useKingdomStore } from './useKingdomStore';
-import { supabase } from '../lib/supabaseClient'; // ADDED: Import Supabase client directly
+import { supabase } from '../lib/supabaseClient';
 
 const INITIAL_SUBMENUS = [
   { id: 'insights', name: 'Insights', isVisible: true, isActive: true },
@@ -44,12 +44,11 @@ export const useDashboardStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const kingdomStore = useKingdomStore.getState();
-      const user = kingdomStore?.user; // FIXED: Extract user instead of undefined profile/supabase
+      const user = kingdomStore?.user;
 
       let loadedPayload = null;
       let databaseQuerySucceeded = false;
 
-      // 1. Primary Sync from Supabase profiles schema
       if (user?.id) {
         const { data, error } = await supabase
           .from('profiles')
@@ -65,7 +64,6 @@ export const useDashboardStore = create((set, get) => ({
         }
       }
 
-      // 2. Local Fallback Cache (only leveraged if database retrieval failed or profile id is unresolvable)
       if (!databaseQuerySucceeded && !loadedPayload) {
         const localCache = localStorage.getItem('eldoria_dashboard_layouts');
         if (localCache) {
@@ -77,7 +75,6 @@ export const useDashboardStore = create((set, get) => ({
         }
       }
 
-      // 3. Setup structural boundaries over restored or default objects
       if (loadedPayload) {
         const { savedLayout, submenus } = loadedPayload;
         
@@ -91,7 +88,6 @@ export const useDashboardStore = create((set, get) => ({
           tab_6: savedLayout?.tab_6 || [],
         };
 
-        // Enforce structural visibility integrity on primary default panels
         const mergedSubmenus = INITIAL_SUBMENUS.map((defaultTab) => {
           const cachedTab = Array.isArray(submenus) ? submenus.find((s) => s.id === defaultTab.id) : null;
           if (cachedTab) {
@@ -105,7 +101,6 @@ export const useDashboardStore = create((set, get) => ({
           return defaultTab;
         });
 
-        // Safe Active Submenu evaluation
         const cachedActiveTab = Array.isArray(submenus) ? submenus.find((s) => s.isActive && s.isVisible) : null;
         let activeId = cachedActiveTab ? cachedActiveTab.id : 'insights';
         const isValidId = INITIAL_SUBMENUS.some(tab => tab.id === activeId);
@@ -123,7 +118,6 @@ export const useDashboardStore = create((set, get) => ({
           hasUnsavedChanges: false,
         });
       } else {
-        // Safe Reset/Instantiation fallback block if store contains no layout configurations
         const defaultLayout = {
           insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
           tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
@@ -162,7 +156,7 @@ export const useDashboardStore = create((set, get) => ({
 
     try {
       const kingdomStore = useKingdomStore.getState();
-      const user = kingdomStore?.user; // FIXED: Extract user properly
+      const user = kingdomStore?.user;
 
       if (user?.id) {
         const { error } = await supabase
@@ -179,7 +173,7 @@ export const useDashboardStore = create((set, get) => ({
         savedLayout: committedDraft,
         isEditingLayout: keepEditing ? state.isEditingLayout : false,
         isSaving: false,
-        hasUnsavedChanges: false, // Reset track state on DB sync success
+        hasUnsavedChanges: false,
       });
     }
   },
@@ -188,13 +182,12 @@ export const useDashboardStore = create((set, get) => ({
     set((state) => ({
       isEditingLayout: !!active,
       draftLayout: JSON.parse(JSON.stringify(state.savedLayout)),
-      hasUnsavedChanges: false // Reset when starting a fresh edit session or discarding draft
+      hasUnsavedChanges: false
     }));
   },
 
   updateDraftLayout: (tabId, nextLayout) => {
-    // STANCE LOCKS REMOVED: Unconditionally allow coordinate adjustments in draft layouts
-    if (!Array.isArray(nextLayout) || nextLayout.length > MAX_WIDGETS_PER_TAB) return false;
+    if (!Array.isArray(nextLayout)) return false;
     
     set((state) => ({
       draftLayout: {
@@ -216,7 +209,6 @@ export const useDashboardStore = create((set, get) => ({
   },
 
   toggleSubmenuVisibility: (tabId) => {
-    // STRICT TOGGLE PROTECTION: insights and tab_1 must remain visible
     if (tabId === 'insights' || tabId === 'tab_1') return;
 
     set((state) => {
@@ -257,22 +249,23 @@ export const useDashboardStore = create((set, get) => ({
 
   deployWidget: (tabId, widgetId, widgetDef) => {
     const state = get();
-    const currentLayout = state.draftLayout[tabId] || [];
+    const currentLayout = Array.isArray(state.draftLayout[tabId]) ? state.draftLayout[tabId] : [];
 
     if (currentLayout.length >= MAX_WIDGETS_PER_TAB) {
+      console.warn("Max widgets per tab limit reached.");
       return false;
     }
 
     const uniqueInstanceId = `${widgetId}-${Date.now()}`;
-    const w = widgetDef.layout.w;
-    const h = widgetDef.layout.h;
+    const w = widgetDef.layout?.w || 4;
+    const h = widgetDef.layout?.h || 3;
     const cols = 12;
 
     let foundX = 0;
     let foundY = 0;
     let placed = false;
 
-    for (let y = 0; y < 200; y++) {
+    for (let y = 0; y < 50; y++) {
       for (let x = 0; x <= cols - w; x++) {
         let overlap = false;
         for (const item of currentLayout) {
@@ -293,21 +286,38 @@ export const useDashboardStore = create((set, get) => ({
       if (placed) break;
     }
 
+    if (!placed) {
+      foundX = 0;
+      foundY = currentLayout.length * 3;
+    }
+
     const newLayoutItem = {
       i: uniqueInstanceId,
       x: foundX,
       y: foundY,
       w,
       h,
-      minW: widgetDef.layout.minW,
-      maxW: widgetDef.layout.maxW,
-      minH: widgetDef.layout.minH,
-      maxH: widgetDef.layout.maxH,
+      minW: widgetDef.layout?.minW || 2,
+      maxW: widgetDef.layout?.maxW || 12,
+      minH: widgetDef.layout?.minH || 2,
+      maxH: widgetDef.layout?.maxH || 6,
     };
 
     const updatedLayout = [...currentLayout, newLayoutItem];
-    set({ hasUnsavedChanges: true });
-    return state.updateDraftLayout(tabId, updatedLayout);
+    
+    // Also mirror layout update into submenus structure if required by canvas bindings
+    set((prevState) => ({
+      draftLayout: {
+        ...prevState.draftLayout,
+        [tabId]: updatedLayout
+      },
+      submenus: prevState.submenus.map(sub => 
+        sub.id === tabId ? { ...sub, layout: updatedLayout } : sub
+      ),
+      hasUnsavedChanges: true
+    }));
+
+    return true;
   }
 }));
 

@@ -49,47 +49,13 @@ const ResponsiveGridLayout = (props) => {
   );
 };
 
-// Parchment-themed skeleton for loading states
-function DashboardSkeleton() {
-  return (
-    <div
-      className="flex-grow p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none"
-      style={{ backgroundColor: '#e8dcb8' }}
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
-        {[1, 2, 3].map((idx) => (
-          <div
-            key={idx}
-            className="rounded-xl border border-[#8b4513]/20 bg-[#faf4e5]/60 p-4 flex flex-col justify-between h-[240px]"
-          >
-            <div className="flex items-center justify-between border-b border-[#8b4513]/10 pb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#8b4513]/30 animate-ping" />
-                <div className="h-3 w-28 bg-[#d1c0a8] rounded" />
-              </div>
-              <div className="h-4 w-12 bg-[#d1c0a8] rounded" />
-            </div>
-            <div className="flex-grow flex items-end gap-3 mt-4 mb-2 justify-center px-4">
-              <div className="h-[25%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
-              <div className="h-[45%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
-              <div className="h-[60%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
-              <div className="h-[75%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
-              <div className="h-[40%] w-full bg-[#d1c0a8]/50 rounded border-t border-[#8b4513]/10" />
-            </div>
-            <div className="h-2 w-20 bg-[#d1c0a8]/80 rounded mt-2" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function DashboardCanvas() {
   const {
     isEditingLayout,
     savedLayout,
     draftLayout,
     submenus,
+    activeSubmenuId,
     updateDraftLayout,
     isLoading,
     saveDraftToProduction,
@@ -97,18 +63,22 @@ export default function DashboardCanvas() {
 
   const ignoreLayoutChangeRef = useRef(false);
 
-  const activeTab = submenus.find((sub) => sub.isActive);
-  const activeTabId = activeTab ? activeTab.id : 'tab_1';
+  const currentSubmenu = useMemo(() => {
+    return submenus.find((s) => s.id === activeSubmenuId) || submenus[0];
+  }, [submenus, activeSubmenuId]);
+
+  const activeTabId = currentSubmenu ? currentSubmenu.id : 'tab_1';
 
   const currentLayout = useMemo(() => {
     return isEditingLayout
-      ? draftLayout[activeTabId] || []
-      : savedLayout[activeTabId] || [];
-  }, [isEditingLayout, draftLayout, savedLayout, activeTabId]);
+      ? draftLayout[activeTabId] || currentSubmenu?.layout || []
+      : savedLayout[activeTabId] || currentSubmenu?.layout || [];
+  }, [isEditingLayout, draftLayout, savedLayout, activeTabId, currentSubmenu]);
 
   const handleRemoveWidget = (widgetKey) => {
     const updated = currentLayout.filter((item) => item.i !== widgetKey);
     updateDraftLayout(activeTabId, updated);
+    saveDraftToProduction(true);
   };
 
   const handleLayoutChange = (newLayout) => {
@@ -119,17 +89,17 @@ export default function DashboardCanvas() {
       .filter((item) => item.i !== 'dropping' && !item.i.includes('__dropping-elem__'))
       .map((item) => {
         const baseId = item.i.split('-')[0];
-        const originalDef = TREASURY_WIDGETS[baseId]?.layout || {};
+        const originalDef = TREASURY_WIDGETS[baseId]?.layout || TREASURY_WIDGETS[item.i]?.layout || {};
         return {
           i: item.i,
           x: item.x,
           y: item.y,
           w: item.w,
           h: item.h,
-          minW: originalDef.minW || item.minW,
-          maxW: originalDef.maxW || item.maxW,
-          minH: originalDef.minH || item.minH,
-          maxH: originalDef.maxH || item.maxH,
+          minW: originalDef.minW || item.minW || 2,
+          maxW: originalDef.maxW || item.maxW || 12,
+          minH: originalDef.minH || item.minH || 2,
+          maxH: originalDef.maxH || item.maxH || 6,
         };
       });
 
@@ -141,7 +111,9 @@ export default function DashboardCanvas() {
   const cols = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 1 };
 
   if (isLoading) {
-    return <DashboardSkeleton />;
+    return (
+      <div className="flex-grow p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none bg-[#e8dcb8]" />
+    );
   }
 
   return (
@@ -155,13 +127,6 @@ export default function DashboardCanvas() {
         `,
         boxShadow: 'inset 0 0 60px rgba(75, 44, 32, 0.4), inset 0 0 15px rgba(0,0,0,0.3)'
       }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      }}
-      onDragEnter={(e) => {
-        e.preventDefault();
-      }}
     >
       {currentLayout.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center pointer-events-none z-0">
@@ -171,7 +136,7 @@ export default function DashboardCanvas() {
           </h3>
           <p className="text-xs text-[#5d4037] max-w-sm mt-1 leading-normal font-serif">
             {isEditingLayout
-              ? "Drag and drop components from the manifest on the right onto this canvas to place widgets."
+              ? "Click the '+' icon in the sidebar manifest to deploy widgets onto this canvas."
               : "Reforge layout in Workspace Configs to deploy visual analytical widgets."}
           </p>
         </div>
@@ -179,6 +144,7 @@ export default function DashboardCanvas() {
 
       <div className={`flex-1 w-full ${isEditingLayout ? 'border-[2px] border-dashed border-[#8b4513]/40 rounded-xl p-2 h-full min-h-[600px] relative z-10' : 'h-full min-h-[600px] relative z-10'}`}>
         <ResponsiveGridLayout
+          key={`${activeTabId}-${currentLayout.length}`}
           className="layout"
           layouts={{
             lg: currentLayout,
@@ -202,7 +168,7 @@ export default function DashboardCanvas() {
         >
           {currentLayout.map((item) => {
             const baseId = item.i.split('-')[0];
-            const widget = TREASURY_WIDGETS[baseId];
+            const widget = TREASURY_WIDGETS[baseId] || TREASURY_WIDGETS[item.i];
 
             if (!widget) return <div key={item.i} className="hidden" />;
 
@@ -220,6 +186,7 @@ export default function DashboardCanvas() {
                   <WidgetComponent />
                 </div>
 
+                {/* RESTORED: Red 'X' Delete Button */}
                 {isEditingLayout && (
                   <button
                     onClick={(e) => {

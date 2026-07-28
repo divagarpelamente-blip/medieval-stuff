@@ -74,7 +74,6 @@ export default function SettingsSidebar() {
   });
 
   return (
-    // FIX APLICADO: Trocado o height fixo (h-[calc(100dvh-4rem)]) por "h-full"
     <aside className="w-80 h-full bg-[#faf4e5] border-r border-[#8b4513]/25 flex flex-col z-20 shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-[#8b4513]/50 scrollbar-track-[#faf4e5]">
       <div className="p-4 bg-[#f4e4bc] border-b border-[#8b4513]/25 flex items-center gap-2">
         <SlidersHorizontal className="text-[#5d4037]" size={16} />
@@ -149,11 +148,15 @@ export default function SettingsSidebar() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[9px] text-[#5d4037] uppercase tracking-widest font-mono">Filter Division</label>
+                  {/* FIX: Aligned dropdown values precisely with the new industry-standard category taxonomy */}
                   <select value={widgetCategory} onChange={(e) => setWidgetCategory(e.target.value)} className="bg-[#faf4e5] text-[#4b2c20] border border-[#8b4513]/30 rounded px-2 py-1.5 text-xs font-serif outline-none focus:border-[#5d4037] hover:border-[#8b4513]/50 transition-colors shadow-sm">
                     <option value="All">All Widgets</option>
-                    <option value="overview">Overview Division</option>
-                    <option value="chart">Analytical Curves</option>
-                    <option value="ledger">Ledger Breakdowns</option>
+                    <option value="kpi">KPIs & Metrics</option>
+                    <option value="trend">Analytical Trends</option>
+                    <option value="distribution">Distributions</option>
+                    <option value="entity">Entities & Risk</option>
+                    <option value="ratio">Financial Ratios</option>
+                    <option value="ledger">Operational Ledgers</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-2.5">
@@ -164,9 +167,24 @@ export default function SettingsSidebar() {
                         <p className="text-[10px] text-[#5d4037] leading-normal font-serif italic">{widget.description || "Reflects ledger records onto visual charts."}</p>
                         <span className="text-[9px] text-[#455a64] font-mono mt-0.5">Size Footprint: {widget.layout.w}x{widget.layout.h}</span>
                       </div>
-                      <div onClick={() => deployWidget(activeTabId, key, widget)} className="relative w-20 h-16 shrink-0 bg-[#f4e4bc] border border-[#8b4513]/30 rounded hover:border-[#5d4037] transition-all cursor-pointer overflow-hidden flex items-center justify-center group/preview" title="Deploy Structure to Workspace">
-                        <span className="text-[8px] font-mono text-[#5d4037] group-hover/preview:text-[#4b2c20] transition-colors select-none tracking-widest uppercase">⚜️ {widget.layout.w}x{widget.layout.h}</span>
-                        <button onClick={(e) => { e.stopPropagation(); deployWidget(activeTabId, key, widget); }} className="absolute top-1 right-1 p-0.5 rounded bg-[#faf4e5] border border-[#8b4513]/30 text-[#5d4037] hover:bg-[#5d4037] hover:text-[#f4e4bc] hover:border-transparent transition-all" title="Deploy"><Plus size={10} className="stroke-[3]" /></button>
+                      
+                      {/* FIX: Cleaned up click handlers to prevent event bubbling conflicts and ensure deployment works seamlessly */}
+                      <div 
+                        onClick={() => deployWidget(activeTabId, key, widget)} 
+                        className="relative w-20 h-16 shrink-0 bg-[#f4e4bc] border border-[#8b4513]/30 rounded hover:border-[#5d4037] transition-all cursor-pointer overflow-hidden flex items-center justify-center group/preview" 
+                        title="Deploy Structure to Workspace"
+                      >
+                        <span className="text-[8px] font-mono text-[#5d4037] group-hover/preview:text-[#4b2c20] transition-colors select-none tracking-widest uppercase">🏛️ {widget.layout.w}x{widget.layout.h}</span>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            deployWidget(activeTabId, key, widget); 
+                          }} 
+                          className="absolute top-1 right-1 p-0.5 rounded bg-[#faf4e5] border border-[#8b4513]/30 text-[#5d4037] hover:bg-[#5d4037] hover:text-[#f4e4bc] hover:border-transparent transition-all" 
+                          title="Deploy"
+                        >
+                          <Plus size={10} className="stroke-[3]" />
+                        </button>
                       </div>
                     </div>
                   ))}
