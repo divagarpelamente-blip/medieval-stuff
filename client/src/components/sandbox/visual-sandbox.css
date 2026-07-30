@@ -1,0 +1,78 @@
+/* client/src/components/sandbox/visual-sandbox.css */
+
+.parchment-bg {
+  background-color: #f4e8d3;
+  background-image: 
+    radial-gradient(circle at center, transparent 0%, rgba(200, 175, 130, 0.4) 100%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+  color: #3b2c1f;
+}
+
+.leather-border {
+  border: 8px solid #4a2e15;
+  border-radius: 6px;
+  box-shadow: 
+    inset 0 0 12px 4px rgba(30, 15, 5, 0.7),
+    0 6px 12px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+
+.leather-border::before {
+  content: '';
+  position: absolute;
+  top: -6px; left: -6px; right: -6px; bottom: -6px;
+  border: 1px solid #231205;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.medieval-scrollbar::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.medieval-scrollbar::-webkit-scrollbar-track {
+  background: #6b4423;
+  border-left: 2px solid #3a2210;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.6);
+}
+
+.medieval-scrollbar::-webkit-scrollbar-thumb {
+  background: #8b5a2b;
+  border-radius: 4px;
+  border: 2px solid #4a2e15;
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.2);
+}
+
+.medieval-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a06b35;
+}
+
+.medieval-scrollbar::-webkit-scrollbar-corner {
+  background: #4a2e15;
+}
+
+/* 9-Slice Border Image Class (Disabled as requested) */
+.medieval-frame {
+  /* Removed borders and background styles */
+}
+
+/* Insights Scroll Tab Style */
+.insights-scroll-tab {
+  background-image: url('../../assets/insights_scroll_tab.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: none;
+  background-color: transparent;
+  color: #5c4033 !important;
+  font-family: serif;
+  font-weight: 800;
+  text-shadow: 0.5px 0.5px 1px rgba(255, 255, 255, 0.6);
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  box-shadow: none !important;
+}

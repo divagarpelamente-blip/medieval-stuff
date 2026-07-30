@@ -1,11 +1,11 @@
 // client/src/components/dashboard/DashboardHeader.jsx
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { useInteractiveStore } from '../../store/useInteractiveStore';
 import { Sliders, Check, X, Loader2, FilterX } from 'lucide-react';
 
-export default function DashboardHeader() {
+export default function DashboardHeader({ onExitRequest, onToggleEditRequest, onDismissRequest }) {
   const {
     isEditingLayout,
     hasUnsavedChanges,
@@ -23,58 +23,39 @@ export default function DashboardHeader() {
     return [...submenus];
   }, [submenus]);
 
-  const handleToggleEditMode = async () => {
-    if (isEditingLayout && hasUnsavedChanges) {
-      const confirmSave = window.confirm(
-        "You have unsaved layout changes. Save them before closing options?\n\nPress OK to Save, or Cancel to Discard."
-      );
-      if (confirmSave) {
-        await saveDraftToProduction();
-      }
+  const handleToggleEditMode = () => {
+    if (isEditingLayout) {
+      onToggleEditRequest();
+    } else {
+      toggleEditMode(true);
     }
-    toggleEditMode(!isEditingLayout);
   };
 
-  const handleDismissDraft = async () => {
-    if (isEditingLayout && hasUnsavedChanges) {
-      const confirmSave = window.confirm(
-        "You have unsaved layout changes. Save them before closing options?\n\nPress OK to Save, or Cancel to Discard."
-      );
-      if (confirmSave) {
-        await saveDraftToProduction();
-      }
-    }
-    toggleEditMode(false);
-  };
-
-  const handleExitDashboard = async () => {
-    const confirmSave = window.confirm(
-      "Do you want to save your current layout before exiting?\n\nPress OK to Save and Exit, or Cancel to discard changes and exit."
-    );
-    if (confirmSave) {
-      await saveDraftToProduction();
+  const handleDismissDraft = () => {
+    if (isEditingLayout) {
+      onDismissRequest();
     } else {
       toggleEditMode(false);
     }
-    window.dispatchEvent(new CustomEvent('close-dashboard'));
+  };
+
+  const handleExitDashboard = () => {
+    if (isEditingLayout) {
+      onExitRequest();
+    } else {
+      toggleEditMode(false);
+      window.dispatchEvent(new CustomEvent('close-dashboard'));
+    }
   };
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        handleExitDashboard();
-      }
-    };
-
     const handleOutsideClick = () => {
       handleExitDashboard();
     };
 
-    window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('trigger-dashboard-exit', handleOutsideClick);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('trigger-dashboard-exit', handleOutsideClick);
     };
   }, [isEditingLayout, hasUnsavedChanges]);
@@ -160,27 +141,7 @@ export default function DashboardHeader() {
           </div>
         )}
 
-        {isEditingLayout && (
-          <>
-            <button
-              onClick={handleDismissDraft}
-              disabled={isSaving || isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#be123c]/40 bg-[#be123c]/10 text-xs font-serif font-bold tracking-wide text-[#be123c] hover:bg-[#be123c]/20 hover:text-[#9f1239] transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-            >
-              <X size={14} />
-              Dismiss Draft
-            </button>
 
-            <button
-              onClick={() => saveDraftToProduction()}
-              disabled={isSaving || isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#047857]/40 bg-[#047857]/10 text-xs font-serif font-bold tracking-wide text-[#047857] hover:bg-[#047857]/20 hover:text-[#065f46] hover:shadow-[0_0_12px_rgba(4,120,87,0.2)] transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-            >
-              <Check size={14} />
-              Seal Layout
-            </button>
-          </>
-        )}
 
         <button
           onClick={handleExitDashboard}
