@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { useKingdomStore } from './store/useKingdomStore';
 import MainMenu from './pages/MainMenu';
-import DashboardWidgetsSandbox from './components/sandbox/dashboard-widgets-sandbox'; // FIX: Added components/ to the path
 import Login from './components/auth/Login';
 
 export default function App() {
@@ -19,12 +18,6 @@ export default function App() {
       };
     }
   }, [initAuth]);
-
-  // Roteamento para a Sandbox
-  const path = window.location.pathname;
-  if (path === '/sandbox') {
-    return <DashboardWidgetsSandbox />;
-  }
 
   // Barreira de Segurança: Se não há utilizador logado, mostra o Login.
   // Isto impede o "profile_id=is.null" que vimos no erro da rede.
