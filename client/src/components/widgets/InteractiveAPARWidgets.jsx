@@ -374,3 +374,92 @@ export const InteractiveLedger = () => {
         </div>
     );
 };
+
+// ==========================================
+// WIDGET 8: Interactive Merged Volume
+// ==========================================
+export const InteractiveMergedVolume = () => {
+    const { data, isFetching } = useInteractiveData();
+    const { filters, setFilter } = useInteractiveStore();
+    const [viewMode, setViewMode] = useState('category');
+
+    const rawData = viewMode === 'category' ? (data?.category_summary || []) : (data?.entity_summary || []);
+    const displayData = rawData.slice(0, 10);
+
+    const activeFilterValue = viewMode === 'category' ? filters.categoryFilter : filters.entityFilter;
+
+    const handleClear = () => {
+        if (viewMode === 'category') setFilter('categoryFilter', null);
+        else setFilter('entityFilter', null);
+    };
+
+    const handleBarClick = (entry, index, e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (viewMode === 'category') {
+            setFilter('categoryFilter', entry.name === filters.categoryFilter ? null : entry.name);
+        } else {
+            setFilter('entityFilter', entry.name === filters.entityFilter ? null : entry.name);
+        }
+    };
+
+    return (
+        <div className="relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-4 shadow-sm overflow-hidden">
+            {isFetching && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none rounded-xl"><Loader2 className="animate-spin text-amber-500" /></div>}
+            
+            {activeFilterValue && <LocalClearBtn onClear={handleClear} />}
+
+            <div className="flex items-center justify-between mb-4 shrink-0">
+                <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Top 10 Volume</h3>
+                
+                <div className="flex bg-gray-100 p-0.5 rounded-md">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setViewMode('category'); }}
+                        className={`cancel-drag [&>*]:pointer-events-none px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${viewMode === 'category' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Category
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setViewMode('entity'); }}
+                        className={`cancel-drag [&>*]:pointer-events-none px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${viewMode === 'entity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Entity
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 w-full min-h-0 relative cancel-drag">
+                {displayData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={displayData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                            <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
+                            <XAxis type="number" hide />
+                            <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
+                            <Tooltip
+                                formatter={(value) => [formatValue(value), 'Amount']}
+                                contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                                cursor={{ fill: '#f3f4f6' }}
+                            />
+                            <Bar
+                                dataKey="value"
+                                radius={[0, 4, 4, 0]}
+                                barSize={20}
+                                isAnimationActive={false}
+                                onClick={handleBarClick}
+                            >
+                                {displayData.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={activeFilterValue === entry.name ? '#0284c7' : '#9ca3af'}
+                                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 italic font-mono">No data matches filters.</div>
+                )}
+            </div>
+        </div>
+    );
+};

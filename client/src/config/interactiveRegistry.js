@@ -7,7 +7,8 @@ import {
   InteractiveArrear,
   InteractiveCategory,
   InteractiveEntity,
-  InteractiveLedger
+  InteractiveLedger,
+  InteractiveMergedVolume
 } from '../components/widgets/InteractiveAPARWidgets';
 
 export const INTERACTIVE_WIDGETS = {
@@ -59,5 +60,12 @@ export const INTERACTIVE_WIDGETS = {
     description: "Master table that outputs exactly what the interactive filters dictate.", 
     category: "interactive", 
     layout: { w: 8, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 8 } 
+  },
+  inter_merged_volume: {
+    name: "Merged Volume Flow",
+    component: InteractiveMergedVolume,
+    description: "Clickable bar chart containing embedded Category and Entity volume toggles, limited to the top 10.",
+    category: "interactive",
+    layout: { w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 }
   }
 };
