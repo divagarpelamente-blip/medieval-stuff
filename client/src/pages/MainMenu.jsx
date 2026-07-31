@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useKingdomStore } from '../store/useKingdomStore';
 import Dashboard from '../pages/Dashboard';
+import FinancialAlerts from '../pages/FinancialAlerts';
 import Modal from '../components/ui/Modal';
 import TreasuryController from '../components/features/Ledger/TreasuryController';
 import SettingsController from '../components/features/settings/SettingsController';
@@ -17,7 +18,12 @@ export default function MainMenu() {
   const fetchFlatMatrix = store?.fetchFlatMatrix;
 
   const [activeModal, setActiveModal] = useState(null);
-  const [viewMode, setViewMode] = useState('tablet'); // Initialize default to Tablet
+  const [viewMode, setViewMode] = useState('tablet'); 
+  
+  const [isTreasuryExpanded, setIsTreasuryExpanded] = useState(false);
+  
+  // Ref to detect clicks outside the treasury menu
+  const treasuryRef = useRef(null);
 
   useEffect(() => {
     if (fetchFlatMatrix) {
@@ -36,34 +42,62 @@ export default function MainMenu() {
     };
   }, []);
 
+  // Handle Escape key and Click Outside for the Treasury drop-up
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isTreasuryExpanded) {
+        setIsTreasuryExpanded(false);
+      }
+    };
+
+    const handleClickOutside = (e) => {
+      if (treasuryRef.current && !treasuryRef.current.contains(e.target)) {
+        setIsTreasuryExpanded(false);
+      }
+    };
+
+    if (isTreasuryExpanded) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isTreasuryExpanded]);
+
   const modalMetadata = {
+    finance_advisor: { icon: '📋', title: 'Finance Advisor', subtitle: 'Royal Financial Alerts' },
+    placeholder01: { icon: '🚧', title: 'Placeholder01', subtitle: 'Under Construction' },
     quests: { icon: '⚔️', title: 'Quests', subtitle: 'Sovereign objectives and campaigns' },
+    treasury_dashboard: { icon: '📈', title: 'Treasury Dashboard', subtitle: 'Financial KPIs and Visualizations' },
+    general_ledger: { icon: '📜', title: 'General Ledger', subtitle: 'Double-entry asset balance and registry' },
+    financial_statements: { icon: '📊', title: 'Financial Statements', subtitle: 'Income, Balance Sheet & Cash Flow' },
     achievements: { icon: '🏆', title: 'Achievements', subtitle: 'Unveiled royal milestones' },
-    treasury: { icon: '🏦', title: 'Treasury', subtitle: 'Double-entry asset balance and registry' },
-    dashboard: { icon: '🏰', title: 'Dashboard', subtitle: 'Command province dashboard' },
     settings: { icon: '⚙️', title: 'Settings', subtitle: 'Citadel identity configurations' }
   };
 
   const currentMeta = activeModal ? modalMetadata[activeModal] : null;
 
-  // Resolves the CSS boundaries for the simulated device screen (Horizontal/Landscape)
   const getViewClasses = () => {
     switch (viewMode) {
       case 'phone': 
-        // iPhone Landscape standard bounds
         return 'w-full max-w-[844px] h-[390px] max-h-[95dvh] border-y-4 border-x-[16px] rounded-[2.5rem] border-stone-900 shadow-[0_0_80px_rgba(0,0,0,0.8)]';
       case 'tablet': 
       default: 
-        // iPad Landscape standard bounds
         return 'w-full max-w-[1180px] h-[820px] max-h-[95dvh] border-y-4 border-x-[16px] rounded-3xl border-stone-900 shadow-[0_0_80px_rgba(0,0,0,0.8)]';
     }
   };
 
+  const openSubMenu = (modalKey) => {
+    setActiveModal(modalKey);
+    setIsTreasuryExpanded(false);
+  };
+
   return (
-    // Outer Monitor Void
     <div className="w-full h-dvh bg-stone-950 flex items-center justify-center overflow-hidden">
       
-      {/* Simulated Device Screen (Using @container for future widget queries) */}
       <div 
         className={`relative mx-auto text-stone-100 flex flex-col justify-between font-serif overflow-hidden transition-all duration-500 ease-in-out @container ${getViewClasses()}`}
         style={{
@@ -73,10 +107,8 @@ export default function MainMenu() {
         }}
       >
         
-        {/* Avatar & View Toggle HUD - Hidden when a module is open */}
         {activeModal === null && (
           <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4">
-            {/* Avatar Profile Row */}
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-full bg-stone-800 border-2 border-amber-600/60 shadow-[0_0_15px_rgba(217,119,6,0.3)] flex items-center justify-center overflow-hidden">
                 <img 
@@ -90,7 +122,6 @@ export default function MainMenu() {
               </span>
             </div>
             
-            {/* Viewport Simulation Controls */}
             <div className="flex bg-stone-900/80 p-1 rounded-lg border border-amber-900/40 backdrop-blur-sm shadow-lg">
               {['tablet', 'phone'].map(mode => (
                 <button
@@ -109,26 +140,77 @@ export default function MainMenu() {
           </div>
         )}
 
-        <main className="flex-grow flex flex-col items-center justify-end px-4 pb-16 z-10 w-full min-h-0">
+        <main className="flex-grow flex flex-col items-center justify-end px-4 pb-8 z-10 w-full min-h-0">
           {activeModal === null ? (
-            <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in flex-wrap">
+            <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in flex-wrap relative">
+              
+              {/* 1. Finance Advisor */}
+              <button onClick={() => setActiveModal('finance_advisor')} title="Finance Advisor" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">📋</button>
+              
+              {/* 2. Placeholder01 */}
+              <button onClick={() => setActiveModal('placeholder01')} title="Placeholder01" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🚧</button>
+              
+              {/* 3. Quests */}
               <button onClick={() => setActiveModal('quests')} title="Quests" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">⚔️</button>
+              
+              {/* 4. Treasury */}
+              <div className="relative flex flex-col items-start" ref={treasuryRef}>
+                {isTreasuryExpanded && (
+                  <div className="absolute bottom-[calc(100%+1.5rem)] left-0 flex flex-col bg-stone-900/95 backdrop-blur-md border border-amber-700/50 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] overflow-hidden animate-fade-in z-50 min-w-max">
+                    <button 
+                      onClick={() => openSubMenu('general_ledger')} 
+                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-amber-100 hover:text-white hover:bg-amber-800/50 border-b border-amber-900/30 transition-colors whitespace-nowrap"
+                    >
+                      📜 General Ledger
+                    </button>
+                    <button 
+                      onClick={() => openSubMenu('financial_statements')} 
+                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-amber-100 hover:text-white hover:bg-amber-800/50 border-b border-amber-900/30 transition-colors whitespace-nowrap"
+                    >
+                      📊 Financial Statements
+                    </button>
+                    <button 
+                      onClick={() => openSubMenu('treasury_dashboard')} 
+                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-amber-100 hover:text-white hover:bg-amber-800/50 transition-colors whitespace-nowrap"
+                    >
+                      📈 Treasury Dashboard
+                    </button>
+                  </div>
+                )}
+                <button 
+                  onClick={() => setIsTreasuryExpanded(!isTreasuryExpanded)} 
+                  title="Treasury" 
+                  className={`text-3xl transition-all duration-200 cursor-pointer focus:outline-none ${
+                    isTreasuryExpanded 
+                      ? 'grayscale-0 scale-125 drop-shadow-[0_0_15px_rgba(251,191,36,0.7)]' 
+                      : 'grayscale hover:grayscale-0 hover:scale-125'
+                  }`}
+                >
+                  🏦
+                </button>
+              </div>
+
+              {/* 5. Achievements */}
               <button onClick={() => setActiveModal('achievements')} title="Achievements" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏆</button>
-              <button onClick={() => setActiveModal('treasury')} title="Treasury" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏦</button>
-              <button onClick={() => setActiveModal('dashboard')} title="Dashboard" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏰</button>
+              
+              {/* 6. Settings */}
               <button onClick={() => setActiveModal('settings')} title="Settings" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">⚙️</button>
             </div>
-          ) : activeModal === 'treasury' ? (
-            <TreasuryController onClose={() => setActiveModal(null)} />
-          ) : activeModal === 'dashboard' ? (
-            /* Dashboard Clickable Backdrop Wrapper */
+          
+          ) : activeModal === 'finance_advisor' ? (
+            <FinancialAlerts onClose={() => setActiveModal(null)} />
+          ) : activeModal === 'general_ledger' ? (
+            <TreasuryController initialView="ledger" onClose={() => setActiveModal(null)} />
+          ) : activeModal === 'financial_statements' ? (
+            <TreasuryController initialView="statements" onClose={() => setActiveModal(null)} />
+          ) : activeModal === 'treasury_dashboard' ? (
             <div 
               className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm"
               onClick={() => window.dispatchEvent(new CustomEvent('trigger-dashboard-exit'))}
             >
               <div 
                 className="absolute top-4 bottom-4 left-2 right-2 md:top-6 md:bottom-6 md:left-6 md:right-6 bg-stone-950 rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(0,0,0,0.95)] border border-amber-900/60"
-                onClick={(e) => e.stopPropagation()} /* Prevents clicks inside the dashboard from closing it */
+                onClick={(e) => e.stopPropagation()} 
               >
                 <Dashboard />
               </div>

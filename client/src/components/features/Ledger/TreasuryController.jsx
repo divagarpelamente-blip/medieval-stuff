@@ -11,10 +11,11 @@ import LedgerTable from './LedgerTable';
  * Manages transition transitions between the root submenu and the 
  * placeholder double-entry worksheets.
  * 
+ * @param {string} initialView - Bypasses the menu and loads a specific view directly
  * @param {function} onClose - Router termination callback returning to main hub
  */
-export default function TreasuryController({ onClose }) {
-  const [activeView, setActiveView] = useState('menu'); // 'menu' | 'ledger' | 'statements' | 'dashboard'
+export default function TreasuryController({ initialView, onClose }) {
+  const [activeView, setActiveView] = useState(initialView || 'menu'); // 'menu' | 'ledger' | 'statements' | 'dashboard'
   const [editingTransaction, setEditingTransaction] = useState(null); // Shared state for edit mode
 
   // Map view types for header configurations
@@ -68,7 +69,11 @@ export default function TreasuryController({ onClose }) {
         subtitle="Royal Treasury - General Ledger"
         maxWidth="max-w-5xl" // Reduced width for a stacked layout
         onClose={() => {
-          setActiveView('menu');
+          if (initialView) {
+            onClose(); // Closes the modal and goes back to the Main Menu map
+          } else {
+            setActiveView('menu'); // Falls back to the old internal selector menu
+          }
           setEditingTransaction(null);
         }}
       >
@@ -101,7 +106,13 @@ export default function TreasuryController({ onClose }) {
       title={currentViewMeta?.title || 'Treasury Module'}
       icon={currentViewMeta?.icon || '🏦'}
       subtitle={`Royal Treasury - ${currentViewMeta?.title}`}
-      onClose={() => setActiveView('menu')}
+      onClose={() => {
+        if (initialView) {
+          onClose(); // Closes the modal and goes back to the Main Menu map
+        } else {
+          setActiveView('menu'); // Falls back to the old internal selector menu
+        }
+      }}
     >
       <div className="flex flex-col items-center justify-center p-12 text-center opacity-50">
         <span className="text-4xl mb-4">🚧</span>
@@ -109,10 +120,16 @@ export default function TreasuryController({ onClose }) {
           This area will be defined later
         </p>
         <button
-          onClick={() => setActiveView('menu')}
+          onClick={() => {
+            if (initialView) {
+              onClose();
+            } else {
+              setActiveView('menu');
+            }
+          }}
           className="mt-8 text-amber-500 hover:text-amber-400 uppercase tracking-widest font-bold text-sm focus:outline-none"
         >
-          ⟵ Return to Menu
+          ⟵ {initialView ? 'Return to Hub' : 'Return to Menu'}
         </button>
       </div>
     </Modal>

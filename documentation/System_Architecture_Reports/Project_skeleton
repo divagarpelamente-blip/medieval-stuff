@@ -1,0 +1,130 @@
+# Project Skeleton
+
+This document provides a comprehensive map of the project files, organized by directories, along with a description of their roles within the medieval ledger/dashboard system.
+
+---
+
+## 📂 Section 1: File Structure by Directory
+
+### 🖥️ Client Root
+* [package.json](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/package.json)
+* [vite.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/vite.config.js)
+* [index.html](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/index.html)
+* [tailwind.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/tailwind.config.js)
+* [postcss.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/postcss.config.js)
+
+### 🎨 Src Assets (`client/src/assets/`)
+* [hero.png](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/hero.png)
+* [dashboard_frame_mockup.png](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/dashboard_frame_mockup.png)
+* [insights_scroll_tab.png](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/insights_scroll_tab.png)
+* [Medieval_Town_Backround.jfif](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/Medieval_Town_Backround.jfif)
+* [Parchement_01.jfif](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/Parchement_01.jfif)
+* [Treasury_Interior.png](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/Treasury_Interior.png)
+* *(Various medieval structures illustrations: Building_Market, Building_Mine, Building_Townhall, etc.)*
+
+### 🧱 Components (`client/src/components/`)
+* **Auth**:
+  * [Login.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/auth/Login.jsx)
+* **Dashboard**:
+  * [DashboardCanvas.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/DashboardCanvas.jsx)
+  * [DashboardHeader.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/DashboardHeader.jsx)
+  * [SettingsSidebar.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/SettingsSidebar.jsx)
+* **Features/Ledger**:
+  * [LedgerModal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/Ledger/LedgerModal.jsx)
+  * [LedgerTable.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/Ledger/LedgerTable.jsx)
+  * [TransactionForm.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/Ledger/TransactionForm.jsx)
+  * [TreasuryController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/Ledger/TreasuryController.jsx)
+* **Features/Settings**:
+  * [SettingsController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/settings/SettingsController.jsx)
+* **Layout**:
+  * [BottomNav.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Layout/BottomNav.jsx)
+  * [HUD.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Layout/HUD.jsx)
+  * [IsometricMap.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Layout/IsometricMap.jsx)
+* **Sandbox**:
+  * [dashboard-visual-sandbox.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/dashboard-visual-sandbox.jsx)
+  * [visual-sandbox.css](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/visual-sandbox.css)
+* **UI Utilities**:
+  * [Modal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/ui/Modal.jsx)
+  * [ModalSubmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/ui/ModalSubmenus.jsx)
+  * [ModalTabmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/ui/ModalTabmenus.jsx)
+* **Dashboard Widgets**:
+  * [AssetAllocationChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/AssetAllocationChart.jsx)
+  * [CashFlowChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/CashFlowChart.jsx)
+  * [HandDrawnCashFlowWidget.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/HandDrawnCashFlowWidget.jsx)
+  * [InteractiveAPARWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/InteractiveAPARWidgets.jsx)
+  * [NetWorthChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/NetWorthChart.jsx)
+  * [Phase1ChartWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase1ChartWidgets.jsx)
+  * [Phase1KpiWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase1KpiWidgets.jsx)
+  * [Phase2EntityWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase2EntityWidgets.jsx)
+  * [Phase2PieWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase2PieWidgets.jsx)
+  * [Phase3FilteredWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase3FilteredWidgets.jsx)
+  * [Phase3RatioWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase3RatioWidgets.jsx)
+  * [Phase4LedgerWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase4LedgerWidgets.jsx)
+
+### ⚙️ Configurations (`client/src/config/`)
+* [accountMappings.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/accountMappings.js)
+* [dashboard.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/dashboard.config.js)
+* [interactiveRegistry.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/interactiveRegistry.js)
+* [treasuryRegistry.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/treasuryRegistry.js)
+* [UI_UX.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/UI_UX.js)
+
+### 🪝 React Hooks & Libs (`client/src/hooks/` & `client/src/lib/`)
+* [useInteractiveData.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/hooks/useInteractiveData.js)
+* [supabaseClient.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/lib/supabaseClient.js)
+
+### 📄 Pages & Main Entry (`client/src/pages/` & `client/src/`)
+* [Dashboard.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/pages/Dashboard.jsx)
+* [MainMenu.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/pages/MainMenu.jsx)
+* [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx)
+* [main.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/main.jsx)
+* [index.css](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/index.css)
+
+### 💾 Zustand State Stores (`client/src/store/`)
+* [useDashboardStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useDashboardStore.js)
+* [useInteractiveStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useInteractiveStore.js)
+* [useKingdomStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useKingdomStore.js)
+
+### 🛠️ Localization & Utilities (`client/src/utils/`)
+* [chartAnalytics.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/utils/chartAnalytics.js)
+* **Locales** (`client/src/utils/locales/`):
+  * de.js, en.js, es.js, fr.js, pt-BR.js
+
+### ☁️ Supabase Configuration & Functions (`supabase/`)
+* [config.toml](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/supabase/config.toml)
+* **Functions**:
+  * [process-gamification/index.ts](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/supabase/functions/process-gamification/index.ts)
+
+### 📖 Documentation (`documentation/`)
+* [dashboard_configuration.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/documentation/dashboard_configuration.md)
+* [dashboard_migration_checklist.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/documentation/dashboard_migration_checklist.md)
+* [Eldoria Architecture Rulebook.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/documentation/Eldoria%20Architecture%20Rulebook.md)
+* [sandbox_specs.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/documentation/sandbox_specs.md)
+* [schema_information.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/documentation/schema_information.md)
+* [setup_rls_transactions.sql](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/documentation/setup_rls_transactions.sql)
+* [signup.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/documentation/signup.md)
+
+---
+
+## 📝 Section 2: Purpose of Core Components
+
+### 🖥️ Page Layout & Navigation
+* **MainMenu.jsx**: Provides the core desktop-styled view containing the isometric map, HUD dashboard shortcuts, and localized options menu buttons.
+* **App.jsx & main.jsx**: Main React application shell handling queries, authorization wrappers, and routing.
+* **HUD.jsx**: Displays the heads-up status bar (gold, mana, resources) and links to toggle main screen tabs.
+* **IsometricMap.jsx**: Renders the village overview map, processing click coordinates for active zones (Tavern, Townhall, Treasury) to open respective overlay modals.
+
+### 📊 Dashboard Core
+* **Dashboard.jsx**: Page container wrapping the header, settings sidebar, canvas grid, and the new **exit confirmation modal overlay**.
+* **DashboardHeader.jsx**: Top-bar navigation inside the dashboard that supports active tab menus, layout locking/unlocking, and hooks the exit request dialogs.
+* **DashboardCanvas.jsx**: Integrates `react-grid-layout` to support drag, drop, and resize functionalities for active widgets in Edit/Options mode.
+* **SettingsSidebar.jsx**: Sidebar configuration listing available card widgets and layout settings when Edit mode is toggled on.
+
+### 💾 Zustand Stores
+* **useDashboardStore.js**: Manages grid positions, active tabs, layout modes (View/Edit), and handles local saving of layout presets.
+* **useInteractiveStore.js**: Manages global data filters (like dates, categories) across widgets.
+* **useKingdomStore.js**: Retains village building upgrades, levels, and resource statistics.
+
+### 🧱 Custom Dashboard Widgets
+* **InteractiveAPARWidgets.jsx**: Renders AP/AR waterfall tables and filters.
+* **HandDrawnCashFlowWidget.jsx**: Renders stylized, hand-drawn scroll tables summarizing cash movements.
+* **AssetAllocationChart.jsx, CashFlowChart.jsx, NetWorthChart.jsx**: Visual charts presenting key metrics from the Supabase databases.
