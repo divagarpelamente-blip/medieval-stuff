@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useKingdomStore } from '../../store/useKingdomStore';
+import { ArrowUp, ArrowDown, Shield } from 'lucide-react';
 
 const formatValue = (val, isPercentage = false, suffix = '', isDelta = false) => {
   const num = Number(val) || 0;
@@ -61,13 +62,15 @@ const useAllRatios = () => {
     
     const sortedExpMonths = Object.keys(expByMonth).sort();
     let expenseVariancePop = 0;
+    let currentExp = 0;
+    let priorExp = 0;
     
     if (sortedExpMonths.length >= 2) {
       const currentMonth = sortedExpMonths[sortedExpMonths.length - 1];
       const priorMonth = sortedExpMonths[sortedExpMonths.length - 2];
       
-      const currentExp = expByMonth[currentMonth] || 0;
-      const priorExp = expByMonth[priorMonth] || 0;
+      currentExp = expByMonth[currentMonth] || 0;
+      priorExp = expByMonth[priorMonth] || 0;
       
       expenseVariancePop = priorExp > 0 ? ((currentExp - priorExp) / priorExp) * 100 : 0;
     }
@@ -108,7 +111,9 @@ const useAllRatios = () => {
     return {
       avgMonthlyExpense, avgDailyExpense, survivalMonths,
       savingsRate, burnRate, dtiRatio, debtRatio,
-      monthlyWealthVariance, expenseVariancePop
+      monthlyWealthVariance, expenseVariancePop,
+      currentExp, priorExp,
+      totalIncome, totalExpenses
     };
   }, [categoryView, monthlyView, cumulativeView, metrics]);
 };
@@ -130,11 +135,159 @@ export const AvgDailyExpenseWidget = withRatioData('avgDailyExpense', 'Avg Daily
 export const SurvivalMonthsWidget = withRatioData('survivalMonths', 'Runway', 'Months of survivability', 'Liquidity / Burn', { suffix: 'Mos' });
 
 // Exports: Percentages & Ratios
-export const SavingsRateWidget = withRatioData('savingsRate', 'Savings Rate', 'Percentage of income retained', 'Net / Income', { isPercentage: true });
 export const BurnRateWidget = withRatioData('burnRate', 'Burn Rate', 'Percentage of income consumed', 'Expenses / Income', { isPercentage: true });
 export const DtiRatioWidget = withRatioData('dtiRatio', 'DTI Ratio', 'Debt payments vs gross income', 'Debt / Income', { isPercentage: true });
 export const DebtRatioWidget = withRatioData('debtRatio', 'Debt Ratio', 'Total Liabilities vs Total Assets', 'Liabilities / Assets', { isPercentage: true });
 
 // Exports: Variances (Deltas)
 export const WealthVarianceWidget = withRatioData('monthlyWealthVariance', 'Wealth Variance (MoM)', 'Delta shift in Net Worth', 'Current - Prior', { isDelta: true });
-export const ExpenseVarianceWidget = withRatioData('expenseVariancePop', 'Expense Variance (PoP)', 'Shift in spending vs prior period', 'Relative Delta', { isPercentage: true, isDelta: true });
+
+export const ExpenseVarianceWidget = () => {
+  const { expenseVariancePop, currentExp, priorExp } = useAllRatios();
+  
+  const isPositive = expenseVariancePop > 0;
+  const isNegative = expenseVariancePop < 0;
+  
+  const colorClass = isPositive 
+    ? 'text-rose-600 bg-rose-50 border-rose-200' 
+    : isNegative 
+      ? 'text-emerald-600 bg-emerald-50 border-emerald-200' 
+      : 'text-gray-500 bg-gray-50 border-gray-200';
+  
+  const textColorClass = isPositive 
+    ? 'text-rose-600' 
+    : isNegative 
+      ? 'text-emerald-600' 
+      : 'text-gray-500';
+
+  const Icon = isPositive ? ArrowUp : ArrowDown;
+
+  return (
+    <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-2.5 xs:p-4 sm:p-5 shadow-sm relative overflow-hidden">
+      {/* Background Crest/Shield Watermark */}
+      <div className="absolute right-4 top-4 text-gray-200/60 pointer-events-none">
+        <Shield className="w-12 h-12 xs:w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 stroke-[1]" />
+      </div>
+
+      {/* Header */}
+      <div className="flex justify-between items-start z-10">
+        <div>
+          <h3 className="text-[10px] xs:text-xs sm:text-sm font-sans font-semibold tracking-wider text-gray-600 uppercase">
+            Expense Variance (PoP)
+          </h3>
+        </div>
+      </div>
+
+      {/* Main Content Area (Absolute Data) */}
+      <div className="mt-2 xs:mt-3 flex flex-col justify-center z-10 flex-1">
+        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+          <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold text-gray-900 leading-tight">
+            {formatValue(currentExp)}g
+          </span>
+          <span className="text-[10px] xs:text-xs sm:text-sm text-gray-600 italic">Current Period</span>
+        </div>
+        
+        {/* Space between current period and previous period */}
+        <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Previous Period: <span className="font-semibold text-gray-800">{formatValue(priorExp)}g</span>
+          </div>
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Absolute Change:{' '}
+            <span className={`font-semibold ${textColorClass}`}>
+              {formatValue(currentExp - priorExp, false, 'g', true)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Divider & Relative Data */}
+      <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between z-10">
+        <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-sans font-semibold text-gray-600 uppercase tracking-wider">
+          Growth / Reduction
+        </span>
+        
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+          <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
+          <span className="text-xs xs:text-sm font-bold font-mono tracking-tight">
+            {formatValue(expenseVariancePop, true, '', true)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const SavingsRateWidget = () => {
+  const { savingsRate, totalIncome, totalExpenses } = useAllRatios();
+  
+  const netSavings = totalIncome - totalExpenses;
+  const isPositive = netSavings > 0;
+  const isNegative = netSavings < 0;
+  
+  const colorClass = isPositive 
+    ? 'text-emerald-600 bg-emerald-50 border-emerald-200' 
+    : isNegative 
+      ? 'text-rose-600 bg-rose-50 border-rose-200' 
+      : 'text-gray-500 bg-gray-50 border-gray-200';
+  
+  const textColorClass = isPositive 
+    ? 'text-emerald-600' 
+    : isNegative 
+      ? 'text-rose-600' 
+      : 'text-gray-500';
+
+  const Icon = isPositive ? ArrowUp : ArrowDown;
+
+  return (
+    <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-2.5 xs:p-4 sm:p-5 shadow-sm relative overflow-hidden">
+      {/* Background Crest/Shield Watermark */}
+      <div className="absolute right-4 top-4 text-gray-200/60 pointer-events-none">
+        <Shield className="w-12 h-12 xs:w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 stroke-[1]" />
+      </div>
+
+      {/* Header */}
+      <div className="flex justify-between items-start z-10">
+        <div>
+          <h3 className="text-[10px] xs:text-xs sm:text-sm font-sans font-semibold tracking-wider text-gray-600 uppercase">
+            Savings Rate
+          </h3>
+        </div>
+      </div>
+
+      {/* Main Content Area (Savings Rate %) */}
+      <div className="mt-2 xs:mt-3 flex flex-col justify-center z-10 flex-1">
+        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+          <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold text-gray-900 leading-tight">
+            {formatValue(savingsRate, true)}
+          </span>
+          <span className="text-[10px] xs:text-xs sm:text-sm text-gray-600 italic">Current Period</span>
+        </div>
+        
+        {/* Space between current period and absolute data */}
+        <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Total Income: <span className="font-semibold text-gray-800">{formatValue(totalIncome)}g</span>
+          </div>
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Total Expenses: <span className="font-semibold text-gray-800">{formatValue(totalExpenses)}g</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Divider & Relative Data */}
+      <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between z-10">
+        <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-sans font-semibold text-gray-600 uppercase tracking-wider">
+          Net Savings
+        </span>
+        
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+          <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
+          <span className="text-xs xs:text-sm font-bold font-mono tracking-tight">
+            {formatValue(netSavings, false, 'g', true)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};

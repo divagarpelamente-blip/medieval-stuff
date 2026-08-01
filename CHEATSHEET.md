@@ -31,3 +31,10 @@ Os workflows detalhados estão na pasta `.agents/workflows/`:
 1. [sandbox-creator.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/sandbox-creator.md): Automatiza a criação e o teste isolado de componentes na Sandbox.
 2. [workspace-cleanup.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/workspace-cleanup.md): Guia para remover com segurança ficheiros temporários (`*.cjs`) e desfazer injeções de teste.
 3. [widget-deployment.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/widget-deployment.md): Processo para mover widgets validados da Sandbox para a grelha de produção.
+4. [database-diagnostic.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/database-diagnostic.md): Workflow para auditoria de saúde da base de dados, RLS e integridade de restrições.
+5. [ui-compliance.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/ui-compliance.md): Workflow para verificação de performance visual, CSS transform scale e Event Shielding.
+6. [database-timeout-diagnostic.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/database-timeout-diagnostic.md): Roteiro padrão para auditar e corrigir queries lentas e garantir a performance das Views e RPCs do Supabase.
+7. [data-flow-compliance.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/data-flow-compliance.md): Regra de ouro que obriga ao uso de RPCs e Views do Supabase para cálculos, mantendo o front-end leve.
+8. [open-banking-integration.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/open-banking-integration.md): Arquitetura base para ligar contas reais da CGD e outros bancos europeus ao Eldoria via Edge Functions e GoCardless.
+
+

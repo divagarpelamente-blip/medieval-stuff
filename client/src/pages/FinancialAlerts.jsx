@@ -114,7 +114,8 @@ export default function FinancialAlerts({ onClose }) {
     const [sortConfigTop, setSortConfigTop] = useState({ key: 'displayDate', direction: 'asc' });
     const [sortConfigBottom, setSortConfigBottom] = useState({ key: 'displayDate', direction: 'asc' });
 
-    const handleSort = (table, key) => {
+    const handleSort = (table, key, e) => {
+        if (e) e.stopPropagation();
         if (table === 'top') {
             setSortConfigTop(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
         } else {
@@ -146,35 +147,38 @@ export default function FinancialAlerts({ onClose }) {
 
     const getBadgeStyle = (status) => {
         switch (status) {
-            case 'overdue': return 'bg-rose-200/80 text-black border-rose-400/60 font-extrabold';
-            case 'pay_today': return 'bg-orange-200/80 text-black border-orange-400/60 font-extrabold';
-            case 'due': return 'bg-amber-200/80 text-black border-amber-400/60 font-extrabold';
-            case 'not_due': return 'bg-emerald-200/80 text-black border-emerald-400/60 font-extrabold';
-            default: return 'bg-stone-200/80 text-black border-stone-400/60 font-extrabold';
+            case 'overdue': return 'bg-rose-900/20 text-rose-800 border-rose-800/30 font-extrabold';
+            case 'pay_today': return 'bg-amber-900/20 text-amber-800 border-amber-800/30 font-extrabold';
+            case 'due': return 'bg-amber-800/10 text-amber-750 border-amber-800/20 font-extrabold';
+            case 'not_due': return 'bg-emerald-900/20 text-emerald-800 border-emerald-800/30 font-extrabold';
+            default: return 'bg-stone-900/10 text-stone-700 border-stone-850/20 font-extrabold';
         }
     };
 
     const TableHeader = ({ sortKey, table, widthClass }) => (
         <th
-            className={`py-2 align-middle text-left text-[#4b2c20]/75 cursor-pointer hover:text-[#4b2c20] transition-colors ${widthClass}`}
-            onClick={() => handleSort(table, sortKey)}
+            className={`py-2 align-middle text-left text-[#4b2c20]/75 cursor-pointer hover:text-[#4b2c20] transition-colors duration-200 ${widthClass}`}
+            onClick={(e) => handleSort(table, sortKey, e)}
             title="Sort Column"
         >
             <div className="flex items-center">
-                <Menu size={14} />
+                <Menu size={14} className="mr-1" />
             </div>
         </th>
     );
 
     return (
-        <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 md:p-6" onClick={onClose}>
+        <div 
+            className="absolute inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 md:p-6" 
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+        >
             <div
                 className="w-full h-full max-w-[1400px] bg-[#faf4e5] rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)] border-4 border-[#8b4513] flex flex-col font-serif"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex items-center gap-4 p-4 border-b-2 border-[#4b2c20]/30 bg-[#8b4513] shrink-0 shadow-md">
-                    <div className="w-14 h-14 rounded-full bg-stone-850 border-2 border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.4)] flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-14 h-14 rounded-full bg-stone-900 border-2 border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.4)] flex items-center justify-center overflow-hidden shrink-0">
                         <img
                             src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix&backgroundColor=transparent"
                             alt="Advisor"
@@ -185,8 +189,8 @@ export default function FinancialAlerts({ onClose }) {
                         Financial Alerts
                     </h2>
                     <button
-                        onClick={onClose}
-                        className="ml-auto w-8 h-8 rounded-full bg-[#4b2c20]/45 border border-[#faf4e5]/30 flex items-center justify-center text-[#faf4e5] hover:text-white hover:bg-[#4b2c20]/60 transition-colors focus:outline-none shadow-sm font-sans"
+                        onClick={(e) => { e.stopPropagation(); onClose(); }}
+                        className="ml-auto w-8 h-8 rounded-full bg-[#4b2c20]/45 border border-[#faf4e5]/30 flex items-center justify-center text-[#faf4e5] hover:text-white hover:bg-[#4b2c20]/60 transition-colors duration-200 focus:outline-none shadow-sm font-sans"
                         title="Close"
                     >
                         ✕
@@ -197,25 +201,25 @@ export default function FinancialAlerts({ onClose }) {
                     {/* Hexagons */}
                     <div className="flex items-center justify-around gap-2 shrink-0">
                         <HexagonCard outerColor="bg-emerald-800" innerColor="bg-emerald-100">
-                            <CheckCircle2 size={24} className="text-emerald-600 mb-1" />
+                            <CheckCircle2 size={24} className="text-emerald-700 mb-1" />
                             <span className="text-[10px] uppercase tracking-wider text-emerald-800 font-bold">Not Due</span>
                             <span className="text-sm font-mono text-emerald-950 font-black mt-1">{formatCurrency(processedData.sums.notDue)}</span>
                         </HexagonCard>
 
                         <HexagonCard outerColor="bg-amber-700" innerColor="bg-amber-100">
-                            <Calendar size={24} className="text-amber-600 mb-1" />
+                            <Calendar size={24} className="text-amber-700 mb-1" />
                             <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Due</span>
                             <span className="text-sm font-mono text-amber-950 font-black mt-1">{formatCurrency(processedData.sums.due)}</span>
                         </HexagonCard>
 
                         <HexagonCard outerColor="bg-orange-700" innerColor="bg-orange-100">
-                            <AlertTriangle size={24} className="text-orange-600 animate-pulse mb-1" />
+                            <AlertTriangle size={24} className="text-orange-700 animate-pulse mb-1" />
                             <span className="text-[10px] uppercase tracking-wider text-orange-800 font-bold">Pay Today</span>
                             <span className="text-sm font-mono text-orange-950 font-black mt-1">{formatCurrency(processedData.sums.payToday)}</span>
                         </HexagonCard>
 
                         <HexagonCard outerColor="bg-rose-800" innerColor="bg-rose-100">
-                            <AlertOctagon size={24} className="text-rose-600 mb-1" />
+                            <AlertOctagon size={24} className="text-rose-700 mb-1" />
                             <span className="text-[10px] uppercase tracking-wider text-rose-800 font-bold">Overdue</span>
                             <span className="text-sm font-mono text-rose-950 font-black mt-1">{formatCurrency(processedData.sums.overdue)}</span>
                         </HexagonCard>
@@ -227,7 +231,7 @@ export default function FinancialAlerts({ onClose }) {
                         {/* Left: Urgent Action Required */}
                         <div className="flex flex-col bg-white border-2 border-[#8b4513]/20 rounded-xl p-4 min-h-0 overflow-hidden shadow-md">
                             <h3 className="text-xs font-serif font-bold text-[#4b2c20] uppercase tracking-widest mb-3 shrink-0 flex items-center gap-2 border-b border-[#8b4513]/20 pb-2">
-                                <AlertOctagon size={14} className="text-rose-600" /> Urgent Action Required
+                                <AlertOctagon size={14} className="text-rose-700" /> Urgent Action Required
                             </h3>
                             <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-amber-800/30 scrollbar-track-transparent relative">
                                 {isFetching && (
@@ -255,7 +259,7 @@ export default function FinancialAlerts({ onClose }) {
                                             <tr><td colSpan="4" className="text-center py-6 text-stone-400 font-mono text-[11px]">No urgent transactions.</td></tr>
                                         ) : (
                                             urgentTxns.map((txn) => (
-                                                <tr key={txn.id} className="hover:bg-[#f4e4bc]/30 transition-colors">
+                                                <tr key={txn.id} className="hover:bg-[#f4e4bc]/30 transition-colors duration-150">
                                                     <td className="py-2.5 align-middle pr-3">
                                                         <div className="font-bold text-[#4b2c20] text-[11px] mb-1 truncate" title={txn.entity || 'Unknown Entity'}>
                                                             {txn.entity || 'Unknown Entity'}
@@ -273,8 +277,8 @@ export default function FinancialAlerts({ onClose }) {
                                                     </td>
                                                     <td className="py-2.5 align-middle text-right">
                                                         <button
-                                                            onClick={() => console.log('Open Ledger for TX:', txn.id)}
-                                                            className="px-1.5 py-1 bg-[#8b4513] hover:bg-[#4b2c20] border border-[#8b4513]/30 rounded text-[#faf4e5] text-[9px] font-bold tracking-wider uppercase transition whitespace-nowrap shadow-sm cursor-pointer"
+                                                            onClick={(e) => { e.stopPropagation(); console.log('Open Ledger for TX:', txn.id); }}
+                                                            className="px-1.5 py-1 bg-[#8b4513] hover:bg-[#4b2c20] border border-[#8b4513]/30 rounded text-[#faf4e5] text-[9px] font-bold tracking-wider uppercase transition-colors duration-200 whitespace-nowrap shadow-sm cursor-pointer"
                                                         >
                                                             Ledger
                                                         </button>
@@ -318,7 +322,7 @@ export default function FinancialAlerts({ onClose }) {
                                             <tr><td colSpan="4" className="text-center py-6 text-stone-400 font-mono text-[11px]">No upcoming transactions.</td></tr>
                                         ) : (
                                             upcomingTxns.map((txn) => (
-                                                <tr key={txn.id} className="hover:bg-[#f4e4bc]/30 transition-colors">
+                                                <tr key={txn.id} className="hover:bg-[#f4e4bc]/30 transition-colors duration-150">
                                                     <td className="py-2.5 align-middle pr-3">
                                                         <div className="font-bold text-[#4b2c20] text-[11px] mb-1 truncate" title={txn.entity || 'Unknown Entity'}>
                                                             {txn.entity || 'Unknown Entity'}
@@ -336,8 +340,8 @@ export default function FinancialAlerts({ onClose }) {
                                                     </td>
                                                     <td className="py-2.5 align-middle text-right">
                                                         <button
-                                                            onClick={() => console.log('Open Ledger for TX:', txn.id)}
-                                                            className="px-1.5 py-1 bg-[#8b4513] hover:bg-[#4b2c20] border border-[#8b4513]/30 rounded text-[#faf4e5] text-[9px] font-bold tracking-wider uppercase transition whitespace-nowrap shadow-sm cursor-pointer"
+                                                            onClick={(e) => { e.stopPropagation(); console.log('Open Ledger for TX:', txn.id); }}
+                                                            className="px-1.5 py-1 bg-[#8b4513] hover:bg-[#4b2c20] border border-[#8b4513]/30 rounded text-[#faf4e5] text-[9px] font-bold tracking-wider uppercase transition-colors duration-200 whitespace-nowrap shadow-sm cursor-pointer"
                                                         >
                                                             Ledger
                                                         </button>
