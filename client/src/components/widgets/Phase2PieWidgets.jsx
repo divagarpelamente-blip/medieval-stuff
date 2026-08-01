@@ -11,23 +11,7 @@ const formatValue = (val) => {
   return num < 0 ? `(${formattedNum})` : formattedNum;
 };
 
-const calculateDebtHorizon = (transactions) => {
-  let shortTerm = 0;
-  let longTerm = 0;
-  
-  transactions.forEach(t => {
-    const amount = Number(t.amount) || 0;
-    if (t.target_account?.startsWith('21')) shortTerm += amount;
-    if (t.source_account?.startsWith('21')) shortTerm -= amount;
-    if (t.target_account?.startsWith('22')) longTerm += amount;
-    if (t.source_account?.startsWith('22')) longTerm -= amount;
-  });
-  
-  return [
-    { name: 'Short-Term Debt', value: Number(shortTerm.toFixed(2)) },
-    { name: 'Long-Term Debt', value: Number(longTerm.toFixed(2)) }
-  ].filter(item => item.value > 0);
-};
+// Removed calculateDebtHorizon to comply with data-flow rules
 
 const PieChartCard = ({ title, subtitle, data, isDonut = false }) => (
   <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
@@ -107,7 +91,7 @@ export const LiabilitiesSubtypeWidget = () => {
 };
 
 export const DebtHorizonWidget = () => {
-  const activeTx = useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => calculateDebtHorizon(activeTx), [activeTx]);
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Liabilities', 'subtype'), [categoryView]);
   return <PieChartCard data={data} subtitle="Immediate vs macro obligations" title="Short vs. Long-Term Debt"/>;
 };

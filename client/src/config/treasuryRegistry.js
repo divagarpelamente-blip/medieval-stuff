@@ -6,7 +6,7 @@ import AssetAllocationChart from '../components/widgets/AssetAllocationChart';
 // PHASE 1 IMPORTS
 // ==========================================
 import {
-  TotalIncomeWidget, TotalExpensesWidget, NetCashFlowWidget,
+  TotalIncomeWidget, TotalExpensesWidget, GrossCashflowWidget, NetCashWidget,
   TotalAssetsWidget, ImmediateLiquidityWidget, TotalInvestmentsWidget,
   TotalLiabilitiesWidget, NetWorthWidget
 } from '../components/widgets/Phase1KpiWidgets';
@@ -26,7 +26,7 @@ import {
 
 import {
   IncomeEntityWidget, EntityExposureWidget, DebtCreditorWidget,
-  TopMerchantsWidget, LargestTransactionsWidget, TopAccountsWidget
+  TopMerchantsWidget, LargestTransactionsWidget, TopAccountsWidget, BankBalancesWidget
 } from '../components/widgets/Phase2EntityWidgets';
 
 // ==========================================
@@ -48,7 +48,8 @@ export const TREASURY_WIDGETS = {
   // --- KPI & METRICS (Standardized to w:3, h:2) ---
   kpi_total_income: { name: "Total Income", component: TotalIncomeWidget, description: "Absolute sum of all incoming revenue accounts.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
   kpi_total_expenses: { name: "Total Expenses", component: TotalExpensesWidget, description: "Absolute sum of all expense accounts.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
-  kpi_net_cash_flow: { name: "Net Cash Flow", component: NetCashFlowWidget, description: "Total Inflows minus Total Outflows.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_gross_cashflow: { name: "Gross Cashflow", component: GrossCashflowWidget, description: "Total Inflows minus Total Outflows (pending + complete).", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_net_cash: { name: "Net Cash", component: NetCashWidget, description: "Total Inflows minus Total Outflows (completed only).", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
   kpi_total_assets: { name: "Total Assets", component: TotalAssetsWidget, description: "Gross sum of all owned assets.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
   kpi_liquidity: { name: "Immediate Liquidity", component: ImmediateLiquidityWidget, description: "Sum of accessible checking, savings, and cash.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
   kpi_investments: { name: "Total Investments", component: TotalInvestmentsWidget, description: "Sum of market and retirement accounts.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
@@ -97,6 +98,7 @@ export const TREASURY_WIDGETS = {
   table_top_merchants: { name: "Top 10 Merchants", component: TopMerchantsWidget, description: "Table of highest spending destinations.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
   table_largest_tx: { name: "Largest Transactions", component: LargestTransactionsWidget, description: "Table of single highest expenses.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
   table_top_accounts: { name: "Top 5 Accounts", component: TopAccountsWidget, description: "Table ranking accounts by real-time balance.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  table_bank_balances: { name: "Bank Balances", component: BankBalancesWidget, description: "List of checking accounts and current balances.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
   table_recent_tx: { name: "Last 10 Transactions", component: RecentTransactionsWidget, description: "Table of the latest ledger entries.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
   table_internal_transfers: { name: "Internal Transfers", component: InternalTransfersWidget, description: "Table of internal vault movements.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } }
 };

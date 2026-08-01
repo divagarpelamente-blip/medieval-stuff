@@ -31,13 +31,22 @@ const useKpiData = () => {
     let totalIncome = 0;
     let totalExpenses = 0;
     let totalInvestments = 0;
+    let completedIncome = 0;
+    let completedExpenses = 0;
 
     // Em vez de iterar sobre 10.000 transações, iteramos apenas sobre o sumário das categorias (ex: ~15 linhas)
     categoryView.forEach(row => {
       const amt = Number(row.total_volume) || 0;
+      const status = row.payment_status || 'Completed';
 
-      if (row.type === 'Income') totalIncome += amt;
-      if (row.type === 'Expenses') totalExpenses += amt;
+      if (row.type === 'Income') {
+        totalIncome += amt;
+        if (status === 'Completed') completedIncome += amt;
+      }
+      if (row.type === 'Expenses') {
+        totalExpenses += amt;
+        if (status === 'Completed') completedExpenses += amt;
+      }
 
       // Heurística simples: se a categoria pertencer a Ativos e contiver a palavra "Invest", soma aos investimentos
       if (row.type === 'Assets' && row.category && row.category.toLowerCase().includes('invest')) {
@@ -48,14 +57,15 @@ const useKpiData = () => {
     return {
       totalIncome,
       totalExpenses,
-      netCashFlow: totalIncome - totalExpenses,
+      netCashFlow: totalIncome - totalExpenses, // pending + complete
+      netCash: completedIncome - completedExpenses, // complete only
       totalInvestments
     };
   }, [categoryView]);
 
   return {
     ...dashboardMetrics, // Traz total_assets, total_liabilities, net_worth, net_vault_cash
-    ...derived           // Traz totalIncome, totalExpenses, netCashFlow, totalInvestments
+    ...derived           // Traz totalIncome, totalExpenses, netCashFlow, netCash, totalInvestments
   };
 };
 
@@ -73,10 +83,16 @@ export const TotalExpensesWidget = () => {
   return <KpiCard title="Total Expenses" amount={totalExpenses} colorClass="text-rose-500" subtitle="Total operational outflows" />;
 };
 
-export const NetCashFlowWidget = () => {
+export const GrossCashflowWidget = () => {
   const { netCashFlow } = useKpiData();
   const color = netCashFlow >= 0 ? "text-emerald-600" : "text-rose-600";
-  return <KpiCard title="Net Cash Flow" amount={netCashFlow} colorClass={color} subtitle="Inflows minus outflows" />;
+  return <KpiCard title="Gross Cashflow" amount={netCashFlow} colorClass={color} subtitle="Inflows minus outflows (pending + complete)" />;
+};
+
+export const NetCashWidget = () => {
+  const { netCash } = useKpiData();
+  const color = netCash >= 0 ? "text-emerald-600" : "text-rose-600";
+  return <KpiCard title="Net Cash" amount={netCash} colorClass={color} subtitle="Inflows minus outflows (completed only)" />;
 };
 
 export const TotalAssetsWidget = () => {

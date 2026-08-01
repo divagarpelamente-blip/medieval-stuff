@@ -9,9 +9,7 @@ const formatValue = (val) => {
   return num < 0 ? `(${formattedNum})` : formattedNum;
 };
 
-const getLargestTx = (txs, targetType) => {
-  return txs.filter(t => t.type === targetType).sort((a,b) => b.amount - a.amount).slice(0, 10);
-};
+// Removed getLargestTx to comply with data-flow rules
 
 const BarChartCard = ({ title, subtitle, data }) => (
   <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
@@ -48,7 +46,7 @@ const TableCard = ({ title, subtitle, headers, children }) => (
       <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
       <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
     </div>
-    <div className="flex-1 overflow-auto pr-2">
+    <div className="flex-1 overflow-auto pr-2 scrollbar-thin scrollbar-thumb-amber-900/50">
       <table className="w-full text-left border-collapse whitespace-nowrap">
         <thead>
           <tr>
@@ -99,15 +97,17 @@ export const TopMerchantsWidget = () => {
 };
 
 export const LargestTransactionsWidget = () => {
-  const activeTx = useKingdomStore(s => s.transactions || []);
-  const data = useMemo(() => getLargestTx(activeTx, 'Expenses'), [activeTx]);
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => {
+    return [...entityView].sort((a, b) => b.value - a.value).slice(0, 10);
+  }, [entityView]);
   return (
-    <TableCard headers={['Date', 'Entity', 'Amount']} subtitle="Largest expenses in recent history" title="Largest Transactions">
+    <TableCard headers={['Type', 'Entity', 'Amount']} subtitle="Largest capital flows by entity" title="Largest Entity Flows">
       {data.map((row, i) => (
         <tr key={i} className="hover:bg-gray-50 transition-colors">
-          <td className="py-3 text-gray-500 text-xs">{row.posting_date}</td>
-          <td className="py-3 text-gray-900 font-medium">{row.entity || row.category}</td>
-          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.amount)}</td>
+          <td className="py-3 text-gray-500 text-xs">{row.type}</td>
+          <td className="py-3 text-gray-900 font-medium">{row.entity}</td>
+          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.value)}</td>
         </tr>
       ))}
     </TableCard>
@@ -139,6 +139,40 @@ export const TopAccountsWidget = () => {
         <tr key={i} className="hover:bg-gray-50 transition-colors">
           <td className="py-3 text-gray-500 font-mono text-xs">{row.account}</td>
           <td className="py-3 text-gray-900 font-medium">{row.entity}</td>
+          <td className="py-3 text-gray-900 font-bold text-right font-mono">{formatValue(row.balance)}</td>
+        </tr>
+      ))}
+    </TableCard>
+  );
+};
+
+export const BankBalancesWidget = () => {
+  const balances = useKingdomStore(s => s.analytics?.balances || []);
+  const flatMatrix = useKingdomStore(s => s.flatMatrix || []);
+
+  const data = useMemo(() => {
+    const checkingAccounts = flatMatrix.filter(m => m.category === 'Checking Accounts');
+    
+    return checkingAccounts.map(acc => {
+      const balRow = balances.find(b => b.account === acc.code) || { balance: 0 };
+      return {
+        code: acc.code,
+        name: acc.account_name || acc.code,
+        entity: acc.entity || 'Institution',
+        balance: Number(balRow.balance) || 0
+      };
+    }).sort((a, b) => b.balance - a.balance);
+  }, [balances, flatMatrix]);
+
+  return (
+    <TableCard headers={['Code', 'Institution / Account', 'Balance']} subtitle="Real-time balances of checking accounts" title="Bank Balances">
+      {data.map((row, i) => (
+        <tr key={i} className="hover:bg-gray-50 transition-colors">
+          <td className="py-3 text-gray-500 font-mono text-xs">{row.code}</td>
+          <td className="py-3 text-gray-900 font-medium">
+            <div>{row.entity}</div>
+            <div className="text-xs text-gray-400 font-normal">{row.name}</div>
+          </td>
           <td className="py-3 text-gray-900 font-bold text-right font-mono">{formatValue(row.balance)}</td>
         </tr>
       ))}

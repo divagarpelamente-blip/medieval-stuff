@@ -215,7 +215,7 @@ export const ExpenseVarianceWidget = () => {
           Growth / Reduction
         </span>
         
-        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-[border-color,background-color,color] duration-300`}>
           <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
           <span className="text-xs xs:text-sm font-bold font-mono tracking-tight">
             {formatValue(expenseVariancePop, true, '', true)}
@@ -289,7 +289,7 @@ export const SavingsRateWidget = () => {
           Treasury Health
         </span>
         
-        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-[border-color,background-color,color] duration-300`}>
           <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
           <span className="text-xs xs:text-sm font-bold font-mono tracking-tight uppercase">
             {classification}
@@ -362,7 +362,7 @@ export const SurvivalMonthsWidget = () => {
           Survival Outlook
         </span>
         
-        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-[border-color,background-color,color] duration-300`}>
           <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
           <span className="text-xs xs:text-sm font-bold font-mono tracking-tight uppercase">
             {runwayClass}
@@ -431,7 +431,7 @@ export const DtiRatioWidget = () => {
           Risk Level
         </span>
         
-        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-[border-color,background-color,color] duration-300`}>
           <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
           <span className="text-xs xs:text-sm font-bold font-mono tracking-tight uppercase">
             {riskClass}
