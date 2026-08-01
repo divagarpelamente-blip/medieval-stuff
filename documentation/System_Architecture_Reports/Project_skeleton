@@ -13,6 +13,10 @@ This document provides a comprehensive map of the project files, organized by di
 * [tailwind.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/tailwind.config.js)
 * [postcss.config.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/postcss.config.js)
 
+### 🗄️ Project Root (SQL Scripts)
+* [global_rls_audit_and_fix.sql](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/global_rls_audit_and_fix.sql)
+* [phase4_rpc_advisor.sql](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/phase4_rpc_advisor.sql)
+
 ### 🎨 Src Assets (`client/src/assets/`)
 * [hero.png](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/hero.png)
 * [dashboard_frame_mockup.png](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/assets/dashboard_frame_mockup.png)
@@ -35,6 +39,7 @@ This document provides a comprehensive map of the project files, organized by di
   * [TransactionForm.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/Ledger/TransactionForm.jsx)
   * [TreasuryController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/Ledger/TreasuryController.jsx)
 * **Features/Settings**:
+  * [BudgetModal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/settings/BudgetModal.jsx)
   * [SettingsController.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/features/settings/SettingsController.jsx)
 * **Layout**:
   * [BottomNav.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/Layout/BottomNav.jsx)
@@ -43,10 +48,11 @@ This document provides a comprehensive map of the project files, organized by di
 * **Sandbox**:
   * [dashboard-visual-sandbox.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/dashboard-visual-sandbox.jsx)
   * [visual-sandbox.css](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/visual-sandbox.css)
-* **UI Utilities**:
+* **UI Utilities & Modals**:
   * [Modal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/ui/Modal.jsx)
   * [ModalSubmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/ui/ModalSubmenus.jsx)
   * [ModalTabmenus.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/ui/ModalTabmenus.jsx)
+  * [RoyalAdvisorModal.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/modals/RoyalAdvisorModal.jsx)
 * **Dashboard Widgets**:
   * [AssetAllocationChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/AssetAllocationChart.jsx)
   * [CashFlowChart.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/CashFlowChart.jsx)
@@ -59,7 +65,9 @@ This document provides a comprehensive map of the project files, organized by di
   * [Phase2PieWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase2PieWidgets.jsx)
   * [Phase3FilteredWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase3FilteredWidgets.jsx)
   * [Phase3RatioWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase3RatioWidgets.jsx)
+  * [Phase3TrendWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase3TrendWidgets.jsx)
   * [Phase4LedgerWidgets.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/Phase4LedgerWidgets.jsx)
+  * [RoyalAdvisorWidget.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/widgets/RoyalAdvisorWidget.jsx)
 
 ### ⚙️ Configurations (`client/src/config/`)
 * [accountMappings.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/config/accountMappings.js)
@@ -70,7 +78,11 @@ This document provides a comprehensive map of the project files, organized by di
 
 ### 🪝 React Hooks & Libs (`client/src/hooks/` & `client/src/lib/`)
 * [useInteractiveData.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/hooks/useInteractiveData.js)
+* [useAllRatios.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/hooks/useAllRatios.js)
 * [supabaseClient.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/lib/supabaseClient.js)
+
+### 📡 Services (`client/src/services/`)
+* [aiAdvisorService.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/services/aiAdvisorService.js)
 
 ### 📄 Pages & Main Entry (`client/src/pages/` & `client/src/`)
 * [Dashboard.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/pages/Dashboard.jsx)
@@ -92,6 +104,7 @@ This document provides a comprehensive map of the project files, organized by di
 ### ☁️ Supabase Configuration & Functions (`supabase/`)
 * [config.toml](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/supabase/config.toml)
 * **Functions**:
+  * [chat_advisor/index.ts](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/supabase/functions/chat_advisor/index.ts)
   * [process-gamification/index.ts](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/supabase/functions/process-gamification/index.ts)
 
 ### 📖 Documentation (`documentation/`)

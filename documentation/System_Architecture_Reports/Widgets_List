@@ -1,0 +1,231 @@
+# Widgets List
+
+Below is a comprehensive list of all the widgets available in the system, organized by their respective components. Each widget details its purpose, category, and how its data is calculated.
+
+## Phase 1: KPIs
+*Located in `Phase1KpiWidgets.jsx`*
+
+* **TotalIncomeWidget**
+  * **Purpose:** Displays gross revenue generated.
+  * **Category:** Phase 1 KPI
+  * **Calculated:** Sum of transaction amounts where `type === 'Income'`.
+* **TotalExpensesWidget**
+  * **Purpose:** Displays total operational outflows.
+  * **Category:** Phase 1 KPI
+  * **Calculated:** Sum of transaction amounts where `type === 'Expenses'`.
+* **GrossCashflowWidget**
+  * **Purpose:** Displays inflows minus outflows (pending + complete).
+  * **Category:** Phase 1 KPI
+  * **Calculated:** `totalIncome - totalExpenses`.
+* **NetCashWidget**
+  * **Purpose:** Displays inflows minus outflows (completed only).
+  * **Category:** Phase 1 KPI
+  * **Calculated:** `completedIncome - completedExpenses`.
+* **TotalAssetsWidget**
+  * **Purpose:** Displays gross owned assets.
+  * **Category:** Phase 1 KPI
+  * **Calculated:** Directly from `total_assets` in `dashboardMetrics`.
+* **ImmediateLiquidityWidget**
+  * **Purpose:** Displays accessible cash and equivalents.
+  * **Category:** Phase 1 KPI
+  * **Calculated:** Directly from `net_vault_cash` in `dashboardMetrics`.
+* **TotalInvestmentsWidget**
+  * **Purpose:** Displays capital allocated to markets.
+  * **Category:** Phase 1 KPI
+  * **Calculated:** Sum of amounts where `type === 'Assets'` and category name includes 'invest'.
+* **TotalLiabilitiesWidget**
+  * **Purpose:** Displays gross outstanding debt.
+  * **Category:** Phase 1 KPI
+  * **Calculated:** Directly from `total_liabilities` in `dashboardMetrics`.
+* **NetWorthWidget**
+  * **Purpose:** Displays Assets minus Liabilities.
+  * **Category:** Phase 1 KPI
+  * **Calculated:** Directly from `net_worth` in `dashboardMetrics`.
+
+## Phase 1: Charts
+*Located in `Phase1ChartWidgets.jsx`*
+
+* **IncomeTrendWidget**
+  * **Purpose:** Historical monthly revenue velocity.
+  * **Category:** Phase 1 Chart
+  * **Calculated:** Generates a trend from `monthlyView` focused on the `income` data key.
+* **ExpenseTrendWidget**
+  * **Purpose:** Historical monthly outflow patterns.
+  * **Category:** Phase 1 Chart
+  * **Calculated:** Generates a trend from `monthlyView` focused on the `expenses` data key.
+* **CumulativeCashFlowWidget**
+  * **Purpose:** Running net-flow balance trajectory.
+  * **Category:** Phase 1 Chart
+  * **Calculated:** Generates cumulative data from `cumulativeView` focused on the `cumulative` balance.
+* **AssetGrowthTrendWidget**
+  * **Purpose:** Historical growth of gross assets.
+  * **Category:** Phase 1 Chart
+  * **Calculated:** Generates a net trend from `cumulativeView` focused on the `assets` data key.
+* **DebtTrendWidget**
+  * **Purpose:** Historical debt accumulation and reduction.
+  * **Category:** Phase 1 Chart
+  * **Calculated:** Generates a net trend from `cumulativeView` focused on the `liabilities` data key.
+* **NetWorthTrendWidget**
+  * **Purpose:** Global net wealth trajectory.
+  * **Category:** Phase 1 Chart
+  * **Calculated:** Generates a net trend from `cumulativeView` focused on the `net` data key.
+
+## Phase 2: Entities & Breakdown
+*Located in `Phase2EntityWidgets.jsx` & `Phase2PieWidgets.jsx`*
+
+* **IncomeEntityWidget**
+  * **Purpose:** Top 10 revenue sources.
+  * **Category:** Phase 2 Entity
+  * **Calculated:** Top 10 `entityView` records filtered by `type === 'Income'`.
+* **EntityExposureWidget**
+  * **Purpose:** Asset concentration across institutions (Risk).
+  * **Category:** Phase 2 Entity
+  * **Calculated:** Top 10 `entityView` records filtered by `type === 'Assets'`.
+* **DebtCreditorWidget**
+  * **Purpose:** Concentration of owed liabilities.
+  * **Category:** Phase 2 Entity
+  * **Calculated:** Top 10 `entityView` records filtered by `type === 'Liabilities'`.
+* **TopMerchantsWidget**
+  * **Purpose:** Highest cumulative spending destinations (Top 10 Merchants).
+  * **Category:** Phase 2 Entity
+  * **Calculated:** Top 10 `entityView` records filtered by `type === 'Expenses'`.
+* **LargestTransactionsWidget**
+  * **Purpose:** Largest capital flows by entity.
+  * **Category:** Phase 2 Entity
+  * **Calculated:** Top 10 rows in `entityView` sorted by absolute value descending across all types.
+* **TopAccountsWidget**
+  * **Purpose:** Largest capital reserves by balance (Top 5).
+  * **Category:** Phase 2 Entity
+  * **Calculated:** Top 5 accounts starting with '1' and positive balance from `analytics.balances`.
+* **BankBalancesWidget**
+  * **Purpose:** Real-time balances of checking accounts.
+  * **Category:** Phase 2 Entity
+  * **Calculated:** Match balances from `analytics.balances` where category is 'Checking Accounts'.
+* **IncomeCategoryWidget** / **IncomeTypeWidget**
+  * **Purpose:** Revenue distribution overview / Active vs Passive Income.
+  * **Category:** Phase 2 Pie
+  * **Calculated:** Breakdown of `categoryView` for `Income` grouped by `category` and `subtype`.
+* **ExpenseCategoryWidget** / **ExpenseSubtypeWidget**
+  * **Purpose:** High-level spending distribution / Detailed operational breakdown.
+  * **Category:** Phase 2 Pie
+  * **Calculated:** Breakdown of `categoryView` for `Expenses` grouped by `category` and `subtype`.
+* **AssetAllocationWidget**
+  * **Purpose:** Wealth breakdown by class.
+  * **Category:** Phase 2 Pie
+  * **Calculated:** Breakdown of `categoryView` for `Assets` grouped by `subtype`.
+* **LiabilitiesSubtypeWidget** / **DebtHorizonWidget**
+  * **Purpose:** Debt category distribution / Short vs Long-Term Debt.
+  * **Category:** Phase 2 Pie
+  * **Calculated:** Breakdown of `categoryView` for `Liabilities` grouped by `subtype`.
+
+## Phase 3: Ratios, Filters & Trends
+*Located in `Phase3RatioWidgets.jsx`, `Phase3FilteredWidgets.jsx`, `Phase3TrendWidgets.jsx`*
+
+* **AvgMonthlyExpenseWidget**
+  * **Purpose:** Moving average of outflows.
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `totalExpenses / activeMonthsCount`.
+* **AvgDailyExpenseWidget**
+  * **Purpose:** Daily cash burn velocity.
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `avgMonthlyExpense / 30.44`.
+* **BurnRateWidget**
+  * **Purpose:** Percentage of income consumed.
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `(totalExpenses / totalIncome) * 100`.
+* **DebtRatioWidget**
+  * **Purpose:** Total Liabilities vs Total Assets.
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `(total_liabilities / total_assets) * 100`.
+* **WealthVarianceWidget**
+  * **Purpose:** Delta shift in Net Worth (Month-over-Month).
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `currentMonthNet - priorMonthNet`.
+* **ExpenseVarianceWidget**
+  * **Purpose:** Expense Variance (Period-over-Period).
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `((currentExp - priorExp) / priorExp) * 100`.
+* **SavingsRateWidget**
+  * **Purpose:** Savings Rate (Treasury Health).
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `((totalIncome - totalExpenses) / totalIncome) * 100`.
+* **SurvivalMonthsWidget**
+  * **Purpose:** Kingdom Runway (Survival Outlook).
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `net_vault_cash / avgMonthlyExpense`.
+* **DtiRatioWidget**
+  * **Purpose:** Debt-To-Income (DTI).
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `(amortizationExpenses / totalIncome) * 100`. *(Amortization is derived from categories including 'debt', 'loan', 'amorti', 'credit', etc.)*
+* **BudgetVsActualWidget**
+  * **Purpose:** Budget vs Actual monitored categories.
+  * **Category:** Phase 3 Ratio
+  * **Calculated:** `(actualExpenses / monthlyBudgetLimit) * 100`.
+* **CostOfDebtWidget**
+  * **Purpose:** Interest expenses paid.
+  * **Category:** Phase 3 Filtered
+  * **Calculated:** Direct balance of account `'69020003'`.
+* **YieldAssetsWidget**
+  * **Purpose:** Income-Generating Assets.
+  * **Category:** Phase 3 Filtered
+  * **Calculated:** Sum of balances of Class `'1'` accounts, excluding sterile cash accounts `'1101'` and `'1103'`.
+* **CashForecast90dWidget**
+  * **Purpose:** 90-Day Cash Forecast.
+  * **Category:** Phase 3 Trend
+  * **Calculated:** Pulls from `vw_cash_flow_forecast_90d` view for 30-day, 60-day, and 90-day projections.
+
+## Phase 4: Ledger
+*Located in `Phase4LedgerWidgets.jsx`*
+
+* **RecentTransactionsWidget**
+  * **Purpose:** Last 10 Transactions.
+  * **Category:** Phase 4 Ledger
+  * **Calculated:** Pulls the 10 most recent chronological entries from `activeTx`.
+* **InternalTransfersWidget**
+  * **Purpose:** Vault movements between accounts.
+  * **Category:** Phase 4 Ledger
+  * **Calculated:** Pulls the 10 most recent entries classified as internal transfers from `activeTx`.
+
+## Interactive APAR
+*Located in `InteractiveAPARWidgets.jsx`*
+
+* **InteractiveDateFilter** / **InteractiveGranularity**
+  * **Purpose:** Provides timescale and grouping controls.
+  * **Category:** Interactive Filters
+  * **Calculated:** Updates interactive store state to filter the APAR dashboard globally.
+* **InteractiveStatus** / **InteractiveArrear**
+  * **Purpose:** Summaries for Payment Status (Pending vs Completed) and Aging (Due, Overdue, etc.).
+  * **Category:** Interactive APAR
+  * **Calculated:** Uses `status_summary` and `arrear_summary` from interactive backend data based on applied filters.
+* **InteractiveCategory** / **InteractiveEntity**
+  * **Purpose:** Volume distributions by Category or Entity.
+  * **Category:** Interactive APAR
+  * **Calculated:** Uses `category_summary` and `entity_summary` respectively from interactive backend data.
+* **InteractiveMergedVolume**
+  * **Purpose:** Top 10 Volume by Category or Entity (Toggleable).
+  * **Category:** Interactive APAR
+  * **Calculated:** Slices the top 10 rows from the toggled view summary.
+* **InteractiveLedger**
+  * **Purpose:** Filtered Ledger Table.
+  * **Category:** Interactive APAR
+  * **Calculated:** Displays detailed `ledger` rows constrained by all active interactive filters.
+
+## Global Charts & Specialized
+*Located directly in `/widgets`*
+
+* **AssetAllocationChart**
+  * **Purpose:** Distribution of wealth holdings and Treasury Health Score.
+  * **Category:** Global Chart
+  * **Calculated:** Top 5 `Assets` by subtype for the pie chart. Treasury Health is calculated as `(Total Income) / (Total Income + Total Expenses)`.
+* **CashFlowChart**
+  * **Purpose:** Historical evolution of all Income vs Expenses.
+  * **Category:** Global Chart
+  * **Calculated:** Parses `monthlyView` into combined `income` and `expenses` over time, including global averages.
+* **NetWorthChart**
+  * **Purpose:** Tracks the total accumulated balance and financial position.
+  * **Category:** Global Chart
+  * **Calculated:** Cumulative calculation of `Assets - Liabilities` over time.
+* **RoyalAdvisorWidget**
+  * **Purpose:** AI Financial Counsel.
+  * **Category:** AI Advisor
+  * **Calculated:** Fetches `fetchFinancialHealthPacket(user.id)`, checks deterministic flags for RED/YELLOW/GREEN statuses, and provides access to the AI Chat Advisor context payload.
