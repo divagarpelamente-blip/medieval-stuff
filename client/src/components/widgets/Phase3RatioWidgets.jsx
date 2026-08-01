@@ -105,15 +105,25 @@ const useAllRatios = () => {
     const debtRatio = metrics.total_assets > 0 ? (metrics.total_liabilities / metrics.total_assets) * 100 : 0;
     const survivalMonths = avgMonthlyExpense > 0 ? (metrics.net_vault_cash || 0) / avgMonthlyExpense : 0;
     
-    // DTI Ratio defaults to 0 unless explicit debt payments are tracked
-    const dtiRatio = 0; 
+    // DTI Ratio calculation mapping real debt payment/amortization categories
+    let amortization = 0;
+    categoryView.forEach(row => {
+      const amt = Number(row.total_volume) || 0;
+      const catName = (row.category || '').toLowerCase();
+      if (row.type === 'Expenses' && (catName.includes('debt') || catName.includes('loan') || catName.includes('amorti') || catName.includes('credit') || catName.includes('liabilit'))) {
+        amortization += amt;
+      }
+    });
+    const dtiRatio = totalIncome > 0 ? (amortization / totalIncome) * 100 : 0;
+    const netVaultCash = metrics.net_vault_cash || 0;
 
     return {
       avgMonthlyExpense, avgDailyExpense, survivalMonths,
       savingsRate, burnRate, dtiRatio, debtRatio,
       monthlyWealthVariance, expenseVariancePop,
       currentExp, priorExp,
-      totalIncome, totalExpenses
+      totalIncome, totalExpenses,
+      netVaultCash, amortization
     };
   }, [categoryView, monthlyView, cumulativeView, metrics]);
 };
@@ -132,11 +142,9 @@ const withRatioData = (kpiKey, title, subtitle, tag, options = {}) => {
 // Exports: Averages & Horizons
 export const AvgMonthlyExpenseWidget = withRatioData('avgMonthlyExpense', 'Avg Monthly Expense', 'Moving average of outflows', 'Temporal Mean');
 export const AvgDailyExpenseWidget = withRatioData('avgDailyExpense', 'Avg Daily Expense', 'Daily cash burn velocity', 'Temporal Mean');
-export const SurvivalMonthsWidget = withRatioData('survivalMonths', 'Runway', 'Months of survivability', 'Liquidity / Burn', { suffix: 'Mos' });
 
 // Exports: Percentages & Ratios
 export const BurnRateWidget = withRatioData('burnRate', 'Burn Rate', 'Percentage of income consumed', 'Expenses / Income', { isPercentage: true });
-export const DtiRatioWidget = withRatioData('dtiRatio', 'DTI Ratio', 'Debt payments vs gross income', 'Debt / Income', { isPercentage: true });
 export const DebtRatioWidget = withRatioData('debtRatio', 'Debt Ratio', 'Total Liabilities vs Total Assets', 'Liabilities / Assets', { isPercentage: true });
 
 // Exports: Variances (Deltas)
@@ -221,23 +229,23 @@ export const ExpenseVarianceWidget = () => {
 export const SavingsRateWidget = () => {
   const { savingsRate, totalIncome, totalExpenses } = useAllRatios();
   
-  const netSavings = totalIncome - totalExpenses;
-  const isPositive = netSavings > 0;
-  const isNegative = netSavings < 0;
+  let classification = 'Deficit';
+  let colorClass = 'text-rose-600 bg-rose-50 border-rose-200';
+  let Icon = ArrowDown;
   
-  const colorClass = isPositive 
-    ? 'text-emerald-600 bg-emerald-50 border-emerald-200' 
-    : isNegative 
-      ? 'text-rose-600 bg-rose-50 border-rose-200' 
-      : 'text-gray-500 bg-gray-50 border-gray-200';
-  
-  const textColorClass = isPositive 
-    ? 'text-emerald-600' 
-    : isNegative 
-      ? 'text-rose-600' 
-      : 'text-gray-500';
-
-  const Icon = isPositive ? ArrowUp : ArrowDown;
+  if (savingsRate > 10) {
+    classification = 'Healthy';
+    colorClass = 'text-emerald-600 bg-emerald-50 border-emerald-200';
+    Icon = ArrowUp;
+  } else if (savingsRate > 6) {
+    classification = 'Good';
+    colorClass = 'text-lime-600 bg-lime-50 border-lime-200';
+    Icon = ArrowUp;
+  } else if (savingsRate > 0) {
+    classification = 'Caution';
+    colorClass = 'text-amber-600 bg-amber-50 border-amber-200';
+    Icon = ArrowDown;
+  }
 
   return (
     <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-2.5 xs:p-4 sm:p-5 shadow-sm relative overflow-hidden">
@@ -278,13 +286,155 @@ export const SavingsRateWidget = () => {
       {/* Footer Divider & Relative Data */}
       <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between z-10">
         <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-sans font-semibold text-gray-600 uppercase tracking-wider">
-          Net Savings
+          Treasury Health
         </span>
         
         <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
           <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
-          <span className="text-xs xs:text-sm font-bold font-mono tracking-tight">
-            {formatValue(netSavings, false, 'g', true)}
+          <span className="text-xs xs:text-sm font-bold font-mono tracking-tight uppercase">
+            {classification}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const SurvivalMonthsWidget = () => {
+  const { survivalMonths, avgMonthlyExpense, netVaultCash } = useAllRatios();
+  
+  let runwayClass = 'Critical';
+  let colorClass = 'text-rose-600 bg-rose-50 border-rose-200';
+  let Icon = ArrowDown;
+  
+  if (survivalMonths > 3) {
+    runwayClass = 'Secure';
+    colorClass = 'text-emerald-600 bg-emerald-50 border-emerald-200';
+    Icon = ArrowUp;
+  } else if (survivalMonths > 1) {
+    runwayClass = 'Caution';
+    colorClass = 'text-amber-600 bg-amber-50 border-amber-200';
+    Icon = ArrowDown;
+  }
+
+  const isSecure = survivalMonths > 3;
+  const symbol = isSecure ? '🌲' : '🔥';
+  const runwayStr = `${symbol}${Number(survivalMonths).toFixed(1)} Months`;
+
+  return (
+    <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-2.5 xs:p-4 sm:p-5 shadow-sm relative overflow-hidden">
+      {/* Background Crest/Shield Watermark */}
+      <div className="absolute right-4 top-4 text-gray-200/60 pointer-events-none">
+        <Shield className="w-12 h-12 xs:w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 stroke-[1]" />
+      </div>
+
+      {/* Header */}
+      <div className="flex justify-between items-start z-10">
+        <div>
+          <h3 className="text-[10px] xs:text-xs sm:text-sm font-sans font-semibold tracking-wider text-gray-600 uppercase">
+            Kingdom Runway
+          </h3>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="mt-2 xs:mt-3 flex flex-col justify-center z-10 flex-1">
+        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+          <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold text-gray-900 leading-tight">
+            {runwayStr}
+          </span>
+        </div>
+        
+        {/* Space between current period and details */}
+        <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Amount per Month: <span className="font-semibold text-gray-800">{formatValue(avgMonthlyExpense)}g</span>
+          </div>
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Liquid Cash: <span className="font-semibold text-gray-800">{formatValue(netVaultCash)}g</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Divider & Relative Data */}
+      <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between z-10">
+        <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-sans font-semibold text-gray-600 uppercase tracking-wider">
+          Survival Outlook
+        </span>
+        
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+          <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
+          <span className="text-xs xs:text-sm font-bold font-mono tracking-tight uppercase">
+            {runwayClass}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const DtiRatioWidget = () => {
+  const { dtiRatio, amortization, totalIncome } = useAllRatios();
+  
+  let riskClass = 'Healthy';
+  let colorClass = 'text-emerald-600 bg-emerald-50 border-emerald-200';
+  let Icon = ArrowDown;
+  
+  if (dtiRatio > 43) {
+    riskClass = 'Critical';
+    colorClass = 'text-rose-600 bg-rose-50 border-rose-200';
+    Icon = ArrowUp;
+  } else if (dtiRatio >= 36) {
+    riskClass = 'Caution';
+    colorClass = 'text-amber-600 bg-amber-50 border-amber-200';
+    Icon = ArrowUp;
+  }
+
+  return (
+    <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-2.5 xs:p-4 sm:p-5 shadow-sm relative overflow-hidden">
+      {/* Background Crest/Shield Watermark */}
+      <div className="absolute right-4 top-4 text-gray-200/60 pointer-events-none">
+        <Shield className="w-12 h-12 xs:w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 stroke-[1]" />
+      </div>
+
+      {/* Header */}
+      <div className="flex justify-between items-start z-10">
+        <div>
+          <h3 className="text-[10px] xs:text-xs sm:text-sm font-sans font-semibold tracking-wider text-gray-600 uppercase">
+            Debt-To-Income (DTI)
+          </h3>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="mt-2 xs:mt-3 flex flex-col justify-center z-10 flex-1">
+        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+          <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold text-gray-900 leading-tight">
+            {formatValue(dtiRatio, true)}
+          </span>
+        </div>
+        
+        {/* Space between current period and details */}
+        <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Amortization: <span className="font-semibold text-gray-800">{formatValue(amortization)}g</span>
+          </div>
+          <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
+            Total Income (net): <span className="font-semibold text-gray-800">{formatValue(totalIncome)}g</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Divider & Relative Data */}
+      <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between z-10">
+        <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-sans font-semibold text-gray-600 uppercase tracking-wider">
+          Risk Level
+        </span>
+        
+        <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-all duration-300`}>
+          <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
+          <span className="text-xs xs:text-sm font-bold font-mono tracking-tight uppercase">
+            {riskClass}
           </span>
         </div>
       </div>
