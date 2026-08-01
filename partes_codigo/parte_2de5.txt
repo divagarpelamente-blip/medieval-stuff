@@ -1,0 +1,2042 @@
+/* === PARTE 2 DE 5 === */
+
+                  const ui = getVarianceIcon(v.type, v.flow);
+                  return (
+                    <div key={i} className="flex justify-between items-center p-1.5 bg-stone-950 rounded border border-stone-800/50 shadow-sm mb-1">
+                      <span className="text-[10px] text-stone-300 font-mono truncate mr-3" title={v.account_name}>
+                        {v.account_name}
+                      </span>
+                      <div className={`flex items-center gap-1 text-[10px] font-bold font-mono whitespace-nowrap ${ui.color}`}>
+                        <span>{ui.arrow}</span>
+                        <span>{v.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )
+            ) : (
+              logDrafts.length === 0 ? (
+                <div className="text-stone-500 text-[10px] italic text-center py-10">
+                  No drafts available.
+                </div>
+              ) : (
+                logDrafts.map((draft) => (
+                  <div key={draft.id} className="flex p-1.5 bg-stone-950 rounded border border-stone-800/50 shadow-sm gap-3 mb-1">
+                    
+                    <div className="flex flex-col gap-1 justify-center shrink-0">
+                      <button 
+                        onClick={() => handleDeleteDraft(draft.id)}
+                        title="Delete Draft"
+                        className="p-1 hover:bg-stone-800 rounded text-stone-500 hover:text-rose-400 transition"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18" /><path d="M6 6l12 12" /></svg>
+                      </button>
+                      <button 
+                        onClick={() => handleEditDraft(draft)}
+                        title="Edit Draft"
+                        className={`p-1 hover:bg-stone-800 rounded transition ${editingDraftId === draft.id ? 'text-amber-400 bg-stone-800' : 'text-stone-500 hover:text-blue-400'}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col flex-1 truncate justify-center">
+                      <span className="text-[10px] text-stone-400 uppercase tracking-wider font-bold mb-0.5">Source</span>
+                      <span className="text-[10px] text-stone-300 truncate" title={getSourceName(draft.payload.source_account)}>
+                        {getSourceName(draft.payload.source_account)}
+                      </span>
+                      <span className="text-[10px] text-amber-500 font-mono mt-0.5">
+                        {draft.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col flex-1 truncate justify-center text-right">
+                      <span className="text-[10px] text-stone-400 uppercase tracking-wider font-bold mb-0.5">Target</span>
+                      <span className="text-[10px] text-stone-300 truncate" title={draft.account_name}>
+                        {draft.account_name}
+                      </span>
+                      <span className="text-[10px] text-amber-500 font-mono mt-0.5">
+                        {draft.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                  </div>
+                ))
+              )
+            )}
+            
+          </div>
+          
+          <div className="shrink-0 pt-3 border-t border-stone-800/50 flex gap-2">
+            {!isLogView ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLogDrafts([...stagedTransactions]);
+                    setIsLogView(true);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-stone-800 hover:bg-stone-700 active:translate-y-px border border-stone-600/50 rounded text-stone-300 text-xs tracking-widest uppercase font-bold transition"
+                >
+                  Stage Log
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCommitBatch}
+                  disabled={stagedTransactions.length === 0 || isLedgerLoading}
+                  className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 active:translate-y-px border border-amber-400/50 rounded text-stone-950 text-xs tracking-widest uppercase font-bold transition disabled:opacity-50"
+                >
+                  {isLedgerLoading ? 'Committing...' : 'Commit Batch'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStagedTransactions([...logDrafts]);
+                    setIsLogView(false);
+                    setEditingDraftId(null);
+                    resetForm();
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/40 active:translate-y-px border border-emerald-500/50 rounded text-emerald-400 text-xs tracking-widest uppercase font-bold transition"
+                >
+                  Save Drafts
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogView(false);
+                    setEditingDraftId(null);
+                    resetForm();
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-stone-800 hover:bg-stone-700 active:translate-y-px border border-stone-600/50 rounded text-stone-300 text-xs tracking-widest uppercase font-bold transition"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\features\Ledger\TreasuryController.jsx
+=========================================
+
+import React, { useState } from 'react';
+import ModalSubmenus from '../../ui/ModalSubmenus';
+import Modal from '../../ui/Modal';
+import TransactionForm from './TransactionForm';
+import LedgerTable from './LedgerTable';
+
+/**
+ * TreasuryController Component
+ * 
+ * Acts as the contextual router for the Royal Treasury module. 
+ */
+export default function TreasuryController({ initialView, onClose }) {
+  const [activeView, setActiveView] = useState(initialView || 'menu');
+  const [editingTransaction, setEditingTransaction] = useState(null); 
+  const [activeTab, setActiveTab] = useState('ledger'); 
+
+  const viewMetadata = {
+    ledger: { title: 'General Ledger', icon: '📖' },
+    statements: { title: 'Financial Statements', icon: '📜' },
+    dashboard: { title: 'Treasury Dashboard', icon: '📊' }
+  };
+
+  const menuItems = [
+    { id: 'ledger', icon: '📖', label: 'General Ledger', onClick: (id) => setActiveView(id) },
+    { id: 'statements', icon: '📜', label: 'Financial Statements', onClick: (id) => setActiveView(id) },
+    { id: 'dashboard', icon: '📊', label: 'Treasury Dashboard', onClick: (id) => setActiveView(id) }
+  ];
+
+  // --- STATE 1: THE MAIN MENU ---
+  if (activeView === 'menu') {
+    return (
+      <ModalSubmenus
+        title="Royal Treasury Menu"
+        icon="🏦"
+        subtitle="Select a treasury function"
+        onClose={onClose}
+        menuItems={menuItems}
+      />
+    );
+  }
+
+  // --- STATE 2: THE GENERAL LEDGER (Custom Frameless Window) ---
+  if (activeView === 'ledger') {
+    return (
+      <div 
+        className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6" 
+        onClick={() => {
+          if (initialView) onClose();
+          else setActiveView('menu');
+          setEditingTransaction(null);
+          setActiveTab('ledger');
+        }}
+      >
+        <div 
+          className="w-full h-full max-w-[1400px] bg-stone-950 rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.95)] border-2 border-amber-900/80 flex flex-col font-serif" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Top Bar: Tabs & Close Button */}
+          <div className="flex items-center justify-between p-4 border-b border-amber-900/50 bg-stone-900/90 shrink-0 shadow-lg">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setActiveTab('ledger')}
+                className={`px-4 py-2 font-bold uppercase tracking-widest text-xs rounded transition border ${
+                  activeTab === 'ledger'
+                    ? 'bg-amber-600 text-stone-950 border-amber-400'
+                    : 'bg-stone-900 text-stone-400 border-transparent hover:text-amber-500 hover:border-stone-700'
+                }`}
+              >
+                General Ledger
+              </button>
+              <button
+                onClick={() => setActiveTab('new_transaction')}
+                className={`px-4 py-2 font-bold uppercase tracking-widest text-xs rounded transition border ${
+                  activeTab === 'new_transaction'
+                    ? 'bg-amber-600 text-stone-950 border-amber-400'
+                    : 'bg-stone-900 text-stone-400 border-transparent hover:text-amber-500 hover:border-stone-700'
+                }`}
+              >
+                New Transaction
+              </button>
+            </div>
+            
+            <button 
+              onClick={() => {
+                if (initialView) onClose();
+                else setActiveView('menu');
+                setEditingTransaction(null);
+                setActiveTab('ledger');
+              }}
+              className="w-8 h-8 rounded-full bg-rose-950/40 border border-rose-900/60 flex items-center justify-center text-rose-400 hover:text-rose-300 hover:bg-rose-900/50 transition-colors focus:outline-none shadow"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Dynamic Body Content */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-stone-950 p-4 md:p-6">
+            {activeTab === 'ledger' && (
+              <LedgerTable
+                onEditTransaction={(txn) => {
+                  setEditingTransaction(txn);
+                  setActiveTab('new_transaction');
+                }}
+              />
+            )}
+            
+            {activeTab === 'new_transaction' && (
+              <TransactionForm
+                editingTransaction={editingTransaction}
+                onCancelEdit={() => {
+                  setEditingTransaction(null);
+                  setActiveTab('ledger');
+                }}
+                onSuccess={() => setActiveTab('ledger')}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- STATE 3: PLACEHOLDER VIEWS ---
+  const currentViewMeta = viewMetadata[activeView];
+
+  return (
+    <Modal
+      title={currentViewMeta?.title || 'Treasury Module'}
+      icon={currentViewMeta?.icon || '🏦'}
+      subtitle={`Royal Treasury - ${currentViewMeta?.title}`}
+      onClose={() => {
+        if (initialView) onClose();
+        else setActiveView('menu');
+      }}
+    >
+      <div className="flex flex-col items-center justify-center p-12 text-center opacity-50">
+        <span className="text-4xl mb-4">🚧</span>
+        <p className="text-stone-400 font-sans tracking-widest uppercase">
+          This area will be defined later
+        </p>
+        <button
+          onClick={() => {
+            if (initialView) onClose();
+            else setActiveView('menu');
+          }}
+          className="mt-8 text-amber-500 hover:text-amber-400 uppercase tracking-widest font-bold text-sm focus:outline-none"
+        >
+          ⟵ {initialView ? 'Return to Hub' : 'Return to Menu'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\features\settings\SettingsController.jsx
+=========================================
+
+import React from 'react';
+import ModalTabmenus from '../../ui/ModalTabmenus';
+
+/**
+ * SettingsController Component
+ * 
+ * Local controller for the Kingdom Citadel Configurations.
+ * Defines settings tab layout and routes dynamic rendering.
+ * 
+ * @param {function} onClose - Modal dismissal callback returning to main dock
+ */
+export default function SettingsController({ onClose }) {
+  
+  // Define layout structures for configuration parameters
+  const tabs = [
+    {
+      id: 'profile',
+      label: 'Profile',
+      icon: '👤',
+      content: (
+        <div className="flex flex-col items-center justify-center p-12 text-center opacity-50 font-serif">
+          <span className="text-4xl mb-4">🚧</span>
+          <p className="text-stone-400 font-sans tracking-widest uppercase text-sm">
+            Profile Settings Area
+          </p>
+        </div>
+      )
+    },
+    {
+      id: 'preferences',
+      label: 'Preferences',
+      icon: '🎨',
+      content: (
+        <div className="flex flex-col items-center justify-center p-12 text-center opacity-50 font-serif">
+          <span className="text-4xl mb-4">🚧</span>
+          <p className="text-stone-400 font-sans tracking-widest uppercase text-sm">
+            Preferences Area
+          </p>
+        </div>
+      )
+    },
+    {
+      id: 'system',
+      label: 'System',
+      icon: '⚙️',
+      content: (
+        <div className="flex flex-col items-center justify-center p-12 text-center opacity-50 font-serif">
+          <span className="text-4xl mb-4">🚧</span>
+          <p className="text-stone-400 font-sans tracking-widest uppercase text-sm">
+            System & Data Area
+          </p>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <ModalTabmenus 
+      title="Citadel Configurations" 
+      icon="⚙️" 
+      subtitle="Adjust kingdom parameters" 
+      onClose={onClose} 
+      tabs={tabs} 
+    />
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\Layout\BottomNav.jsx
+=========================================
+
+import React from 'react';
+
+export default function BottomNav({ activeTab, onTabChange }) {
+  const tabs = [
+    { id: 'ledger', icon: '📜', label: 'Ledger' },
+    { id: 'treasury', icon: '⚖️', label: 'Treasury' },
+    { id: 'quests', icon: '⚔️', label: 'Quests' },
+    { id: 'settings', icon: '⚙️', label: 'Settings' }
+  ];
+
+  return (
+    <div className="absolute bottom-0 left-0 w-full bg-[#1a0f0a] border-t-4 border-[#8b4513] p-4 z-50 flex justify-around shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
+      {tabs.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => onTabChange(tab.id)}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === tab.id 
+              ? 'scale-110 opacity-100 text-[#ffd700]' 
+              : 'opacity-50 text-stone-400 hover:opacity-80'
+          }`}
+        >
+          <span className="text-2xl drop-shadow-md">{tab.icon}</span>
+          <span className="text-[10px] font-black uppercase tracking-wider">{tab.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+
+
+=========================================
+ARQUIVO: client\src\components\Layout\HUD.jsx
+=========================================
+
+import React from 'react';
+
+export default function HUD({ profile, diamonds }) {
+  return (
+    <div className="absolute top-4 left-4 right-4 flex justify-between z-50 pointer-events-none">
+      {/* Player Profile */}
+      <div className="bg-[#1a0f0a]/90 border-2 border-[#8b4513] rounded-lg p-2 shadow-xl flex items-center gap-4 pointer-events-auto">
+        <div className="w-10 h-10 bg-stone-800 rounded-full border-2 border-[#d4af37] flex items-center justify-center text-xs font-black text-[#d4af37]">
+          Lv.{profile?.level || 1}
+        </div>
+        <div>
+          <div className="text-[10px] font-black uppercase text-[#8b4513] tracking-widest">Kingdom</div>
+          <div className="text-xs font-bold text-stone-300 truncate max-w-[120px]">
+            {profile?.email?.split('@')[0] || 'Lord'}
+          </div>
+        </div>
+      </div>
+
+      {/* Resources */}
+      <div className="flex gap-2 pointer-events-auto">
+        <div className="bg-[#1a0f0a]/90 border-2 border-[#8b4513] rounded-lg px-4 py-2 flex items-center gap-2">
+          <span className="text-lg">💎</span>
+          <span className="font-mono font-black text-cyan-400">{diamonds || 0}</span>
+        </div>
+        <div className="bg-[#1a0f0a]/90 border-2 border-[#8b4513] rounded-lg px-4 py-2 flex items-center gap-2">
+          <span className="text-lg">🪙</span>
+          <span className="font-mono font-black text-[#ffd700]">{profile?.gold || 0}g</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+=========================================
+ARQUIVO: client\src\components\Layout\IsometricMap.jsx
+=========================================
+
+import React from 'react';
+
+export default function IsometricMap({ onMineClick, onTreasuryClick }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+      {/* We will build the interactive buildings (Mine, Treasury) here in Phase 2 */}
+      <div className="bg-black/50 text-white/50 px-4 py-2 rounded-full font-mono text-sm tracking-widest uppercase border border-white/10">
+        Map Canvas Ready
+      </div>
+    </div>
+  );
+}
+
+
+
+=========================================
+ARQUIVO: client\src\components\sandbox\dashboard-visual-sandbox.jsx
+=========================================
+
+// client/src/components/sandbox/dashboard-visual-sandbox.jsx
+
+import React, { useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { Sliders, FilterX, X, Lock } from 'lucide-react';
+import './visual-sandbox.css';
+
+// --- MOCK DATA FROM IMAGE ---
+const MOCK_VOLUME_DATA = [
+    { name: 'Payroll', value: 35000 },
+    { name: 'Medical', value: 25000 },
+    { name: 'Direct Taxes', value: 5000 },
+    { name: 'Refunds', value: 4000 },
+    { name: 'Savings & Wallets', value: 3800 },
+    { name: 'Invest Accounts', value: 3500 },
+    { name: 'Checking Accounts', value: 3000 },
+    { name: 'Freelance & Services', value: 2500 },
+    { name: 'Maintenance', value: 2000 },
+    { name: 'Cash', value: 1500 },
+];
+
+const MOCK_LEDGER = [
+    { id: 1, posting_date: '2026-07-24', value_date: '2026-07-24', entity: 'Dentista', category: 'Medical', amount: '12,500.00' },
+    { id: 2, posting_date: '2026-07-22', value_date: '2026-07-22', entity: '<b>hello</b>', category: 'Short-Term Goals', amount: '145.67' },
+    { id: 3, posting_date: '2026-07-21', value_date: '2026-07-21', entity: 'Dinheiro (Fisico)', category: 'Cash', amount: '328.75' },
+    { id: 4, posting_date: '2026-07-20', value_date: '2026-07-20', entity: 'WiZink Poupança', category: 'Savings & Wallets', amount: '96.75' },
+    { id: 5, posting_date: '2026-07-19', value_date: '2026-07-19', entity: 'Inter Bank Poupança', category: 'Savings & Wallets', amount: '80.26' },
+    { id: 6, posting_date: '2026-07-18', value_date: '2026-07-18', entity: 'ActivoBank Poupança', category: 'Savings & Wallets', amount: '414.55' },
+    { id: 7, posting_date: '2026-07-17', value_date: '2026-07-17', entity: 'Universo Poupança', category: 'Savings & Wallets', amount: '185.09' },
+    { id: 8, posting_date: '2026-07-17', value_date: '2026-07-17', entity: 'CGD Poupança', category: 'Savings & Wallets', amount: '54.40' },
+    { id: 9, posting_date: '2026-07-16', value_date: '2026-07-16', entity: 'WiZink', category: 'Checking Accounts', amount: '241.91' },
+    { id: 10, posting_date: '2026-07-15', value_date: '2026-07-15', entity: 'Inter Bank', category: 'Checking Accounts', amount: '149.68' },
+];
+
+export default function DashboardVisualSandbox() {
+    const [viewMode, setViewMode] = useState('category');
+
+    return (
+        // Dark backdrop simulating the full screen behind the dashboard modal
+        <div className="min-h-screen bg-[#12100e] flex items-center justify-center p-4 md:p-8 font-sans">
+            
+            {/* Main Dashboard Window */}
+            <div className="w-full max-w-[1400px] h-[90vh] bg-transparent flex flex-col overflow-hidden">
+                
+                {/* 1. HEADER (Exact Replica) */}
+                <header className="w-full h-16 shrink-0 bg-[#faf4e5]/90 border-b border-[#8b4513]/25 px-6 flex items-center justify-between z-30 shadow-sm select-none">
+                    <div className="flex items-center gap-6 overflow-hidden flex-grow mr-4">
+                        {/* Logo / Title */}
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#ffd700] shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
+                            <span className="font-serif text-sm font-bold tracking-widest text-[#4b2c20] uppercase">
+                                Citadel Command
+                            </span>
+                        </div>
+
+                        <div className="h-6 w-px bg-[#8b4513]/20 shrink-0" />
+
+                        {/* Controls */}
+                        <button className="p-1.5 rounded border border-[#8b4513]/20 bg-[#faf4e5] text-[#5d4037] shrink-0">
+                            <Sliders size={20} />
+                        </button>
+                        <button className="p-1.5 rounded border border-[#8b4513]/20 bg-[#faf4e5] text-[#5d4037] shrink-0">
+                            <FilterX size={20} />
+                        </button>
+
+                        {/* 8 Tabs Grid */}
+                        <nav className="grid grid-cols-4 gap-1.5 w-full max-w-[640px] shrink-0 py-0.5 items-center">
+                            {/* Row 1 */}
+                            <button className="insights-scroll-tab">INSIGHTS</button>
+                            <button className="px-3 py-1 rounded font-serif text-[9px] font-bold tracking-wider uppercase border bg-[#f4e4bc] border-[#5d4037]/60 text-[#4b2c20] shadow-[0_0_8px_rgba(93,64,55,0.15)]">AP/AR COMMAND</button>
+                            <button className="px-3 py-1 rounded font-serif text-[9px] font-bold tracking-wider uppercase border border-transparent text-[#5d4037]">ROYAL TREASURY</button>
+                            <div className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase text-[#8b4513]/70 font-bold flex items-center justify-center gap-0.5"><Lock size={10}/> CAMPAIGN LEDGER</div>
+                            {/* Row 2 */}
+                            <div className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase text-[#8b4513]/70 font-bold flex items-center justify-center gap-0.5"><Lock size={10}/> CITADEL RESERVES</div>
+                            <div className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase text-[#8b4513]/70 font-bold flex items-center justify-center gap-0.5"><Lock size={10}/> MERCHANT GUILD</div>
+                            <div className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase text-[#8b4513]/70 font-bold flex items-center justify-center gap-0.5"><Lock size={10}/> VASSAL TRIBUTES</div>
+                            <div className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase text-[#8b4513]/70 font-bold flex items-center justify-center gap-0.5"><Lock size={10}/> WAR FUND</div>
+                        </nav>
+                    </div>
+
+                    {/* Close Button */}
+                    <button className="w-8 h-8 rounded-full bg-[#be123c] border border-[#7f1d1d] text-[#ffd700] flex items-center justify-center shadow-md shrink-0 ml-1.5">
+                        <X size={15} className="stroke-[3]" />
+                    </button>
+                </header>
+
+                {/* 2. CANVAS AREA */}
+                <div 
+                    className="flex-1 p-6 relative overflow-y-scroll overflow-x-hidden flex flex-col scrollbar-thin scrollbar-thumb-[#8b4513]/60 scrollbar-track-[#e8dcb8]"
+                    style={{
+                        backgroundImage: `
+                            radial-gradient(circle at 50% 50%, transparent 30%, rgba(139, 69, 19, 0.15) 80%, rgba(75, 44, 32, 0.4) 100%),
+                            linear-gradient(to right, rgba(75, 44, 32, 0.15) 0%, transparent 4%, transparent 96%, rgba(75, 44, 32, 0.15) 100%)
+                        `,
+                        boxShadow: 'inset 0 0 60px rgba(75, 44, 32, 0.4), inset 0 0 15px rgba(0,0,0,0.3)'
+                    }}
+                >
+                    <div className="max-w-[1200px] w-full mx-auto grid grid-cols-12 gap-4 auto-rows-min">
+                        
+                        {/* ROW 1 */}
+                        {/* Granularity */}
+                        <div className="col-span-4 h-[90px] bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl shadow-sm p-4 flex flex-col justify-center">
+                            <div className="flex flex-wrap gap-2">
+                                {['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ALL TIME'].map(opt => (
+                                    <div key={opt} className={`flex-1 text-center px-2 py-1.5 rounded text-[9px] font-semibold uppercase tracking-wider border min-w-[60px] ${opt === 'MONTHLY' ? 'bg-amber-900 text-amber-100 border-amber-950 shadow-inner' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                                        {opt}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Dates */}
+                        <div className="col-span-4 h-[90px] bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl shadow-sm p-4 flex items-center justify-center">
+                            <div className="flex gap-4 w-full">
+                                <div className="flex-[0.8] flex flex-col gap-1 border-r border-gray-200 pr-4">
+                                    <div className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-400 font-mono text-center">--/----</div>
+                                </div>
+                                <div className="flex-1 flex flex-col gap-1">
+                                    <div className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-400 font-mono text-center">dd/mm/yyyy</div>
+                                </div>
+                                <div className="flex-1 flex flex-col gap-1">
+                                    <div className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-400 font-mono text-center">dd/mm/yyyy</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="col-span-4 h-[90px] bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl shadow-sm p-4 flex flex-row gap-2 justify-center">
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-gray-200 bg-gray-50">
+                                <span className="font-serif font-bold text-gray-700 text-[10px] uppercase mb-1">PENDING</span>
+                                <span className="font-mono font-bold text-gray-900 text-xs">4,452.01</span>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-gray-200 bg-gray-50">
+                                <span className="font-serif font-bold text-gray-700 text-[10px] uppercase mb-1">COMPLETED</span>
+                                <span className="font-mono font-bold text-gray-900 text-xs">37,705.98</span>
+                            </div>
+                        </div>
+
+                        {/* ROW 2 - Arrears */}
+                        <div className="col-span-12 h-[80px] bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl shadow-sm p-3 flex flex-row items-stretch gap-2">
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded border border-blue-200 bg-blue-50 text-blue-800">
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">NOT YET DUE</span>
+                                <span className="font-mono font-bold text-xs">0.00</span>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded border border-amber-200 bg-amber-50 text-amber-800">
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">DUE (&lt; 7 DAYS)</span>
+                                <span className="font-mono font-bold text-xs">0.00</span>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded border border-orange-300 bg-orange-100 text-orange-900">
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">PAY TODAY</span>
+                                <span className="font-mono font-bold text-xs">0.00</span>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded border border-red-200 bg-red-50 text-red-800">
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">OVERDUE</span>
+                                <span className="font-mono font-bold text-xs">4,452.01</span>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded border border-emerald-200 bg-emerald-50 text-emerald-800">
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">PAID ON TIME</span>
+                                <span className="font-mono font-bold text-xs">25,205.98</span>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center p-2 rounded border border-purple-200 bg-purple-50 text-purple-800">
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">PAID OVERDUE</span>
+                                <span className="font-mono font-bold text-xs">0.00</span>
+                            </div>
+                        </div>
+
+                        {/* ROW 3 - Main Charts */}
+                        {/* Top 10 Volume (Merged) */}
+                        <div className="col-span-5 h-[450px] bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl shadow-sm p-5 flex flex-col">
+                            <div className="flex items-center justify-between mb-4 shrink-0">
+                                <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">TOP 10 VOLUME</h3>
+                                <div className="flex bg-gray-100 p-0.5 rounded-md border border-gray-200">
+                                    <button 
+                                        onClick={() => setViewMode('category')}
+                                        className={`px-2 py-1 text-[9px] font-bold uppercase rounded ${viewMode === 'category' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                                    >
+                                        CATEGORY
+                                    </button>
+                                    <button 
+                                        onClick={() => setViewMode('entity')}
+                                        className={`px-2 py-1 text-[9px] font-bold uppercase rounded ${viewMode === 'entity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                                    >
+                                        ENTITY
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex-1 w-full relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={MOCK_VOLUME_DATA} layout="vertical" margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
+                                        <XAxis type="number" hide />
+                                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={110} />
+                                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={12} fill="#9ca3af" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Ledger */}
+                        <div className="col-span-7 h-[450px] bg-[#faf4e5] border border-[#8b4513]/30 rounded-xl shadow-sm p-5 flex flex-col">
+                            <div className="flex items-center justify-between mb-4 shrink-0">
+                                <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">FILTERED LEDGER</h3>
+                                <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500 border border-gray-200">101 Rows</span>
+                            </div>
+                            <div className="flex-1 overflow-auto pr-2">
+                                <table className="w-full text-left border-collapse whitespace-nowrap">
+                                    <thead className="sticky top-0 bg-[#faf4e5] z-10">
+                                        <tr>
+                                            <th className="pb-3 border-b border-[#8b4513]/20 text-[9px] font-bold text-gray-400 uppercase tracking-wider">POST DATE</th>
+                                            <th className="pb-3 border-b border-[#8b4513]/20 text-[9px] font-bold text-gray-400 uppercase tracking-wider">DUE DATE</th>
+                                            <th className="pb-3 border-b border-[#8b4513]/20 text-[9px] font-bold text-gray-400 uppercase tracking-wider">ENTITY</th>
+                                            <th className="pb-3 border-b border-[#8b4513]/20 text-[9px] font-bold text-gray-400 uppercase tracking-wider">CATEGORY</th>
+                                            <th className="pb-3 border-b border-[#8b4513]/20 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">AMOUNT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-xs divide-y divide-[#8b4513]/10 font-mono">
+                                        {MOCK_LEDGER.map((row) => (
+                                            <tr key={row.id}>
+                                                <td className="py-3 text-gray-500">{row.posting_date}</td>
+                                                <td className="py-3 text-gray-500">{row.value_date}</td>
+                                                <td className="py-3 text-gray-700 font-sans font-medium">{row.entity}</td>
+                                                <td className="py-3 text-gray-700 font-sans font-medium">{row.category}</td>
+                                                <td className="py-3 text-right font-bold text-gray-900">{row.amount}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\sandbox\visual-sandbox.css
+=========================================
+
+/* client/src/components/sandbox/visual-sandbox.css */
+
+.parchment-bg {
+  background-color: #f4e8d3;
+  background-image: 
+    radial-gradient(circle at center, transparent 0%, rgba(200, 175, 130, 0.4) 100%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+  color: #3b2c1f;
+}
+
+.leather-border {
+  border: 8px solid #4a2e15;
+  border-radius: 6px;
+  box-shadow: 
+    inset 0 0 12px 4px rgba(30, 15, 5, 0.7),
+    0 6px 12px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+
+.leather-border::before {
+  content: '';
+  position: absolute;
+  top: -6px; left: -6px; right: -6px; bottom: -6px;
+  border: 1px solid #231205;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.medieval-scrollbar::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.medieval-scrollbar::-webkit-scrollbar-track {
+  background: #6b4423;
+  border-left: 2px solid #3a2210;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.6);
+}
+
+.medieval-scrollbar::-webkit-scrollbar-thumb {
+  background: #8b5a2b;
+  border-radius: 4px;
+  border: 2px solid #4a2e15;
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.2);
+}
+
+.medieval-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a06b35;
+}
+
+.medieval-scrollbar::-webkit-scrollbar-corner {
+  background: #4a2e15;
+}
+
+/* 9-Slice Border Image Class (Disabled as requested) */
+.medieval-frame {
+  /* Removed borders and background styles */
+}
+
+/* Insights Scroll Tab Style */
+.insights-scroll-tab {
+  background-image: url('../../assets/insights_scroll_tab.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: none;
+  background-color: transparent;
+  color: #5c4033 !important;
+  font-family: serif;
+  font-weight: 800;
+  text-shadow: 0.5px 0.5px 1px rgba(255, 255, 255, 0.6);
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  box-shadow: none !important;
+}
+
+
+
+=========================================
+ARQUIVO: client\src\components\ui\Modal.jsx
+=========================================
+
+import React, { useEffect } from 'react';
+
+/**
+ * Universal Modal Component
+ */
+export default function Modal({ icon, title, subtitle, onClose, children, maxWidth = "max-w-4xl" }) {
+  
+  // FIX: Listen for the Escape key being pressed
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    // FIX: Added absolute inset-0 and a darkened background to create a clickable backdrop
+    <div 
+      className="absolute inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in"
+      onClick={onClose} // Triggers onClose when clicking the background
+    >
+      <div 
+        className={`w-full ${maxWidth} transition-all duration-300 ease-in-out flex flex-col max-h-full`}
+        onClick={(e) => e.stopPropagation()} // Prevents clicks INSIDE the modal from closing it
+      >
+        <div className="bg-stone-950 border-2 border-amber-900/50 rounded-lg shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-full w-full">
+          
+          <div className="shrink-0 bg-stone-900/80 border-b border-amber-900/30 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {icon && <span className="text-2xl">{icon}</span>}
+              <div>
+                <h2 className="text-lg font-bold text-amber-400 uppercase tracking-widest">
+                  {title}
+                </h2>
+                {subtitle && (
+                  <p className="text-[10px] text-stone-400 uppercase tracking-wider font-sans">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button 
+              onClick={onClose} 
+              className="w-8 h-8 rounded-full bg-red-900/80 hover:bg-red-800 border-2 border-red-950 flex items-center justify-center text-yellow-400 font-bold transition-colors leading-none focus:outline-none"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="p-6 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-amber-900 scrollbar-track-stone-950">
+            {children}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\ui\ModalSubmenus.jsx
+=========================================
+
+import React from 'react';
+import Modal from './Modal';
+
+/**
+ * ModalSubmenus Component
+ * 
+ * A reusable template for modal menu layouts. Imports and wraps its 
+ * content in the universal <Modal> component, rendering a list of 
+ * styled navigation buttons.
+ * 
+ * @param {string} icon - Header icon symbol
+ * @param {string} title - Header title text
+ * @param {string} subtitle - Header subtitle text
+ * @param {function} onClose - Frame dismiss callback
+ * @param {Array} menuItems - Objects structured as: { id, icon, label, onClick }
+ */
+export default function ModalSubmenus({ icon, title, subtitle, onClose, menuItems }) {
+  return (
+    <Modal icon={icon} title={title} subtitle={subtitle} onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        {menuItems.map((item) => (
+          <button 
+            key={item.id}
+            onClick={() => item.onClick(item.id)} 
+            className="w-full flex items-center gap-4 p-4 bg-stone-900/50 border-2 border-stone-800/80 rounded-lg hover:border-amber-700/80 hover:bg-stone-800 transition-all text-left group"
+          >
+            <span className="text-3xl group-hover:scale-110 transition-transform">
+              {item.icon}
+            </span>
+            <span className="font-bold text-stone-200 tracking-widest uppercase">
+              {item.label}
+            </span>
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\ui\ModalTabmenus.jsx
+=========================================
+
+import React, { useState } from 'react';
+import Modal from './Modal';
+
+/**
+ * ModalTabmenus Component
+ * 
+ * A reusable template for tabbed modal layouts. Imports and wraps its 
+ * content in the universal <Modal> component, rendering a horizontal 
+ * navigation menu to toggle sub-content areas seamlessly.
+ * 
+ * @param {string} icon - Header icon symbol
+ * @param {string} title - Header title text
+ * @param {string} subtitle - Header subtitle text
+ * @param {function} onClose - Frame dismiss callback
+ * @param {Array} tabs - Tab parameters structured as: { id, label, icon, content }
+ */
+export default function ModalTabmenus({ icon, title, subtitle, onClose, tabs }) {
+  // Set default active tab to the first elements id
+  const [activeTabId, setActiveTabId] = useState(tabs[0]?.id || '');
+
+  // Find currently active tab payload
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  return (
+    <Modal icon={icon} title={title} subtitle={subtitle} onClose={onClose}>
+      
+      {/* 1. Horizontal Tab Bar */}
+      <div className="flex border-b border-amber-900/30 mb-6 overflow-x-auto custom-scrollbar-subtle">
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTabId;
+          
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTabId(tab.id)}
+              className={`flex items-center gap-2 px-4 py-3 uppercase tracking-widest text-xs whitespace-nowrap transition-all outline-none focus:outline-none ${
+                isActive
+                  ? 'border-b-2 border-amber-500 text-amber-500 font-bold'
+                  : 'border-b-2 border-transparent text-stone-400 hover:text-stone-200 hover:border-stone-600 font-medium'
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 2. Active Content Area */}
+      <div className="animate-fade-in">
+        {activeTab?.content || null}
+      </div>
+
+    </Modal>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\AssetAllocationChart.jsx
+=========================================
+
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { generateCategoryBreakdown } from '../../utils/chartAnalytics';
+
+const PIE_COLORS = ['#111827', '#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db'];
+
+export default function AssetAllocationChart() {
+  const categoryView = useKingdomStore((state) => state.analytics?.category || []);
+  const monthlyView = useKingdomStore((state) => state.analytics?.monthly || []);
+  
+  // Sensor Espacial: Deteta se o utilizador redimensionou o widget para um tamanho muito pequeno
+  const containerRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        // Se a largura ou a altura do cartão caírem abaixo do limiar (aprox tamanho 2x2), ativa o modo compacto
+        if (entry.contentRect.width < 300 || entry.contentRect.height < 250) {
+          setIsCompact(true);
+        } else {
+          setIsCompact(false);
+        }
+      }
+    });
+
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const data = useMemo(() => {
+    return generateCategoryBreakdown(categoryView, 'Assets').slice(0, 5);
+  }, [categoryView]);
+
+  const totalAssetValue = useMemo(() => {
+    return data.reduce((sum, item) => sum + item.value, 0);
+  }, [data]);
+
+  const dataWithMeta = useMemo(() => {
+    return data.map((item, index) => {
+      const percentage = totalAssetValue > 0 ? ((item.value / totalAssetValue) * 100).toFixed(1) : 0;
+      return { ...item, percentage, color: PIE_COLORS[index % PIE_COLORS.length] };
+    });
+  }, [data, totalAssetValue]);
+
+  const healthScore = useMemo(() => {
+    let income = 0;
+    let expenses = 0;
+    monthlyView.forEach((row) => {
+      const amt = Number(row.total_amount) || 0;
+      if (row.type === 'Income') income += amt;
+      if (row.type === 'Expenses') expenses += Math.abs(amt);
+    });
+
+    if (income === 0 && expenses === 0) return 100;
+    if (income === 0) return 0;
+    const ratio = income / (income + expenses);
+    return Math.round(ratio * 100);
+  }, [monthlyView]);
+
+  const getHealthDescriptor = (score) => {
+    if (score >= 80) return { label: 'Flourishing', color: 'text-emerald-500' };
+    if (score >= 50) return { label: 'Stable', color: 'text-amber-500' };
+    return { label: 'Strained', color: 'text-rose-500' };
+  };
+
+  const healthMeta = getHealthDescriptor(healthScore);
+  const formatGP = (val) => `${Number(val).toLocaleString()} GP`;
+
+  return (
+    <div 
+      ref={containerRef}
+      // min-h-[380px] substituido por min-h-0 e overflow-hidden para permitir encolhimento
+      className={`w-full h-full min-h-0 flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-between overflow-hidden transition-all duration-200 ${isCompact ? 'p-3 gap-2' : 'p-6 gap-6'}`}
+    >
+      {/* Cabeçalho Condicional */}
+      <div className="shrink-0">
+        <h3 className={`font-sans font-semibold tracking-wide text-gray-500 uppercase truncate ${isCompact ? 'text-[10px] mb-0' : 'text-sm'}`}>
+          Asset Allocation
+        </h3>
+        {!isCompact && (
+          <p className="text-xs text-gray-400 mt-1 truncate">Distribution of wealth holdings</p>
+        )}
+      </div>
+
+      {/* Lista de Ativos com Scroll Interno (se houver overlow) e Fontes Fluidas */}
+      <div className={`flex flex-col flex-1 overflow-y-auto scrollbar-thin ${isCompact ? 'gap-1.5' : 'gap-4'}`}>
+        {dataWithMeta.map((item) => (
+          <div key={item.name} className={`flex items-center justify-between border-b border-gray-100 last:border-0 ${isCompact ? 'pb-1' : 'pb-2'}`}>
+            <div className="flex items-center gap-2 overflow-hidden pr-2">
+              <div className={`rounded-sm flex-shrink-0 ${isCompact ? 'w-2 h-2' : 'w-3 h-3'}`} style={{ backgroundColor: item.color }} />
+              <p className={`font-serif font-semibold text-gray-800 truncate ${isCompact ? 'text-[10px]' : 'text-sm'}`}>
+                {item.name}
+              </p>
+            </div>
+            <div className="text-right font-mono flex-shrink-0 pl-2">
+              <p className={`font-bold text-gray-900 ${isCompact ? 'text-[10px]' : 'text-sm'}`}>{formatGP(item.value)}</p>
+              <p className={`font-semibold text-gray-500 ${isCompact ? 'text-[9px]' : 'text-xs'}`}>{item.percentage}%</p>
+            </div>
+          </div>
+        ))}
+        {dataWithMeta.length === 0 && (
+          <p className={`text-center font-serif text-gray-400 ${isCompact ? 'text-[10px] py-2' : 'text-sm py-8'}`}>
+            No reserves discovered.
+          </p>
+        )}
+      </div>
+
+      {/* Traço separador visível apenas no modo normal */}
+      {!isCompact && <div className="w-full h-px bg-gray-100 shrink-0" />}
+
+      {/* Painel de Saúde do Tesouro Responsivo */}
+      <div className={`rounded bg-gray-50 border border-gray-200 flex items-center justify-between shrink-0 ${isCompact ? 'p-1.5' : 'p-3.5'}`}>
+        <div className="overflow-hidden pr-2">
+          <p className={`uppercase tracking-wider font-semibold text-gray-500 truncate ${isCompact ? 'text-[9px]' : 'text-[11px]'}`}>
+            Treasury Health
+          </p>
+          {!isCompact && (
+            <p className="text-xs text-gray-400 truncate">Ratio of earnings to expenses</p>
+          )}
+        </div>
+        <div className="text-right flex-shrink-0 pl-2">
+          <p className={`font-mono font-black tracking-tighter text-gray-800 ${isCompact ? 'text-sm' : 'text-xl'}`}>
+            {healthScore}%
+          </p>
+          <span className={`font-serif font-bold uppercase block ${healthMeta.color} ${isCompact ? 'text-[8px]' : 'text-[10px]'}`}>
+            {healthMeta.label}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\CashFlowChart.jsx
+=========================================
+
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { generateCashFlowData } from '../../utils/chartAnalytics';
+
+export default function CashFlowChart() {
+  const monthlyView = useKingdomStore((state) => state.analytics?.monthly || []);
+
+  const data = useMemo(() => {
+    return generateCashFlowData(monthlyView);
+  }, [monthlyView]);
+
+  const stats = useMemo(() => {
+    if (!data.length) return { avgIncome: 0, avgExpense: 0 };
+    const totalIncome = data.reduce((sum, d) => sum + d.income, 0);
+    const totalExpense = data.reduce((sum, d) => sum + d.expenses, 0);
+    return {
+      avgIncome: totalIncome / data.length,
+      avgExpense: totalExpense / data.length,
+    };
+  }, [data]);
+
+  const formatGP = (val) => `${Number(val).toLocaleString()} GP`;
+
+  // Spatial Sensor Logic
+  const containerRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width < 350 || entry.contentRect.height < 280) {
+          setIsCompact(true);
+        } else {
+          setIsCompact(false);
+        }
+      }
+    });
+
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div 
+      ref={containerRef}
+      className={`w-full h-full min-h-0 flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-all duration-200 ${isCompact ? 'p-3 gap-2' : 'p-6 gap-6'}`}
+    >
+      <div className={`flex ${isCompact ? 'flex-row items-center' : 'flex-col sm:flex-row sm:items-center'} justify-between ${isCompact ? 'gap-2' : 'gap-4'} shrink-0`}>
+        <div className="shrink-0 overflow-hidden pr-2">
+          <h3 className={`font-sans font-semibold tracking-wide text-gray-500 uppercase truncate ${isCompact ? 'text-[10px] mb-0' : 'text-sm'}`}>
+            Income vs Expenses
+          </h3>
+          {!isCompact && (
+            <p className="text-xs text-gray-400 mt-1 truncate">Historical evolution of all Income vs Expenses</p>
+          )}
+        </div>
+        
+        <div className={`flex items-center ${isCompact ? 'gap-1.5' : 'gap-3'} shrink-0`}>
+          <div className={`flex items-center gap-1.5 rounded bg-emerald-50 border border-emerald-200 font-semibold text-emerald-600 font-mono ${isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-3 py-1.5 text-xs'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            {!isCompact && <span>Avg Inflow:</span>}
+            {Number(Math.abs(stats.avgIncome).toFixed(0)).toLocaleString()}
+          </div>
+          <div className={`flex items-center gap-1.5 rounded bg-rose-50 border border-rose-200 font-semibold text-rose-600 font-mono ${isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-3 py-1.5 text-xs'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+            {!isCompact && <span>Avg Outflow:</span>}
+            {Number(Math.abs(stats.avgExpense).toFixed(0)).toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 10, right: 5, left: -15, bottom: 0 }}>
+            <defs>
+              <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+
+            <CartesianGrid stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
+
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={12} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tickMargin={8} />
+
+            <Tooltip
+              contentStyle={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+              labelStyle={{ fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}
+              formatter={(value, name) => [formatGP(Math.abs(value)), name === 'income' ? 'Inflows' : 'Outflows']}
+            />
+
+            <Area type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2.5} fill="url(#incomeGrad)" dot={{ fill: '#10b981', r: 4, strokeWidth: 1, stroke: '#ffffff' }} activeDot={{ r: 6, fill: '#10b981', strokeWidth: 0 }} />
+            <Area type="monotone" dataKey="expenses" stroke="#f43f5e" strokeWidth={2.5} fill="url(#expenseGrad)" dot={{ fill: '#f43f5e', r: 4, strokeWidth: 1, stroke: '#ffffff' }} activeDot={{ r: 6, strokeWidth: 0 }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\HandDrawnCashFlowWidget.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { generateCashFlowData } from '../../utils/chartAnalytics';
+
+export default function HandDrawnCashFlowWidget() {
+  const monthlyView = useKingdomStore(s => s.analytics?.monthly || []);
+  const data = useMemo(() => generateCashFlowData(monthlyView), [monthlyView]);
+
+  return (
+    <div className="w-full h-full min-h-[380px] flex flex-col font-[cursive] text-[#2c2825]">
+      <div className="mb-4 text-center border-b-2 border-[#2c2825] border-dashed pb-2 opacity-80" style={{ filter: 'url(#pencil)' }}>
+        <h3 className="text-2xl font-bold tracking-widest uppercase">Income vs Expenses</h3>
+        <p className="text-sm">~ A Charcoal Record of the Royal Vault ~</p>
+      </div>
+      <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <defs>
+              <filter id="pencil" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+              <pattern id="hatch-income" patternUnits="userSpaceOnUse" width="4" height="4">
+                <path d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2" stroke="#2c2825" strokeWidth="0.5" opacity="0.4" />
+              </pattern>
+              <pattern id="hatch-expense" patternUnits="userSpaceOnUse" width="4" height="4">
+                <path d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2" stroke="#5a3a31" strokeWidth="1" opacity="0.5" />
+              </pattern>
+            </defs>
+            <CartesianGrid filter="url(#pencil)" opacity={0.2} stroke="#2c2825" strokeDasharray="5 10" vertical={false}/>
+            <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: '#2c2825', strokeWidth: 2 }} tick={{ fontSize: 12, fill: '#2c2825', fontFamily: 'cursive' }} filter="url(#pencil)" />
+            <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} axisLine={{ stroke: '#2c2825', strokeWidth: 2 }} tickLine={false} tick={{ fontSize: 12, fill: '#2c2825', fontFamily: 'cursive' }} filter="url(#pencil)" />
+            <Tooltip contentStyle={{ backgroundColor: 'transparent', border: 'none', fontFamily: 'cursive', color: '#2c2825', fontWeight: 'bold', boxShadow: 'none' }} cursor={{ stroke: '#2c2825', strokeWidth: 2, strokeDasharray: '2 2' }} />
+            <Area type="monotone" dataKey="income" stroke="#2c2825" strokeWidth={3} fill="url(#hatch-income)" filter="url(#pencil)" activeDot={{ r: 6, fill: '#2c2825' }} />
+            <Area type="monotone" dataKey="expenses" stroke="#5a3a31" strokeWidth={3} fill="url(#hatch-expense)" filter="url(#pencil)" activeDot={{ r: 6, fill: '#5a3a31' }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\InteractiveAPARWidgets.jsx
+=========================================
+
+// client/src/components/widgets/InteractiveAPARWidgets.jsx
+
+import React, { useState, useEffect, useRef } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useInteractiveStore } from '../../store/useInteractiveStore';
+import { useInteractiveData } from '../../hooks/useInteractiveData';
+import { Loader2, FilterX } from 'lucide-react';
+
+const formatValue = (val) => {
+    const num = Number(val) || 0;
+    const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+const LocalClearBtn = ({ onClear }) => (
+    <button
+        onClick={(e) => { e.stopPropagation(); onClear(); }}
+        className="cancel-drag absolute top-2 right-2 p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors [&>*]:pointer-events-none z-20"
+        title="Clear Widget Filter"
+    >
+        <FilterX size={14} />
+    </button>
+);
+
+const useWidgetResize = (heightThreshold = 120) => {
+    const [isCompact, setIsCompact] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        if (!ref.current) return;
+        
+        const checkSize = () => {
+            if (ref.current) {
+                setIsCompact(ref.current.offsetHeight < heightThreshold);
+            }
+        };
+        
+        checkSize();
+
+        const observer = new ResizeObserver(() => checkSize());
+        observer.observe(ref.current);
+        return () => observer.disconnect();
+    }, [heightThreshold]);
+
+    return { ref, isCompact };
+};
+
+// ==========================================
+// WIDGET 1: Date Range & Month Picker
+// ==========================================
+export const InteractiveDateFilter = () => {
+    const { filters, setFilter } = useInteractiveStore();
+    const { ref, isCompact } = useWidgetResize(110);
+
+    const hasFilter = filters.startDate || filters.endDate || filters.monthFilter;
+
+    return (
+        <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center ${isCompact ? 'p-2' : 'p-4'}`}>
+            {hasFilter && <LocalClearBtn onClear={() => { setFilter('startDate', null); setFilter('endDate', null); setFilter('monthFilter', null); }} />}
+
+            {!isCompact && <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-4 shrink-0">Timeframe</h3>}
+            <div className="flex gap-4 pr-6">
+                <div className="flex-[0.8] flex flex-col gap-1 border-r border-gray-200 pr-4">
+                    {!isCompact && <label className="text-[10px] uppercase font-bold text-gray-400">Select Month</label>}
+                    <input
+                        type="month"
+                        value={filters.monthFilter || ''}
+                        onChange={(e) => setFilter('monthFilter', e.target.value || null)}
+                        className="cancel-drag w-full border border-gray-300 rounded p-1.5 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+                    />
+                </div>
+                <div className="flex-1 flex flex-col gap-1">
+                    {!isCompact && <label className="text-[10px] uppercase font-bold text-gray-400">Start Date</label>}
+                    <input
+                        type="date"
+                        value={filters.startDate || ''}
+                        onChange={(e) => setFilter('startDate', e.target.value || null)}
+                        className="cancel-drag w-full border border-gray-300 rounded p-1.5 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+                    />
+                </div>
+                <div className="flex-1 flex flex-col gap-1">
+                    {!isCompact && <label className="text-[10px] uppercase font-bold text-gray-400">End Date</label>}
+                    <input
+                        type="date"
+                        value={filters.endDate || ''}
+                        onChange={(e) => setFilter('endDate', e.target.value || null)}
+                        className="cancel-drag w-full border border-gray-300 rounded p-1.5 text-xs text-gray-700 font-mono outline-none focus:border-amber-600"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// WIDGET 2: Granularity Selector
+// ==========================================
+export const InteractiveGranularity = () => {
+    const { filters, setFilter } = useInteractiveStore();
+    const { ref, isCompact } = useWidgetResize(110);
+    const options = ['Weekly', 'Monthly', 'Quarterly', 'Yearly', 'All Time'];
+
+    return (
+        <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm justify-center overflow-hidden ${isCompact ? 'p-2' : 'p-4'}`}>
+            {!isCompact && <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-4 shrink-0">Grouping</h3>}
+            <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar-subtle pr-2">
+                {options.map(opt => (
+                    <button
+                        key={opt}
+                        onClick={(e) => { if (e && e.stopPropagation) e.stopPropagation(); setFilter('granularity', opt); }}
+                        className={`cancel-drag [&>*]:pointer-events-none flex-1 px-2 py-1.5 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors border whitespace-nowrap min-w-[70px] ${filters.granularity === opt
+                                ? 'bg-amber-900 text-amber-100 border-amber-950 shadow-inner'
+                                : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                            }`}
+                    >
+                        {opt}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// WIDGET 3: Payment Status Summary
+// ==========================================
+export const InteractiveStatus = () => {
+    const { data, isFetching } = useInteractiveData();
+    const { filters, setFilter } = useInteractiveStore();
+    const { ref, isCompact } = useWidgetResize(130);
+
+    const statusData = data?.status_summary || [];
+
+    return (
+        <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-4'}`}>
+            {isFetching && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none rounded-xl"><Loader2 className="animate-spin text-amber-500"/></div>}
+            
+            {filters.statusFilter && <LocalClearBtn onClear={() => setFilter('statusFilter', null)} />}
+
+            {!isCompact && (
+                <div className="flex items-center mb-4 shrink-0">
+                    <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Payment Status</h3>
+                </div>
+            )}
+
+            <div className={`flex-1 flex ${isCompact ? 'flex-row' : 'flex-col'} gap-2 justify-center pr-6`}>
+                {['Pending', 'Completed'].map(status => {
+                    const sum = statusData.find(d => d.name === status)?.value || 0;
+                    const isActive = filters.statusFilter === status;
+                    return (
+                        <button
+                            key={status}
+                            onClick={(e) => { if (e && e.stopPropagation) e.stopPropagation(); setFilter('statusFilter', isActive ? null : status); }}
+                            className={`cancel-drag [&>*]:pointer-events-none flex-1 flex ${isCompact ? 'flex-col justify-center' : 'items-center justify-between'} p-2 rounded-lg border transition-all ${isActive ? 'border-amber-600 bg-amber-50 ring-1 ring-amber-600' : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
+                                }`}
+                        >
+                            <span className={`font-serif font-bold text-gray-700 ${isCompact ? 'text-[10px] uppercase mb-1' : 'text-sm'}`}>{status}</span>
+                            <span className={`font-mono font-bold text-gray-900 ${isCompact ? 'text-xs' : ''}`}>{formatValue(sum)}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// WIDGET 4: Arrear Breakdown
+// ==========================================
+export const InteractiveArrear = () => {
+    const { data, isFetching } = useInteractiveData();
+    const { filters, setFilter } = useInteractiveStore();
+    const { ref, isCompact } = useWidgetResize(110);
+
+    const arrearData = data?.arrear_summary || [];
+
+    const arrearOrder = [
+        { id: 'not yet due', label: 'Not Yet Due', color: 'border-blue-200 bg-blue-50 text-blue-800' },
+        { id: 'due', label: 'Due (< 7 Days)', color: 'border-amber-200 bg-amber-50 text-amber-800' },
+        { id: 'pay today', label: 'Pay Today', color: 'border-orange-300 bg-orange-100 text-orange-900' },
+        { id: 'overdue', label: 'Overdue', color: 'border-red-200 bg-red-50 text-red-800' },
+        { id: 'paid on time', label: 'Paid On Time', color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
+        { id: 'paid overdue', label: 'Paid Overdue', color: 'border-purple-200 bg-purple-50 text-purple-800' }
+    ];
+
+    return (
+        <div ref={ref} className={`relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ${isCompact ? 'p-2' : 'p-4'}`}>
+            {isFetching && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none rounded-xl"><Loader2 className="animate-spin text-amber-500"/></div>}
+            
+            {filters.arrearFilter && <LocalClearBtn onClear={() => setFilter('arrearFilter', null)} />}
+
+            {!isCompact && (
+                <div className="flex items-center mb-4 shrink-0">
+                    <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Aging & Arrears</h3>
+                </div>
+            )}
+
+            <div className="flex-1 flex flex-row items-stretch gap-2 overflow-x-auto custom-scrollbar-subtle pb-1 pr-6">
+                {arrearOrder.map(arr => {
+                    const sum = arrearData.find(d => d.name === arr.id)?.value || 0;
+                    const isActive = filters.arrearFilter === arr.id;
+                    return (
+                        <button
+                            key={arr.id}
+                            onClick={(e) => { if (e && e.stopPropagation) e.stopPropagation(); setFilter('arrearFilter', isActive ? null : arr.id); }}
+                            className={`cancel-drag [&>*]:pointer-events-none flex-1 flex flex-col items-center justify-center p-2 rounded border transition-all whitespace-nowrap min-w-[90px] ${arr.color} ${isActive ? 'ring-2 ring-offset-1 ring-gray-400' : 'hover:brightness-95'
+                                }`}
+                        >
+                            <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">{arr.label}</span>
+                            <span className="font-mono font-bold text-xs">{formatValue(sum)}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// WIDGET 5: Category Breakdown
+// ==========================================
+export const InteractiveCategory = () => {
+    const { data, isFetching } = useInteractiveData();
+    const { filters, setFilter } = useInteractiveStore();
+
+    const categoryData = data?.category_summary || [];
+
+    return (
+        <div className="relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-4 shadow-sm overflow-hidden">
+            {isFetching && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none rounded-xl"><Loader2 className="animate-spin text-amber-500"/></div>}
+            
+            {filters.categoryFilter && <LocalClearBtn onClear={() => setFilter('categoryFilter', null)} />}
+
+            <div className="flex items-center mb-4 shrink-0">
+                <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Volume by Category</h3>
+            </div>
+
+            <div className="flex-1 w-full min-h-0 relative cancel-drag">
+                {categoryData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={categoryData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                            <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
+                            <XAxis type="number" hide />
+                            <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
+                            <Tooltip
+                                formatter={(value) => [formatValue(value), 'Amount']}
+                                contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                                cursor={{ fill: '#f3f4f6' }}
+                            />
+                            <Bar
+                                dataKey="value"
+                                radius={[0, 4, 4, 0]}
+                                barSize={20}
+                                isAnimationActive={false}
+                                onClick={(entry, index, e) => { if (e && e.stopPropagation) e.stopPropagation(); setFilter('categoryFilter', entry.name === filters.categoryFilter ? null : entry.name); }}
+                            >
+                                {categoryData.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={filters.categoryFilter === entry.name ? '#d97706' : '#4b5563'}
+                                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 italic font-mono">No data matches filters.</div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// WIDGET 7: NEW Entity Breakdown
+// ==========================================
+export const InteractiveEntity = () => {
+    const { data, isFetching } = useInteractiveData();
+    const { filters, setFilter } = useInteractiveStore();
+
+    const entityData = data?.entity_summary || [];
+
+    return (
+        <div className="relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-4 shadow-sm overflow-hidden">
+            {isFetching && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none rounded-xl"><Loader2 className="animate-spin text-amber-500"/></div>}
+            
+            {filters.entityFilter && <LocalClearBtn onClear={() => setFilter('entityFilter', null)} />}
+
+            <div className="flex items-center mb-4 shrink-0">
+                <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Volume by Entity</h3>
+            </div>
+
+            <div className="flex-1 w-full min-h-0 relative cancel-drag">
+                {entityData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={entityData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                            <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
+                            <XAxis type="number" hide />
+                            <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
+                            <Tooltip
+                                formatter={(value) => [formatValue(value), 'Amount']}
+                                contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                                cursor={{ fill: '#f3f4f6' }}
+                            />
+                            <Bar
+                                dataKey="value"
+                                radius={[0, 4, 4, 0]}
+                                barSize={20}
+                                isAnimationActive={false}
+                                onClick={(entry, index, e) => { if (e && e.stopPropagation) e.stopPropagation(); setFilter('entityFilter', entry.name === filters.entityFilter ? null : entry.name); }}
+                            >
+                                {entityData.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={filters.entityFilter === entry.name ? '#047857' : '#9ca3af'}
+                                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 italic font-mono">No data matches filters.</div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// WIDGET 6: Filtered Ledger Table
+// ==========================================
+export const InteractiveLedger = () => {
+    const { data, isFetching } = useInteractiveData();
+    const ledgerData = data?.ledger || [];
+
+    return (
+        <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-4 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+                <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Filtered Ledger</h3>
+                <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500">{ledgerData.length} Rows</span>
+            </div>
+
+            <div className="flex-1 overflow-auto pr-2 relative cancel-drag">
+                {isFetching && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none rounded-xl"><Loader2 className="animate-spin text-amber-600" /></div>}
+                
+                <table className="w-full text-left border-collapse whitespace-nowrap">
+                    <thead className="sticky top-0 bg-white z-0">
+                        <tr>
+                            <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Post Date</th>
+                            <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Due Date</th>
+                            <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Entity</th>
+                            <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">Category</th>
+                            <th className="pb-2 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase text-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody className="text-xs divide-y divide-gray-100 font-mono">
+                        {ledgerData.map((row, i) => (
+                            <tr key={i} className="hover:bg-amber-50/50 transition-colors">
+                                <td className="py-2.5 text-gray-500">{row.posting_date}</td>
+                                <td className="py-2.5 text-gray-500">{row.value_date}</td>
+                                <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[100px]">{row.entity || '-'}</td>
+                                <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[100px]">{row.category}</td>
+                                <td className="py-2.5 text-right font-bold text-gray-900">{formatValue(row.amount)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {!isFetching && ledgerData.length === 0 && (
+                    <div className="mt-8 text-center text-xs text-gray-400 italic">No records found for current filters.</div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// WIDGET 8: Interactive Merged Volume
+// ==========================================
+export const InteractiveMergedVolume = () => {
+    const { data, isFetching } = useInteractiveData();
+    const { filters, setFilter } = useInteractiveStore();
+    const [viewMode, setViewMode] = useState('category');
+
+    const rawData = viewMode === 'category' ? (data?.category_summary || []) : (data?.entity_summary || []);
+    const displayData = rawData.slice(0, 10);
+
+    const activeFilterValue = viewMode === 'category' ? filters.categoryFilter : filters.entityFilter;
+
+    const handleClear = () => {
+        if (viewMode === 'category') setFilter('categoryFilter', null);
+        else setFilter('entityFilter', null);
+    };
+
+    const handleBarClick = (entry, index, e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (viewMode === 'category') {
+            setFilter('categoryFilter', entry.name === filters.categoryFilter ? null : entry.name);
+        } else {
+            setFilter('entityFilter', entry.name === filters.entityFilter ? null : entry.name);
+        }
+    };
+
+    return (
+        <div className="relative w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-4 shadow-sm overflow-hidden">
+            {isFetching && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none rounded-xl"><Loader2 className="animate-spin text-amber-500" /></div>}
+            
+            {activeFilterValue && <LocalClearBtn onClear={handleClear} />}
+
+            <div className="flex items-center justify-between mb-4 shrink-0">
+                <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Top 10 Volume</h3>
+                
+                <div className="flex bg-gray-100 p-0.5 rounded-md">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setViewMode('category'); }}
+                        className={`cancel-drag [&>*]:pointer-events-none px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${viewMode === 'category' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Category
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setViewMode('entity'); }}
+                        className={`cancel-drag [&>*]:pointer-events-none px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${viewMode === 'entity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Entity
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 w-full min-h-0 relative cancel-drag">
+                {displayData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={displayData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                            <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
+                            <XAxis type="number" hide />
+                            <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
+                            <Tooltip
+                                formatter={(value) => [formatValue(value), 'Amount']}
+                                contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                                cursor={{ fill: '#f3f4f6' }}
+                            />
+                            <Bar
+                                dataKey="value"
+                                radius={[0, 4, 4, 0]}
+                                barSize={20}
+                                isAnimationActive={false}
+                                onClick={handleBarClick}
+                            >
+                                {displayData.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={activeFilterValue === entry.name ? '#0284c7' : '#9ca3af'}
+                                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 italic font-mono">No data matches filters.</div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\NetWorthChart.jsx
+=========================================
+
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { generateNetTrendData } from '../../utils/chartAnalytics';
+
+export default function NetWorthChart() {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+
+  const data = useMemo(() => {
+    return generateNetTrendData(cumulativeView);
+  }, [cumulativeView]);
+
+  const currentNet = useMemo(() => {
+    if (!data || !data.length) return 0;
+    return data[data.length - 1].net;
+  }, [data]);
+
+  const formatAbsoluteGP = (val) => {
+    const num = Number(val);
+    const formatted = Math.abs(num).toLocaleString();
+    return num < 0 ? `${formatted} GP (Deficit)` : `${formatted} GP`;
+  };
+
+  // Spatial Sensor Logic
+  const containerRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width < 350 || entry.contentRect.height < 280) {
+          setIsCompact(true);
+        } else {
+          setIsCompact(false);
+        }
+      }
+    });
+
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div 
+      ref={containerRef}
+      className={`w-full h-full min-h-0 flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-all duration-200 ${isCompact ? 'p-3 gap-2' : 'p-6 gap-6'}`}
+    >
+      <div className={`flex ${isCompact ? 'flex-row items-center' : 'flex-col sm:flex-row sm:items-center'} justify-between ${isCompact ? 'gap-2' : 'gap-4'} shrink-0`}>
+        <div className="shrink-0 overflow-hidden pr-2">
+          <h3 className={`font-sans font-semibold tracking-wide text-gray-500 uppercase truncate ${isCompact ? 'text-[10px] mb-0' : 'text-sm'}`}>
+            Asset Growth Trend
+          </h3>
+          {!isCompact && (
+            <p className="text-xs text-gray-400 mt-1 truncate">Tracks the total accumulated balance and financial position.</p>
+          )}
+        </div>
+        
+        <div className={`flex items-center ${isCompact ? 'gap-1.5' : 'gap-3'} shrink-0`}>
+          <div className={`flex items-center gap-1.5 rounded bg-gray-100 border border-gray-200 font-semibold text-gray-700 font-mono ${isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-3 py-1.5 text-xs'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-600 animate-pulse shrink-0" />
+            {!isCompact && <span>Current Position:</span>}
+            {formatAbsoluteGP(currentNet)}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 12, right: 8, left: -15, bottom: 4 }}>
+            <defs>
+              <linearGradient id="netGradientLight" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#111827" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#111827" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+
+            <CartesianGrid stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
+
+            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} tickMargin={12} />
+            <YAxis axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} tickMargin={8} />
+
+            <Tooltip
+              contentStyle={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: '10px 14px' }}
+              formatter={(value) => [formatAbsoluteGP(value), 'Net Position']}
+              labelStyle={{ fontWeight: 700, color: '#6b7280', marginBottom: '4px' }}
+            />
+
+            <Area type="monotone" dataKey="net" stroke="#111827" strokeWidth={2.5} fillOpacity={1} fill="url(#netGradientLight)" dot={{ fill: '#111827', r: 4, strokeWidth: 1, stroke: '#ffffff' }} activeDot={{ r: 6, fill: '#111827', strokeWidth: 0 }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\Phase1ChartWidgets.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { generateCashFlowData, generateNetTrendData, generateCumulativeCashFlowData } from '../../utils/chartAnalytics';
+
+// 1. Importa a imagem do pergaminho
+import parchmentBg from '../../assets/Parchement_01.jfif';
+
+const formatValue = (val) => {
+  const num = Number(val) || 0;
+  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+// 2. Adiciona 'bgImage' às propriedades (props) do componente base
+const TrendChartCard = ({ title, subtitle, data, dataKey, xAxisKey, color, isNegative, bgImage }) => (
+  <div 
+    // 3. Aplica as classes Tailwind dinamicamente consoante a existência da imagem
+    className={`w-full h-full min-h-[300px] flex flex-col border border-gray-200 rounded-xl p-6 shadow-sm relative overflow-hidden ${
+      bgImage ? 'bg-cover bg-center bg-no-repeat' : 'bg-white'
+    }`}
+    style={bgImage ? { backgroundImage: `url(${bgImage})` } : {}}
+  >
+    {/* Opcional: Um overlay leve para garantir que a grelha e o texto se leem bem por cima da textura */}
+    {bgImage && <div className="absolute inset-0 bg-white/40 pointer-events-none" />}
+
+    <div className="mb-4 relative z-10">
+      <h3 className={`text-sm font-sans font-semibold tracking-wide uppercase ${bgImage ? 'text-stone-800' : 'text-gray-500'}`}>
+        {title}
+      </h3>
+      <p className={`text-xs mt-1 ${bgImage ? 'text-stone-600 font-medium' : 'text-gray-400'}`}>
+        {subtitle}
+      </p>
+    </div>
+    
+    <div className="flex-1 w-full min-h-0 overflow-hidden relative z-10">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`color-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={bgImage ? 0.4 : 0.2} />
+              <stop offset="95%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke={bgImage ? "#a8a29e" : "#f3f4f6"} strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey={xAxisKey} axisLine={false} tickLine={false} tickMargin={10} tick={{ fontSize: 11, fill: bgImage ? '#5c524b' : '#9ca3af', fontWeight: bgImage ? 600 : 400 }} />
+          <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: bgImage ? '#5c524b' : '#9ca3af', fontWeight: bgImage ? 600 : 400 }} axisLine={false} tickLine={false} />
+          <Tooltip
+            formatter={(value) => [formatValue(isNegative ? Math.abs(value) : value), title]}
+            contentStyle={{ backgroundColor: bgImage ? 'rgba(255, 255, 255, 0.85)' : '#ffffff', backdropFilter: 'blur(4px)', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+            labelStyle={{ fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}
+          />
+          <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2.5} fill={`url(#color-${dataKey})`} fillOpacity={1} dot={{ r: 4, strokeWidth: 1 }} activeDot={{ r: 6 }} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+);
+
+export const IncomeTrendWidget = () => {
+  const monthlyView = useKingdomStore((state) => state.analytics?.monthly || []);
+  const data = useMemo(() => generateCashFlowData(monthlyView), [monthlyView]);
+  return <TrendChartCard color="#10b981" data={data} dataKey="income" subtitle="Historical monthly revenue velocity" title="Income Trend" xAxisKey="name" />;
+};
+
+export const ExpenseTrendWidget = () => {
+  const monthlyView = useKingdomStore((state) => state.analytics?.monthly || []);
+  const data = useMemo(() => generateCashFlowData(monthlyView), [monthlyView]);
+  return <TrendChartCard color="#f43f5e" data={data} dataKey="expenses" isNegative={true} subtitle="Historical monthly outflow patterns" title="Expense Trend" xAxisKey="name" />;
+};
+
+export const CumulativeCashFlowWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateCumulativeCashFlowData(cumulativeView), [cumulativeView]);
+  return <TrendChartCard color="#3b82f6" data={data} dataKey="cumulative" subtitle="Running net-flow balance trajectory" title="Cumulative Cash Flow" xAxisKey="name" />;
+};
+
+export const AssetGrowthTrendWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateNetTrendData(cumulativeView), [cumulativeView]);
+  // 4. Passa a imagem APENAS para este widget
+  return <TrendChartCard bgImage={parchmentBg} color="#6366f1" data={data} dataKey="assets" subtitle="Historical growth of gross assets" title="Asset Growth Trend" xAxisKey="month" />;
+};
+
+export const DebtTrendWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateNetTrendData(cumulativeView), [cumulativeView]);
+  return <TrendChartCard color="#f97316" data={data} dataKey="liabilities" subtitle="Historical debt accumulation and reduction" title="Debt Trend" xAxisKey="month" />;
+};
+
+export const NetWorthTrendWidget = () => {
+  const cumulativeView = useKingdomStore((state) => state.analytics?.cumulative || []);
+  const data = useMemo(() => generateNetTrendData(cumulativeView), [cumulativeView]);
+  return <TrendChartCard color="#111827" data={data} dataKey="net" subtitle="Global net wealth trajectory" title="Net Worth Trend" xAxisKey="month" />;
+};
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\Phase1KpiWidgets.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { useKingdomStore } from '../../store/useKingdomStore';
+
+// Utilitário simples para formatar os valores monetários com vírgulas e casas decimais
+const formatVal = (val) => {
+  const num = Number(val) || 0;
+  const formatted = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return num < 0 ? `(${formatted})` : formatted;
+};
+
+// O Componente Base Visual para todos os cartões KPI (mantendo o design limpo que tinhas)
+const KpiCard = ({ title, amount, subtitle, colorClass }) => (
+  <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm justify-center">
+    <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-2">{title}</h3>
+    <div className={`text-3xl font-bold ${colorClass} mb-1 truncate`}>
+      {formatVal(amount)}
+    </div>
+    <p className="text-xs text-gray-400">{subtitle}</p>
+  </div>
+);
+
+// ==========================================
+// CENTRAL DE DADOS KPI (Otimizada)
+// ==========================================
+// Este hook consome as métricas que a base de dados já calculou
+const useKpiData = () => {
+  const dashboardMetrics = useKingdomStore(state => state.dashboardMetrics);
+  const categoryView = useKingdomStore(state => state.analytics?.category || []);
+
+  const derived = useMemo(() => {
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    let totalInvestments = 0;
+
+    // Em vez de iterar sobre 10.000 transações, iteramos apenas sobre o sumário das categorias (ex: ~15 linhas)
+    categoryView.forEach(row => {
+      const amt = Number(row.total_volume) || 0;
+
+      if (row.type === 'Income') totalIncome += amt;
+      if (row.type === 'Expenses') totalExpenses += amt;
+
+      // Heurística simples: se a categoria pertencer a Ativos e contiver a palavra "Invest", soma aos investimentos
+      if (row.type === 'Assets' && row.category && row.category.toLowerCase().includes('invest')) {
+        totalInvestments += amt;
+      }
+    });
+
+    return {
+      totalIncome,
+      totalExpenses,
+      netCashFlow: totalIncome - totalExpenses,
+      totalInvestments
+    };
+  }, [categoryView]);
+
+  return {
+    ...dashboardMetrics, // Traz total_assets, total_liabilities, net_worth, net_vault_cash
+    ...derived           // Traz totalIncome, totalExpenses, netCashFlow, totalInvestments
+  };
+};
+
+// ==========================================
+// WIDGETS EXPORTADOS
+// ==========================================
+
+export const TotalIncomeWidget = () => {
+  const { totalIncome } = useKpiData();
+  return <KpiCard title="Total Income" amount={totalIncome} colorClass="text-emerald-500" subtitle="Gross revenue generated" />;
+};
+
+export const TotalExpensesWidget = () => {
+  const { totalExpenses } = useKpiData();
+  return <KpiCard title="Total Expenses" amount={totalExpenses} colorClass="text-rose-500" subtitle="Total operational outflows" />;
+};
+
+export const NetCashFlowWidget = () => {
+  const { netCashFlow } = useKpiData();
+  const color = netCashFlow >= 0 ? "text-emerald-600" : "text-rose-600";
+  return <KpiCard title="Net Cash Flow" amount={netCashFlow} colorClass={color} subtitle="Inflows minus outflows" />;
+};
+
+export const TotalAssetsWidget = () => {
+  const { total_assets } = useKpiData();
+  return <KpiCard title="Total Assets" amount={total_assets} colorClass="text-indigo-600" subtitle="Gross owned assets" />;
+};
+
+export const ImmediateLiquidityWidget = () => {
+  const { net_vault_cash } = useKpiData();
+  return <KpiCard title="Immediate Liquidity" amount={net_vault_cash} colorClass="text-blue-500" subtitle="Accessible cash and equivalents" />;
+};
+
+export const TotalInvestmentsWidget = () => {
+  const { totalInvestments } = useKpiData();
+  return <KpiCard title="Total Investments" amount={totalInvestments} colorClass="text-violet-500" subtitle="Capital allocated to markets" />;
+};
+
+export const TotalLiabilitiesWidget = () => {
+  const { total_liabilities } = useKpiData();
+  return <KpiCard title="Total Liabilities" amount={total_liabilities} colorClass="text-orange-500" subtitle="Gross outstanding debt" />;
+};
+
+export const NetWorthWidget = () => {
+  const { net_worth } = useKpiData();
+  const color = net_worth >= 0 ? "text-slate-800" : "text-rose-600";
+  return <KpiCard title="Net Worth" amount={net_worth} colorClass={color} subtitle="Assets minus Liabilities" />;
+};
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\Phase2EntityWidgets.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useKingdomStore } from '../../store/useKingdomStore';

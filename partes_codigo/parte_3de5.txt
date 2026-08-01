@@ -1,0 +1,2037 @@
+/* === PARTE 3 DE 5 === */
+
+import { getEntityExposure } from '../../utils/chartAnalytics';
+
+const formatValue = (val) => {
+  const num = Number(val) || 0;
+  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+const getLargestTx = (txs, targetType) => {
+  return txs.filter(t => t.type === targetType).sort((a,b) => b.amount - a.amount).slice(0, 10);
+};
+
+const BarChartCard = ({ title, subtitle, data }) => (
+  <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div className="mb-4">
+      <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
+      <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+    </div>
+    <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+      {data.length > 0 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 5, right: 40, left: 15, bottom: 5 }}>
+            <CartesianGrid horizontal={true} stroke="#f3f4f6" strokeDasharray="3 3" vertical={false}/>
+            <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
+            <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
+            <Tooltip 
+              formatter={(value) => [formatValue(value), 'Amount']}
+              contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+              labelStyle={{ fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}
+              cursor={{ fill: '#f3f4f6' }}
+            />
+            <Bar dataKey="value" fill="#374151" barSize={24} radius={[0, 4, 4, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="h-full flex items-center justify-center text-xs font-mono text-gray-400 italic">No entity data available.</div>
+      )}
+    </div>
+  </div>
+);
+
+const TableCard = ({ title, subtitle, headers, children }) => (
+  <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm overflow-hidden">
+    <div className="mb-4 shrink-0">
+      <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
+      <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+    </div>
+    <div className="flex-1 overflow-auto pr-2">
+      <table className="w-full text-left border-collapse whitespace-nowrap">
+        <thead>
+          <tr>
+            {headers.map((h, i) => (
+              <th key={i} className={`pb-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider ${i === headers.length - 1 ? 'text-right' : ''}`}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="text-sm divide-y divide-gray-100">
+          {children}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+export const IncomeEntityWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Income', 10), [entityView]);
+  return <BarChartCard data={data} subtitle="Top 10 revenue sources" title="Income by Entity"/>;
+};
+
+export const EntityExposureWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Assets', 10), [entityView]);
+  return <BarChartCard data={data} subtitle="Asset concentration across institutions" title="Entity Exposure (Risk)"/>;
+};
+
+export const DebtCreditorWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Liabilities', 10), [entityView]);
+  return <BarChartCard data={data} subtitle="Concentration of owed liabilities" title="Debt by Creditor"/>;
+};
+
+export const TopMerchantsWidget = () => {
+  const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const data = useMemo(() => getEntityExposure(entityView, 'Expenses', 10), [entityView]);
+  return (
+    <TableCard headers={['Merchant', 'Total Spent']} subtitle="Highest cumulative spending destinations" title="Top 10 Merchants">
+      {data.map((row, i) => (
+        <tr key={i} className="hover:bg-gray-50 transition-colors">
+          <td className="py-3 text-gray-900 font-medium">{row.name}</td>
+          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.value)}</td>
+        </tr>
+      ))}
+    </TableCard>
+  );
+};
+
+export const LargestTransactionsWidget = () => {
+  const activeTx = useKingdomStore(s => s.transactions || []);
+  const data = useMemo(() => getLargestTx(activeTx, 'Expenses'), [activeTx]);
+  return (
+    <TableCard headers={['Date', 'Entity', 'Amount']} subtitle="Largest expenses in recent history" title="Largest Transactions">
+      {data.map((row, i) => (
+        <tr key={i} className="hover:bg-gray-50 transition-colors">
+          <td className="py-3 text-gray-500 text-xs">{row.posting_date}</td>
+          <td className="py-3 text-gray-900 font-medium">{row.entity || row.category}</td>
+          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.amount)}</td>
+        </tr>
+      ))}
+    </TableCard>
+  );
+};
+
+export const TopAccountsWidget = () => {
+  const balances = useKingdomStore(s => s.analytics?.balances || []);
+  const flatMatrix = useKingdomStore(s => s.flatMatrix || []);
+
+  const data = useMemo(() => {
+    return balances
+      .filter(b => b.account && b.account.startsWith('1') && b.balance > 0)
+      .map(b => {
+        const matrixInfo = flatMatrix.find(m => m.code === b.account) || {};
+        return {
+          account: b.account,
+          entity: matrixInfo.entity || matrixInfo.account_name || b.account,
+          balance: b.balance
+        };
+      })
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 5);
+  }, [balances, flatMatrix]);
+
+  return (
+    <TableCard headers={['Code', 'Institution', 'Current Balance']} subtitle="Largest capital reserves by balance" title="Top 5 Accounts">
+      {data.map((row, i) => (
+        <tr key={i} className="hover:bg-gray-50 transition-colors">
+          <td className="py-3 text-gray-500 font-mono text-xs">{row.account}</td>
+          <td className="py-3 text-gray-900 font-medium">{row.entity}</td>
+          <td className="py-3 text-gray-900 font-bold text-right font-mono">{formatValue(row.balance)}</td>
+        </tr>
+      ))}
+    </TableCard>
+  );
+};
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\Phase2PieWidgets.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { generateCategoryBreakdown } from '../../utils/chartAnalytics';
+
+const PIE_COLORS = ['#111827', '#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db'];
+
+const formatValue = (val) => {
+  const num = Number(val) || 0;
+  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+const calculateDebtHorizon = (transactions) => {
+  let shortTerm = 0;
+  let longTerm = 0;
+  
+  transactions.forEach(t => {
+    const amount = Number(t.amount) || 0;
+    if (t.target_account?.startsWith('21')) shortTerm += amount;
+    if (t.source_account?.startsWith('21')) shortTerm -= amount;
+    if (t.target_account?.startsWith('22')) longTerm += amount;
+    if (t.source_account?.startsWith('22')) longTerm -= amount;
+  });
+  
+  return [
+    { name: 'Short-Term Debt', value: Number(shortTerm.toFixed(2)) },
+    { name: 'Long-Term Debt', value: Number(longTerm.toFixed(2)) }
+  ].filter(item => item.value > 0);
+};
+
+const PieChartCard = ({ title, subtitle, data, isDonut = false }) => (
+  <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div className="mb-2">
+      <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
+      <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+    </div>
+    <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+      {data.length > 0 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie 
+              cx="50%" 
+              cy="50%" 
+              data={data} 
+              dataKey="value" 
+              innerRadius={isDonut ? "55%" : "0%"} 
+              outerRadius="80%" 
+              paddingAngle={isDonut ? 2 : 0} 
+              stroke={isDonut ? "none" : "#ffffff"} 
+              strokeWidth={1.5}
+            >
+              {data.map((entry, index) => (
+                <Cell fill={PIE_COLORS[index % PIE_COLORS.length]} key={`cell-${index}`}/>
+              ))}
+            </Pie>
+            <Tooltip formatter={(value) => [formatValue(value), 'Value']}
+              contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }}
+              itemStyle={{ fontWeight: 600 }}
+            />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', color: '#6b7280' }}/>
+          </PieChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-xs font-mono text-gray-400 italic">
+          No data available for this breakdown.
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+export const IncomeCategoryWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Income', 'category'), [categoryView]);
+  return <PieChartCard data={data} isDonut={true} subtitle="Revenue distribution overview" title="Income by Category"/>;
+};
+
+export const IncomeTypeWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Income', 'subtype'), [categoryView]);
+  return <PieChartCard data={data} subtitle="Earned vs automated revenue" title="Active vs. Passive Income"/>;
+};
+
+export const ExpenseCategoryWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Expenses', 'category'), [categoryView]);
+  return <PieChartCard data={data} isDonut={true} subtitle="High-level spending distribution" title="Expenses by Category"/>;
+};
+
+export const ExpenseSubtypeWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Expenses', 'subtype'), [categoryView]);
+  return <PieChartCard data={data} isDonut={true} subtitle="Detailed operational breakdown" title="Expenses by Subtype"/>;
+};
+
+export const AssetAllocationWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Assets', 'subtype'), [categoryView]);
+  return <PieChartCard data={data} subtitle="Wealth breakdown by class" title="Asset Allocation"/>;
+};
+
+export const LiabilitiesSubtypeWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const data = useMemo(() => generateCategoryBreakdown(categoryView, 'Liabilities', 'subtype'), [categoryView]);
+  return <PieChartCard data={data} isDonut={true} subtitle="Debt category distribution" title="Liabilities by Subtype"/>;
+};
+
+export const DebtHorizonWidget = () => {
+  const activeTx = useKingdomStore(s => s.transactions || []);
+  const data = useMemo(() => calculateDebtHorizon(activeTx), [activeTx]);
+  return <PieChartCard data={data} subtitle="Immediate vs macro obligations" title="Short vs. Long-Term Debt"/>;
+};
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\Phase3FilteredWidgets.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { useKingdomStore } from '../../store/useKingdomStore';
+
+const formatValue = (val) => {
+  const num = Number(val) || 0;
+  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+const FilteredKpiCard = ({ title, subtitle, value, tag }) => (
+  <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div className="flex justify-between items-start">
+      <div>
+        <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
+        <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+      </div>
+    </div>
+    <div className="mt-4">
+      <span className="text-3xl font-sans font-bold text-gray-900">{value}</span>
+    </div>
+    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] font-mono text-gray-500">
+      <span>{tag}</span>
+      <span className="text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded border border-gray-200">Strict Filter</span>
+    </div>
+  </div>
+);
+
+export const CostOfDebtWidget = () => {
+  const balances = useKingdomStore(s => s.analytics?.balances || []);
+  
+  const costOfDebt = useMemo(() => {
+    // Procura o saldo total acumulado na conta específica de custo da dívida
+    const targetAcc = balances.find(b => b.account === '69020003');
+    return targetAcc ? targetAcc.balance : 0;
+  }, [balances]);
+
+  return <FilteredKpiCard subtitle="Interest expenses paid" tag="[69020003]" title="Cost of Debt" value={formatValue(costOfDebt)}/>;
+};
+
+export const YieldAssetsWidget = () => {
+  const balances = useKingdomStore(s => s.analytics?.balances || []);
+  
+  const yieldAssets = useMemo(() => {
+    // Soma os saldos de todas as contas de Ativo ('1') ignorando dinheiro estéril ('1101', '1103')
+    return balances
+      .filter(b => b.account && b.account.startsWith('1') && !b.account.startsWith('1101') && !b.account.startsWith('1103'))
+      .reduce((sum, b) => sum + Number(b.balance), 0);
+  }, [balances]);
+
+  return <FilteredKpiCard subtitle="Yield-bearing vs sterile assets" tag="Class [1] - Cash" title="Income-Generating Assets" value={formatValue(yieldAssets)}/>;
+};
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\Phase3RatioWidgets.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { useKingdomStore } from '../../store/useKingdomStore';
+
+const formatValue = (val, isPercentage = false, suffix = '', isDelta = false) => {
+  const num = Number(val) || 0;
+  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  
+  let baseStr = num < 0 ? `(${formattedNum})` : formattedNum;
+  if (isDelta && num > 0) baseStr = `+${baseStr}`;
+  
+  let finalStr = baseStr;
+  if (isPercentage) finalStr += '%';
+  if (suffix) finalStr += ` ${suffix}`;
+  return finalStr;
+};
+
+// Generic Monochromatic Ratio Card
+const RatioCard = ({ title, subtitle, valueStr, tag }) => (
+  <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div className="flex justify-between items-start">
+      <div>
+        <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
+        <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+      </div>
+    </div>
+    <div className="mt-4">
+      <span className="text-3xl font-sans font-bold text-gray-900">{valueStr}</span>
+    </div>
+    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] font-mono text-gray-500">
+      <span>{tag}</span>
+      <span className="text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded border border-gray-200">Algorithmic</span>
+    </div>
+  </div>
+);
+
+// Engine de cálculo centralizado para as rácios da Fase 3
+const useAllRatios = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const monthlyView = useKingdomStore(s => s.analytics?.monthly || []);
+  const cumulativeView = useKingdomStore(s => s.analytics?.cumulative || []);
+  const metrics = useKingdomStore(s => s.dashboardMetrics);
+
+  return useMemo(() => {
+    // 1. Aggregate Global Totals (Full History)
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    
+    categoryView.forEach(row => {
+      const amt = Number(row.total_volume) || 0;
+      if (row.type === 'Income') totalIncome += amt;
+      if (row.type === 'Expenses') totalExpenses += amt;
+    });
+
+    // 2. Period-over-Period (PoP) Expense Variance
+    const expByMonth = {};
+    monthlyView.forEach(row => {
+      if (row.type === 'Expenses') {
+        expByMonth[row.month_date] = Number(row.total_amount);
+      }
+    });
+    
+    const sortedExpMonths = Object.keys(expByMonth).sort();
+    let expenseVariancePop = 0;
+    
+    if (sortedExpMonths.length >= 2) {
+      const currentMonth = sortedExpMonths[sortedExpMonths.length - 1];
+      const priorMonth = sortedExpMonths[sortedExpMonths.length - 2];
+      
+      const currentExp = expByMonth[currentMonth] || 0;
+      const priorExp = expByMonth[priorMonth] || 0;
+      
+      expenseVariancePop = priorExp > 0 ? ((currentExp - priorExp) / priorExp) * 100 : 0;
+    }
+
+    // 3. Month-over-Month Wealth Variance
+    const netByMonth = {};
+    cumulativeView.forEach(row => {
+      const date = row.month_date;
+      const amt = Number(row.cumulative_amount) || 0;
+      if (!netByMonth[date]) netByMonth[date] = 0;
+      
+      if (row.type === 'Assets') netByMonth[date] += amt;
+      if (row.type === 'Liabilities') netByMonth[date] -= amt;
+    });
+
+    const sortedNetMonths = Object.keys(netByMonth).sort();
+    let monthlyWealthVariance = 0;
+    
+    if (sortedNetMonths.length >= 2) {
+      const currentMonth = sortedNetMonths[sortedNetMonths.length - 1];
+      const priorMonth = sortedNetMonths[sortedNetMonths.length - 2];
+      monthlyWealthVariance = (netByMonth[currentMonth] || 0) - (netByMonth[priorMonth] || 0);
+    }
+
+    // 4. Compute Final Ratios
+    const activeMonthsCount = sortedExpMonths.length || 1;
+    const avgMonthlyExpense = totalExpenses / activeMonthsCount;
+    const avgDailyExpense = avgMonthlyExpense / 30.44;
+
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+    const burnRate = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+    const debtRatio = metrics.total_assets > 0 ? (metrics.total_liabilities / metrics.total_assets) * 100 : 0;
+    const survivalMonths = avgMonthlyExpense > 0 ? (metrics.net_vault_cash || 0) / avgMonthlyExpense : 0;
+    
+    // DTI Ratio defaults to 0 unless explicit debt payments are tracked
+    const dtiRatio = 0; 
+
+    return {
+      avgMonthlyExpense, avgDailyExpense, survivalMonths,
+      savingsRate, burnRate, dtiRatio, debtRatio,
+      monthlyWealthVariance, expenseVariancePop
+    };
+  }, [categoryView, monthlyView, cumulativeView, metrics]);
+};
+
+// HOC to inject data
+const withRatioData = (kpiKey, title, subtitle, tag, options = {}) => {
+  return function WidgetComponent() {
+    const ratios = useAllRatios();
+    const rawValue = ratios[kpiKey] || 0;
+    const valueStr = formatValue(rawValue, options.isPercentage, options.suffix, options.isDelta);
+
+    return <RatioCard subtitle={subtitle} tag={tag} title={title} valueStr={valueStr}/>;
+  };
+};
+
+// Exports: Averages & Horizons
+export const AvgMonthlyExpenseWidget = withRatioData('avgMonthlyExpense', 'Avg Monthly Expense', 'Moving average of outflows', 'Temporal Mean');
+export const AvgDailyExpenseWidget = withRatioData('avgDailyExpense', 'Avg Daily Expense', 'Daily cash burn velocity', 'Temporal Mean');
+export const SurvivalMonthsWidget = withRatioData('survivalMonths', 'Runway', 'Months of survivability', 'Liquidity / Burn', { suffix: 'Mos' });
+
+// Exports: Percentages & Ratios
+export const SavingsRateWidget = withRatioData('savingsRate', 'Savings Rate', 'Percentage of income retained', 'Net / Income', { isPercentage: true });
+export const BurnRateWidget = withRatioData('burnRate', 'Burn Rate', 'Percentage of income consumed', 'Expenses / Income', { isPercentage: true });
+export const DtiRatioWidget = withRatioData('dtiRatio', 'DTI Ratio', 'Debt payments vs gross income', 'Debt / Income', { isPercentage: true });
+export const DebtRatioWidget = withRatioData('debtRatio', 'Debt Ratio', 'Total Liabilities vs Total Assets', 'Liabilities / Assets', { isPercentage: true });
+
+// Exports: Variances (Deltas)
+export const WealthVarianceWidget = withRatioData('monthlyWealthVariance', 'Wealth Variance (MoM)', 'Delta shift in Net Worth', 'Current - Prior', { isDelta: true });
+export const ExpenseVarianceWidget = withRatioData('expenseVariancePop', 'Expense Variance (PoP)', 'Shift in spending vs prior period', 'Relative Delta', { isPercentage: true, isDelta: true });
+
+
+=========================================
+ARQUIVO: client\src\components\widgets\Phase4LedgerWidgets.jsx
+=========================================
+
+import React, { useMemo } from 'react';
+import { useKingdomStore } from '../../store/useKingdomStore';
+import { getRecentTransactions, getInternalTransfers } from '../../utils/chartAnalytics';
+
+const formatValue = (val) => {
+  const num = Number(val) || 0;
+  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return num < 0 ? `(${formattedNum})` : formattedNum;
+};
+
+const TableCard = ({ title, subtitle, headers, children }) => (
+  <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm overflow-hidden">
+    <div className="mb-4 shrink-0">
+      <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
+      <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+    </div>
+    <div className="flex-1 overflow-auto pr-2">
+      <table className="w-full text-left border-collapse whitespace-nowrap">
+        <thead>
+          <tr>
+            {headers.map((h, i) => (
+              <th key={i} className={`pb-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider ${i === headers.length - 1 ? 'text-right' : ''}`}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="text-sm divide-y divide-gray-100">
+          {children}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+export const RecentTransactionsWidget = ({ transactions }) => {
+  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
+  const data = useMemo(() => getRecentTransactions(activeTx, 10), [activeTx]);
+  return (
+    <TableCard headers={['Date', 'Entity / Category', 'Amount']} subtitle="Paginated table of latest entries" title="Last 10 Transactions">
+      {data.map((row, i) => (
+        <tr key={i} className="hover:bg-gray-50 transition-colors">
+          <td className="py-3 text-gray-500 text-xs">{row.posting_date}</td>
+          <td className="py-3 text-gray-900 font-medium">{row.entity || row.category}</td>
+          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.amount)}</td>
+        </tr>
+      ))}
+    </TableCard>
+  );
+};
+
+export const InternalTransfersWidget = ({ transactions }) => {
+  const activeTx = transactions || useKingdomStore(s => s.transactions || []);
+  const data = useMemo(() => getInternalTransfers(activeTx, 10), [activeTx]);
+  return (
+    <TableCard headers={['Date', 'Target Entity', 'Amount']} subtitle="Vault movements between accounts" title="Internal Transfers">
+      {data.map((row, i) => (
+        <tr key={i} className="hover:bg-gray-50 transition-colors">
+          <td className="py-3 text-gray-500 text-xs">{row.posting_date}</td>
+          <td className="py-3 text-gray-900 font-medium">{row.entity || 'Self'}</td>
+          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.amount)}</td>
+        </tr>
+      ))}
+    </TableCard>
+  );
+};
+
+
+
+=========================================
+ARQUIVO: client\src\config\accountMappings.js
+=========================================
+
+export const defaultAccountMappings = {
+  // Asset Accounts (1xxxxxxx)
+  '11010001': 'Checking Accounts CGD',
+  '11010002': 'Checking Accounts Universo',
+  '11010003': 'Checking Accounts ActivoBank',
+  '11010004': 'Checking Accounts Inter Bank',
+  '11010005': 'Checking Accounts WiZink',
+  '11020001': 'Savings & Wallets CGD',
+  '11020002': 'Savings & Wallets Universo',
+  '11020003': 'Savings & Wallets ActivoBank',
+  '11020004': 'Savings & Wallets Inter Bank',
+  '11020005': 'Savings & Wallets WiZink',
+  '11030001': 'Cash Dinheiro (Físico)',
+  '12010001': 'Short-Term Goals Fundo Férias',
+  '12010002': 'Short-Term Goals Fundo Emergência',
+  '13010001': 'Invest Accounts CGD',
+  '13010002': 'Invest Accounts Universo',
+  '13010003': 'Invest Accounts ActivoBank',
+  '13010004': 'Invest Accounts Inter Bank',
+  '13010005': 'Invest Accounts WiZink',
+  '13020001': 'Retirement PPR',
+  '14010001': 'Real Estate Habitação Própria',
+  '14020001': 'Vehicles Carro Pessoal',
+  '14020002': 'Vehicles Mota Pessoal',
+
+  // Liability Accounts (2xxxxxxx)
+  '21010001': 'Credit Cards CGD',
+  '21010002': 'Credit Cards Universo',
+  '21010003': 'Credit Cards ActivoBank',
+  '21010004': 'Credit Cards Inter Bank',
+  '21010005': 'Credit Cards WiZink',
+  '21020001': 'Personal Loans Cofidis',
+  '21020002': 'Personal Loans Mãe',
+  '21020003': 'Personal Loans Pedro',
+  '21020004': 'Personal Loans Reni',
+  '21030001': 'State Debts Finanças',
+  '21030002': 'State Debts Segurança Social',
+  '21030003': 'State Debts Justiça',
+  '22010001': 'Other Loans Crédito Automóvel',
+  '22010002': 'Other Loans Crédito Habitação',
+
+  // Expense Accounts (6xxxxxxx)
+  '61010001': 'Utilities Renda',
+  '61010002': 'Utilities Endesa',
+  '61010003': 'Utilities Agua',
+  '61010004': 'Utilities NOS',
+  '61010005': 'Utilities DIGAL',
+  '61020001': 'Maintenance Obras e Decoração',
+  '62010001': 'Supermarket Mercearia e Alimentação',
+  '62010002': 'Supermarket Limpeza e Higiene',
+  '62010003': 'Supermarket Drinks & Alcohol',
+  '62020001': 'Pet Care Pet Food',
+  '62020002': 'Pet Care Veterinário',
+  '62030001': 'Dependents Educação Filhos',
+  '63010001': 'Personal Vehicle Gasoline',
+  '63010002': 'Personal Vehicle Tolls (Via Verde)',
+  '63010003': 'Personal Vehicle Repairs & Parking',
+  '63020001': 'Public & Taxis Public Transport (Navegante)',
+  '63020002': 'Public & Taxis Uber / Taxis',
+  '64010001': 'Medical Hospital & Consultas',
+  '64010002': 'Medical Dentista',
+  '64010003': 'Medical Psicologia',
+  '64020001': 'Pharmacy Farmácia',
+  '65010001': 'Retail Clothing & Shoes',
+  '65020001': 'Hobbies & Tech Tools & Electronics',
+  '66010001': 'Leisure Cinema & Dining Out',
+  '66010002': 'Leisure Nightlife & Drinks',
+  '66020001': 'Subscriptions Streaming',
+  '67010001': 'Professional PhD',
+  '67010002': 'Professional Trainings',
+  '67020001': 'Freelance Expenses Software & Materials',
+  '68010001': 'Policies Health Insurance',
+  '68010002': 'Policies Car & Motorcycle Insurance',
+  '68010003': 'Policies Life Insurance',
+  '69010001': 'Direct Taxes IRS (Pagamento)',
+  '69010002': 'Direct Taxes IUC / Finanças',
+  '69010003': 'Direct Taxes Social Security',
+  '69020001': 'Interest & Bank Fees Bank Fees & Commissions',
+  '69020002': 'Interest & Bank Fees Fines & Penalties',
+  '69020003': 'Interest & Bank Fees Credit Interest Paid',
+  '69030001': 'Philanthropy Donativos Institucionais',
+  '69030002': 'Philanthropy Prendas a Terceiros',
+
+  // Income Accounts (7xxxxxxx)
+  '71010001': 'Payroll Base Salary',
+  '71010002': 'Payroll Bonus (Scorecard)',
+  '71010003': 'Payroll Vacation Subsidy',
+  '71010004': 'Payroll Christmas Subsidy',
+  '71020001': 'Freelance & Services Consulting',
+  '71020002': 'Freelance & Services Teaching Classes',
+  '72010001': 'Cashbacks & Rewards Cashbacks CGD',
+  '72010002': 'Cashbacks & Rewards Cashbacks Universo',
+  '72010003': 'Cashbacks & Rewards Family Gifts',
+  '72020001': 'Refunds IRS Refund',
+  '72020002': 'Refunds Health Insurance Refund'
+};
+
+export let accountMappings = { ...defaultAccountMappings };
+
+export const setDynamicAccountMappings = (newMappings) => {
+  accountMappings = { ...newMappings };
+};
+
+export const getAccountName = (code) => {
+  return accountMappings[code] || `Account ${code}`;
+};
+
+
+
+=========================================
+ARQUIVO: client\src\config\dashboard.config.js
+=========================================
+
+/**
+ * Eldoria V2.1 Centralized Dashboard Configuration Invariants
+ * Dictates layout limitations and initial dynamic templates for new cycles.
+ */
+
+// Maximum layout items permitted on any single grid workspace to prevent layout lag
+export const MAX_WIDGETS_PER_TAB = 8;
+
+// Baseline Preset ("Standard 1") injected on tab expansion
+export const DEFAULT_PRESET = [
+  { 
+    i: 'cash_flow_chart', 
+    x: 0, 
+    y: 0, 
+    w: 5, 
+    
+    h: 3, 
+    minW: 3, 
+    maxW: 12, 
+    minH: 2, 
+    maxH: 6 
+  },
+  { 
+    i: 'net_worth_chart', 
+    x: 5, 
+    y: 0, 
+    w: 5, 
+    h: 3, 
+    minW: 3, 
+    maxW: 12, 
+    minH: 2, 
+    maxH: 6 
+  },
+  { 
+    i: 'asset_allocation_chart', 
+    x: 0, 
+    y: 3, 
+    w: 3, 
+    h: 3, 
+    minW: 2, 
+    maxW: 6, 
+    minH: 2, 
+    maxH: 6 
+  }
+];
+
+export const DASHBOARD_CONFIG = {
+  MAX_WIDGETS_PER_TAB,
+  DEFAULT_PRESET
+};
+
+export default DASHBOARD_CONFIG;
+
+
+=========================================
+ARQUIVO: client\src\config\interactiveRegistry.js
+=========================================
+
+// client/src/config/interactiveRegistry.js
+
+import {
+  InteractiveDateFilter,
+  InteractiveGranularity,
+  InteractiveStatus,
+  InteractiveArrear,
+  InteractiveCategory,
+  InteractiveEntity,
+  InteractiveLedger,
+  InteractiveMergedVolume
+} from '../components/widgets/InteractiveAPARWidgets';
+
+export const INTERACTIVE_WIDGETS = {
+  inter_date_picker: { 
+    name: "Date Range Selector", 
+    component: InteractiveDateFilter, 
+    description: "Sets the global start and end date boundaries for interactive dashboards.", 
+    category: "interactive", 
+    layout: { w: 5, h: 2, minW: 4, maxW: 8, minH: 1, maxH: 3 } 
+  },
+  inter_granularity: { 
+    name: "Granularity Selector", 
+    component: InteractiveGranularity, 
+    description: "Sets grouping scales (Weekly, Monthly, etc.) for interactive charts.", 
+    category: "interactive", 
+    layout: { w: 4, h: 2, minW: 3, maxW: 12, minH: 1, maxH: 3 } 
+  },
+  inter_status: { 
+    name: "Payment Status Split", 
+    component: InteractiveStatus, 
+    description: "Filters transactions by Pending vs Completed status.", 
+    category: "interactive", 
+    layout: { w: 4, h: 2, minW: 3, maxW: 12, minH: 1, maxH: 4 } 
+  },
+  inter_arrear: { 
+    name: "Aging & Arrears", 
+    component: InteractiveArrear, 
+    description: "Filters pending and paid invoices by detailed chronological urgency.", 
+    category: "interactive", 
+    layout: { w: 12, h: 1, minW: 6, maxW: 12, minH: 1, maxH: 4 } 
+  },
+  inter_category: { 
+    name: "Interactive Category Flow", 
+    component: InteractiveCategory, 
+    description: "Clickable bar chart that filters the dashboard by specific category volumes.", 
+    category: "interactive", 
+    layout: { w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 } 
+  },
+  inter_entity: { 
+    name: "Interactive Entity Flow", 
+    component: InteractiveEntity, 
+    description: "Clickable bar chart that filters the dashboard by specific entity volumes.", 
+    category: "interactive", 
+    layout: { w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 } 
+  },
+  inter_ledger: { 
+    name: "Cross-Filtered Ledger", 
+    component: InteractiveLedger, 
+    description: "Master table that outputs exactly what the interactive filters dictate.", 
+    category: "interactive", 
+    layout: { w: 8, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 8 } 
+  },
+  inter_merged_volume: {
+    name: "Merged Volume Flow",
+    component: InteractiveMergedVolume,
+    description: "Clickable bar chart containing embedded Category and Entity volume toggles, limited to the top 10.",
+    category: "interactive",
+    layout: { w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 }
+  }
+};
+
+
+=========================================
+ARQUIVO: client\src\config\treasuryRegistry.js
+=========================================
+
+import CashFlowChart from '../components/widgets/CashFlowChart';
+import NetWorthChart from '../components/widgets/NetWorthChart';
+import AssetAllocationChart from '../components/widgets/AssetAllocationChart';
+
+// ==========================================
+// PHASE 1 IMPORTS
+// ==========================================
+import {
+  TotalIncomeWidget, TotalExpensesWidget, NetCashFlowWidget,
+  TotalAssetsWidget, ImmediateLiquidityWidget, TotalInvestmentsWidget,
+  TotalLiabilitiesWidget, NetWorthWidget
+} from '../components/widgets/Phase1KpiWidgets';
+
+import {
+  IncomeTrendWidget, ExpenseTrendWidget, CumulativeCashFlowWidget,
+  AssetGrowthTrendWidget, DebtTrendWidget, NetWorthTrendWidget
+} from '../components/widgets/Phase1ChartWidgets';
+
+// ==========================================
+// PHASE 2 IMPORTS
+// ==========================================
+import {
+  IncomeCategoryWidget, IncomeTypeWidget, ExpenseCategoryWidget,
+  ExpenseSubtypeWidget, AssetAllocationWidget, LiabilitiesSubtypeWidget, DebtHorizonWidget
+} from '../components/widgets/Phase2PieWidgets';
+
+import {
+  IncomeEntityWidget, EntityExposureWidget, DebtCreditorWidget,
+  TopMerchantsWidget, LargestTransactionsWidget, TopAccountsWidget
+} from '../components/widgets/Phase2EntityWidgets';
+
+// ==========================================
+// PHASE 3 & 4 IMPORTS
+// ==========================================
+import {
+  AvgMonthlyExpenseWidget, AvgDailyExpenseWidget, SurvivalMonthsWidget,
+  SavingsRateWidget, BurnRateWidget, DtiRatioWidget, DebtRatioWidget,
+  WealthVarianceWidget, ExpenseVarianceWidget
+} from '../components/widgets/Phase3RatioWidgets';
+
+import { CostOfDebtWidget, YieldAssetsWidget } from '../components/widgets/Phase3FilteredWidgets';
+import { RecentTransactionsWidget, InternalTransfersWidget } from '../components/widgets/Phase4LedgerWidgets';
+
+// ==========================================
+// PRODUCTION REGISTRY EXPORT (Optimized Sizing)
+// ==========================================
+export const TREASURY_WIDGETS = {
+  // --- KPI & METRICS (Standardized to w:3, h:2) ---
+  kpi_total_income: { name: "Total Income", component: TotalIncomeWidget, description: "Absolute sum of all incoming revenue accounts.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_total_expenses: { name: "Total Expenses", component: TotalExpensesWidget, description: "Absolute sum of all expense accounts.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_net_cash_flow: { name: "Net Cash Flow", component: NetCashFlowWidget, description: "Total Inflows minus Total Outflows.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_total_assets: { name: "Total Assets", component: TotalAssetsWidget, description: "Gross sum of all owned assets.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_liquidity: { name: "Immediate Liquidity", component: ImmediateLiquidityWidget, description: "Sum of accessible checking, savings, and cash.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_investments: { name: "Total Investments", component: TotalInvestmentsWidget, description: "Sum of market and retirement accounts.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_total_liabilities: { name: "Total Liabilities", component: TotalLiabilitiesWidget, description: "Gross sum of all outstanding debt.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_net_worth: { name: "Net Worth", component: NetWorthWidget, description: "True valuation (Assets minus Liabilities).", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_cost_of_debt: { name: "Cost of Debt", component: CostOfDebtWidget, description: "Interest expenses paid across liabilities.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  kpi_yield_assets: { name: "Yield Assets", component: YieldAssetsWidget, description: "Total value of yield-bearing vs sterile assets.", category: "kpi", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+
+  // --- ANALYTICAL TRENDS (Standardized to w:6, h:4) ---
+  chart_income_trend: { name: "Income Trend", component: IncomeTrendWidget, description: "Time-series line tracking historical monthly income.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  chart_expense_trend: { name: "Expense Trend", component: ExpenseTrendWidget, description: "Temporal trend line graphing monthly outflow patterns.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  chart_cumulative_flow: { name: "Cumulative Cash Flow", component: CumulativeCashFlowWidget, description: "Area chart mapping net-flow balance trajectory.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  chart_asset_growth: { name: "Asset Growth Trend", component: AssetGrowthTrendWidget, description: "Historical growth curve of gross assets.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  chart_debt_trend: { name: "Debt Trend", component: DebtTrendWidget, description: "Trend line showing debt accumulation velocity.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  chart_net_worth_trend: { name: "Net Worth Trend", component: NetWorthTrendWidget, description: "Area chart showing historical net worth curve.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  cash_flow_chart: { name: "Cash Flow Trend", component: CashFlowChart, description: "Visualizes income vs expenses over time.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  net_worth_chart: { name: "Net Worth Trend", component: NetWorthChart, description: "Tracks cumulative asset value.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+
+  // --- COMPOSITION & DISTRIBUTION (Standardized to w:6, h:4) ---
+  pie_income_category: { name: "Income by Category", component: IncomeCategoryWidget, description: "Donut chart of revenue distribution.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  pie_income_type: { name: "Active vs. Passive", component: IncomeTypeWidget, description: "Pie chart comparing earned vs automated income.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  pie_expense_category: { name: "Expenses by Category", component: ExpenseCategoryWidget, description: "Donut chart of high-level spending.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  pie_expense_subtype: { name: "Expenses by Subtype", component: ExpenseSubtypeWidget, description: "Donut chart of detailed operational spending.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  pie_asset_allocation: { name: "Asset Allocation", component: AssetAllocationWidget, description: "Pie chart breaking down wealth by class.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  pie_liability_subtype: { name: "Liabilities by Subtype", component: LiabilitiesSubtypeWidget, description: "Donut chart of debt distribution.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  pie_debt_horizon: { name: "Short vs. Long-Term Debt", component: DebtHorizonWidget, description: "Pie chart comparing immediate vs macro debt.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  asset_allocation_chart: { name: "Asset Allocation", component: AssetAllocationChart, description: "Current distribution of assets.", category: "distribution", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+
+  // --- ENTITIES & COUNTERPARTIES (Standardized to w:6, h:4) ---
+  bar_income_entity: { name: "Income by Entity", component: IncomeEntityWidget, description: "Bar chart grouping income by payor.", category: "entity", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  bar_entity_exposure: { name: "Entity Exposure (Risk)", component: EntityExposureWidget, description: "Bar chart of capital concentration.", category: "entity", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  bar_debt_creditor: { name: "Debt by Creditor", component: DebtCreditorWidget, description: "Bar chart of debt owed to specific entities.", category: "entity", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+
+  // --- FINANCIAL RATIOS (Standardized to w:3, h:2) ---
+  ratio_avg_monthly_exp: { name: "Avg Monthly Expense", component: AvgMonthlyExpenseWidget, description: "Moving average of expenses.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_avg_daily_exp: { name: "Avg Daily Expense", component: AvgDailyExpenseWidget, description: "Daily spending rate.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_survival_runway: { name: "Survival Months (Runway)", component: SurvivalMonthsWidget, description: "Months of immediate survivability.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_savings_rate: { name: "Savings Rate (%)", component: SavingsRateWidget, description: "Percentage of income retained.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_burn_rate: { name: "Burn Rate", component: BurnRateWidget, description: "Percentage of income consumed.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_dti: { name: "DTI (Debt-to-Income)", component: DtiRatioWidget, description: "Debt payments vs gross income.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_debt_ratio: { name: "Debt Ratio", component: DebtRatioWidget, description: "Liabilities divided by Assets.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_wealth_variance: { name: "Monthly Wealth Variance", component: WealthVarianceWidget, description: "Delta shift in Net Worth.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_exp_variance: { name: "Expense Variance (PoP)", component: ExpenseVarianceWidget, description: "Percentage shift in spending.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+
+  // --- OPERATIONAL LEDGERS (Standardized to w:6, h:4) ---
+  table_top_merchants: { name: "Top 10 Merchants", component: TopMerchantsWidget, description: "Table of highest spending destinations.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  table_largest_tx: { name: "Largest Transactions", component: LargestTransactionsWidget, description: "Table of single highest expenses.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  table_top_accounts: { name: "Top 5 Accounts", component: TopAccountsWidget, description: "Table ranking accounts by real-time balance.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  table_recent_tx: { name: "Last 10 Transactions", component: RecentTransactionsWidget, description: "Table of the latest ledger entries.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+  table_internal_transfers: { name: "Internal Transfers", component: InternalTransfersWidget, description: "Table of internal vault movements.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } }
+};
+
+
+
+=========================================
+ARQUIVO: client\src\config\UI_UX.js
+=========================================
+
+export const SAFE_AREAS = {
+  TOP_CLEARANCE: 'pt-20',
+  BOTTOM_CLEARANCE: 'pb-24'
+};
+
+
+
+=========================================
+ARQUIVO: client\src\hooks\useInteractiveData.js
+=========================================
+
+// client/src/hooks/useInteractiveData.js
+
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { supabase } from '../lib/supabaseClient';
+import { useInteractiveStore } from '../store/useInteractiveStore';
+import { useKingdomStore } from '../store/useKingdomStore';
+
+export function useInteractiveData() {
+  const user = useKingdomStore((state) => state.user);
+  const filters = useInteractiveStore((state) => state.filters);
+
+  return useQuery({
+    queryKey: ['interactive_dashboard', user?.id, filters],
+    queryFn: async () => {
+      if (!user?.id) return null;
+
+      const clientToday = new Date().toISOString().split('T')[0];
+
+      const { data, error } = await supabase.rpc('get_interactive_dashboard', {
+        p_profile_id: user.id,
+        p_client_today: clientToday,
+        p_start_date: filters.startDate || null,
+        p_end_date: filters.endDate || null,
+        p_month: filters.monthFilter || null,
+        p_status: filters.statusFilter || null,
+        p_arrear: filters.arrearFilter || null,
+        p_category: filters.categoryFilter || null,
+        p_entity: filters.entityFilter || null
+      });
+
+      if (error) {
+        console.error("Failed to fetch interactive dashboard data:", error);
+        throw error;
+      }
+      
+      return data;
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5, 
+    placeholderData: keepPreviousData, // STOPS DOM DESTRUCTION
+  });
+}
+
+
+=========================================
+ARQUIVO: client\src\lib\supabaseClient.js
+=========================================
+
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+
+
+=========================================
+ARQUIVO: client\src\pages\Dashboard.jsx
+=========================================
+
+import React, { useEffect, useState } from 'react';
+import DashboardHeader from '../components/dashboard/DashboardHeader';
+import DashboardCanvas from '../components/dashboard/DashboardCanvas';
+import SettingsSidebar from '../components/dashboard/SettingsSidebar';
+import { useDashboardStore } from '../store/useDashboardStore';
+import { Loader2 } from 'lucide-react';
+
+export default function Dashboard() {
+  const { isEditingLayout, hydrateLayouts, saveDraftToProduction, toggleEditMode, isSaving } = useDashboardStore();
+  const [exitConfirm, setExitConfirm] = useState({ isOpen: false, target: null });
+
+  // Apenas hidrata a posição dos cartões na grelha.
+  // (O carregamento dos dados das tabelas acontece no App.jsx em segurança)
+  useEffect(() => {
+    hydrateLayouts();
+  }, [hydrateLayouts]);
+
+  const handleConfirmYes = async () => {
+    await saveDraftToProduction();
+    setExitConfirm({ isOpen: false, target: null });
+    toggleEditMode(false);
+  };
+
+  const handleConfirmNo = () => {
+    setExitConfirm({ isOpen: false, target: null });
+    toggleEditMode(false);
+  };
+
+  const handleConfirmCancel = () => {
+    setExitConfirm({ isOpen: false, target: null });
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (exitConfirm.isOpen) {
+          handleConfirmCancel();
+        } else {
+          if (isEditingLayout) {
+            setExitConfirm({ isOpen: true, target: 'exit' });
+          } else {
+            window.dispatchEvent(new CustomEvent('close-dashboard'));
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isEditingLayout, exitConfirm.isOpen]);
+
+  return (
+    <div className="flex flex-col h-full w-full bg-stone-950 text-stone-200 overflow-hidden font-sans relative">
+      {/* Top Header Row */}
+      <DashboardHeader 
+        onExitRequest={() => setExitConfirm({ isOpen: true, target: 'exit' })}
+        onToggleEditRequest={() => setExitConfirm({ isOpen: true, target: 'toggle_edit' })}
+        onDismissRequest={() => setExitConfirm({ isOpen: true, target: 'dismiss' })}
+      />
+      
+      {/* Flexible Workspace Containment Box */}
+      <div className="relative flex flex-1 overflow-hidden min-h-0">
+        
+        {/* Dynamic Slide Drawer Sidepanel */}
+        <aside 
+          className={`
+            transition-all duration-300 ease-in-out
+            absolute inset-y-0 left-0 lg:relative
+            ${isEditingLayout 
+              ? 'w-80 translate-x-0 border-r border-amber-900/30 shadow-2xl' 
+              : 'w-0 -translate-x-full lg:translate-x-0 border-none shadow-none'
+            }
+            bg-stone-900 z-40 overflow-hidden shrink-0
+          `}
+        >
+          <div className="w-80 h-full">
+            <SettingsSidebar />
+          </div>
+        </aside>
+
+        {/* Grid Canvas Workspace */}
+        <main className="flex-1 overflow-y-auto p-4 bg-stone-900/50 flex flex-col min-h-0">
+          <DashboardCanvas />
+        </main>
+
+      </div>
+
+      {/* Center Screen Confirmation Overlay */}
+      {exitConfirm.isOpen && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="w-72 bg-[#faf4e5] border border-[#8b4513]/40 rounded-xl p-5 shadow-2xl flex flex-col text-center font-serif">
+            <p className="text-xs font-bold text-[#4b2c20] mb-5 leading-normal">
+              Save changes done to your layout?
+            </p>
+            <div className="flex gap-2">
+              <button 
+                onClick={handleConfirmYes} 
+                disabled={isSaving}
+                className="flex-grow flex items-center justify-center gap-1 py-1.5 rounded bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs uppercase shadow hover:bg-emerald-800 transition-colors cursor-pointer"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="animate-spin" size={10} />
+                    Saving...
+                  </>
+                ) : (
+                  "Yes"
+                )}
+              </button>
+              <button 
+                onClick={handleConfirmNo} 
+                disabled={isSaving}
+                className="flex-1 py-1.5 rounded bg-rose-700 disabled:opacity-50 text-white font-bold text-xs uppercase shadow hover:bg-rose-800 transition-colors cursor-pointer"
+              >
+                No
+              </button>
+              <button 
+                onClick={handleConfirmCancel} 
+                disabled={isSaving}
+                className="flex-1 py-1.5 rounded bg-stone-200 disabled:opacity-50 text-stone-700 border border-stone-300 font-bold text-xs uppercase hover:bg-stone-300 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\pages\FinancialAlerts.jsx
+=========================================
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../lib/supabaseClient';
+import { useKingdomStore } from '../store/useKingdomStore';
+import {
+    CheckCircle2,
+    Calendar,
+    AlertTriangle,
+    AlertOctagon,
+    Menu,
+    Loader2
+} from 'lucide-react';
+
+
+const HexagonCard = ({ outerColor, innerColor, children }) => (
+    <div
+        className={`relative w-full max-w-[140px] h-32 md:h-36 ${outerColor} flex items-center justify-center shrink-0`}
+        style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
+    >
+        <div
+            className={`absolute inset-[2px] ${innerColor} flex flex-col items-center justify-center p-2 text-center`}
+            style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
+        >
+            {children}
+        </div>
+    </div>
+);
+
+export default function FinancialAlerts({ onClose }) {
+    const user = useKingdomStore((state) => state.user);
+
+    const clientToday = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+    const { data: rpcData, isFetching } = useQuery({
+        queryKey: ['advisor_alerts', user?.id, clientToday],
+        queryFn: async () => {
+            if (!user?.id) return null;
+            const { data, error } = await supabase.rpc('get_interactive_dashboard', {
+                p_profile_id: user.id,
+                p_client_today: clientToday,
+                p_start_date: null,
+                p_end_date: null,
+                p_month: null,
+                p_status: 'Pending',
+                p_arrear: null,
+                p_category: null,
+                p_entity: null
+            });
+            if (error) {
+                console.error("Failed to fetch advisor alerts:", error);
+                throw error;
+            }
+            return data;
+        },
+        enabled: !!user?.id,
+        staleTime: 1000 * 60 * 5
+    });
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
+    // Arrears sums directly mapped from database pre-calculated values
+    const processedData = useMemo(() => {
+        const sums = { overdue: 0, payToday: 0, due: 0, notDue: 0 };
+        
+        if (rpcData?.arrear_summary) {
+            rpcData.arrear_summary.forEach(item => {
+                const val = Number(item.value) || 0;
+                if (item.name === 'overdue') sums.overdue = val;
+                else if (item.name === 'pay today') sums.payToday = val;
+                else if (item.name === 'due') sums.due = val;
+                else if (item.name === 'not yet due') sums.notDue = val;
+            });
+        }
+
+        const today = new Date(clientToday);
+        const classified = (rpcData?.ledger || []).map(txn => {
+            let arrearStatus = 'not_due';
+            let daysText = 'Not due';
+
+            if (txn.value_date) {
+                const dueDate = new Date(txn.value_date);
+                const diffTime = dueDate.getTime() - today.getTime();
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays < 0) {
+                    arrearStatus = 'overdue';
+                    daysText = `Overdue by ${Math.abs(diffDays)} day(s)`;
+                } else if (diffDays === 0) {
+                    arrearStatus = 'pay_today';
+                    daysText = 'Pay Today';
+                } else if (diffDays > 0 && diffDays <= 7) {
+                    arrearStatus = 'due';
+                    daysText = `Due in ${diffDays} day(s)`;
+                }
+            }
+
+            return {
+                ...txn,
+                arrearStatus,
+                daysText,
+                displayDate: txn.value_date
+            };
+        });
+
+        return { transactions: classified, sums };
+    }, [rpcData, clientToday]);
+
+    const [sortConfigTop, setSortConfigTop] = useState({ key: 'displayDate', direction: 'asc' });
+    const [sortConfigBottom, setSortConfigBottom] = useState({ key: 'displayDate', direction: 'asc' });
+
+    const handleSort = (table, key) => {
+        if (table === 'top') {
+            setSortConfigTop(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
+        } else {
+            setSortConfigBottom(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
+        }
+    };
+
+    const sortTransactions = (txns, config) => {
+        return [...txns].sort((a, b) => {
+            const valA = a[config.key] || '';
+            const valB = b[config.key] || '';
+            if (valA < valB) return config.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return config.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    const urgentTxns = sortTransactions(
+        processedData.transactions.filter(t => t.arrearStatus === 'overdue' || t.arrearStatus === 'pay_today'),
+        sortConfigTop
+    );
+
+    const upcomingTxns = sortTransactions(
+        processedData.transactions.filter(t => t.arrearStatus === 'due' || t.arrearStatus === 'not_due'),
+        sortConfigBottom
+    );
+
+    const formatCurrency = (amount) => `${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} 🪙`;
+
+    const getBadgeStyle = (status) => {
+        switch (status) {
+            case 'overdue': return 'bg-rose-200/80 text-black border-rose-400/60 font-extrabold';
+            case 'pay_today': return 'bg-orange-200/80 text-black border-orange-400/60 font-extrabold';
+            case 'due': return 'bg-amber-200/80 text-black border-amber-400/60 font-extrabold';
+            case 'not_due': return 'bg-emerald-200/80 text-black border-emerald-400/60 font-extrabold';
+            default: return 'bg-stone-200/80 text-black border-stone-400/60 font-extrabold';
+        }
+    };
+
+    const TableHeader = ({ sortKey, table, widthClass }) => (
+        <th
+            className={`py-2 align-middle text-left text-[#4b2c20]/75 cursor-pointer hover:text-[#4b2c20] transition-colors ${widthClass}`}
+            onClick={() => handleSort(table, sortKey)}
+            title="Sort Column"
+        >
+            <div className="flex items-center">
+                <Menu size={14} />
+            </div>
+        </th>
+    );
+
+    return (
+        <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 md:p-6" onClick={onClose}>
+            <div
+                className="w-full h-full max-w-[1400px] bg-[#faf4e5] rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)] border-4 border-[#8b4513] flex flex-col font-serif"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex items-center gap-4 p-4 border-b-2 border-[#4b2c20]/30 bg-[#8b4513] shrink-0 shadow-md">
+                    <div className="w-14 h-14 rounded-full bg-stone-850 border-2 border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.4)] flex items-center justify-center overflow-hidden shrink-0">
+                        <img
+                            src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix&backgroundColor=transparent"
+                            alt="Advisor"
+                            className="w-full h-full object-cover scale-110"
+                        />
+                    </div>
+                    <h2 className="text-xl md:text-2xl font-black text-[#faf4e5] tracking-widest uppercase drop-shadow-md">
+                        Financial Alerts
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        className="ml-auto w-8 h-8 rounded-full bg-[#4b2c20]/45 border border-[#faf4e5]/30 flex items-center justify-center text-[#faf4e5] hover:text-white hover:bg-[#4b2c20]/60 transition-colors focus:outline-none shadow-sm font-sans"
+                        title="Close"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div className="flex-1 flex flex-col p-4 md:p-6 gap-6 min-h-0 overflow-hidden bg-gradient-to-b from-[#faf4e5] to-[#f4e4bc]/30">
+                    {/* Hexagons */}
+                    <div className="flex items-center justify-around gap-2 shrink-0">
+                        <HexagonCard outerColor="bg-emerald-800" innerColor="bg-emerald-100">
+                            <CheckCircle2 size={24} className="text-emerald-600 mb-1" />
+                            <span className="text-[10px] uppercase tracking-wider text-emerald-800 font-bold">Not Due</span>
+                            <span className="text-sm font-mono text-emerald-950 font-black mt-1">{formatCurrency(processedData.sums.notDue)}</span>
+                        </HexagonCard>
+
+                        <HexagonCard outerColor="bg-amber-700" innerColor="bg-amber-100">
+                            <Calendar size={24} className="text-amber-600 mb-1" />
+                            <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Due</span>
+                            <span className="text-sm font-mono text-amber-950 font-black mt-1">{formatCurrency(processedData.sums.due)}</span>
+                        </HexagonCard>
+
+                        <HexagonCard outerColor="bg-orange-700" innerColor="bg-orange-100">
+                            <AlertTriangle size={24} className="text-orange-600 animate-pulse mb-1" />
+                            <span className="text-[10px] uppercase tracking-wider text-orange-800 font-bold">Pay Today</span>
+                            <span className="text-sm font-mono text-orange-950 font-black mt-1">{formatCurrency(processedData.sums.payToday)}</span>
+                        </HexagonCard>
+
+                        <HexagonCard outerColor="bg-rose-800" innerColor="bg-rose-100">
+                            <AlertOctagon size={24} className="text-rose-600 mb-1" />
+                            <span className="text-[10px] uppercase tracking-wider text-rose-800 font-bold">Overdue</span>
+                            <span className="text-sm font-mono text-rose-950 font-black mt-1">{formatCurrency(processedData.sums.overdue)}</span>
+                        </HexagonCard>
+                    </div>
+
+                    {/* SIDE BY SIDE TABLES */}
+                    <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 overflow-hidden">
+
+                        {/* Left: Urgent Action Required */}
+                        <div className="flex flex-col bg-white border-2 border-[#8b4513]/20 rounded-xl p-4 min-h-0 overflow-hidden shadow-md">
+                            <h3 className="text-xs font-serif font-bold text-[#4b2c20] uppercase tracking-widest mb-3 shrink-0 flex items-center gap-2 border-b border-[#8b4513]/20 pb-2">
+                                <AlertOctagon size={14} className="text-rose-600" /> Urgent Action Required
+                            </h3>
+                            <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-amber-800/30 scrollbar-track-transparent relative">
+                                {isFetching && (
+                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center pointer-events-none">
+                                        <Loader2 className="animate-spin text-amber-800" />
+                                    </div>
+                                )}
+                                <table className="w-full text-xs table-fixed">
+                                    <colgroup>
+                                        <col className="w-[42%]" />
+                                        <col className="w-[20%]" />
+                                        <col className="w-[25%]" />
+                                        <col className="w-[13%]" />
+                                    </colgroup>
+                                    <thead className="sticky top-0 bg-[#f4e4bc] z-10 border-b border-[#8b4513]/20">
+                                        <tr>
+                                            <TableHeader sortKey="entity" table="top" widthClass="w-[42%]" />
+                                            <TableHeader sortKey="displayDate" table="top" widthClass="w-[20%]" />
+                                            <th className="py-2 text-left text-[10px] uppercase tracking-wider text-[#4b2c20]/80 font-bold w-[25%]">Amount</th>
+                                            <th className="py-2 text-right text-[10px] uppercase tracking-wider text-[#4b2c20]/80 font-bold w-[13%] pr-1">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#8b4513]/10 font-sans">
+                                        {urgentTxns.length === 0 ? (
+                                            <tr><td colSpan="4" className="text-center py-6 text-stone-400 font-mono text-[11px]">No urgent transactions.</td></tr>
+                                        ) : (
+                                            urgentTxns.map((txn) => (
+                                                <tr key={txn.id} className="hover:bg-[#f4e4bc]/30 transition-colors">
+                                                    <td className="py-2.5 align-middle pr-3">
+                                                        <div className="font-bold text-[#4b2c20] text-[11px] mb-1 truncate" title={txn.entity || 'Unknown Entity'}>
+                                                            {txn.entity || 'Unknown Entity'}
+                                                        </div>
+                                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-mono border truncate max-w-full ${getBadgeStyle(txn.arrearStatus)}`} title={txn.daysText}>
+                                                            {txn.daysText}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 align-middle pl-1 pr-1">
+                                                        <div className="text-[9px] uppercase tracking-wider text-[#5d4037] font-semibold font-serif">Due</div>
+                                                        <div className="text-stone-600 font-mono text-[11px] truncate">{txn.displayDate || '-'}</div>
+                                                    </td>
+                                                    <td className="py-2.5 align-middle text-rose-700 font-mono font-bold text-[11px] truncate">
+                                                        {formatCurrency(txn.amount)}
+                                                    </td>
+                                                    <td className="py-2.5 align-middle text-right">
+                                                        <button
+                                                            onClick={() => console.log('Open Ledger for TX:', txn.id)}
+                                                            className="px-1.5 py-1 bg-[#8b4513] hover:bg-[#4b2c20] border border-[#8b4513]/30 rounded text-[#faf4e5] text-[9px] font-bold tracking-wider uppercase transition whitespace-nowrap shadow-sm cursor-pointer"
+                                                        >
+                                                            Ledger
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Right: Upcoming Queue */}
+                        <div className="flex flex-col bg-white border-2 border-[#8b4513]/20 rounded-xl p-4 min-h-0 overflow-hidden shadow-md">
+                            <h3 className="text-xs font-serif font-bold text-[#4b2c20] uppercase tracking-widest mb-3 shrink-0 flex items-center gap-2 border-b border-[#8b4513]/20 pb-2">
+                                <Calendar size={14} className="text-emerald-700" /> Upcoming Queue
+                            </h3>
+                            <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-amber-800/30 scrollbar-track-transparent relative">
+                                {isFetching && (
+                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center pointer-events-none">
+                                        <Loader2 className="animate-spin text-amber-800" />
+                                    </div>
+                                )}
+                                <table className="w-full text-xs table-fixed">
+                                    <colgroup>
+                                        <col className="w-[42%]" />
+                                        <col className="w-[20%]" />
+                                        <col className="w-[25%]" />
+                                        <col className="w-[13%]" />
+                                    </colgroup>
+                                    <thead className="sticky top-0 bg-[#f4e4bc] z-10 border-b border-[#8b4513]/20">
+                                        <tr>
+                                            <TableHeader sortKey="entity" table="bottom" widthClass="w-[42%]" />
+                                            <TableHeader sortKey="displayDate" table="bottom" widthClass="w-[20%]" />
+                                            <th className="py-2 text-left text-[10px] uppercase tracking-wider text-[#4b2c20]/80 font-bold w-[25%]">Amount</th>
+                                            <th className="py-2 text-right text-[10px] uppercase tracking-wider text-[#4b2c20]/80 font-bold w-[13%] pr-1">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#8b4513]/10 font-sans">
+                                        {upcomingTxns.length === 0 ? (
+                                            <tr><td colSpan="4" className="text-center py-6 text-stone-400 font-mono text-[11px]">No upcoming transactions.</td></tr>
+                                        ) : (
+                                            upcomingTxns.map((txn) => (
+                                                <tr key={txn.id} className="hover:bg-[#f4e4bc]/30 transition-colors">
+                                                    <td className="py-2.5 align-middle pr-3">
+                                                        <div className="font-bold text-[#4b2c20] text-[11px] mb-1 truncate" title={txn.entity || 'Unknown Entity'}>
+                                                            {txn.entity || 'Unknown Entity'}
+                                                        </div>
+                                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-mono border truncate max-w-full ${getBadgeStyle(txn.arrearStatus)}`} title={txn.daysText}>
+                                                            {txn.daysText}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 align-middle pl-1 pr-1">
+                                                        <div className="text-[9px] uppercase tracking-wider text-[#5d4037] font-semibold font-serif">Due</div>
+                                                        <div className="text-stone-600 font-mono text-[11px] truncate">{txn.displayDate || '-'}</div>
+                                                    </td>
+                                                    <td className="py-2.5 align-middle text-[#8b4513] font-mono font-bold text-[11px] truncate">
+                                                        {formatCurrency(txn.amount)}
+                                                    </td>
+                                                    <td className="py-2.5 align-middle text-right">
+                                                        <button
+                                                            onClick={() => console.log('Open Ledger for TX:', txn.id)}
+                                                            className="px-1.5 py-1 bg-[#8b4513] hover:bg-[#4b2c20] border border-[#8b4513]/30 rounded text-[#faf4e5] text-[9px] font-bold tracking-wider uppercase transition whitespace-nowrap shadow-sm cursor-pointer"
+                                                        >
+                                                            Ledger
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+=========================================
+ARQUIVO: client\src\pages\MainMenu.jsx
+=========================================
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useKingdomStore } from '../store/useKingdomStore';
+import Dashboard from '../pages/Dashboard';
+import FinancialAlerts from '../pages/FinancialAlerts';
+import Modal from '../components/ui/Modal';
+import TreasuryController from '../components/features/Ledger/TreasuryController';
+import SettingsController from '../components/features/settings/SettingsController';
+import bgImage from '../assets/Medieval_Town_Backround.jfif';
+
+/**
+ * MainMenu Component (V2.0 Core Shell)
+ * 
+ * Simulated Device Wrapper (Landscape Only).
+ * Forces the UI into iPad (Tablet) or iPhone (Phone) horizontal aspect ratios.
+ */
+export default function MainMenu() {
+  const store = useKingdomStore();
+  const fetchFlatMatrix = store?.fetchFlatMatrix;
+
+  const [activeModal, setActiveModal] = useState(null);
+  const [viewMode, setViewMode] = useState('tablet'); 
+  
+  const [isTreasuryExpanded, setIsTreasuryExpanded] = useState(false);
+  
+  // Ref to detect clicks outside the treasury menu
+  const treasuryRef = useRef(null);
+
+  useEffect(() => {
+    if (fetchFlatMatrix) {
+      fetchFlatMatrix();
+    }
+  }, [fetchFlatMatrix]);
+
+  useEffect(() => {
+    const handleCloseDashboard = () => {
+      setActiveModal(null);
+    };
+
+    window.addEventListener('close-dashboard', handleCloseDashboard);
+    return () => {
+      window.removeEventListener('close-dashboard', handleCloseDashboard);
+    };
+  }, []);
+
+  // Handle Escape key and Click Outside for the Treasury drop-up
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isTreasuryExpanded) {
+        setIsTreasuryExpanded(false);
+      }
+    };
+
+    const handleClickOutside = (e) => {
+      if (treasuryRef.current && !treasuryRef.current.contains(e.target)) {
+        setIsTreasuryExpanded(false);
+      }
+    };
+
+    if (isTreasuryExpanded) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isTreasuryExpanded]);
+
+  const modalMetadata = {
+    finance_advisor: { icon: '📋', title: 'Finance Advisor', subtitle: 'Royal Financial Alerts' },
+    placeholder01: { icon: '🚧', title: 'Placeholder01', subtitle: 'Under Construction' },
+    quests: { icon: '⚔️', title: 'Quests', subtitle: 'Sovereign objectives and campaigns' },
+    treasury_dashboard: { icon: '📈', title: 'Treasury Dashboard', subtitle: 'Financial KPIs and Visualizations' },
+    general_ledger: { icon: '📜', title: 'General Ledger', subtitle: 'Double-entry asset balance and registry' },
+    financial_statements: { icon: '📊', title: 'Financial Statements', subtitle: 'Income, Balance Sheet & Cash Flow' },
+    achievements: { icon: '🏆', title: 'Achievements', subtitle: 'Unveiled royal milestones' },
+    settings: { icon: '⚙️', title: 'Settings', subtitle: 'Citadel identity configurations' }
+  };
+
+  const currentMeta = activeModal ? modalMetadata[activeModal] : null;
+
+  const getViewClasses = () => {
+    switch (viewMode) {
+      case 'phone': 
+        return 'w-full max-w-[844px] h-[390px] max-h-[95dvh] border-y-4 border-x-[16px] rounded-[2.5rem] border-stone-900 shadow-[0_0_80px_rgba(0,0,0,0.8)]';
+      case 'tablet': 
+      default: 
+        return 'w-full max-w-[1180px] h-[820px] max-h-[95dvh] border-y-4 border-x-[16px] rounded-3xl border-stone-900 shadow-[0_0_80px_rgba(0,0,0,0.8)]';
+    }
+  };
+
+  const openSubMenu = (modalKey) => {
+    setActiveModal(modalKey);
+    setIsTreasuryExpanded(false);
+  };
+
+  return (
+    <div className="w-full h-dvh bg-stone-950 flex items-center justify-center overflow-hidden">
+      
+      <div 
+        className={`relative mx-auto text-stone-100 flex flex-col justify-between font-serif overflow-hidden transition-all duration-500 ease-in-out @container ${getViewClasses()}`}
+        style={{
+          backgroundImage: `radial-gradient(ellipse at center, rgba(12, 10, 9, 0.4) 0%, rgba(9, 8, 8, 0.95) 100%), url(${bgImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        
+        {activeModal === null && (
+          <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-stone-800 border-2 border-amber-600/60 shadow-[0_0_15px_rgba(217,119,6,0.3)] flex items-center justify-center overflow-hidden">
+                <img 
+                  src="https://api.dicebear.com/7.x/adventurer/svg?seed=Proudmore&backgroundColor=transparent" 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover scale-110" 
+                />
+              </div>
+              <span className="font-black text-amber-50 tracking-widest uppercase text-sm drop-shadow-md">
+                Proudmore
+              </span>
+            </div>
+            
+            <div className="flex bg-stone-900/80 p-1 rounded-lg border border-amber-900/40 backdrop-blur-sm shadow-lg">
+              {['tablet', 'phone'].map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded transition-colors ${
+                    viewMode === mode 
+                      ? 'bg-amber-700/80 text-amber-100 font-bold shadow-inner' 
+                      : 'text-stone-400 hover:text-amber-200 hover:bg-stone-800/80'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <main className="flex-grow flex flex-col items-center justify-end px-4 pb-8 z-10 w-full min-h-0">
+          {activeModal === null ? (
+            <div className="flex items-center justify-center bg-stone-950/80 backdrop-blur-md border border-amber-900/50 rounded-full px-8 py-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-8 animate-fade-in flex-wrap relative">
+              
+              {/* 1. Finance Advisor */}
+              <button onClick={() => setActiveModal('finance_advisor')} title="Finance Advisor" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">📋</button>
+              
+              {/* 2. Placeholder01 */}
+              <button onClick={() => setActiveModal('placeholder01')} title="Placeholder01" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🚧</button>
+              
+              {/* 3. Quests */}
+              <button onClick={() => setActiveModal('quests')} title="Quests" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">⚔️</button>
+              
+              {/* 4. Treasury */}
+              <div className="relative flex flex-col items-start" ref={treasuryRef}>
+                {isTreasuryExpanded && (
+                  <div className="absolute bottom-[calc(100%+1.5rem)] left-0 flex flex-col bg-stone-900/95 backdrop-blur-md border border-amber-700/50 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] overflow-hidden animate-fade-in z-50 min-w-max">
+                    <button 
+                      onClick={() => openSubMenu('general_ledger')} 
+                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-amber-100 hover:text-white hover:bg-amber-800/50 border-b border-amber-900/30 transition-colors whitespace-nowrap"
+                    >
+                      📜 General Ledger
+                    </button>
+                    <button 
+                      onClick={() => openSubMenu('financial_statements')} 
+                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-amber-100 hover:text-white hover:bg-amber-800/50 border-b border-amber-900/30 transition-colors whitespace-nowrap"
+                    >
+                      📊 Financial Statements
+                    </button>
+                    <button 
+                      onClick={() => openSubMenu('treasury_dashboard')} 
+                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-amber-100 hover:text-white hover:bg-amber-800/50 transition-colors whitespace-nowrap"
+                    >
+                      📈 Treasury Dashboard
+                    </button>
+                  </div>
+                )}
+                <button 
+                  onClick={() => setIsTreasuryExpanded(!isTreasuryExpanded)} 
+                  title="Treasury" 
+                  className={`text-3xl transition-all duration-200 cursor-pointer focus:outline-none ${
+                    isTreasuryExpanded 
+                      ? 'grayscale-0 scale-125 drop-shadow-[0_0_15px_rgba(251,191,36,0.7)]' 
+                      : 'grayscale hover:grayscale-0 hover:scale-125'
+                  }`}
+                >
+                  🏦
+                </button>
+              </div>
+
+              {/* 5. Achievements */}
+              <button onClick={() => setActiveModal('achievements')} title="Achievements" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">🏆</button>
+              
+              {/* 6. Settings */}
+              <button onClick={() => setActiveModal('settings')} title="Settings" className="text-3xl grayscale hover:grayscale-0 hover:scale-125 transition-all duration-200 cursor-pointer focus:outline-none">⚙️</button>
+            </div>
+          
+          ) : activeModal === 'finance_advisor' ? (
+            <FinancialAlerts onClose={() => setActiveModal(null)} />
+          ) : activeModal === 'general_ledger' ? (
+            <TreasuryController initialView="ledger" onClose={() => setActiveModal(null)} />
+          ) : activeModal === 'financial_statements' ? (
+            <TreasuryController initialView="statements" onClose={() => setActiveModal(null)} />
+          ) : activeModal === 'treasury_dashboard' ? (
+            <div 
+              className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => window.dispatchEvent(new CustomEvent('trigger-dashboard-exit'))}
+            >
+              <div 
+                className="absolute top-4 bottom-4 left-2 right-2 md:top-6 md:bottom-6 md:left-6 md:right-6 bg-stone-950 rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(0,0,0,0.95)] border border-amber-900/60"
+                onClick={(e) => e.stopPropagation()} 
+              >
+                <Dashboard />
+              </div>
+            </div>
+          ) : activeModal === 'settings' ? (
+            <SettingsController onClose={() => setActiveModal(null)} />
+          ) : (
+            <Modal icon={currentMeta?.icon} title={currentMeta?.title} subtitle={currentMeta?.subtitle} onClose={() => setActiveModal(null)}>
+              <div className="flex flex-col items-center justify-center p-12 text-center opacity-50">
+                <span className="text-4xl mb-4">🚧</span>
+                <p className="text-stone-400 font-sans tracking-widest uppercase">This area will be defined later</p>
+              </div>
+            </Modal>
+          )}
+        </main>
+
+      </div>
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\store\useDashboardStore.js
+=========================================
+
+// client/src/store/useDashboardStore.js
+
+import { create } from 'zustand';
+import { MAX_WIDGETS_PER_TAB, DEFAULT_PRESET } from '../config/dashboard.config';
+import { useKingdomStore } from './useKingdomStore';
+import { supabase } from '../lib/supabaseClient';
+
+const DEFAULT_INTERACTIVE_PRESET = [
+  { i: 'inter_granularity-1', x: 0, y: 0, w: 4, h: 1, minW: 3, maxW: 12, minH: 1, maxH: 3 },
+  { i: 'inter_date_picker-1', x: 4, y: 0, w: 4, h: 1, minW: 4, maxW: 8, minH: 1, maxH: 3 },
+  { i: 'inter_status-1', x: 8, y: 0, w: 4, h: 1, minW: 3, maxW: 12, minH: 1, maxH: 4 },
+  { i: 'inter_arrear-1', x: 0, y: 1, w: 12, h: 1, minW: 6, maxW: 12, minH: 1, maxH: 4 },
+  { i: 'inter_category-1', x: 0, y: 2, w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 },
+  { i: 'inter_entity-1', x: 4, y: 2, w: 4, h: 4, minW: 3, maxW: 8, minH: 3, maxH: 6 },
+  { i: 'inter_ledger-1', x: 8, y: 2, w: 4, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 8 }
+];
+
+const INITIAL_SUBMENUS = [
+  { id: 'insights', name: 'Insights', isVisible: true, isActive: true },
+  { id: 'apar_interactive', name: 'AP/AR Command', isVisible: true, isActive: false },
+  { id: 'tab_1', name: 'Royal Treasury', isVisible: true, isActive: false },
+  { id: 'tab_2', name: 'Campaign Ledger', isVisible: false, isActive: false },
+  { id: 'tab_3', name: 'Citadel Reserves', isVisible: false, isActive: false },
+  { id: 'tab_4', name: 'Merchant Guild', isVisible: false, isActive: false },
+  { id: 'tab_5', name: 'Vassal Tributes', isVisible: false, isActive: false },
+  { id: 'tab_6', name: 'War Fund', isVisible: false, isActive: false },
+];
+
+export const useDashboardStore = create((set, get) => ({
+  isEditingLayout: false,
+  isLoading: false,
+  isSaving: false,
+  hasUnsavedChanges: false,
+  submenus: INITIAL_SUBMENUS,
+  
+  savedLayout: {
+    insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    apar_interactive: JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
+    tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    tab_2: [],
+    tab_3: [],
+    tab_4: [],
+    tab_5: [],
+    tab_6: [],
+  },
+  
+  draftLayout: {
+    insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    apar_interactive: JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
+    tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+    tab_2: [],
+    tab_3: [],
+    tab_4: [],
+    tab_5: [],
+    tab_6: [],
+  },
+
+  hydrateLayouts: async () => {
+    set({ isLoading: true });
+    try {
+      const kingdomStore = useKingdomStore.getState();
+      const user = kingdomStore?.user;
+
+      let loadedPayload = null;
+      let databaseQuerySucceeded = false;
+
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('dashboard_layouts')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (!error) {
+          databaseQuerySucceeded = true;
+          if (data?.dashboard_layouts) {
+            loadedPayload = data.dashboard_layouts;
+          }
+        }
+      }
+
+      if (!databaseQuerySucceeded && !loadedPayload) {
+        const localCache = localStorage.getItem('eldoria_dashboard_layouts');
+        if (localCache) {
+          try {
+            loadedPayload = JSON.parse(localCache);
+          } catch (e) {
+            console.warn("Corrupted client database caches skipped during layout mapping:", e);
+          }
+        }
+      }
+
+      if (loadedPayload) {
+        const { savedLayout, submenus } = loadedPayload;
+        
+        const finalSaved = {
+          insights: savedLayout?.insights ? JSON.parse(JSON.stringify(savedLayout.insights)) : JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          apar_interactive: (savedLayout?.apar_interactive && !savedLayout.apar_interactive.some(item => item.i === 'inter_date_picker-1' && item.w < 4)) 
+            ? JSON.parse(JSON.stringify(savedLayout.apar_interactive)) 
+            : JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
+          tab_1: savedLayout?.tab_1 ? JSON.parse(JSON.stringify(savedLayout.tab_1)) : JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          tab_2: savedLayout?.tab_2 ? JSON.parse(JSON.stringify(savedLayout.tab_2)) : [],
+          tab_3: savedLayout?.tab_3 ? JSON.parse(JSON.stringify(savedLayout.tab_3)) : [],
+          tab_4: savedLayout?.tab_4 ? JSON.parse(JSON.stringify(savedLayout.tab_4)) : [],
+          tab_5: savedLayout?.tab_5 ? JSON.parse(JSON.stringify(savedLayout.tab_5)) : [],
+          tab_6: savedLayout?.tab_6 ? JSON.parse(JSON.stringify(savedLayout.tab_6)) : [],
+        };
+
+        const mergedSubmenus = INITIAL_SUBMENUS.map((defaultTab) => {
+          const cachedTab = Array.isArray(submenus) ? submenus.find((s) => s.id === defaultTab.id) : null;
+          if (cachedTab) {
+            const isProtected = defaultTab.id === 'insights' || defaultTab.id === 'tab_1' || defaultTab.id === 'apar_interactive';
+            return {
+              ...defaultTab,
+              name: cachedTab.name || defaultTab.name,
+              isVisible: isProtected ? true : (cachedTab.isVisible !== undefined ? cachedTab.isVisible : defaultTab.isVisible),
+            };
+          }
+          return defaultTab;
+        });
+
+        const cachedActiveTab = Array.isArray(submenus) ? submenus.find((s) => s.isActive && s.isVisible) : null;
+        let activeId = cachedActiveTab ? cachedActiveTab.id : 'insights';
+        const isValidId = INITIAL_SUBMENUS.some(tab => tab.id === activeId);
+        if (!isValidId) activeId = 'insights';
+
+        const finalSubmenus = mergedSubmenus.map((tab) => ({
+          ...tab,
+          isActive: tab.id === activeId,
+        }));
+
+        set({
+          savedLayout: finalSaved,
+          draftLayout: JSON.parse(JSON.stringify(finalSaved)),
+          submenus: finalSubmenus,
+          hasUnsavedChanges: false,
+        });
+      } else {
+        const defaultLayout = {
+          insights: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          apar_interactive: JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET)),
+          tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
+          tab_2: [], tab_3: [], tab_4: [], tab_5: [], tab_6: [],
+        };
+        set({
+          savedLayout: defaultLayout,
+          draftLayout: JSON.parse(JSON.stringify(defaultLayout)),
+          submenus: INITIAL_SUBMENUS,
+          hasUnsavedChanges: false,
+        });
+      }
+    } catch (err) {
+      console.error("Hydration process encountered an error, falling back to baseline defaults:", err);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  saveDraftToProduction: async (keepEditing = false) => {
+    set({ isSaving: true });
+    const state = get();
+    const committedDraft = JSON.parse(JSON.stringify(state.draftLayout));
+    const committedSubmenus = JSON.parse(JSON.stringify(state.submenus));
+
+    const payload = {
+      savedLayout: committedDraft,
+      submenus: committedSubmenus,
+    };
+
+    try {
+      localStorage.setItem('eldoria_dashboard_layouts', JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Client layout sync rejected by local device constraints:", e);
+    }
+
+    try {
+      const kingdomStore = useKingdomStore.getState();
+      const user = kingdomStore?.user;
+
+      if (user?.id) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ dashboard_layouts: payload })
+          .eq('id', user.id);
+
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error("Supabase failed to archive remote changes, offline backup preserved:", err);
+    } finally {
+      set({
+        savedLayout: committedDraft,
+        isEditingLayout: keepEditing ? state.isEditingLayout : false,
+        isSaving: false,
+        hasUnsavedChanges: false,
+      });
+    }
+  },
+  
+  toggleEditMode: (active) => {
+    set((state) => ({
+      isEditingLayout: !!active,
+      draftLayout: JSON.parse(JSON.stringify(state.savedLayout)),
+      hasUnsavedChanges: false
+    }));
+  },
+
+  updateDraftLayout: (tabId, nextLayout) => {
+    if (!Array.isArray(nextLayout)) return false;
+    
+    set((state) => ({
+      draftLayout: {
+        ...state.draftLayout,
+        [tabId]: JSON.parse(JSON.stringify(nextLayout))
+      },
+      hasUnsavedChanges: true
+    }));
+    return true;
+  },
+
+  setActiveSubmenu: (tabId) => {
+    set((state) => ({
+      submenus: state.submenus.map((sub) => ({
+        ...sub,
+        isActive: sub.id === tabId
+      }))
+    }));
+  },
+
+  toggleSubmenuVisibility: (tabId) => {
+    if (tabId === 'insights' || tabId === 'tab_1' || tabId === 'apar_interactive') return;
+
+    set((state) => {
+      const updatedSubmenus = state.submenus.map((sub) => {
+        if (sub.id === tabId) {
+          return { ...sub, isVisible: !sub.isVisible };
+        }
+        return sub;
+      });
+
+      const wasInvisible = state.submenus.find((s) => s.id === tabId)?.isVisible === false;
+      const nextDraft = JSON.parse(JSON.stringify(state.draftLayout));
+
+      if (wasInvisible && (!nextDraft[tabId] || nextDraft[tabId].length === 0)) {
+        nextDraft[tabId] = JSON.parse(JSON.stringify(DEFAULT_PRESET));
+      }
+
+      return {
+        submenus: updatedSubmenus,
+        draftLayout: nextDraft,
+        hasUnsavedChanges: true
+      };
+    });
+  },
+
+  updateSubmenuName: (tabId, newName) => {
+    if (!newName || typeof newName !== 'string') return;
+    set((state) => ({
+      submenus: state.submenus.map((sub) => {
+        if (sub.id === tabId) {
+          return { ...sub, name: newName.trim() };
+        }
+        return sub;
+      }),
+      hasUnsavedChanges: true
+    }));
+  },
+
+  deployWidget: (tabId, widgetId, widgetDef) => {
+    const state = get();
+    const currentLayout = Array.isArray(state.draftLayout[tabId]) 
+      ? JSON.parse(JSON.stringify(state.draftLayout[tabId])) 
+      : [];
+
+    if (currentLayout.length >= MAX_WIDGETS_PER_TAB) {
+      console.warn("Max widgets per tab limit reached.");
+      return false;
+    }
+
+    const uniqueInstanceId = `${widgetId}-${Date.now()}`;
+    const w = widgetDef.layout?.w || 4;
+    const h = widgetDef.layout?.h || 3;
+    const cols = 12;
+
+    let foundX = 0;
+    let foundY = 0;
+    let placed = false;
+
+    for (let y = 0; y < 50; y++) {
+      for (let x = 0; x <= cols - w; x++) {
+        let overlap = false;
+        for (const item of currentLayout) {
+          const overlapX = x < item.x + item.w && x + w > item.x;
+          const overlapY = y < item.y + item.h && y + h > item.y;
+          if (overlapX && overlapY) {
+            overlap = true;
+            break;
+          }
+        }
+        if (!overlap) {
+          foundX = x;
+          foundY = y;
+          placed = true;
+          break;
+        }
+      }
+      if (placed) break;
+    }
+
+    if (!placed) {
+      foundX = 0;
+      foundY = currentLayout.length * 3;
+    }
+
+    const newLayoutItem = {
+      i: uniqueInstanceId,
+      x: foundX,
+      y: foundY,
+      w,
+      h,
+      minW: widgetDef.layout?.minW || 2,
+      maxW: widgetDef.layout?.maxW || 12,

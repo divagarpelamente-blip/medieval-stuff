@@ -1,0 +1,2057 @@
+/* === PARTE 1 DE 5 === */
+
+
+=========================================
+ARQUIVO: index.html
+=========================================
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AcuityLedger - Financial Transaction Recorder</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+
+
+=========================================
+ARQUIVO: package.json
+=========================================
+
+{
+  "name": "medieval-stuff",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+    "client": "npm run dev --prefix client",
+    "server": "npm run dev --prefix server",
+    "save": "node auto_commit.js",
+    "push": "node auto_commit.js && git push"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "framer-motion": "^12.42.2",
+    "puppeteer": "^25.1.0",
+    "zustand": "^5.0.14"
+  }
+}
+
+
+
+=========================================
+ARQUIVO: SANDBOX_GUIDE.md
+=========================================
+
+# 🛠️ Sandbox Integration Guide: Eldoria
+
+This guide provides step-by-step instructions on how to temporarily inject the `SettingsSandbox` component into the Eldoria client for testing, and how to safely revert the changes back to the production-ready state.
+
+---
+
+## 🚀 Step 1: Enable the Sandbox Mode
+
+To display the settings sandbox at the top of the viewport, modify the main entry file [client/src/App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx):
+
+### 1. Add the Import Statement
+Open [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx), scroll to the top of the file where other files are imported, and add the following import:
+
+```javascript
+import SettingsSandbox from './components/SettingsSandbox';
+```
+
+### 2. Mount the Sandbox in the UI
+Scroll down to the main `return` statement of the `App` component (around line 1032) and mount the component at the very top of the returned tree:
+
+```javascript
+  return (
+    <div className="w-screen h-screen overflow-hidden select-none bg-black flex items-center justify-center">
+      <SettingsSandbox />
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          style: {
+            background: '#f4e4bc',
+            color: '#4b2c20',
+            borderColor: '#8b4513',
+            borderWidth: '2px'
+          },
+          success: {
+            iconTheme: { primary: '#059669', secondary: '#f4e4bc' },
+          },
+          error: {
+            iconTheme: { primary: '#dc2626', secondary: '#f4e4bc' },
+          },
+        }}
+      />
+```
+
+---
+
+## ⏪ Step 2: Revert Back to Initial State
+
+To restore the standard game layout and remove the sandbox, follow these steps:
+
+### 1. Remove the Import Statement
+Open [App.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/App.jsx) and delete the import statement:
+
+```diff
+-import SettingsSandbox from './components/SettingsSandbox';
+```
+
+### 2. Unmount the Sandbox from the UI
+Scroll to the main `return` statement and delete the `<SettingsSandbox />` component:
+
+```diff
+  return (
+    <div className="w-screen h-screen overflow-hidden select-none bg-black flex items-center justify-center">
+-      <SettingsSandbox />
+       <Toaster 
+         position="top-center" 
+```
+
+
+
+=========================================
+ARQUIVO: .vscode\extensions.json
+=========================================
+
+{
+  "recommendations": ["denoland.vscode-deno"]
+}
+
+
+
+=========================================
+ARQUIVO: .vscode\settings.json
+=========================================
+
+{
+  "deno.enable": true,
+  "deno.enablePaths": [
+    "supabase/functions"
+  ],
+  "deno.lint": true,
+  "deno.unstable": [
+    "bare-node-builtins",
+    "byonm",
+    "sloppy-imports",
+    "unsafe-proto",
+    "webgpu",
+    "broadcast-channel",
+    "worker-options",
+    "cron",
+    "kv",
+    "ffi",
+    "fs",
+    "http",
+    "net"
+  ],
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  }
+}
+
+
+=========================================
+ARQUIVO: client\eslint.config.js
+=========================================
+
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{js,jsx}'],
+    extends: [
+      js.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      globals: globals.browser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+  },
+])
+
+
+
+=========================================
+ARQUIVO: client\index.html
+=========================================
+
+<!doctype html>
+<html lang="en">
+  <head><script>window.onerror = function(m, u, l, col, e) { console.log("REACT CRASH: " + m); };</script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>client</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+
+
+=========================================
+ARQUIVO: client\jsconfig.json
+=========================================
+
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "types": ["vite/client"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": false,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "vite.config.js"],
+  "exclude": ["node_modules"]
+}
+
+
+=========================================
+ARQUIVO: client\package.json
+=========================================
+
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
+    "@tailwindcss/postcss": "^4.2.4",
+    "@tanstack/react-query": "^5.101.2",
+    "i18next": "^26.3.1",
+    "i18next-browser-languagedetector": "^8.2.1",
+    "jimp": "^1.6.1",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-grid-layout": "^2.2.3",
+    "react-hot-toast": "^2.6.0",
+    "react-i18next": "^17.0.8",
+    "recharts": "^3.9.2",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^10.2.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.5.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.0.0",
+    "vite": "^8.0.10"
+  }
+}
+
+
+
+=========================================
+ARQUIVO: client\postcss.config.js
+=========================================
+
+export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+}
+
+
+=========================================
+ARQUIVO: client\tailwind.config.js
+=========================================
+
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        medieval: {
+          gold: '#d97706',
+          goldLight: '#fbbf24',
+          wood: '#451a03',
+          woodDark: '#2d0f02',
+          slate: '#334155',
+          parchment: '#f5f5f4',
+        },
+        stone: {
+          950: '#0c0a09',
+          900: '#1c1917',
+          800: '#292524',
+        },
+        violet: {
+          600: '#7c3aed',
+          700: '#6d28d9',
+        },
+        emerald: {
+          500: '#10b981',
+          600: '#059669',
+        }
+      },
+      fontFamily: {
+        medieval: ['"Cinzel"', 'serif'],
+        sans: ['Inter', 'sans-serif'],
+      },
+      backgroundImage: {
+        'medieval-pattern': "url('https://www.transparenttextures.com/patterns/dark-leather.png')",
+      }
+    },
+  },
+  plugins: [],
+}
+
+
+
+=========================================
+ARQUIVO: client\vite.config.js
+=========================================
+
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  base: './',
+  server: {
+    open: 'msedge'
+  },
+  define: {
+    'process.env': {}
+  }
+})
+
+
+
+=========================================
+ARQUIVO: client\src\App.jsx
+=========================================
+
+import React, { useEffect } from 'react';
+import { useKingdomStore } from './store/useKingdomStore';
+import MainMenu from './pages/MainMenu';
+import Login from './components/auth/Login';
+import DashboardVisualSandbox from './components/sandbox/dashboard-visual-sandbox';
+
+export default function App() {
+  const initAuth = useKingdomStore((state) => state.initAuth);
+  const user = useKingdomStore((state) => state.user);
+  
+  // Gatilho principal: Acorda a Store e trata do Login + Fetch de Dados
+  useEffect(() => {
+    if (initAuth) {
+      const unsubscribe = initAuth();
+      return () => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      };
+    }
+  }, [initAuth]);
+
+  // Visual Sandbox Bypass (Placed BEFORE the Auth Barrier)
+  const path = window.location.pathname;
+  if (path === '/visual-sandbox') {
+    return <DashboardVisualSandbox />;
+  }
+
+  // Barreira de Segurança: Se não há utilizador logado, mostra o Login.
+  // Isto impede o "profile_id=is.null" que vimos no erro da rede.
+  if (!user) {
+    return (
+       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center">
+         <Login />
+       </div>
+    );
+  }
+
+  // Tudo seguro: O Utilizador existe. Carrega a UI.
+  return (
+    <div className="min-h-screen bg-stone-950 text-stone-200 antialiased selection:bg-amber-900 selection:text-amber-100">
+      <MainMenu />
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\index.css
+=========================================
+
+@import "tailwindcss";
+@source "./src"; /* Or wherever your component folder is */
+
+:root {
+  --gold: #ffd700;
+  --wood: #5d4037;
+  --stone: #455a64;
+  --tudor-brown: #4b2c20;
+  --tudor-cream: #faf4e5;
+  --leather-border: #8b4513;
+  --parchment-bg: #f4e4bc;
+}
+
+
+body {
+  background-color: #000;
+  color: #fff;
+}
+
+#root {
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Force the React Grid Layout container to stretch so drops are registered */
+.react-grid-layout {
+  min-height: 600px !important;
+  min-width: 100%;
+}
+
+
+=========================================
+ARQUIVO: client\src\main.jsx
+=========================================
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App'; 
+import './index.css'; 
+
+// Initialize the React Query Client for our data caching
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Prevents unnecessary refetches when switching browser tabs
+      retry: 1, // Only retry failed requests once before showing an error
+    },
+  },
+});
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    {/* Wrap the App to provide the cache context to all widgets */}
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </React.StrictMode>
+);
+
+
+=========================================
+ARQUIVO: client\src\components\auth\Login.jsx
+=========================================
+
+import React, { useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import toast from 'react-hot-toast';
+
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Welcome back to Eldoria!");
+    } catch (error) {
+      toast.error(error.message || "Failed to authenticate.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#faf4e5] border-4 border-[#8b4513] rounded-xl p-8 shadow-2xl max-w-sm w-full relative">
+      {/* Decorative Header */}
+      <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#8b4513] text-[#ffd700] px-6 py-2 rounded-t-lg border-2 border-[#d4af37] font-black uppercase tracking-widest text-lg shadow-lg whitespace-nowrap">
+        Eldoria Vault
+      </div>
+      
+      <form onSubmit={handleLogin} className="mt-6 flex flex-col gap-4">
+        <div>
+          <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1">Email / Scroll</label>
+          <input 
+            type="email" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full bg-white border-2 border-[#8b4513]/30 rounded-lg px-4 py-2 text-stone-800 font-bold focus:outline-none focus:border-[#8b4513] transition-colors"
+            placeholder="lord@eldoria.com"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1">Password / Sigil</label>
+          <input 
+            type="password" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full bg-white border-2 border-[#8b4513]/30 rounded-lg px-4 py-2 text-stone-800 font-bold focus:outline-none focus:border-[#8b4513] transition-colors"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={loading}
+          className="mt-4 w-full bg-[#8b4513] text-[#ffd700] font-black uppercase tracking-widest py-3 rounded-lg border-2 border-[#d4af37]/50 hover:bg-[#a0522d] hover:scale-[1.02] active:scale-95 transition-all shadow-md disabled:opacity-50"
+        >
+          {loading ? 'Unsealing...' : 'Enter Vault'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+
+
+=========================================
+ARQUIVO: client\src\components\dashboard\DashboardCanvas.jsx
+=========================================
+
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Responsive } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+
+import { useDashboardStore } from '../../store/useDashboardStore';
+import { TREASURY_WIDGETS } from '../../config/treasuryRegistry';
+import { INTERACTIVE_WIDGETS } from '../../config/interactiveRegistry';
+import { MAX_WIDGETS_PER_TAB } from '../../config/dashboard.config';
+import { X, LayoutGrid } from 'lucide-react';
+
+const ALL_WIDGETS = { ...TREASURY_WIDGETS, ...INTERACTIVE_WIDGETS };
+
+const ResponsiveGridLayout = (props) => {
+  const [scale, setScale] = useState(1);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const newWidth = entries[0].contentRect.width;
+      if (newWidth > 0) {
+        const calculatedScale = Math.min(newWidth / 1200, 1.0);
+        setScale(calculatedScale);
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div 
+      ref={containerRef} 
+      className="w-full h-full relative min-h-[600px] overflow-hidden"
+      onScroll={(e) => {
+        e.currentTarget.scrollTop = 0;
+        e.currentTarget.scrollLeft = 0;
+      }}
+    >
+      <div
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          width: '1200px',
+          height: `${100 / scale}%`
+        }}
+        className="absolute top-0 left-0"
+      >
+        <Responsive
+          width={1200}
+          style={{ minHeight: '600px', minWidth: '100%', height: '100%' }}
+          transformScale={scale}
+          {...props}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default function DashboardCanvas() {
+  const {
+    isEditingLayout,
+    savedLayout,
+    draftLayout,
+    submenus,
+    updateDraftLayout,
+    isLoading,
+    saveDraftToProduction,
+  } = useDashboardStore();
+
+  const ignoreLayoutChangeRef = useRef(false);
+
+  const currentSubmenu = useMemo(() => {
+    return submenus.find((s) => s.isActive) || submenus.find((s) => s.id === 'insights');
+  }, [submenus]);
+
+  const activeTabId = currentSubmenu ? currentSubmenu.id : 'insights';
+
+  const currentLayout = useMemo(() => {
+    if (isEditingLayout) {
+      return Array.isArray(draftLayout[activeTabId]) ? draftLayout[activeTabId] : [];
+    }
+    return Array.isArray(savedLayout[activeTabId]) ? savedLayout[activeTabId] : [];
+  }, [isEditingLayout, draftLayout, savedLayout, activeTabId]);
+
+  const layouts = useMemo(() => ({
+    lg: currentLayout,
+    md: currentLayout,
+    sm: currentLayout,
+    xs: currentLayout,
+    xxs: currentLayout
+  }), [currentLayout]);
+
+  const handleRemoveWidget = (widgetKey) => {
+    const updated = currentLayout.filter((item) => item.i !== widgetKey);
+    updateDraftLayout(activeTabId, updated);
+    saveDraftToProduction(true);
+  };
+
+  const handleLayoutChange = (newLayout) => {
+    if (!isEditingLayout) return;
+    if (ignoreLayoutChangeRef.current) return;
+    if (isLoading) return;
+
+    const cleanedLayout = newLayout
+      .filter((item) => item.i !== 'dropping' && !item.i.includes('__dropping-elem__'))
+      .map((item) => {
+        const baseId = item.i.split('-')[0];
+        const originalDef = ALL_WIDGETS[baseId]?.layout || ALL_WIDGETS[item.i]?.layout || {};
+        return {
+          i: item.i,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+          minW: originalDef.minW || item.minW || 2,
+          maxW: originalDef.maxW || item.maxW || 12,
+          minH: originalDef.minH || item.minH || 2,
+          maxH: originalDef.maxH || item.maxH || 6,
+        };
+      });
+
+    if (cleanedLayout.length > MAX_WIDGETS_PER_TAB) return;
+    updateDraftLayout(activeTabId, cleanedLayout);
+  };
+
+  const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
+  const cols = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 1 };
+
+  if (isLoading) {
+    return (
+      <div className="flex-grow p-6 flex flex-col h-full min-h-[600px] gap-6 animate-pulse select-none bg-[#e8dcb8]" />
+    );
+  }
+
+  return (
+    <div
+      /* 
+       * PERMANENT FIX: overflow-y-scroll overflow-x-hidden forces the scrollbar track to remain visible.
+       * This stops tooltips from flashing the scrollbar and triggering the 15px layout jitter loop.
+       */
+      className="flex-1 p-6 relative overflow-y-scroll overflow-x-hidden flex flex-col scrollbar-thin scrollbar-thumb-[#8b4513]/60 scrollbar-track-[#e8dcb8]"
+      style={{
+        backgroundColor: '#e8dcb8',
+        backgroundImage: `
+          radial-gradient(circle at 50% 50%, transparent 30%, rgba(139, 69, 19, 0.15) 80%, rgba(75, 44, 32, 0.4) 100%),
+          linear-gradient(to right, rgba(75, 44, 32, 0.15) 0%, transparent 4%, transparent 96%, rgba(75, 44, 32, 0.15) 100%)
+        `,
+        boxShadow: 'inset 0 0 60px rgba(75, 44, 32, 0.4), inset 0 0 15px rgba(0,0,0,0.3)'
+      }}
+    >
+      {currentLayout.length === 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center pointer-events-none z-0">
+          <LayoutGrid className="text-[#8b4513]/40 w-16 h-16 stroke-[1] mb-3 animate-pulse" />
+          <h3 className="font-serif text-sm font-bold text-[#4b2c20] uppercase tracking-wider">
+            Empty Workspace Grid
+          </h3>
+          <p className="text-xs text-[#5d4037] max-w-sm mt-1 leading-normal font-serif">
+            {isEditingLayout
+              ? "Click the '+' icon in the sidebar manifest to deploy widgets onto this canvas."
+              : "Reforge layout in Workspace Configs to deploy visual analytical widgets."}
+          </p>
+        </div>
+      )}
+
+      <div className={`flex-1 w-full ${isEditingLayout ? 'border-[2px] border-dashed border-[#8b4513]/40 rounded-xl p-2 h-full min-h-[600px] relative z-10' : 'h-full min-h-[600px] relative z-10'}`}>
+        <ResponsiveGridLayout
+          key={`${activeTabId}-${currentLayout.length}`}
+          className="layout"
+          layouts={layouts}
+          breakpoints={breakpoints}
+          cols={cols}
+          rowHeight={80}
+          isDraggable={isEditingLayout}
+          isResizable={isEditingLayout}
+          isDroppable={false}
+          draggableCancel="button, input, select, textarea, table, svg, canvas, .cancel-drag"
+          onLayoutChange={handleLayoutChange}
+          onDragStop={() => saveDraftToProduction(true)}
+          onResizeStop={() => saveDraftToProduction(true)}
+          margin={[16, 16]}
+          containerPadding={[0, 0]}
+        >
+          {currentLayout.map((item) => {
+            const baseId = item.i.split('-')[0];
+            const widget = ALL_WIDGETS[baseId] || ALL_WIDGETS[item.i];
+
+            if (!widget) return <div key={item.i} className="hidden" />;
+
+            const WidgetComponent = widget.component;
+
+            return (
+              <div
+                key={item.i}
+                className={`group relative rounded-xl overflow-hidden transition-[border-color,box-shadow,background-color] duration-200 flex flex-col ${isEditingLayout
+                  ? 'border-2 border-[#8b4513]/50 hover:border-[#5d4037] hover:shadow-[0_0_15px_rgba(139,69,19,0.2)] bg-[#faf4e5]/95 cursor-grab active:cursor-grabbing'
+                  : 'bg-[#faf4e5] border border-[#8b4513]/30 shadow-[0_8px_15px_rgba(75,44,32,0.1)]'
+                  }`}
+              >
+                {/* Pointer-events-none drops an invisible shield over the widget during Edit Mode, preventing filter misclicks */}
+                <div 
+                  className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}
+                  onMouseDown={(e) => {
+                    if (!isEditingLayout) {
+                      e.stopPropagation();
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (!isEditingLayout) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  <WidgetComponent />
+                </div>
+
+                {isEditingLayout && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRemoveWidget(item.i);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="cancel-drag absolute top-2.5 right-2.5 z-10 p-1.5 rounded-full bg-[#4b2c20] border border-[#2a1711] text-[#f4e4bc] hover:bg-[#8b4513] hover:scale-105 shadow-md cursor-pointer pointer-events-auto transition-all"
+                    title="Dismantle Structure"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </ResponsiveGridLayout>
+      </div>
+    </div>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\dashboard\DashboardHeader.jsx
+=========================================
+
+// client/src/components/dashboard/DashboardHeader.jsx
+
+import React, { useEffect, useState } from 'react';
+import { useDashboardStore } from '../../store/useDashboardStore';
+import { useInteractiveStore } from '../../store/useInteractiveStore';
+import { Sliders, Check, X, Loader2, FilterX } from 'lucide-react';
+
+export default function DashboardHeader({ onExitRequest, onToggleEditRequest, onDismissRequest }) {
+  const {
+    isEditingLayout,
+    hasUnsavedChanges,
+    submenus,
+    toggleEditMode,
+    saveDraftToProduction,
+    isLoading,
+    isSaving,
+    setActiveSubmenu
+  } = useDashboardStore();
+
+  const clearFilters = useInteractiveStore((state) => state.clearFilters);
+
+  const gridItems = React.useMemo(() => {
+    return [...submenus];
+  }, [submenus]);
+
+  const handleToggleEditMode = () => {
+    if (isEditingLayout) {
+      onToggleEditRequest();
+    } else {
+      toggleEditMode(true);
+    }
+  };
+
+  const handleDismissDraft = () => {
+    if (isEditingLayout) {
+      onDismissRequest();
+    } else {
+      toggleEditMode(false);
+    }
+  };
+
+  const handleExitDashboard = () => {
+    if (isEditingLayout) {
+      onExitRequest();
+    } else {
+      toggleEditMode(false);
+      window.dispatchEvent(new CustomEvent('close-dashboard'));
+    }
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      handleExitDashboard();
+    };
+
+    window.addEventListener('trigger-dashboard-exit', handleOutsideClick);
+
+    return () => {
+      window.removeEventListener('trigger-dashboard-exit', handleOutsideClick);
+    };
+  }, [isEditingLayout, hasUnsavedChanges]);
+
+  return (
+    <header className="w-full h-16 shrink-0 bg-[#faf4e5]/90 backdrop-blur-sm border-b border-[#8b4513]/25 px-6 flex items-center justify-between z-30 shadow-sm select-none">
+      <div className="flex items-center gap-6 overflow-hidden flex-grow mr-4">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#ffd700] animate-pulse shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
+          <span className="font-serif text-sm font-bold tracking-widest text-[#4b2c20] uppercase">
+            Citadel Command
+          </span>
+        </div>
+
+        <div className="h-6 w-px bg-[#8b4513]/20 shrink-0" />
+
+        <button
+          onClick={handleToggleEditMode}
+          disabled={isLoading || isSaving}
+          title={isEditingLayout ? "Exit Configuration Mode" : "Configure Workspace Layout"}
+          className={`p-1.5 rounded border transition-all duration-200 cursor-pointer focus:outline-none disabled:opacity-40 disabled:pointer-events-none shrink-0 ${
+            isEditingLayout
+              ? 'border-[#8b4513]/50 bg-[#f4e4bc] text-[#8b4513] shadow-[0_0_8px_rgba(139,69,19,0.4)] animate-pulse'
+              : 'border-[#8b4513]/20 bg-[#faf4e5] text-[#5d4037] hover:text-[#4b2c20] hover:border-[#8b4513]/40'
+          }`}
+        >
+          <Sliders size={20} className={isEditingLayout ? 'drop-shadow-[0_0_8px_rgba(139,69,19,0.5)]' : ''} />
+        </button>
+
+        <button
+          onClick={clearFilters}
+          title="Clear All Interactive Filters"
+          className="p-1.5 rounded border border-[#8b4513]/20 bg-[#faf4e5] text-[#5d4037] hover:text-[#4b2c20] hover:border-[#8b4513]/40 transition-all duration-200 cursor-pointer focus:outline-none shrink-0 cancel-drag"
+        >
+          <FilterX size={20} />
+        </button>
+
+        <nav className="grid grid-cols-4 gap-1.5 w-full max-w-[640px] shrink-0 py-0.5">
+          {gridItems.map((tab) => {
+            if (tab.isSpacer) {
+              return <div key={tab.id} className="col-span-1" />;
+            }
+
+            const isActive = tab.isActive;
+            const isVisible = tab.isVisible;
+
+            if (!isVisible) {
+              return (
+                <div
+                  key={tab.id}
+                  title={`${tab.name} is sealed. Render active in the Sidebar configurations.`}
+                  className="opacity-50 border border-transparent px-3 py-1 text-[9px] font-serif tracking-wider uppercase cursor-not-allowed text-[#8b4513]/70 font-bold select-none shrink-0 flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
+                >
+                  <span>🔒</span>
+                  <span className="whitespace-nowrap overflow-hidden text-ellipsis">{tab.name}</span>
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSubmenu(tab.id)}
+                disabled={isLoading || isSaving}
+                className={`px-3 py-1 rounded font-serif text-[9px] font-bold tracking-wider uppercase border transition-all duration-150 cursor-pointer disabled:pointer-events-none shrink-0 text-center flex items-center justify-center whitespace-nowrap overflow-hidden text-ellipsis ${
+                  isActive
+                    ? 'bg-[#f4e4bc] border-[#5d4037]/60 text-[#4b2c20] shadow-[0_0_8px_rgba(93,64,55,0.15)]'
+                    : 'border-transparent text-[#5d4037] hover:text-[#4b2c20] hover:bg-[#f4e4bc]/50'
+                }`}
+              >
+                <span className="whitespace-nowrap overflow-hidden text-ellipsis">{tab.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        {(isLoading || isSaving) && (
+          <div className="flex items-center gap-2 text-[#5d4037] font-mono text-xs border border-[#8b4513]/20 px-2 py-1.5 rounded bg-[#f4e4bc]">
+            <Loader2 className="animate-spin text-[#8b4513]" size={14} />
+            <span>{isLoading ? 'Hydrating...' : 'Archiving...'}</span>
+          </div>
+        )}
+
+
+
+        <button
+          onClick={handleExitDashboard}
+          title="Exit Command Dashboard"
+          className="w-8 h-8 rounded-full bg-[#be123c] hover:bg-[#9f1239] border border-[#7f1d1d] text-[#ffd700] hover:text-[#fde047] flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-md cursor-pointer shrink-0 ml-1.5"
+        >
+          <X size={15} className="stroke-[3]" />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\dashboard\SettingsSidebar.jsx
+=========================================
+
+import React, { useState } from 'react';
+import { useDashboardStore } from '../../store/useDashboardStore';
+import { TREASURY_WIDGETS } from '../../config/treasuryRegistry';
+import { INTERACTIVE_WIDGETS } from '../../config/interactiveRegistry';
+import { DEFAULT_PRESET } from '../../config/dashboard.config';
+import { Eye, EyeOff, Pencil, Check, Layers, Grid, SlidersHorizontal, Plus, Search } from 'lucide-react';
+
+const EXTRA_PRESETS = {
+  standard_1: {
+    name: 'Standard Preset',
+    layout: DEFAULT_PRESET,
+  },
+  focused_flow: {
+    name: 'Inflow Priority',
+    layout: [
+      { i: 'cash_flow_chart', x: 0, y: 0, w: 12, h: 5 },
+      { i: 'asset_allocation_chart', x: 0, y: 5, w: 6, h: 4 },
+    ],
+  },
+  max_analytics: {
+    name: 'Unified Command',
+    layout: [
+      { i: 'cash_flow_chart', x: 0, y: 0, w: 6, h: 4 },
+      { i: 'net_worth_chart', x: 6, y: 0, w: 6, h: 4 },
+      { i: 'asset_allocation_chart', x: 0, y: 4, w: 12, h: 4 },
+    ],
+  },
+};
+
+export default function SettingsSidebar() {
+  const {
+    isEditingLayout,
+    submenus,
+    toggleSubmenuVisibility,
+    updateSubmenuName,
+    setActiveSubmenu,
+    updateDraftLayout,
+    deployWidget,
+  } = useDashboardStore();
+
+  const [editingTabId, setEditingTabId] = useState(null);
+  const [tempName, setTempName] = useState('');
+
+  const [activeSection, setActiveSection] = useState(null);
+  const [widgetCategory, setWidgetCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // NEW: Registry Toggle State
+  const [registryType, setRegistryType] = useState('standard');
+
+  // Dynamically select which registry to map over
+  const activeRegistry = registryType === 'standard' ? TREASURY_WIDGETS : INTERACTIVE_WIDGETS;
+
+  const activeTab = submenus.find((sub) => sub.isActive);
+  const activeTabId = activeTab ? activeTab.id : 'insights';
+
+  if (!isEditingLayout) return null;
+
+  const handleStartRename = (tab) => {
+    setEditingTabId(tab.id);
+    setTempName(tab.name);
+  };
+
+  const handleSaveRename = (tabId) => {
+    updateSubmenuName(tabId, tempName);
+    setEditingTabId(null);
+  };
+
+  const handleToggleSection = (section) => {
+    setActiveSection((prev) => (prev === section ? null : section));
+  };
+
+  const filteredWidgets = Object.entries(activeRegistry).filter(([key, widget]) => {
+    const matchesCategory = widgetCategory === 'All' || widget.category === widgetCategory;
+    const matchesSearch = widget.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      widget.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <aside className="w-80 h-full bg-[#faf4e5] border-r border-[#8b4513]/25 flex flex-col z-20 shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-[#8b4513]/50 scrollbar-track-[#faf4e5]">
+      <div className="p-4 bg-[#f4e4bc] border-b border-[#8b4513]/25 flex items-center gap-2">
+        <SlidersHorizontal className="text-[#5d4037]" size={16} />
+        <h2 className="font-serif text-sm font-bold tracking-wider text-[#4b2c20] uppercase">
+          Workspace Sandbox
+        </h2>
+      </div>
+
+      <div className="flex-1 p-4 flex flex-col gap-4">
+        {(activeSection === null || activeSection === 'ledgers') && (
+          <section className="flex flex-col gap-3">
+            <button onClick={() => handleToggleSection('ledgers')} className="w-full flex items-center justify-between text-[#4b2c20] font-serif text-xs font-bold tracking-wider uppercase border-b border-[#8b4513]/25 pb-2 hover:text-[#8b4513] transition-colors focus:outline-none">
+              <div className="flex items-center gap-1.5"><Layers size={14} className="text-[#5d4037]" /><span>Active Ledgers</span></div>
+              <span className="text-[9px] text-[#5d4037] font-mono">{activeSection === 'ledgers' ? '[- COLLAPSE]' : '[+ EXPAND]'}</span>
+            </button>
+            {activeSection === 'ledgers' && (
+              <div className="flex flex-col gap-2 mt-1">
+                {submenus.map((tab) => {
+                  const isEditingName = editingTabId === tab.id;
+                  const isProtected = tab.id === 'insights' || tab.id === 'tab_1';
+                  return (
+                    <div key={tab.id} onClick={() => tab.isVisible && setActiveSubmenu(tab.id)} className={`p-2.5 rounded border transition-all duration-150 cursor-pointer flex flex-col gap-1.5 ${tab.isActive ? 'bg-[#f4e4bc] border-[#5d4037] shadow-sm' : 'bg-[#faf4e5]/60 border-[#8b4513]/15 hover:border-[#8b4513]/30'} ${!tab.isVisible ? 'opacity-50' : ''}`}>
+                      <div className="flex items-center justify-between w-full">
+                        {isEditingName ? (
+                          <div className="flex items-center gap-1 flex-1 mr-2" onClick={(e) => e.stopPropagation()}>
+                            <input type="text" value={tempName} onChange={(e) => setTempName(e.target.value)} className="bg-[#faf4e5] text-[#4b2c20] font-serif text-xs px-2 py-1 rounded border border-[#8b4513]/40 outline-none w-full" maxLength={25} />
+                            <button onClick={() => handleSaveRename(tab.id)} className="p-1 text-[#047857] hover:text-[#047857]/70"><Check size={14} /></button>
+                          </div>
+                        ) : (<span className="font-serif text-xs font-bold text-[#4b2c20]">{tab.name}</span>)}
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          {tab.isVisible && !isEditingName && (<button onClick={() => handleStartRename(tab)} className="text-[#5d4037] hover:text-[#8b4513] transition-colors"><Pencil size={12} /></button>)}
+                          {!isProtected && (<button onClick={() => toggleSubmenuVisibility(tab.id)} className="text-[#5d4037] hover:text-[#8b4513] transition-colors">{tab.isVisible ? <Eye size={13} /> : <EyeOff size={13} />}</button>)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {(activeSection === null || activeSection === 'presets') && (
+          <section className="flex flex-col gap-3">
+            <button onClick={() => handleToggleSection('presets')} className="w-full flex items-center justify-between text-[#4b2c20] font-serif text-xs font-bold tracking-wider uppercase border-b border-[#8b4513]/25 pb-2 hover:text-[#8b4513] transition-colors focus:outline-none">
+              <div className="flex items-center gap-1.5"><Grid size={14} className="text-[#5d4037]" /><span>Grid Preset Blueprints</span></div>
+              <span className="text-[9px] text-[#5d4037] font-mono">{activeSection === 'presets' ? '[- COLLAPSE]' : '[+ EXPAND]'}</span>
+            </button>
+            {activeSection === 'presets' && (
+              <div className="grid grid-cols-1 gap-2 mt-1">
+                {Object.entries(EXTRA_PRESETS).map(([key, item]) => (
+                  <button key={key} onClick={() => updateDraftLayout(activeTabId, item.layout)} className="w-full text-left p-2.5 rounded bg-[#faf4e5]/60 border border-[#8b4513]/20 text-[#4b2c20] hover:border-[#5d4037] hover:bg-[#f4e4bc] transition-all font-serif text-xs font-bold flex items-center justify-between">
+                    <span>{item.name}</span><span className="text-[9px] uppercase tracking-wider text-[#5d4037] font-sans">Deploy</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {(activeSection === null || activeSection === 'widgets') && (
+          <section className="flex flex-col gap-3">
+            <button onClick={() => handleToggleSection('widgets')} className="w-full flex items-center justify-between text-[#4b2c20] font-serif text-xs font-bold tracking-wider uppercase border-b border-[#8b4513]/25 pb-2 hover:text-[#8b4513] transition-colors focus:outline-none">
+              <div className="flex items-center gap-1.5"><Grid size={14} className="text-[#5d4037]" /><span>Widget Manifest</span></div>
+              <span className="text-[9px] text-[#5d4037] font-mono">{activeSection === 'widgets' ? '[- COLLAPSE]' : '[+ EXPAND]'}</span>
+            </button>
+            {activeSection === 'widgets' && (
+              <div className="flex flex-col gap-3 mt-1">
+                
+                {/* NEW: Registry Toggle Buttons */}
+                <div className="flex bg-[#f4e4bc] p-1 rounded-md border border-[#8b4513]/25 shrink-0">
+                  <button 
+                    onClick={() => { setRegistryType('standard'); setWidgetCategory('All'); }}
+                    className={`flex-1 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${registryType === 'standard' ? 'bg-[#5d4037] text-[#f4e4bc] shadow-sm' : 'text-[#5d4037] hover:bg-[#faf4e5]/50'}`}
+                  >
+                    Standard
+                  </button>
+                  <button 
+                    onClick={() => { setRegistryType('interactive'); setWidgetCategory('All'); }}
+                    className={`flex-1 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${registryType === 'interactive' ? 'bg-[#5d4037] text-[#f4e4bc] shadow-sm' : 'text-[#5d4037] hover:bg-[#faf4e5]/50'}`}
+                  >
+                    Interactive
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none"><Search size={14} className="text-[#8b4513]/60" /></div>
+                  <input type="text" placeholder="Search manifest..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#faf4e5] text-[#4b2c20] border border-[#8b4513]/30 rounded-md pl-8 pr-3 py-1.5 text-xs font-serif outline-none focus:border-[#5d4037] hover:border-[#8b4513]/50 transition-colors placeholder:text-[#8b4513]/40 shadow-sm" />
+                </div>
+                
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-[#5d4037] uppercase tracking-widest font-mono">Filter Division</label>
+                  <select value={widgetCategory} onChange={(e) => setWidgetCategory(e.target.value)} className="bg-[#faf4e5] text-[#4b2c20] border border-[#8b4513]/30 rounded px-2 py-1.5 text-xs font-serif outline-none focus:border-[#5d4037] hover:border-[#8b4513]/50 transition-colors shadow-sm">
+                    <option value="All">All Widgets</option>
+                    {registryType === 'standard' ? (
+                      <>
+                        <option value="kpi">KPIs & Metrics</option>
+                        <option value="trend">Analytical Trends</option>
+                        <option value="distribution">Distributions</option>
+                        <option value="entity">Entities & Risk</option>
+                        <option value="ratio">Financial Ratios</option>
+                        <option value="ledger">Operational Ledgers</option>
+                      </>
+                    ) : (
+                      <option value="interactive">Interactive Suite</option>
+                    )}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  {filteredWidgets.map(([key, widget]) => (
+                    <div key={key} className="w-full p-3 rounded bg-[#faf4e5]/80 border border-[#8b4513]/20 hover:border-[#5d4037] transition-all flex items-center justify-between gap-4 group shadow-sm">
+                      <div className="flex-1 flex flex-col gap-1 select-none">
+                        <h4 className="font-serif text-xs font-bold text-[#4b2c20] group-hover:text-[#8b4513] transition-colors">{widget.name}</h4>
+                        <p className="text-[10px] text-[#5d4037] leading-normal font-serif italic">{widget.description}</p>
+                        <span className="text-[9px] text-[#455a64] font-mono mt-0.5">Size Footprint: {widget.layout.w}x{widget.layout.h}</span>
+                      </div>
+                      
+                      <div 
+                        onClick={() => deployWidget(activeTabId, key, widget)} 
+                        className="relative w-20 h-16 shrink-0 bg-[#f4e4bc] border border-[#8b4513]/30 rounded hover:border-[#5d4037] transition-all cursor-pointer overflow-hidden flex items-center justify-center group/preview" 
+                        title="Deploy Structure to Workspace"
+                      >
+                        <span className="text-[8px] font-mono text-[#5d4037] group-hover/preview:text-[#4b2c20] transition-colors select-none tracking-widest uppercase">ðŸ ›ï¸  {widget.layout.w}x{widget.layout.h}</span>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            deployWidget(activeTabId, key, widget); 
+                          }} 
+                          className="absolute top-1 right-1 p-0.5 rounded bg-[#faf4e5] border border-[#8b4513]/30 text-[#5d4037] hover:bg-[#5d4037] hover:text-[#f4e4bc] hover:border-transparent transition-all" 
+                          title="Deploy"
+                        >
+                          <Plus size={10} className="stroke-[3]" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredWidgets.length === 0 && (<p className="text-center text-[11px] text-[#5d4037] font-serif italic py-4">No structures matching criteria</p>)}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\features\Ledger\LedgerModal.jsx
+=========================================
+
+
+
+
+=========================================
+ARQUIVO: client\src\components\features\Ledger\LedgerTable.jsx
+=========================================
+
+import React, { useEffect, useState, useMemo } from 'react';
+import { useKingdomStore } from "../../../store/useKingdomStore";
+import { toast } from 'react-hot-toast';
+import { ArrowUpDown, RefreshCw, FilterX } from 'lucide-react';
+
+export default function LedgerTable({ onEditTransaction }) {
+  const transactions = useKingdomStore((state) => state.transactions) || [];
+  const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
+  const fetchTransactions = useKingdomStore((state) => state.fetchTransactions);
+  const deleteTransaction = useKingdomStore((state) => state.deleteTransaction);
+  const user = useKingdomStore((state) => state.user);
+
+  // Fetch initial batch
+  useEffect(() => {
+    if (user?.id) fetchTransactions(1000, 0);
+  }, [fetchTransactions, user?.id]);
+
+  // --- FILTERING STATE ---
+  const [filters, setFilters] = useState({
+    year: '', month: '', type: '', category: '', flow: '', entity: '', minAmount: '', maxAmount: ''
+  });
+
+  // --- SORTING STATE ---
+  const [sortConfig, setSortConfig] = useState({ key: 'posting_date', direction: 'desc' });
+
+  // Generate unique dropdown options natively from the dataset
+  const uniqueYears = [...new Set(transactions.map(t => t.posting_date?.substring(0,4)).filter(Boolean))].sort().reverse();
+  const uniqueTypes = [...new Set(transactions.map(t => t.type).filter(Boolean))].sort();
+  const uniqueCategories = [...new Set(transactions.map(t => t.category).filter(Boolean))].sort();
+  const uniqueEntities = [...new Set(transactions.map(t => t.entity).filter(Boolean))].sort();
+  const months = Array.from({length: 12}, (_, i) => (i + 1).toString().padStart(2, '0'));
+
+  // --- PROCESS DATA (Filter + Sort) ---
+  const processedTransactions = useMemo(() => {
+    let filtered = transactions.filter(t => {
+      if (filters.year && !t.posting_date?.startsWith(filters.year)) return false;
+      if (filters.month && t.posting_date?.split('-')[1] !== filters.month) return false;
+      if (filters.type && t.type !== filters.type) return false;
+      if (filters.category && t.category !== filters.category) return false;
+      if (filters.flow && t.flow !== filters.flow) return false;
+      if (filters.entity && t.entity !== filters.entity) return false;
+      if (filters.minAmount && Number(t.amount) < Number(filters.minAmount)) return false;
+      if (filters.maxAmount && Number(t.amount) > Number(filters.maxAmount)) return false;
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      let valA = a[sortConfig.key] || '';
+      let valB = b[sortConfig.key] || '';
+      
+      // Ensure numeric sorting for amounts
+      if (sortConfig.key === 'amount') {
+        valA = Number(valA) || 0;
+        valB = Number(valB) || 0;
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [transactions, filters, sortConfig]);
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const handleDeleteClick = async (id) => {
+    if (window.confirm("Are you sure you want to permanently delete this transaction?")) {
+      try {
+        await deleteTransaction(id);
+        toast.success("Transaction deleted");
+      } catch (error) {
+        toast.error("Failed to delete transaction");
+      }
+    }
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const resetFilters = () => {
+    setFilters({ year: '', month: '', type: '', category: '', flow: '', entity: '', minAmount: '', maxAmount: '' });
+  };
+
+  // Sortable Header Component
+  const TableHeader = ({ label, sortKey, align = "text-left" }) => (
+    <th 
+      className={`py-2 px-2 text-[10px] uppercase tracking-wider text-amber-500/80 font-bold font-serif cursor-pointer hover:text-amber-200 transition-colors whitespace-nowrap`}
+      onClick={() => handleSort(sortKey)}
+      title={`Sort by ${label}`}
+    >
+      <div className={`flex items-center gap-1 ${align === 'text-right' ? 'justify-end' : align === 'text-center' ? 'justify-center' : 'justify-start'}`}>
+        {label} <ArrowUpDown size={10} className={`opacity-50 ${sortConfig.key === sortKey ? 'opacity-100 text-amber-400' : ''}`} />
+      </div>
+    </th>
+  );
+
+  return (
+    <section className="bg-stone-950 border-2 border-amber-900/50 rounded-lg p-5 shadow-2xl flex flex-col h-full min-h-0">
+      
+      {/* FILTER BAR (Replaces Title) */}
+      <div className="flex flex-wrap items-center gap-2 mb-4 bg-stone-900/50 p-2.5 rounded border border-amber-900/30 shrink-0">
+        <select name="year" value={filters.year} onChange={handleFilterChange} className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition cursor-pointer">
+          <option value="">Year</option>
+          {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+
+        <select name="month" value={filters.month} onChange={handleFilterChange} className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition cursor-pointer">
+          <option value="">Month</option>
+          {months.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+
+        <select name="type" value={filters.type} onChange={handleFilterChange} className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition cursor-pointer max-w-[120px]">
+          <option value="">Type</option>
+          {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        <select name="category" value={filters.category} onChange={handleFilterChange} className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition cursor-pointer max-w-[140px]">
+          <option value="">Category</option>
+          {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        <select name="flow" value={filters.flow} onChange={handleFilterChange} className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition cursor-pointer">
+          <option value="">Flow</option>
+          <option value="inflow">Inflow</option>
+          <option value="outflow">Outflow</option>
+          <option value="neutral">Neutral</option>
+        </select>
+
+        <select name="entity" value={filters.entity} onChange={handleFilterChange} className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition cursor-pointer max-w-[140px]">
+          <option value="">Entity</option>
+          {uniqueEntities.map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+
+        <button
+          onClick={resetFilters}
+          title="Reset Filters"
+          className="p-1.5 bg-stone-900/60 hover:bg-stone-800 border border-stone-800/50 rounded text-stone-400 transition ml-1 shadow"
+        >
+          <FilterX size={14} />
+        </button>
+
+        <div className="flex items-center gap-1 ml-auto">
+          <input type="number" name="minAmount" value={filters.minAmount} onChange={handleFilterChange} placeholder="Min 🪙" className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition w-20 font-mono" />
+          <span className="text-stone-600">-</span>
+          <input type="number" name="maxAmount" value={filters.maxAmount} onChange={handleFilterChange} placeholder="Max 🪙" className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition w-20 font-mono" />
+          
+          <button
+            onClick={() => fetchTransactions(1000, 0)}
+            disabled={isLedgerLoading}
+            title="Refresh Records"
+            className="ml-2 p-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/50 rounded text-amber-400 transition disabled:opacity-50 shadow"
+          >
+            <RefreshCw size={14} className={isLedgerLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* TABLE CONTAINER (Smart Scrollbar invisible until hover/scroll) */}
+      <div className="flex-1 overflow-y-auto bg-stone-900/50 rounded border border-amber-900/20 scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-amber-900/50 scrollbar-track-transparent transition-colors duration-300">
+        
+        {isLedgerLoading && transactions.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-amber-500 animate-pulse font-mono text-xs">
+            Summoning ledger archives...
+          </div>
+        ) : processedTransactions.length > 0 ? (
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-stone-900/95 z-10 border-b border-amber-900/40 backdrop-blur-sm">
+              <tr>
+                <TableHeader label="Date" sortKey="posting_date" />
+                <TableHeader label="Entity" sortKey="entity" />
+                <TableHeader label="Category" sortKey="category" />
+                <TableHeader label="Account" sortKey="target_account" />
+                <TableHeader label="Type" sortKey="type" />
+                <TableHeader label="Flow" sortKey="flow" align="text-right" />
+                <TableHeader label="Amount" sortKey="amount" align="text-right" />
+                <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wider text-amber-500/80 font-bold font-serif w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-800/30 font-sans">
+              {processedTransactions.map((t) => (
+                <tr key={t.id} className="hover:bg-stone-800/40 transition-colors group">
+                  <td className="py-2.5 px-2 text-stone-300 font-mono text-[11px] whitespace-nowrap">{t.posting_date}</td>
+                  <td className="py-2.5 px-2 text-stone-300 truncate max-w-[120px]" title={t.entity}>{t.entity || '-'}</td>
+                  <td className="py-2.5 px-2 text-stone-400 truncate max-w-[120px]" title={t.category}>{t.category || '-'}</td>
+                  <td className="py-2.5 px-2 text-amber-100/70 font-mono text-[11px] truncate max-w-[100px]">{t.target_account}</td>
+                  <td className="py-2.5 px-2 text-amber-600/90 font-serif truncate max-w-[100px]">{t.type}</td>
+                  <td className={`py-2.5 px-2 text-right capitalize font-semibold text-[11px] ${t.flow === 'inflow' ? 'text-emerald-500' : t.flow === 'outflow' ? 'text-rose-500' : 'text-stone-400'}`}>
+                    {t.flow}
+                  </td>
+                  <td className="py-2.5 px-2 text-right text-amber-400 font-bold font-mono whitespace-nowrap">
+                    {Number(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-2.5 px-2 text-center">
+                    <div className="flex justify-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => onEditTransaction(t)} 
+                        title="Edit"
+                        className="p-1 bg-blue-950/60 hover:bg-blue-900 border border-blue-800/50 rounded text-blue-300 transition"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteClick(t.id)} 
+                        title="Delete"
+                        className="p-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 rounded text-rose-400 transition"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-stone-500 text-center font-mono text-xs">
+            <span>No records match the current ledger filters.</span>
+          </div>
+        )}
+      </div>
+      
+      {/* Load More Row */}
+      {processedTransactions.length > 0 && processedTransactions.length === transactions.length && (
+        <div className="flex justify-center mt-4 shrink-0">
+          <button
+            onClick={() => fetchTransactions(1000, transactions.length)}
+            disabled={isLedgerLoading}
+            className="px-6 py-2 bg-stone-900 hover:bg-stone-800 border border-stone-700/50 rounded text-stone-400 text-[10px] tracking-widest uppercase font-bold transition disabled:opacity-50 shadow"
+          >
+            {isLedgerLoading ? 'Summoning...' : 'Fetch Older Records'}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+=========================================
+ARQUIVO: client\src\components\features\Ledger\TransactionForm.jsx
+=========================================
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { useKingdomStore } from "../../../store/useKingdomStore";
+import { toast } from 'react-hot-toast';
+
+const normalizeType = (type) => {
+  if (!type) return '';
+  const lower = type.trim().toLowerCase();
+  if (lower === 'asset' || lower === 'assets') return 'Assets';
+  if (lower === 'liability' || lower === 'liabilities') return 'Liabilities';
+  if (lower === 'income') return 'Income';
+  if (lower === 'expense' || lower === 'expenses') return 'Expenses';
+  return type;
+};
+
+const getVarianceIcon = (type, flow) => {
+  const normType = normalizeType(type);
+  const isIncrease = flow === 'inflow';
+  
+  if (normType === 'Assets') {
+    return isIncrease 
+      ? { color: 'text-emerald-500', arrow: '↑' }
+      : { color: 'text-rose-500', arrow: '↓' };
+  } else {
+    // Liabilities, Expenses, Income
+    return isIncrease
+      ? { color: 'text-rose-500', arrow: '↑' }
+      : { color: 'text-emerald-500', arrow: '↓' };
+  }
+};
+
+export default function TransactionForm({ editingTransaction, onCancelEdit, onSuccess }) {
+  const flatMatrix = useKingdomStore((state) => state.flatMatrix) || [];
+  const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
+  const fetchFlatMatrix = useKingdomStore((state) => state.fetchFlatMatrix);
+  const addTransaction = useKingdomStore((state) => state.addTransaction);
+  const updateTransaction = useKingdomStore((state) => state.updateTransaction);
+
+  const [stagedTransactions, setStagedTransactions] = useState([]);
+  
+  // Stage Log State
+  const [isLogView, setIsLogView] = useState(false);
+  const [logDrafts, setLogDrafts] = useState([]);
+  const [editingDraftId, setEditingDraftId] = useState(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [amount, setAmount] = useState('');
+  const [flow, setFlow] = useState('outflow');
+  const [paymentStatus, setPaymentStatus] = useState('Completed');
+  const [sourceAccount, setSourceAccount] = useState('');
+
+  const [valueDate, setValueDate] = useState(todayStr);
+  const [postingDate, setPostingDate] = useState(todayStr);
+  const [paymentDate, setPaymentDate] = useState('');
+
+  const [entity, setEntity] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+  const [selectedSubtype, setSelectedSubtype] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedAccountCode, setSelectedAccountCode] = useState('');
+
+  useEffect(() => {
+    fetchFlatMatrix();
+  }, [fetchFlatMatrix]);
+
+  useEffect(() => {
+    if (editingTransaction) {
+      setEntity(editingTransaction.entity || '');
+      setSelectedType(editingTransaction.type || '');
+      setSelectedSubtype(editingTransaction.subtype || '');
+      setSelectedCategory(editingTransaction.category || '');
+      setSelectedAccountCode(editingTransaction.target_account || '');
+      setAmount(editingTransaction.amount || '');
+      setFlow(editingTransaction.flow || 'outflow');
+      setSourceAccount(editingTransaction.source_account || '');
+      setPaymentStatus(editingTransaction.payment_status || 'Completed');
+      setValueDate(editingTransaction.value_date || todayStr);
+      setPostingDate(editingTransaction.posting_date || todayStr);
+      setPaymentDate(editingTransaction.payment_date || '');
+    }
+  }, [editingTransaction, todayStr]);
+
+  // Clean dynamic mapping (ignores bad data)
+  const uniqueEntities = [...new Set(flatMatrix.map((row) => row.entity).filter(Boolean))].sort();
+  // Ensure we only use the 4 valid root types (handling singular/plural variations)
+  const validTypes = ['Assets', 'Asset', 'Liabilities', 'Liability', 'Income', 'Expense', 'Expenses'];
+  const uniqueTypes = [...new Set(flatMatrix.map((row) => row.type).filter(Boolean))]
+    .filter(type => validTypes.includes(type))
+    .sort();
+
+  // Filter Subtypes
+  const filteredSubtypes = selectedType
+    ? [...new Set(
+        flatMatrix
+          .filter((row) => normalizeType(row.type) === normalizeType(selectedType))
+          .map((row) => row.subtype)
+          .filter(Boolean)
+      )].sort()
+    : [...new Set(flatMatrix.map((row) => row.subtype).filter(Boolean))].sort();
+
+  // Filter Categories (must respect both Type and Subtype)
+  const filteredCategories = useMemo(() => {
+    return [...new Set(
+      flatMatrix
+        .filter((row) => {
+          if (selectedType && normalizeType(row.type) !== normalizeType(selectedType)) return false;
+          if (selectedSubtype && row.subtype !== selectedSubtype) return false;
+          return true;
+        })
+        .map((row) => row.category)
+        .filter(Boolean)
+    )].sort();
+  }, [flatMatrix, selectedType, selectedSubtype]);
+
+  // Filter Target Accounts
+  const filteredAccounts = flatMatrix.filter((row) => {
+    if (selectedType && normalizeType(row.type) !== normalizeType(selectedType)) return false;
+    if (selectedSubtype && row.subtype !== selectedSubtype) return false;
+    if (selectedCategory && row.category !== selectedCategory) return false;
+    return true;
+  });
+
+  const allAccounts = [...flatMatrix].sort((a, b) => a.code.localeCompare(b.code));
+
+  const handleEntityChange = (e) => {
+    const val = e.target.value;
+    setEntity(val);
+
+    if (val) {
+      const match = flatMatrix.find((row) => row.entity === val);
+      if (match) {
+        setSelectedType(match.type || '');
+        setSelectedSubtype(match.subtype || '');
+        setSelectedCategory(match.category || '');
+        setSelectedAccountCode(match.code || '');
+
+        if (match.type === 'Income') setFlow('inflow');
+        else if (match.type === 'Expense' || match.type === 'Expenses') setFlow('outflow');
+      }
+    }
+  };
+
+  const handleTypeChange = (e) => {
+    const val = e.target.value;
+    setSelectedType(val);
+    setSelectedSubtype('');
+    setSelectedCategory('');
+    setSelectedAccountCode('');
+
+    if (val === 'Income') setFlow('inflow');
+    else if (val === 'Expense' || val === 'Expenses') setFlow('outflow');
+  };
+
+  const handleSubtypeChange = (e) => {
+    setSelectedSubtype(e.target.value);
+    setSelectedCategory('');
+    setSelectedAccountCode('');
+  };
+
+  const handleCategoryChange = (e) => {
+    setSelectedCategory(e.target.value);
+    setSelectedAccountCode('');
+  };
+
+  const handleAccountCodeChange = (e) => {
+    const code = e.target.value;
+    setSelectedAccountCode(code);
+
+    const match = flatMatrix.find((row) => row.code === code);
+    if (match) {
+      setSelectedType(match.type);
+      setSelectedSubtype(match.subtype);
+      setSelectedCategory(match.category);
+      if (!entity) setEntity(match.entity || '');
+
+      if (match.type === 'Income') setFlow('inflow');
+      else if (match.type === 'Expense' || match.type === 'Expenses') setFlow('outflow');
+    }
+  };
+
+  const resetForm = () => {
+    setAmount('');
+    setEntity('');
+    setSelectedType('');
+    setSelectedSubtype('');
+    setSelectedCategory('');
+    setSelectedAccountCode('');
+    setSourceAccount('');
+    setFlow('outflow');
+    setPaymentStatus('Completed');
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!selectedType) {
+      toast.error('Constraint Violation: A valid Type is required.');
+      return;
+    }
+    if (!selectedAccountCode) {
+      toast.error('Select a valid Target Account code before submission.');
+      return;
+    }
+    if (!amount || Number(amount) <= 0) {
+      toast.error('Amount must be a positive value.');
+      return;
+    }
+
+    const payload = {
+      value_date: valueDate,
+      posting_date: postingDate,
+      payment_date: paymentDate || null,
+      amount: amount,
+      target_account: selectedAccountCode,
+      source_account: sourceAccount || null,
+      flow: flow,
+      payment_status: paymentStatus,
+      type: selectedType,
+      subtype: selectedSubtype,
+      category: selectedCategory,
+      entity: entity || null,
+      description: '', // Suppressed in new UI flow
+      origin: 'Web Client'
+    };
+
+    const targetAccountName = flatMatrix.find(row => row.code === selectedAccountCode)?.account_name || selectedAccountCode;
+
+    if (editingTransaction) {
+      try {
+        await updateTransaction(editingTransaction.id, payload);
+        toast.success("Transaction Updated");
+        resetForm();
+        if (onCancelEdit) onCancelEdit();
+        if (onSuccess) onSuccess();
+      } catch (error) {
+        toast.error("Failed to update transaction.");
+      }
+    } else if (editingDraftId) {
+      const updatedDraft = {
+        id: editingDraftId,
+        payload,
+        account_name: targetAccountName,
+        type: selectedType,
+        flow: flow,
+        amount: Number(amount)
+      };
+      setLogDrafts(prev => prev.map(d => d.id === editingDraftId ? updatedDraft : d));
+      resetForm();
+      setEditingDraftId(null);
+      toast.success("Draft Updated");
+    } else {
+      const stagedItem = {
+        id: Date.now().toString() + Math.random().toString(),
+        payload,
+        account_name: targetAccountName,
+        type: selectedType,
+        flow: flow,
+        amount: Number(amount)
+      };
+      setStagedTransactions(prev => [...prev, stagedItem]);
+      if (isLogView) {
+        setLogDrafts(prev => [...prev, stagedItem]);
+      }
+      resetForm();
+    }
+  };
+
+  const handleCommitBatch = async () => {
+    if (stagedTransactions.length === 0) return;
+
+    try {
+      for (const txn of stagedTransactions) {
+        await addTransaction(txn.payload);
+      }
+      toast.success(`Successfully committed ${stagedTransactions.length} transactions.`);
+      setStagedTransactions([]);
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      toast.error("Failed to commit one or more transactions.");
+    }
+  };
+
+  const handleEditDraft = (draft) => {
+    const p = draft.payload;
+    setEntity(p.entity || '');
+    setSelectedType(p.type || '');
+    setSelectedSubtype(p.subtype || '');
+    setSelectedCategory(p.category || '');
+    setSelectedAccountCode(p.target_account || '');
+    setSourceAccount(p.source_account || '');
+    setAmount(p.amount || '');
+    setFlow(p.flow || 'outflow');
+    setPaymentStatus(p.payment_status || 'Completed');
+    setValueDate(p.value_date || todayStr);
+    setPostingDate(p.posting_date || todayStr);
+    setPaymentDate(p.payment_date || '');
+    setEditingDraftId(draft.id);
+  };
+
+  const handleDeleteDraft = (id) => {
+    setLogDrafts(prev => prev.filter(d => d.id !== id));
+    if (editingDraftId === id) {
+      setEditingDraftId(null);
+      resetForm();
+    }
+  };
+
+  const getSourceName = (code) => {
+    if (!code) return 'External';
+    const match = flatMatrix.find(r => r.code === code);
+    return match ? match.account_name : code;
+  };
+
+  const aggregatedVariances = useMemo(() => {
+    const map = {};
+    stagedTransactions.forEach(txn => {
+      const processLeg = (code, name, type, flow, amount) => {
+        if (!map[code]) map[code] = { account_name: name, type: type, net_impact: 0 };
+        // Assuming 'inflow' is a positive numeric vector for this calculation
+        map[code].net_impact += (flow === 'inflow') ? amount : -amount;
+      };
+      
+      if (txn.payload.source_account) {
+        const sMatch = flatMatrix.find(row => row.code === txn.payload.source_account);
+        processLeg(
+          txn.payload.source_account, 
+          sMatch ? sMatch.account_name : txn.payload.source_account, 
+          sMatch ? sMatch.type : 'Assets', 
+          txn.payload.flow, 
+          txn.amount
+        );
+      }
+      
+      const tFlow = txn.payload.flow === 'inflow' ? 'outflow' : txn.payload.flow === 'outflow' ? 'inflow' : 'neutral';
+      processLeg(txn.payload.target_account, txn.account_name, txn.type, tFlow, txn.amount);
+    });
+
+    return Object.values(map)
+      .filter(v => v.net_impact !== 0) // Hide accounts that perfectly net to 0
+      .map(v => ({
+        ...v,
+        flow: v.net_impact > 0 ? 'inflow' : 'outflow',
+        amount: Math.abs(v.net_impact)
+      }));
+  }, [stagedTransactions, flatMatrix]);
+
+  return (
+    <section className="bg-stone-950 border-2 border-amber-900/50 rounded-lg p-5 shadow-2xl relative overflow-hidden">
+      
+      <datalist id="entities-suggest">
+        {uniqueEntities.map((ent) => (
+          <option key={ent} value={ent} />
+        ))}
+      </datalist>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* LEFT PANEL - Form Input */}
+        <div className="bg-stone-900/30 p-4 rounded-lg border border-stone-800/50">
+          <form onSubmit={handleFormSubmit} className="space-y-4">
+            
+            {/* ROW 1: Type + Subtype */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Type</label>
+                <select
+                  value={selectedType}
+                  onChange={handleTypeChange}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition"
+                >
+                  <option value="">-- Select Type --</option>
+                  {uniqueTypes.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Subtype</label>
+                <select
+                  value={selectedSubtype}
+                  onChange={handleSubtypeChange}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition"
+                >
+                  <option value="">-- Select Subtype --</option>
+                  {filteredSubtypes.map((sub) => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* ROW 2: Category + Entity */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Category</label>
+                <select
+                  value={selectedCategory}
+                  onChange={handleCategoryChange}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition"
+                >
+                  <option value="">-- Select Category --</option>
+                  {filteredCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
+                  Entity
+                </label>
+                <input
+                  type="text"
+                  list="entities-suggest"
+                  value={entity}
+                  onChange={handleEntityChange}
+                  placeholder="Enter Entity..."
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition"
+                />
+              </div>
+            </div>
+
+            {/* ROW 3: Flow + Payment Status */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Flow</label>
+                <select
+                  value={flow}
+                  onChange={(e) => setFlow(e.target.value)}
+                  disabled={selectedType === 'Income' || selectedType === 'Expense' || selectedType === 'Expenses'}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition disabled:opacity-60"
+                >
+                  <option value="outflow">Outflow</option>
+                  <option value="inflow">Inflow</option>
+                  <option value="neutral">Neutral</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Payment Status</label>
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition"
+                >
+                  <option value="Completed">Completed</option>
+                  <option value="Pending">Pending</option>
+                </select>
+              </div>
+            </div>
+
+            {/* ROW 4: Value Date + Posting Date + Payment Date */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Value Date</label>
+                <input
+                  type="date"
+                  required
+                  value={valueDate}
+                  onChange={(e) => setValueDate(e.target.value)}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition font-mono"
+                />
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Posting Date</label>
+                <input
+                  type="date"
+                  required
+                  value={postingDate}
+                  onChange={(e) => setPostingDate(e.target.value)}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition font-mono"
+                />
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Payment Date</label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 transition font-mono"
+                />
+              </div>
+            </div>
+
+            {/* ROW 5: Source Account */}
+            <div className="flex flex-col space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Source Account</label>
+              <select
+                value={sourceAccount}
+                onChange={(e) => setSourceAccount(e.target.value)}
+                className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 font-mono transition w-full"
+              >
+                <option value="">-- Select Source Account --</option>
+                {allAccounts.map((row) => (
+                  <option key={row.code} value={row.code}>
+                    {row.code} - {row.account_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* ROW 6: Target Account */}
+            <div className="flex flex-col space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Target Account</label>
+              <select
+                value={selectedAccountCode}
+                onChange={handleAccountCodeChange}
+                className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 font-mono transition w-full"
+              >
+                <option value="">-- Select Target Account --</option>
+                {filteredAccounts.map((row) => (
+                  <option key={row.code} value={row.code}>
+                    {row.code} - {row.account_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* ROW 7: Amount + Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 items-end pt-2">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 font-mono transition"
+                />
+              </div>
+
+              <div className="flex gap-2 w-full h-[34px]">
+                <button
+                  type="submit"
+                  className="flex-1 bg-stone-800 hover:bg-stone-700 active:translate-y-px border border-stone-600/50 rounded text-stone-300 text-[10px] sm:text-xs tracking-widest uppercase font-bold transition px-2"
+                >
+                  {editingTransaction ? 'Update Transaction' : editingDraftId ? 'Save Staged' : 'Stage Transaction'}
+                </button>
+                
+                {editingTransaction && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetForm();
+                      if (onCancelEdit) onCancelEdit();
+                    }}
+                    className="px-3 bg-stone-950 hover:bg-stone-900 active:translate-y-px border border-stone-800 rounded text-stone-400 text-[10px] sm:text-xs tracking-widest uppercase font-bold transition"
+                  >
+                    Cancel
+                  </button>
+                )}
+
+                {editingDraftId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetForm();
+                      setEditingDraftId(null);
+                    }}
+                    className="px-3 bg-stone-950 hover:bg-stone-900 active:translate-y-px border border-stone-800 rounded text-stone-400 text-[10px] sm:text-xs tracking-widest uppercase font-bold transition whitespace-nowrap"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </form>
+        </div>
+
+        {/* RIGHT PANEL - Variance Summary / Stage Log */}
+        <div className="bg-stone-900/30 p-4 rounded-lg border border-stone-800/50 flex flex-col h-full min-h-[500px]">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-500 mb-4 font-serif">
+            {isLogView ? 'Stage Log (Drafts)' : 'Variance Summary'}
+          </h3>
+          
+          <div className="flex-1 overflow-y-auto space-y-1 mb-4 scrollbar-thin scrollbar-thumb-stone-800 scrollbar-track-transparent pr-1">
+            
+            {!isLogView ? (
+              aggregatedVariances.length === 0 ? (
+                <div className="text-stone-500 text-[10px] italic text-center py-10">
+                  No transactions staged.
+                </div>
+              ) : (
+                aggregatedVariances.map((v, i) => {

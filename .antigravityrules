@@ -1,0 +1,38 @@
+# Eldoria V3.0 - Regras Principais do Projeto (.antigravityrules)
+
+Este ficheiro define as diretivas de arquitetura, desenvolvimento e design que todos os agentes do Antigravity devem cumprir estritamente neste repositório.
+
+---
+
+## 1. Stack Principal
+* **Frontend**: React (Vite) + Tailwind CSS.
+* **Estado Global**: Zustand (usando `useKingdomStore` e `useDashboardStore`).
+* **Sincronização de Dados**: TanStack Query (React Query) para chamadas assíncronas e Supabase Client.
+* **Base de Dados**: Supabase (PostgreSQL) com RLS (Row Level Security) ativo em todas as tabelas.
+
+---
+
+## 2. Arquitetura de Dados (Sem Loops Pesados no Cliente)
+* **Proibição de Agregações no Frontend**: É estritamente proibido realizar loops (`reduce`, `map` pesados ou cálculos complexos de agregação) no cliente sobre listas completas de transações.
+* **Views de Base de Dados (`vw_*`)**: Gráficos, métricas analíticas e tendências devem subscrever e consumir diretamente views otimizadas da base de dados (ex: `vw_monthly_analytics`, `vw_cumulative_trends`, `vw_category_balances`).
+* **Stored Procedures e RPCs**: Cálculos de saldos, balanço e gamificação (ouro/XP) devem ser processados no PostgreSQL e expostos através de funções RPC do Supabase (ex: `get_dashboard_metrics`, `get_interactive_dashboard`).
+
+---
+
+## 3. Mutações e Optimistic UI
+* **Feedback Instantâneo**: Adições, atualizações e eliminações de transações devem implementar **Optimistic UI** (UI Otimista) no Zustand. 
+* As atualizações devem ser refletidas instantaneamente na interface do utilizador, revertendo automaticamente o estado local apenas no caso de falha de rede/Supabase.
+* **Sincronização Pós-Mutação**: Após qualquer commit na base de dados, deve ser efetuada a atualização das métricas servidor-side chamando `fetchDashboardMetrics()` e `fetchAnalytics()`.
+
+---
+
+## 4. UI/UX e Design "Medieval Dark-Fantasy"
+* **Aparência e Cores**: Tons de amber, gold, stone escuro e castanhos de couro. Ficheiro de referência: `client/src/index.css`.
+* **Grelha estrita de 12 colunas**: O Dashboard principal deve utilizar `react-grid-layout` com suporte para posicionamento fluido e redimensionável baseado numa grelha horizontal estrita de 12 colunas.
+* **Controlo de Jitter**: É obrigatório usar mecanismos de escala CSS (CSS transforms) no Dashboard para prevenir o jitter de foco e saltos bruscos de scroll durante o redimensionamento ou arrasto de widgets.
+
+---
+
+## 5. Estrutura de COA (Chart of Accounts) de 8 Dígitos
+* **Flat Matrix**: Toda a categorização financeira (Type, Subtype, Category, Entity, Account Code) deve respeitar a estrutura de 8 dígitos pré-definida na tabela `dim_contas`.
+* **Cascade Dropdowns**: Em formulários de registo (como `TransactionForm`), a seleção de Type deve filtrar dinamicamente Subtypes, e este por sua vez as Categories e Target Accounts baseados na correspondência da matriz `dim_contas`. A comparação deve normalizar variações singulares/plurais (ex: `Expense` vs `Expenses`).

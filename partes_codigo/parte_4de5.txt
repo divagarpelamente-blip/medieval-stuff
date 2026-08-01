@@ -1,0 +1,2034 @@
+/* === PARTE 4 DE 5 === */
+
+      minH: widgetDef.layout?.minH || 2,
+      maxH: widgetDef.layout?.maxH || 6,
+    };
+
+    const updatedLayout = [...currentLayout, newLayoutItem];
+    
+    set((prevState) => ({
+      draftLayout: {
+        ...prevState.draftLayout,
+        [tabId]: updatedLayout
+      },
+      hasUnsavedChanges: true
+    }));
+
+    return true;
+  }
+}));
+
+export default useDashboardStore;
+
+
+=========================================
+ARQUIVO: client\src\store\useInteractiveStore.js
+=========================================
+
+// client/src/store/useInteractiveStore.js
+
+import { create } from 'zustand';
+
+export const useInteractiveStore = create((set) => ({
+  filters: {
+    startDate: null,
+    endDate: null,
+    monthFilter: null,
+    granularity: 'Monthly',
+    statusFilter: null,
+    arrearFilter: null,
+    categoryFilter: null,
+    entityFilter: null,
+  },
+  
+  setFilter: (key, value) => set((state) => {
+    const newFilters = { ...state.filters, [key]: value };
+    
+    if (key === 'monthFilter' && value) {
+      newFilters.startDate = null;
+      newFilters.endDate = null;
+    }
+    if ((key === 'startDate' || key === 'endDate') && value) {
+      newFilters.monthFilter = null;
+    }
+    
+    return { filters: newFilters };
+  }),
+
+  clearFilters: () => set({
+    filters: {
+      startDate: null,
+      endDate: null,
+      monthFilter: null,
+      granularity: 'Monthly',
+      statusFilter: null,
+      arrearFilter: null,
+      categoryFilter: null,
+      entityFilter: null,
+    }
+  }),
+}));
+
+
+=========================================
+ARQUIVO: client\src\store\useKingdomStore.js
+=========================================
+
+import { create } from 'zustand';
+import { supabase } from '../lib/supabaseClient';
+import { toast } from 'react-hot-toast';
+
+// Helper function to normalize transaction type to match the strict database check constraint
+const normalizeType = (type) => {
+  if (!type) return type;
+  const lower = type.trim().toLowerCase();
+  if (lower === 'expenses' || lower === 'expense') {
+    return 'Expenses';
+  }
+  return type;
+};
+
+export const useKingdomStore = create((set, get) => ({
+  // ==========================================
+  // 1. CORE STATE
+  // ==========================================
+  user: null,
+  email: 'guest@medieval.stuff',
+  role: 'lord',
+  isLoading: false,
+  isLedgerLoading: false,
+  isAnalyticsLoading: false,
+  
+  // Gamification State
+  gold: 0,
+  gems: 100,
+  xp: 0,
+  level: 1,
+  mineLevel: 1,
+  lastCollectionTime: null,
+
+  // Data State
+  flatMatrix: [], 
+  transactions: [], 
+  accountBalances: [],
+
+  // Scalable Server-Side Dashboard Aggregations
+  dashboardMetrics: {
+    total_assets: 0,
+    total_liabilities: 0,
+    net_worth: 0,
+    net_vault_cash: 0
+  },
+
+  // State for the aggregated views (Phase 1 Database Optimization)
+  analytics: {
+    monthly: [],
+    category: [],
+    entity: [],
+    cumulative: [],
+    daily: [],
+    balances: [] // NOVA ADIÇÃO: Armazena os saldos reais das contas
+  },
+
+  // ==========================================
+  // 2. AUTHENTICATION PIPELINE
+  // ==========================================
+  initAuth: () => {
+    const loadSessionUser = async (session) => {
+      if (session?.user) {
+        set({ user: session.user, email: session.user.email });
+        
+        await get().fetchKingdomData(session.user.id);
+        await get().fetchFlatMatrix();
+        await get().fetchDashboardMetrics();
+        
+        await get().fetchTransactions();
+        await get().fetchAnalytics(); 
+      } else {
+        set({ user: null, email: 'guest@medieval.stuff' });
+        get().resetStore();
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      loadSessionUser(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      loadSessionUser(session);
+    });
+
+    return () => subscription.unsubscribe();
+  },
+
+  // ==========================================
+  // 3. FLAT MATRIX & OMNI-DIRECTIONAL HELPERS
+  // ==========================================
+  fetchFlatMatrix: async () => {
+    set({ isLoading: true });
+    try {
+      const { data, error } = await supabase
+        .from('dim_contas')
+        .select('*')
+        .order('code', { ascending: true });
+
+      if (error) throw error;
+      if (data) {
+        set({ flatMatrix: data });
+      }
+    } catch (err) {
+      console.error('Failed to fetch Flat Matrix (dim_contas):', err);
+      toast.error('Failed to load chart of accounts matrix.');
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  getTypes: () => {
+    const matrix = get().flatMatrix || [];
+    const uniqueTypes = [...new Set(matrix.map(row => {
+      const norm = normalizeType(row.type);
+      return norm;
+    }).filter(Boolean))];
+    
+    const preferredOrder = ['Assets', 'Liabilities', 'Income', 'Expenses', 'Receivable', 'Payable'];
+    return uniqueTypes.sort((a, b) => {
+      const idxA = preferredOrder.indexOf(a);
+      const idxB = preferredOrder.indexOf(b);
+      return (idxA > -1 ? idxA : 99) - (idxB > -1 ? idxB : 99);
+    });
+  },
+
+  // ==========================================
+  // 4. BACKEND METRICS & ANALYTICS RPC
+  // ==========================================
+  fetchDashboardMetrics: async () => {
+    const userId = get().user?.id || null;
+
+    if (!userId || userId === '00000000-0000-0000-0000-000000000000') {
+      console.warn("Hydration paused: Waiting for secure auth handshake.");
+      return; 
+    }
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_dashboard_metrics', { p_profile_id: userId });
+
+      if (error) throw error;
+
+      if (data && data[0]) {
+        set({
+          dashboardMetrics: {
+            total_assets: Number(data[0].total_assets) || 0,
+            total_liabilities: Number(data[0].total_liabilities) || 0,
+            net_worth: Number(data[0].net_worth) || 0,
+            net_vault_cash: Number(data[0].net_vault_cash) || 0
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error invoking server-side metrics RPC:', err);
+    }
+  },
+
+  fetchAnalytics: async () => {
+    const userId = get().user?.id;
+    if (!userId) return;
+
+    set({ isAnalyticsLoading: true });
+    try {
+      const [
+        { data: monthly },
+        { data: category },
+        { data: entity },
+        { data: cumulative },
+        { data: daily },
+        { data: balances }
+      ] = await Promise.all([
+        supabase.from('vw_monthly_analytics').select('*').eq('profile_id', userId).order('month_date', { ascending: true }),
+        supabase.from('vw_category_balances').select('*').eq('profile_id', userId),
+        supabase.from('vw_entity_exposure').select('*').eq('profile_id', userId),
+        supabase.from('vw_cumulative_trends').select('*').eq('profile_id', userId).order('month_date', { ascending: true }),
+        supabase.from('vw_daily_analytics').select('*').eq('profile_id', userId).order('day_date', { ascending: true }),
+        supabase.from('vw_account_balances').select('*').eq('profile_id', userId)
+      ]);
+
+      set({
+        analytics: {
+          monthly: monthly || [],
+          category: category || [],
+          entity: entity || [],
+          cumulative: cumulative || [],
+          daily: daily || [],
+          balances: balances || []
+        }
+      });
+    } catch (err) {
+      console.error('Failed to fetch optimized analytics views:', err);
+    } finally {
+      set({ isAnalyticsLoading: false });
+    }
+  },
+
+  // ==========================================
+  // 5. TRANSACTIONS PIPELINE WITH OPTIMISTIC UI
+  // ==========================================
+  fetchTransactions: async (limit = 50, offset = 0) => {
+    set({ isLedgerLoading: true });
+    try {
+      const userId = get().user?.id;
+      let query = supabase
+        .from('transactions')
+        .select('*')
+        .order('posting_date', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (userId) {
+        query = query.eq('profile_id', userId);
+      } else {
+        query = query.is('profile_id', null);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (offset === 0) {
+        set({ transactions: data || [] });
+      } else {
+        set((state) => ({
+          transactions: [...state.transactions, ...(data || [])]
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to query ledger transactions:', err);
+      toast.error('Failed to sync transactional scrolls.');
+    } finally {
+      set({ isLedgerLoading: false });
+    }
+  },
+
+  addTransaction: async (payload) => {
+    const userId = get().user?.id;
+      
+    const formattedPayload = {
+      profile_id: userId || null,
+      value_date: payload.value_date,
+      posting_date: payload.posting_date,
+      payment_date: payload.payment_date || null,
+      amount: Number(payload.amount),
+      target_account: payload.target_account,
+      source_account: payload.source_account || null,
+      flow: payload.flow,
+      payment_status: payload.payment_status || 'Completed',
+      type: normalizeType(payload.type),
+      subtype: payload.subtype || null,
+      category: payload.category || null,
+      entity: payload.entity || null,
+      description: payload.description || '',
+      origin: payload.origin || 'Web Client'
+    };
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticTx = { ...formattedPayload, id: tempId };
+    
+    set((state) => ({
+      transactions: [optimisticTx, ...state.transactions]
+    }));
+
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert([formattedPayload])
+        .select();
+
+      if (error) throw error;
+
+      toast.success('Transaction logged successfully.');
+
+      if (data && data[0]) {
+        set((state) => ({
+          transactions: state.transactions.map(t => t.id === tempId ? data[0] : t)
+        }));
+      }
+
+      get().fetchDashboardMetrics();
+      get().fetchAnalytics();
+      
+      return { success: true, data };
+    } catch (err) {
+      console.error('Failed to add transaction:', err);
+      
+      set((state) => ({
+        transactions: state.transactions.filter(t => t.id !== tempId)
+      }));
+      
+      toast.error(`Ledger Error: ${err.message || err}`);
+      return { success: false, error: err };
+    }
+  },
+
+  updateTransaction: async (id, payload) => {
+    set({ isLedgerLoading: true });
+    try {
+      const normalizedPayload = { ...payload };
+      if (payload.type) {
+        normalizedPayload.type = normalizeType(payload.type);
+      }
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .update(normalizedPayload)
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+      
+      if (data && data[0]) {
+        set((state) => ({
+          transactions: state.transactions.map((t) => (t.id === id ? data[0] : t))
+        }));
+      }
+
+      get().fetchDashboardMetrics();
+      get().fetchAnalytics();
+
+      return { success: true, data };
+    } catch (err) {
+      console.error('Error updating transaction:', err);
+      throw err; 
+    } finally {
+      set({ isLedgerLoading: false });
+    }
+  },
+
+  deleteTransaction: async (id) => {
+    const previousTransactions = get().transactions;
+    set((state) => ({
+      transactions: state.transactions.filter((t) => t.id !== id)
+    }));
+
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      get().fetchDashboardMetrics();
+      get().fetchAnalytics();
+
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting transaction:', err);
+      set({ transactions: previousTransactions });
+      toast.error('Failed to delete transaction.');
+      throw err;
+    }
+  },
+
+  // ==========================================
+  // 6. GAMIFICATION & PROFILES
+  // ==========================================
+  fetchKingdomData: async (userId) => {
+    set({ isLoading: true });
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (profile) {
+        set({
+          gold: Number(profile.gold) || 0,
+          gems: Number(profile.gems) || 100,
+          level: profile.level || 1,
+          xp: profile.xp || 0,
+          role: profile.role || 'lord'
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch kingdom profile:', err);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  resetStore: () => set({
+    flatMatrix: [],
+    gold: 0,
+    gems: 100,
+    xp: 0,
+    level: 1,
+    mineLevel: 1,
+    lastCollectionTime: null,
+    transactions: [],
+    isLedgerLoading: false,
+    isAnalyticsLoading: false,
+    accountBalances: [],
+    dashboardMetrics: {
+      total_assets: 0,
+      total_liabilities: 0,
+      net_worth: 0,
+      net_vault_cash: 0
+    },
+    analytics: {
+      monthly: [],
+      category: [],
+      entity: [],
+      cumulative: [],
+      daily: [],
+      balances: []
+    }
+  })
+}));
+
+export default useKingdomStore;
+
+
+=========================================
+ARQUIVO: client\src\utils\chartAnalytics.js
+=========================================
+
+/**
+ * Eldoria V3.0 Optimized Charting & Analytics Utilities
+ * Formats pre-aggregated Supabase Views (Server-Side) for Recharts rendering.
+ * Eliminates heavy client-side loops and calculations.
+ */
+
+/**
+ * Transforms pre-aggregated monthly data into chronological cash flow for Recharts.
+ * @param {Array} monthlyView - Data from vw_monthly_analytics
+ */
+export function generateCashFlowData(monthlyView) {
+  if (!Array.isArray(monthlyView)) return [];
+  const map = {};
+
+  monthlyView.forEach(row => {
+    // Parse the date safely
+    const date = new Date(row.month_date);
+    const name = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    
+    if (!map[name]) map[name] = { name, income: 0, expenses: 0 };
+    
+    const amount = Number(row.total_amount) || 0;
+    
+    // Map based on the normalized type
+    if (row.type === 'Income') {
+      map[name].income += amount;
+    } else if (row.type === 'Expenses') {
+      // Recharts standard: plot expenses below the zero line
+      map[name].expenses -= Math.abs(amount);
+    }
+  });
+
+  return Object.values(map);
+}
+
+/**
+ * Transforms pre-aggregated cumulative data into a net worth trend line.
+ * @param {Array} cumulativeView - Data from vw_cumulative_trends
+ */
+export function generateNetTrendData(cumulativeView) {
+  if (!Array.isArray(cumulativeView)) return [];
+  const map = {};
+
+  cumulativeView.forEach(row => {
+    const date = new Date(row.month_date);
+    const month = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    
+    if (!map[month]) map[month] = { month, net: 0, assets: 0, liabilities: 0 };
+    
+    const amount = Number(row.cumulative_amount) || 0;
+
+    if (row.type === 'Assets' || row.type === 'Asset') {
+      map[month].assets += amount;
+      map[month].net += amount;
+    } else if (row.type === 'Liabilities' || row.type === 'Liability') {
+      map[month].liabilities += amount;
+      map[month].net -= amount; 
+    }
+  });
+
+  return Object.values(map);
+}
+
+/**
+ * Calculates a running cumulative total of net cash flow over time.
+ * @param {Array} cumulativeView - Data from vw_cumulative_trends
+ */
+export function generateCumulativeCashFlowData(cumulativeView) {
+  if (!Array.isArray(cumulativeView)) return [];
+  const map = {};
+
+  cumulativeView.forEach(row => {
+    const date = new Date(row.month_date);
+    const name = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    
+    if (!map[name]) map[name] = { name, cumulative: 0 };
+    
+    const amount = Number(row.cumulative_amount) || 0;
+
+    if (row.type === 'Income') map[name].cumulative += amount;
+    if (row.type === 'Expenses') map[name].cumulative -= amount;
+  });
+
+  return Object.values(map);
+}
+
+/**
+ * Groups and formats the category view for Pie Charts.
+ * @param {Array} categoryView - Data from vw_category_balances
+ * @param {string} targetType - Ex: 'Expenses', 'Income', 'Assets'
+ * @param {string} groupBy - The key to group by (default: 'category')
+ */
+export function generateCategoryBreakdown(categoryView, targetType, groupBy = 'category') {
+  if (!Array.isArray(categoryView) || !targetType) return [];
+  const map = {};
+
+  categoryView.forEach(row => {
+    if (row.type !== targetType) return;
+    
+    const groupKey = row[groupBy] || 'Uncategorized';
+    const amount = Number(row.total_volume) || 0;
+
+    map[groupKey] = (map[groupKey] || 0) + amount;
+  });
+
+  return Object.entries(map)
+    .map(([name, value]) => ({
+      name,
+      value: Number(value.toFixed(2))
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
+}
+
+/**
+ * Formats Entity Exposure for tables and bar charts.
+ * @param {Array} entityView - Data from vw_entity_exposure
+ * @param {string} targetType - Ex: 'Expenses'
+ */
+export function getEntityExposure(entityView, targetType, limit = 10) {
+  if (!Array.isArray(entityView)) return [];
+  
+  return entityView
+    .filter(row => row.type === targetType && row.entity)
+    .map(row => ({
+      name: row.entity,
+      value: Number(row.total_volume),
+      count: row.transaction_count
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit);
+}
+
+/**
+ * Phase 3 Ratios - Now heavily simplified using daily views and dashboard metrics.
+ */
+export function calculateRatioKPIs(dailyView, metrics) {
+  if (!Array.isArray(dailyView) || !metrics) return {};
+
+  let totalDailyExpenses = 0;
+  let activeDays = new Set();
+
+  dailyView.forEach(row => {
+    if (row.type === 'Expenses') {
+      totalDailyExpenses += Number(row.total_amount);
+      activeDays.add(row.day_date);
+    }
+  });
+
+  const daysCount = activeDays.size || 1;
+  const avgDailyExpense = totalDailyExpenses / daysCount;
+  const avgMonthlyExpense = avgDailyExpense * 30.44;
+
+  const survivalMonths = avgMonthlyExpense > 0 
+    ? (metrics.net_vault_cash || 0) / avgMonthlyExpense 
+    : 0;
+
+  const debtRatio = metrics.total_assets > 0 
+    ? (metrics.total_liabilities / metrics.total_assets) * 100 
+    : 0;
+
+  return {
+    avgMonthlyExpense,
+    avgDailyExpense,
+    survivalMonths,
+    debtRatio
+  };
+}
+
+/**
+ * Extracts latest general transactions and internal transfers (Phase 4A).
+ * These still use the raw transaction array from the paginated ledger store.
+ */
+export function getRecentTransactions(transactions, limit = 10) {
+  if (!Array.isArray(transactions)) return [];
+  return [...transactions]
+    .sort((a, b) => new Date(b.posting_date) - new Date(a.posting_date))
+    .slice(0, limit);
+}
+
+export function getInternalTransfers(transactions, limit = 10) {
+  if (!Array.isArray(transactions)) return [];
+  return transactions
+    .filter(t => t.flow === 'neutral' || (t.source_account && t.target_account && t.source_account[0] === t.target_account[0]))
+    .sort((a, b) => new Date(b.posting_date) - new Date(a.posting_date))
+    .slice(0, limit);
+}
+
+
+=========================================
+ARQUIVO: client\src\utils\locales\de.js
+=========================================
+
+export const de = {
+  quests: "Quests",
+  achievements: "Erfolge",
+  transactions: "Transaktionen",
+  dashboard: "Übersicht",
+  settings: "Einstellungen",
+  language_select: "Sprache Auswählen",
+  
+  gold_mine: "Goldmine",
+  royal_treasury: "Schatzkammer",
+  central_market: "Markt",
+  town_hall: "Rathaus",
+  village_housing: "Dorfhäuser",
+  tributes: "Tribute",
+  tavern: "Taverne",
+  under_construction: "Im Bau",
+
+  back_to_map: "Zurück zur Karte",
+  kingdom_lists: "Königreichslisten",
+  configuration_panel: "Konfigurationsfenster",
+  official_ledger_editor: "Hofbuch-Editor",
+  new_value: "Neuer Wert",
+  default_category: "Standardkategorie",
+  add: "Hinzufügen",
+  delete: "Löschen",
+  value: "Wert",
+  actions: "Aktionen",
+  no_options_registered: "Keine Optionen in dieser Liste registriert.",
+  close: "Schließen",
+  clear: "Bereinigen",
+  eliminate: "Eliminieren",
+
+  manage_from: "Quellen verwalten/From",
+  manage_status: "Status verwalten",
+  manage_category: "Kategorien verwalten",
+  manage_subcategory: "Untertypen verwalten",
+  manage_entity: "Empfänger verwalten (Category)",
+  manage_entityCategory: "Kategorie der Empfänger verwalten",
+  manage_month: "Monate verwalten",
+
+  register_movement: "Transaktion Registrieren",
+  gold_mine_commerce: "Goldmine & Handel",
+  ledger_transactions: "Hauptbuch der Transaktionen",
+  type: "Typ",
+  income: "Einnahme",
+  expense: "Ausgabe",
+  amount_gold: "Menge",
+  origin_from: "Herkunft/From",
+  date: "Datum",
+  status: "Status",
+  category: "Kategorie",
+  subcategory: "Untertyp",
+  entity: "Empfänger",
+  entity_category: "Empfängerkategorie",
+  description: "Beschreibung",
+  save_transaction: "Transaktion Speichern",
+  import_csv: "CSV Importieren",
+  export_csv: "CSV Exportieren",
+
+  err_invalid_amount: "Bitte geben Sie eine gültige Menge an Goldmünzen ein!",
+  err_invalid_from: "Bitte geben Sie die Quelle (Payer/From) an!",
+  success_added_gold: "{amount} Gold hinzugefügt! Stufe und XP aktualisiert.",
+  success_spent_gold: "{amount} Gold ausgegeben!",
+  err_transaction_failed: "Transaktion fehlgeschlagen: {error}",
+  success_export: "Hauptbuch erfolgreich exportiert!",
+  success_export_empty: "CSV-Vorlage exportiert (keine Daten)!",
+  success_import: "{count} Transaktionen erfolgreich importiert!",
+  success_import_zero: "Import abgeschlossen: 0 Transaktionen geladen.",
+  err_import: "Fehler beim Verarbeiten der CSV-Datei!",
+  err_import_db: "Import fehlgeschlagen: {error}",
+  success_added_option: "Option '{val}' erfolgreich hinzugefügt!",
+  success_deleted_option: "Option '{val}' erfolgreich entfernt!",
+  err_enter_value: "Bitte geben Sie einen Wert ein!",
+  err_value_exists: "Dieser Wert existiert bereits in der Liste!",
+
+  subtab_overview: "Übersicht",
+  subtab_income_expense: "Einnahmen & Ausgaben",
+  subtab_payables_receivables: "Verbindlichkeiten",
+  gran_month: "Monatlich",
+  gran_quarter: "Quartalsweise",
+  gran_year: "Jährlich",
+  financial_report: "Finanzbericht des Reiches",
+  treasury_books: "Schatzmeisterbücher",
+
+  advice_empty: '"Keine Transaktionen im offiziellen Hauptbuch der Krone registriert, mein Herr. Das Reich wartet auf finanzielle Aktivität."',
+  advice_positive: '"Die Schatzkammern des Reiches florieren, mein Herr! Wir haben einen positiven Saldo von +{balance}g Goldmünzen registriert. Die Spareffizienz liegt bei {ratio}%."',
+  advice_negative: '"Achtung, mein Herr! Die königliche Schatzkammer weist ein Defizit von {balance}g Goldmünzen auf. Unsere Ausgaben übersteigen die Einnahmen. Wir müssen die Ausgaben senken!"',
+  advice_neutral: '"Die Bilanz der königlichen Schatzkammer ist perfekt ausgeglichen, mein Herr."',
+
+  total_income_inflow: "Gesamteinnahmen (Inflow)",
+  total_expenses_outflow: "Gesamtausgaben (Outflow)",
+  net_balance: "Netto-Saldo",
+  savings_efficiency: "Spareffizienz",
+  treasurer_advice_banner: "Königlicher Schatzmeisterrat",
+  flow_by_category: "Fluss nach Kategorie",
+  general_consolidated: "Allgemein Konsolidiert",
+  time_evolution: "Zeitliche Entwicklung",
+  active_grouping: "Aktive Gruppierung ({gran})",
+  balance: "Saldo",
+  gold_origin: "Goldherkunft (From Allocation)",
+  paying_sources: "Zahlungsquellen",
+  no_income_registered: "Keine Einnahmen registriert.",
+  top_entities: "Top-Empfänger",
+  by_gold_volume: "Nach Goldvolumen",
+  no_commercial_record: "Kein Handelsregister.",
+  savings_rate_real: "Reale Sparquote",
+  advice_efficiency_good: '"Eure Verwaltung ist legendär, mein Herr! Ihr spart einen großen Teil Eures Goldes für zukünftige Eroberungen."',
+  advice_efficiency_ok: '"Ihr haltet die Bücher unter Kontrolle, aber wir könnten mehr Gold sparen, wenn wir kleinere Ausgaben reduzieren."',
+  advice_efficiency_bad: '"Gefahr! Das Reich erschöpft seine Reserven. Wir müssen die Ausgaben sofort senken!"',
+  flow_comparison: "Flussvergleich",
+  revenue_vs_expense: "Einnahmen vs Ausgaben",
+  expenses_by_entity_category: "Ausgaben nach Empfängerkategorie",
+  spending_distribution: "Ausgabenverteilung",
+  no_expenses_registered: "Keine Ausgaben registriert.",
+  no_records_active_period: "Keine Handelsregister im aktiven Zeitraum.",
+  receivables: "Forderungen (Receivables)",
+  payables: "Verbindlichkeiten (Payables)",
+  overdue_rate: "Verzugsquote (Overdue Rate)",
+  pending_revenues: "Ausstehende Einnahmen",
+  pending_expenses: "Ausstehende / Überfällige Ausgaben",
+  no_pending_revenues: "Keine ausstehenden Einnahmen. Alle Zahlungen eingezogen!",
+  no_pending_expenses: "Keine ausstehenden Ausgaben. Das Reich ist schuldenfrei!",
+  active_filters: "Aktive Filter",
+  clear_all: "Alles Löschen",
+  year_label: "Jahr",
+  month_label: "Monat",
+  quarter_label: "Quartal",
+  type_label: "Typ",
+  date_label: "Datum",
+  category_label: "Kategorie",
+  all_years: "Alle Jahre",
+  all_months: "Alle Monate",
+  all_quarters: "Alle Quartale",
+  all_from: "Alle Quellen",
+  all_types: "Alle Typen",
+  all_categories: "Alle Kategorien",
+  filters_cleared: "Filter gelöscht!",
+  hide_filters: "Filter ausblenden",
+  show_filters: "Filter anzeigen",
+  entidade_header: "Empfänger",
+  total_header: "Gesamt",
+  register_ledger: "Registrieren",
+  registering_ledger: "Registrierung...",
+  history_transactions: "Transaktionsverlauf",
+  chart_horizon_all: "Gesamtzeit",
+  chart_horizon_moon: "Aktueller Mond",
+  chart_horizon_cycles: "Letzte 30 Zyklen",
+  chart_scale_absolute: "Absolutes Gold",
+  chart_scale_percentage: "Prozent",
+  chart_segment_percentage: "Segmentanteil",
+  chart_time_horizon: "Zeithorizont",
+  chart_scale_mode: "Skalierungsmodus",
+  savings: "Sparen",
+  debt: "Schulden"
+};
+
+
+
+=========================================
+ARQUIVO: client\src\utils\locales\en.js
+=========================================
+
+export const en = {
+  // Tabs & HUD
+  quests: "Quests",
+  achievements: "Achievements",
+  transactions: "Ledger",
+  dashboard: "Treasury",
+  settings: "Settings",
+  language_select: "Select Language",
+  
+  // Map Locations
+  gold_mine: "Gold Mine",
+  royal_treasury: "Royal Treasury",
+  central_market: "Central Market",
+  town_hall: "Town Hall",
+  village_housing: "Village Housing",
+  tributes: "Tributes",
+  tavern: "The Tavern",
+  under_construction: "Under Construction",
+
+  // General UI
+  back_to_map: "Back to Map",
+  kingdom_lists: "Kingdom Lists",
+  configuration_panel: "Configuration Panel",
+  official_ledger_editor: "Official Ledger Editor",
+  new_value: "New Value",
+  default_category: "Default Category",
+  add: "Add",
+  delete: "Delete",
+  value: "Value",
+  actions: "Actions",
+  no_options_registered: "No options registered in this list.",
+  close: "Close",
+  clear: "Clear",
+  eliminate: "Delete",
+
+  // Settings Manage Titles
+  manage_from: "Manage Origins/From",
+  manage_status: "Manage Statuses",
+  manage_category: "Manage Categories",
+  manage_subcategory: "Manage Subtypes",
+  manage_entity: "Manage Entities (Category)",
+  manage_entityCategory: "Manage Entity Categories",
+  manage_month: "Manage Months",
+  manage_quick_actions: "Manage Quick Actions",
+
+  // Ledger / Mine Modal
+  register_movement: "Register Transaction",
+  gold_mine_commerce: "Gold Mine & Commerce",
+  ledger_transactions: "General Ledger",
+  type: "Type",
+  income: "Income",
+  expense: "Expense",
+  amount_gold: "Amount",
+  origin_from: "Origin/From",
+  value_date: "Value Date",
+  posting_date: "Posting Date",
+  status: "Status",
+  category: "Category",
+  subcategory: "Subtype",
+  entity: "Entity",
+  entity_category: "Entity Category",
+  description: "Description",
+  save_transaction: "Save Transaction",
+  import_csv: "Import CSV",
+  export_csv: "Export CSV",
+
+  // Toast alerts & messages
+  err_invalid_amount: "Please enter a valid amount of Gold Coins!",
+  err_invalid_from: "Please specify the 'From' (origin/payer) field!",
+  success_added_gold: "Added {amount} Gold! Level and XP updated.",
+  success_spent_gold: "Spent {amount} Gold!",
+  err_transaction_failed: "Transaction failed: {error}",
+  success_export: "Ledger exported successfully!",
+  success_export_empty: "CSV template exported (no data)!",
+  success_import: "Imported {count} transactions successfully!",
+  success_import_zero: "Import complete: 0 transactions loaded.",
+  err_import: "Error processing CSV file!",
+  err_import_db: "Import failed: {error}",
+  success_added_option: "Added '{val}' successfully!",
+  success_deleted_option: "Removed '{val}' successfully!",
+  err_enter_value: "Please enter a value!",
+  err_value_exists: "This value already exists in the list!",
+
+  // Dashboard General
+  subtab_overview: "Overview & Ratios",
+  subtab_income_expense: "Income & Expenses",
+  subtab_financial_statement: "Financial Statements",
+  subtab_payables_receivables: "Payables & Receivables",
+  subtab_liabilities: "Liabilities",
+  subtab_ratios: "Ratios",
+  net_accrued_income: "Net Accrued Income (P&L)",
+  balance_sheet: "Balance Sheet",
+  pnl_statement: "Profit & Loss",
+  cash_flow_statement: "Cash Flow",
+  treasury_menu_title: "Royal Treasury Menu",
+  menu_primary: "Primary",
+  menu_financial_statements: "Financial Statements",
+  menu_financial_statements_desc: "Consolidated financial reports including Balance Sheet, Profit & Loss, and Cash Flow.",
+  menu_economic_overview: "Economic Overview",
+  menu_economic_overview_desc: "General view of cash balances, time evolution, and category distribution.",
+  menu_commercial_accounts: "Commercial Accounts",
+  menu_commercial_accounts_desc: "Track outstanding payables, receivables, and payment methods.",
+  menu_liabilities_debt: "Liabilities & Debt",
+  menu_liabilities_debt_desc: "Monitor outstanding liabilities, debt principal, and amortizations.",
+  menu_general_ledger: "General Ledger",
+  menu_general_ledger_desc: "Register gold coins movements, manage status, category, entity, and view entire book history.",
+  menu_treasury_dashboard: "Treasury Dashboard",
+  menu_treasury_dashboard_desc: "General view of cash balances, category distribution, commercial accounts, and liabilities.",
+  menu_register_transaction: "Register Transaction",
+  menu_register_transaction_desc: "Record a new gold coin movement, income, expense, payable, receivable or debt.",
+  gran_month: "Monthly view",
+  gran_quarter: "Quarterly view",
+  gran_year: "Year view",
+  financial_report: "Financial Report of the Realm",
+  treasury_books: "Treasury Books",
+  
+  // Treasurer Advice
+  advice_empty: '"No transactions registered in the official ledger of the crown, my Lord. The realm awaits financial activity."',
+  advice_positive: '"The vaults of the realm are thriving, my Lord! We registered a positive balance of +{balance}g gold coins. Savings efficiency is at {ratio}%."',
+  advice_negative: '"Alert, my Lord! The Royal Treasury is in a deficit of {balance}g gold coins. Our expenses exceed income. We must cut spending!"',
+  advice_neutral: '"The balance of the Royal Treasury is perfectly balanced, my Lord."',
+  
+  advice_financial_position_positive: '"My Liege, our coffers grow! The realm prospers as our income of {inflow} outweighs our expenses. Truly a golden age!"',
+  advice_financial_position_negative: '"My Liege, caution! We are bleeding gold. Our expenses outpace our income, leaving us with a deficit of {balance}. We must act!"',
+  advice_expenses_report: '"My Liege, {category} demands the largest share of our treasury, claiming {amount}. A heavy toll indeed!"',
+  advice_expenses_detailed: '"My Liege, {entity} is our greatest drain, demanding {amount}. Perhaps a royal inquiry is in order?"',
+  advice_debt_positive: '"My Liege, our debts stand at {debt}. The iron bank\'s patience is not infinite, we must prioritize repayment."',
+  advice_debt_free: '"My Liege, the realm is free of debt! A golden age of financial independence is upon us."',
+  advice_pr_evolution_positive: '"An excellent treasury outlook, my Lord! Our expected collections exceed our upcoming obligations by {diff}. The kingdom\'s future cash balance remains secure."',
+  advice_pr_evolution_negative: '"My Liege, our future liabilities exceed our expected collections by {diff}. We must negotiate longer payment terms or accelerate collections to protect our treasury\'s liquidity!"',
+  advice_pr_category_positive: '"My Lord, the category of {category} has the heaviest burden of outstanding open bills, totaling {amount}. We should review these commercial accounts first."',
+  advice_pr_category_none: '"We have no open payables registered across any transaction category, my Liege."',
+  advice_pr_entity_positive: '"Our records show that {entity} is our largest creditor, with {amount} in outstanding open items. Settling this account should be prioritized to maintain our trade repute."',
+  advice_pr_entity_none: '"Our trading relations are clear of any unpaid debts, my Lord."',
+  advice_pr_month_positive: '"My Liege, our outstanding payables are spread across the seasons. Ensuring we align payment dates with our monthly tax collections will keep the royal chest stable."',
+  advice_pr_month_none: '"No monthly liabilities to report, Sire."',
+  advice_pr_payment_method_positive: '"Our trading vectors show that {method} is the primary medium of exchange, representing {amount} of completed movements. Maintaining diverse payment vectors ensures commerce flows smoothly."',
+  advice_pr_payment_method_none: '"No settled transactions with recorded payment methods exist in our archives yet."',
+
+  // Dashboard Detail Translations (Audit Fixes)
+  total_income_inflow: "Total Income (Inflow)",
+  total_expenses_outflow: "Total Expenses (Outflow)",
+  net_balance: "Net Balance",
+  savings_efficiency: "Savings Efficiency",
+  treasurer_advice_banner: "Royal Treasurer Advice",
+  flow_by_category: "Flow by Category",
+  general_consolidated: "General Consolidated",
+  time_evolution: "Time Evolution",
+  active_grouping: "Active Grouping ({gran})",
+  balance: "Balance",
+  gold_origin: "Gold Origin (From Allocation)",
+  paying_sources: "Paying Sources",
+  no_income_registered: "No income registered.",
+  top_entities: "Top Entities",
+  by_gold_volume: "By Gold Volume",
+  no_commercial_record: "No commercial record.",
+  savings_rate_real: "Real Savings Rate",
+  advice_efficiency_good: '"Your management is legendary, my Lord! You save a large portion of your gold for future conquests."',
+  advice_efficiency_ok: '"You keep the books under control, but we could save more gold if we cut down minor expenses."',
+  advice_efficiency_bad: '"Danger! The realm is exhausting its reserves. We must cut expenses immediately!"',
+  flow_comparison: "Flow Comparison",
+  revenue_vs_expense: "Revenue vs Expense",
+  expenses_by_entity_category: "Expenses by Entity Category",
+  spending_distribution: "Spending Distribution",
+  no_expenses_registered: "No expenses registered.",
+  no_records_active_period: "No commercial records in the active period.",
+  receivables: "Receivables",
+  payables: "Payables",
+  overdue_rate: "Overdue Rate",
+  kpi_all_payables: "All Payables",
+  kpi_open_payables: "Open Payables",
+  kpi_all_receivables: "All Receivables",
+  kpi_open_receivables: "Open Receivables",
+  kpi_overdue_rate: "Overdue Rate",
+  chart_payables_vs_receivables: "Payables & Receivables Evolution",
+  chart_open_payables_by_category: "Open Payables by Category",
+  chart_open_payables_by_entity: "Open Payables by Entity",
+  chart_open_payables_by_month: "Open Payables by Month",
+  chart_payment_methods: "Payment Methods Distribution",
+  pending_revenues: "Pending Revenues",
+  pending_expenses: "Pending / Overdue Expenses",
+  no_pending_revenues: "No pending revenues. All payments collected!",
+  no_pending_expenses: "No pending expenses. The realm is debt-free!",
+  active_filters: "Active Filters",
+  clear_all: "Clear All",
+  year_label: "Year",
+  month_label: "Month",
+  quarter_label: "Quarter",
+  type_label: "Type",
+  date_label: "Date",
+  category_label: "Category",
+  all_years: "All Years",
+  all_months: "All Months",
+  all_quarters: "All Quarters",
+  all_from: "All From",
+  all_types: "All Types",
+  all_categories: "All Categories",
+  filters_cleared: "Filters cleared!",
+  hide_filters: "Hide Filters",
+  show_filters: "Show Filters",
+  entidade_header: "Entity",
+  total_header: "Total",
+  register_ledger: "Record in Ledger",
+  registering_ledger: "Recording...",
+  history_transactions: "Transactions History",
+  "placeholder.item": "e.g. New Item",
+  "placeholder.amount": "e.g. 500",
+  "placeholder.notes": "e.g. Notes",
+  "dashboard.charts.flow_by_category": "Flow by Category",
+  "dashboard.charts.time_horizon": "Time Horizon",
+  "dashboard.charts.horizon_all": "All-Time",
+  "dashboard.charts.horizon_moon": "Current Moon",
+  "dashboard.charts.horizon_cycles": "Past 30 Cycles",
+  "dashboard.charts.scale_mode": "Scale Mode",
+  "dashboard.charts.scale_absolute": "Absolute Gold",
+  "dashboard.charts.scale_percentage": "Percentage",
+  "dashboard.charts.segment_percentage": "Segment Share",
+  savings: "Savings",
+  debt: "Debt",
+  "ledger.headers.from": "From",
+  "ledger.headers.date": "Date",
+  "ledger.headers.due_date": "Due Date",
+  "ledger.headers.month": "Month",
+  "ledger.headers.year": "Year",
+  "ledger.headers.quarter": "Quarter",
+  "ledger.headers.type": "Type",
+  "ledger.headers.status": "Status",
+  "ledger.headers.category": "Category",
+  "ledger.headers.subcategory": "Subtype",
+  "ledger.headers.entity": "Entity",
+  "ledger.headers.entity_category": "Entity Category",
+  "ledger.headers.amount": "Amount",
+  kpi_total_debt: "Total Debt",
+  kpi_to_be_paid: "To Be Paid",
+  kpi_new_liabilities: "New Liabilities",
+  kpi_amortizations: "Amortizations",
+  chart_liabilities_evolution: "Liabilities Evolution",
+  chart_debt_by_entity: "Debt by Entity",
+  chart_debt_composition: "Debt Composition by Type",
+  advice_liabilities_evolution: '"My Liege, our spline charts track our liabilities over time. Repayments and amortizations represent healthy reductions in our overall principal. Let us balance our borrow rate with repayment velocity."',
+  advice_debt_by_entity: '"This chart displays who we owe gold to, my Liege. {entity} is our biggest creditor at {amount}. Prioritizing payments to them will preserve our trade relationships."',
+  advice_debt_composition: '"My Lord, this donut displays the composition of our active debt. We have {amount} outstanding, split among various categories. Diversifying our lines of credit keeps the treasury stable."',
+  tpl_salary: "Salary",
+  tpl_blacksmith_payment: "Tools & Equipment (Pay Blacksmith)",
+  tpl_pay_blacksmith: "Tools & Equipment (Pay Blacksmith)",
+  tpl_tavern_feast: "Restaurant (Tavern Feast)",
+  tpl_borrow_gold: "Bank Loan (Borrow Gold)",
+  tpl_pay_landlord: "Rent (Pay Landlord)",
+  tpl_purchase_food: "Supermarket (Purchase Food)",
+  tpl_pay_interest: "Interest Expense (Pay Interest)",
+  tpl_transfers: "Internal Transfer (Transfers)"
+};
+
+
+
+
+=========================================
+ARQUIVO: client\src\utils\locales\es.js
+=========================================
+
+export const es = {
+  quests: "Misiones",
+  achievements: "Logros",
+  transactions: "Transacciones",
+  dashboard: "Panel",
+  settings: "Ajustes",
+  language_select: "Seleccionar Idioma",
+  
+  gold_mine: "Mina de Oro",
+  royal_treasury: "Tesouraria Real",
+  central_market: "Mercado Central",
+  town_hall: "Ayuntamiento",
+  village_housing: "Casas del Pueblo",
+  tributes: "Tributos",
+  tavern: "La Taberna",
+  under_construction: "En Constr.",
+
+  back_to_map: "Volver al Mapa",
+  kingdom_lists: "Listas del Reino",
+  configuration_panel: "Panel de Configuración",
+  official_ledger_editor: "Editor de Registro Oficial",
+  new_value: "Nuevo Valor",
+  default_category: "Categoría por Defecto",
+  add: "Añadir",
+  delete: "Eliminar",
+  value: "Valor",
+  actions: "Acciones",
+  no_options_registered: "No hay opciones registradas en esta lista.",
+  close: "Cerrar",
+  clear: "Limpiar",
+  eliminate: "Eliminar",
+
+  manage_from: "Gestionar Orígenes/From",
+  manage_status: "Gestionar Estados",
+  manage_category: "Gestionar Categorías",
+  manage_subcategory: "Gestionar Subtipos",
+  manage_entity: "Gestionar Entidades (Category)",
+  manage_entityCategory: "Gestionar Categorías de Entidad",
+  manage_month: "Gestionar Meses",
+
+  register_movement: "Registrar Transacción",
+  gold_mine_commerce: "Mina de Oro & Comercio",
+  ledger_transactions: "Libro de Transacciones",
+  type: "Tipo",
+  income: "Ingreso",
+  expense: "Gasto",
+  amount_gold: "Cantidad",
+  origin_from: "Origen/From",
+  date: "Fecha",
+  status: "Estado",
+  category: "Categoría",
+  subcategory: "Subtipo",
+  entity: "Entidad",
+  entity_category: "Categoría de Entidad",
+  description: "Descripción",
+  save_transaction: "Guardar Transacción",
+  import_csv: "Importar CSV",
+  export_csv: "Exportar CSV",
+
+  err_invalid_amount: "¡Por favor, introduzca una cantidad válida de monedas de oro!",
+  err_invalid_from: "¡Por favor, especifique el campo 'Origen' (Payer/From)!",
+  success_added_gold: "¡Añadido {amount} de Oro! Nivel y XP actualizados.",
+  success_spent_gold: "¡Gastado {amount} de Oro!",
+  err_transaction_failed: "Error en la transacción: {error}",
+  success_export: "¡Libro de registro exportado con éxito!",
+  success_export_empty: "¡Plantilla CSV exportada (sin datos)!",
+  success_import: "¡Importadas con éxito {count} transacciones!",
+  success_import_zero: "Importación completa: 0 transacciones cargadas.",
+  err_import: "¡Error al procesar el archivo CSV!",
+  err_import_db: "Error en la importación: {error}",
+  success_added_option: "¡Añadido '{val}' con éxito!",
+  success_deleted_option: "¡Eliminado '{val}' con éxito!",
+  err_enter_value: "¡Por favor, introduzca un valor!",
+  err_value_exists: "¡Este valor ya existe en la lista!",
+
+  subtab_overview: "Resumen",
+  subtab_income_expense: "Ingresos & Gastos",
+  subtab_payables_receivables: "Por Cobrar & Por Pagar",
+  gran_month: "Mensual",
+  gran_quarter: "Trimestral",
+  gran_year: "Anual",
+  financial_report: "Informe Financiero del Reino",
+  treasury_books: "Libros de Tesorería",
+
+  advice_empty: '"Ninguna transacción registrada en el libro oficial de la corona, mi Señor. El reino espera actividad financiera."',
+  advice_positive: '"¡Los cofres del reino prosperan, mi Señor! Registramos un saldo positivo de +{balance}g monedas de oro. La eficiencia de ahorro es del {ratio}%."',
+  advice_negative: '"¡Alerta, mi Señor! La Tesorería Real está en déficit de {balance}g monedas de oro. Nuestros gastos superan los ingresos. ¡Debemos reducir los gastos!"',
+  advice_neutral: '"El saldo de la Tesorería Real está perfectamente equilibrado, mi Señor."',
+
+  total_income_inflow: "Ingresos Totales (Inflow)",
+  total_expenses_outflow: "Gastos Totales (Outflow)",
+  net_balance: "Saldo Neto",
+  savings_efficiency: "Eficiencia de Ahorro",
+  treasurer_advice_banner: "Consejo del Tesorero Real",
+  flow_by_category: "Flujo por Categoría",
+  general_consolidated: "Consolidado General",
+  time_evolution: "Evolución Temporal",
+  active_grouping: "Agrupamiento Ativo ({gran})",
+  balance: "Balance",
+  gold_origin: "Origen del Oro (From Allocation)",
+  paying_sources: "Fuentes de Pago",
+  no_income_registered: "Ningún ingreso registrado.",
+  top_entities: "Principales Entidades",
+  by_gold_volume: "Por Volumen de Oro",
+  no_commercial_record: "Sin registro comercial.",
+  savings_rate_real: "Tasa de Ahorro Real",
+  advice_efficiency_good: '"¡Vuestra gestión es legendaria, mi Señor! Guardais una gran parte de vuestro oro para futuras conquistas."',
+  advice_efficiency_ok: '"Mantenéis las cuentas bajo control, pero podríamos ahorrar más oro si redujéramos los gastos menores."',
+  advice_efficiency_bad: '"¡Peligro! El reino está agotando sus reservas. ¡Debemos cortar los gastos de inmediato!"',
+  flow_comparison: "Comparación de Flujos",
+  revenue_vs_expense: "Ingreso vs Gasto",
+  expenses_by_entity_category: "Gastos por Categoría de Entidad",
+  spending_distribution: "Distribución del Gasto",
+  no_expenses_registered: "Ningún gasto registrado.",
+  no_records_active_period: "Sin registros comerciales en el período activo.",
+  receivables: "Por Cobrar (Receivables)",
+  payables: "Por Pagar (Payables)",
+  overdue_rate: "Tasa de Retraso (Overdue Rate)",
+  pending_revenues: "Ingresos Pendientes",
+  pending_expenses: "Gastos Pendientes / Atrasados",
+  no_pending_revenues: "¡Sin ingresos pendientes. Todos los pagos han sido cobrados!",
+  no_pending_expenses: "¡Sin gastos pendientes. El reino está libre de deudas!",
+  active_filters: "Filtros Activos",
+  clear_all: "Limpiar Todo",
+  year_label: "Año",
+  month_label: "Mes",
+  quarter_label: "Trimestre",
+  type_label: "Tipo",
+  date_label: "Fecha",
+  category_label: "Categoría",
+  all_years: "Todos los Años",
+  all_months: "Todos los Meses",
+  all_quarters: "Todos los Trimestres",
+  all_from: "Todos los Orígenes",
+  all_types: "Todos los Tipos",
+  all_categories: "Todas las Categorías",
+  filters_cleared: "¡Filtros limpiados!",
+  hide_filters: "Ocultar Filtros",
+  show_filters: "Mostrar Filtros",
+  entidade_header: "Entidad",
+  total_header: "Total",
+  register_ledger: "Registrar",
+  registering_ledger: "Registrando...",
+  history_transactions: "Histórico de Transacciones",
+  chart_horizon_all: "Todo el Tiempo",
+  chart_horizon_moon: "Luna Actual",
+  chart_horizon_cycles: "Últimos 30 Ciclos",
+  chart_scale_absolute: "Oro Absoluto",
+  chart_scale_percentage: "Porcentaje",
+  chart_segment_percentage: "Cuota de Segmento",
+  chart_time_horizon: "Horizonte Temporal",
+  chart_scale_mode: "Modo de Escala",
+  savings: "Ahorro",
+  debt: "Deuda"
+};
+
+
+
+=========================================
+ARQUIVO: client\src\utils\locales\fr.js
+=========================================
+
+export const fr = {
+  quests: "Quêtes",
+  achievements: "Hauts Faits",
+  transactions: "Transactions",
+  dashboard: "Tableau",
+  settings: "Réglages",
+  language_select: "Choisir la Langue",
+  
+  gold_mine: "Mine d'Or",
+  royal_treasury: "Trésorerie Royale",
+  central_market: "Grand Marché",
+  town_hall: "Mairie",
+  village_housing: "Maisons du Village",
+  tributes: "Tributs",
+  tavern: "La Taverne",
+  under_construction: "En Construction",
+
+  back_to_map: "Retour à la Carte",
+  kingdom_lists: "Listes du Royaume",
+  configuration_panel: "Panneau de Configuration",
+  official_ledger_editor: "Éditeur du Registre Officiel",
+  new_value: "Nouvelle Valeur",
+  default_category: "Catégorie par Défaut",
+  add: "Ajouter",
+  delete: "Supprimer",
+  value: "Valor",
+  actions: "Actions",
+  no_options_registered: "Aucune option enregistrée dans cette liste.",
+  close: "Fermer",
+  clear: "Effacer",
+  eliminate: "Éliminer",
+
+  manage_from: "Gérer les Origines/From",
+  manage_status: "Gérer les Statuts",
+  manage_category: "Gérer les Catégories",
+  manage_subcategory: "Gérer les Sous-types",
+  manage_entity: "Gérer les Entités (Category)",
+  manage_entityCategory: "Gérer la Catégorie des Entités",
+  manage_month: "Gérer les Mois",
+
+  register_movement: "Enregistrer Transaction",
+  gold_mine_commerce: "Mine d'Or & Commerce",
+  ledger_transactions: "Registre des Transactions",
+  type: "Type",
+  income: "Revenu",
+  expense: "Dépense",
+  amount_gold: "Montant",
+  origin_from: "Origine/From",
+  date: "Date",
+  status: "Statut",
+  category: "Catégorie",
+  subcategory: "Sous-type",
+  entity: "Entité",
+  entity_category: "Catégorie d'Entité",
+  description: "Description",
+  save_transaction: "Sauvegarder",
+  import_csv: "Importer CSV",
+  export_csv: "Exporter CSV",
+
+  err_invalid_amount: "Veuillez entrer un montant valide de pièces d'or!",
+  err_invalid_from: "Veuillez spécifier le champ 'Origine' (Payer/From)!",
+  success_added_gold: "Ajouté {amount} d'or! Niveau et XP mis à jour.",
+  success_spent_gold: "Dépensé {amount} d'or!",
+  err_transaction_failed: "Échec de la transaction: {error}",
+  success_export: "Registre exporté avec succès!",
+  success_export_empty: "Modèle CSV exporté (sans données)!",
+  success_import: "Importation réussie de {count} transactions!",
+  success_import_zero: "Importation terminée: 0 transactions chargées.",
+  err_import: "Erreur lors du traitement du fichier CSV!",
+  err_import_db: "Échec de l'importation: {error}",
+  success_added_option: "Ajouté '{val}' avec succès!",
+  success_deleted_option: "Supprimé '{val}' avec succès!",
+  err_enter_value: "Veuillez entrer une valeur!",
+  err_value_exists: "Cette valeur existe déjà dans la liste!",
+
+  subtab_overview: "Vue d'Ensemble",
+  subtab_income_expense: "Revenus & Dépenses",
+  subtab_payables_receivables: "À Recevoir & À Payer",
+  gran_month: "Mensuel",
+  gran_quarter: "Trimestriel",
+  gran_year: "Annuel",
+  financial_report: "Rapport Financier du Royaume",
+  treasury_books: "Livres de Comptes",
+
+  advice_empty: '"Aucune transaction enregistrée dans le registre officiel de la couronne, mon Seigneur. Le royaume attend une activité financière."',
+  advice_positive: '"Les coffres du royaume sont prospères, mon Seigneur! Nous avons enregistré un solde positif de +{balance}g pièces d\'or. L\'efficacité de l\'épargne est de {ratio}%."',
+  advice_negative: '"Alerte, mon Seigneur! La Trésorerie Royale est en déficit de {balance}g pièces d\'or. Nos dépenses dépassent nos revenus. Nous devons réduire les dépenses!"',
+  advice_neutral: '"Le solde de la Trésorerie Royale est parfaitement équilibré, mon Seigneur."',
+
+  total_income_inflow: "Revenus Totaux (Inflow)",
+  total_expenses_outflow: "Dépenses Totales (Outflow)",
+  net_balance: "Solde Net",
+  savings_efficiency: "Efficacité de l'Épargne",
+  treasurer_advice_banner: "Conseil du Trésorier Royal",
+  flow_by_category: "Flux par Catégorie",
+  general_consolidated: "Consolidé Général",
+  time_evolution: "Évolution Temporelle",
+  active_grouping: "Groupement Actif ({gran})",
+  balance: "Solde",
+  gold_origin: "Origine de l'Or (From Allocation)",
+  paying_sources: "Sources de Paiement",
+  no_income_registered: "Aucun revenu enregistré.",
+  top_entities: "Principales Entités",
+  by_gold_volume: "Par Volume d'Or",
+  no_commercial_record: "Aucun registre commercial.",
+  savings_rate_real: "Taux d'Épargne Réel",
+  advice_efficiency_good: '"Votre gestion est légendaire, mon Seigneur ! Vous gardez une grande partie de votre or pour de futures conquêtes."',
+  advice_efficiency_ok: '"Vous gardez les comptes sous contrôle, mais nous pourrions épargner plus d\'or si nous réduisions les petites dépenses."',
+  advice_efficiency_bad: '"Danger ! Le royaume épuise ses réserves. Nous devons couper les dépenses immédiatement !"',
+  flow_comparison: "Comparaison des Flux",
+  revenue_vs_expense: "Revenu vs Dépense",
+  expenses_by_entity_category: "Dépenses par Catégorie d'Entité",
+  spending_distribution: "Distribution des Dépenses",
+  no_expenses_registered: "Aucune dépense enregistrée.",
+  no_records_active_period: "Aucun registre commercial dans la période active.",
+  receivables: "À Recevoir (Receivables)",
+  payables: "À Payer (Payables)",
+  overdue_rate: "Taux de Retard (Overdue Rate)",
+  pending_revenues: "Revenus en Attente",
+  pending_expenses: "Dépenses en Attente / En Retard",
+  no_pending_revenues: "Aucun revenu en attente. Tous les paiements ont été perçus !",
+  no_pending_expenses: "Aucune dépense en attente. Le royaume est libre de dettes !",
+  active_filters: "Filtres Actifs",
+  clear_all: "Tout Effacer",
+  year_label: "Année",
+  month_label: "Mois",
+  quarter_label: "Trimestre",
+  type_label: "Type",
+  date_label: "Date",
+  category_label: "Catégorie",
+  all_years: "Toutes les Années",
+  all_months: "Tous les Mois",
+  all_quarters: "Tous les Trimestres",
+  all_from: "Toutes les Origines",
+  all_types: "Tous les Types",
+  all_categories: "Toutes les Catégories",
+  filters_cleared: "Filtres effacés !",
+  hide_filters: "Masquer Filtres",
+  show_filters: "Afficher Filtres",
+  entidade_header: "Entité",
+  total_header: "Total",
+  register_ledger: "Enregistrer",
+  registering_ledger: "Enregistrement...",
+  history_transactions: "Historique des Transactions",
+  chart_horizon_all: "Tout le Temps",
+  chart_horizon_moon: "Lune Actuelle",
+  chart_horizon_cycles: "30 Derniers Cycles",
+  chart_scale_absolute: "Or Absolu",
+  chart_scale_percentage: "Pourcentage",
+  chart_segment_percentage: "Part du Segment",
+  chart_time_horizon: "Horizon Temporel",
+  chart_scale_mode: "Mode d'Échelle",
+  savings: "Épargne",
+  debt: "Dette"
+};
+
+
+
+=========================================
+ARQUIVO: client\src\utils\locales\pt-BR.js
+=========================================
+
+export const ptBR = {
+  quests: "Missões",
+  achievements: "Conquistas",
+  transactions: "Transações",
+  dashboard: "Painel",
+  settings: "Definições",
+  language_select: "Selecionar Idioma",
+  
+  gold_mine: "Mina de Ouro",
+  royal_treasury: "Tesouraria Real",
+  central_market: "Mercado Central",
+  town_hall: "Prefeitura",
+  village_housing: "Casas da Vila",
+  tributes: "Tributos",
+  tavern: "A Taverna",
+  under_construction: "Em Construção",
+
+  back_to_map: "Voltar ao Mapa",
+  kingdom_lists: "Listas do Reino",
+  configuration_panel: "Painel de Configuração",
+  official_ledger_editor: "Editor do Livro Oficial",
+  new_value: "Novo Valor",
+  default_category: "Categoria Padrão",
+  add: "Adicionar",
+  delete: "Excluir",
+  value: "Valor",
+  actions: "Ações",
+  no_options_registered: "Nenhuma opção registrada nesta lista.",
+  close: "Fechar",
+  clear: "Limpar",
+  eliminate: "Eliminar",
+
+  manage_from: "Gerenciar Origens/From",
+  manage_status: "Gerenciar Status (Estados)",
+  manage_category: "Gerenciar Categorias",
+  manage_subcategory: "Gerenciar Subtipos",
+  manage_entity: "Gerenciar Entidades (Entities)",
+  manage_entityCategory: "Gerenciar Categoria das Entidades",
+  manage_month: "Gerenciar Meses",
+ 
+  register_movement: "Registrar Movimento",
+  gold_mine_commerce: "Mina de Ouro & Comércio",
+  ledger_transactions: "Livro Razão Geral",
+  type: "Tipo",
+  income: "Rendimento",
+  expense: "Despesa",
+  amount_gold: "Quantidade",
+  origin_from: "Origem/From",
+  value_date: "Data de Valor",
+  posting_date: "Data de Lançamento",
+  status: "Status",
+  category: "Categoria",
+  subcategory: "Subtipo",
+  entity: "Entidade",
+  entity_category: "Categoria da Entidade",
+  description: "Descrição",
+  save_transaction: "Salvar Registro",
+  import_csv: "Importar CSV",
+  export_csv: "Exportar CSV",
+
+  err_invalid_amount: "Por favor, digite uma quantidade válida de Moedas de Ouro!",
+  err_invalid_from: "Por favor, especifique o campo 'Origem' (Payer/From)!",
+  success_added_gold: "Adicionado {amount} de Ouro! Nível e XP atualizados.",
+  success_spent_gold: "Gastou {amount} de Ouro!",
+  err_transaction_failed: "Falha na transação: {error}",
+  success_export: "Livro contábil exportado com sucesso!",
+  success_export_empty: "Modelo CSV exportado (sem dados)!",
+  success_import: "Importado com sucesso {count} transações!",
+  success_import_zero: "Importação concluída: 0 transações carregadas.",
+  err_import: "Erro ao processar o arquivo CSV!",
+  err_import_db: "Falha na importação: {error}",
+  success_added_option: "Adicionado '{val}' com sucesso!",
+  success_deleted_option: "Removido '{val}' com sucesso!",
+  err_enter_value: "Por favor, digite um valor!",
+  err_value_exists: "Este valor já existe na lista!",
+
+  subtab_overview: "Visão Geral",
+  subtab_income_expense: "Receitas & Despesas",
+  subtab_financial_statement: "Demonstrativos Financeiros",
+  subtab_payables_receivables: "A Receber & A Pagar",
+  subtab_liabilities: "Passivos",
+  subtab_ratios: "Índices",
+  net_accrued_income: "Lucro Líquido Acumulado (DRE)",
+  balance_sheet: "Balanço Patrimonial",
+  pnl_statement: "Demonstração de Resultados (DRE)",
+  cash_flow_statement: "Fluxo de Caixa",
+  treasury_menu_title: "Menu da Tesouraria Real",
+  menu_primary: "Principal",
+  menu_financial_statements: "Demonstrativos Financeiros",
+  menu_financial_statements_desc: "Relatórios financeiros consolidados incluindo Balanço Patrimonial, DRE e Fluxo de Caixa.",
+  menu_economic_overview: "Visão Geral Econômica",
+  menu_economic_overview_desc: "Visão geral dos saldos de caixa, evolução temporal e distribuição de categorias.",
+  menu_commercial_accounts: "Contas Comerciais",
+  menu_commercial_accounts_desc: "Rastreie contas a pagar, contas a receber e métodos de pagamento em aberto.",
+  menu_liabilities_debt: "Passivos & Dívidas",
+  menu_liabilities_debt_desc: "Monitore obrigações pendentes, principal da dívida e amortizações.",
+  menu_general_ledger: "Livro Razão Geral",
+  menu_general_ledger_desc: "Registre movimentos de moedas de ouro, gerencie status, categorias, entidades e veja o histórico completo do livro.",
+  menu_treasury_dashboard: "Painel da Tesouraria",
+  menu_treasury_dashboard_desc: "Visão geral dos saldos de caixa, distribuição de categorias, contas comerciais e obrigações.",
+  menu_register_transaction: "Registrar Movimento",
+  menu_register_transaction_desc: "Registre uma nova movimentação de moedas de ouro, receitas, despesas, ativos ou passivos.",
+  gran_month: "Mensal",
+  gran_quarter: "Trimestral",
+  gran_year: "Anual",
+  financial_report: "Relatório Financeiro do Reino",
+  treasury_books: "Livros da Tesouraria",
+
+  advice_empty: '"Nenhum movimento registrado nos livros oficiais da coroa, meu Lorde. O reino aguarda atividade financeira."',
+  advice_positive: '"Os cofres do reino estão prósperos, meu Lorde! Registamos um saldo positivo de +{balance}g moedas de ouro. A eficiência de poupança está em {ratio}%."',
+  advice_negative: '"Alerta, meu Lorde! A Tesouraria Real está em déficit comercial de {balance}g moedas de ouro. Nossas despesas superam os rendimentos. Devemos conter os gastos!"',
+  advice_neutral: '"O balanço da Tesouraria Real está perfeitamente equilibrado, meu Lorde."',
+
+  // Dashboard Detail Translations (Audit Fixes)
+  total_income_inflow: "Total de Receitas (Inflow)",
+  total_expenses_outflow: "Total de Despesas (Outflow)",
+  net_balance: "Saldo Líquido",
+  savings_efficiency: "Eficiência de Poupança",
+  treasurer_advice_banner: "Conselho do Tesoureiro Real",
+  flow_by_category: "Fluxo por Categoria",
+  general_consolidated: "Consolidado Geral",
+  time_evolution: "Evolução Temporal",
+  active_grouping: "Agrupamento Ativo ({gran})",
+  balance: "Balanço",
+  gold_origin: "Origem do Ouro (From Allocation)",
+  paying_sources: "Fontes Pagadoras",
+  no_income_registered: "Nenhum rendimento registado.",
+  top_entities: "Maiores Comércios (Top Entities)",
+  by_gold_volume: "Por Volume de Ouro",
+  no_commercial_record: "Sem registo comercial.",
+  savings_rate_real: "Taxa de Poupança Real",
+  advice_efficiency_good: '"A vossa gestão é digna de lenda, meu Lorde! Guardais uma grande fatia do vosso ouro para futuras conquistas."',
+  advice_efficiency_ok: '"Mantendes as contas sob controlo, mas podíamos poupar mais ouro se reduzíssemos as despesas menores."',
+  advice_efficiency_bad: '"Perigo! O reino está a esgotar as suas reservas. Precisamos cortar despesas imediatamente!"',
+  flow_comparison: "Comparação de Fluxos",
+  revenue_vs_expense: "Receita vs Despesa",
+  expenses_by_entity_category: "Despesas por Categoria de Entidade",
+  spending_distribution: "Distribuição do Gasto",
+  no_expenses_registered: "Nenhuma despesa registada.",
+  no_records_active_period: "Sem registos comerciais no período activo.",
+  receivables: "Moedas a Receber (Receivables)",
+  payables: "Moedas a Pagar (Payables)",
+  overdue_rate: "Taxa de Atraso (Overdue Rate)",
+  kpi_all_payables: "Contas a Pagar Total",
+  kpi_open_payables: "Contas a Pagar Abertas",
+  kpi_all_receivables: "Contas a Receber Total",
+  kpi_open_receivables: "Contas a Receber Abertas",
+  kpi_overdue_rate: "Taxa de Atraso",
+  chart_payables_vs_receivables: "Evolução de Contas a Pagar e Receber",
+  chart_open_payables_by_category: "Contas a Pagar por Categoria",
+  chart_open_payables_by_entity: "Contas a Pagar por Entidade",
+  chart_open_payables_by_month: "Contas a Pagar por Mês",
+  chart_payment_methods: "Distribuição de Métodos de Pagamento",
+  advice_pr_evolution_positive: '"Excelente perspectiva de tesouraria, meu Lorde! Nossas cobranças esperadas superam as obrigações futuras em {diff}. O saldo de caixa futuro do reino permanece seguro."',
+  advice_pr_evolution_negative: '"Meu suserano, nossas obrigações futuras superam as cobranças esperadas em {diff}. Devemos negociar prazos de pagamento mais longos ou acelerar as cobranças para proteger a liquidez de nossa tesouraria!"',
+  advice_pr_category_positive: '"Meu Senhor, a categoria de {category} tem a maior parcela de contas em aberto, totalizando {amount}. Devemos revisar estas contas comerciais primeiro."',
+  advice_pr_category_none: '"Não temos contas a pagar abertas registradas em nenhuma categoria de transação, meu suserano."',
+  advice_pr_entity_positive: '"Nossos registros mostram que {entity} é o nosso maior credor, com {amount} em aberto. Liquidar esta conta deve ser prioritário para manter nossa reputação comercial."',
+  advice_pr_entity_none: '"Nossas relações comerciais estão livres de dívidas não pagas, meu Senhor."',
+  advice_pr_month_positive: '"Meu suserano, nossas contas a pagar em aberto estão distribuídas ao longo das estações. Alinhar as datas de pagamento com nossas cobranças de impostos mensais manterá o baú real estável."',
+  advice_pr_month_none: '"Nenhum passivo mensal a relatar, Senhor."',
+  advice_pr_payment_method_positive: '"Nossos vetores comerciais mostram que {method} é o principal meio de troca, representando {amount} de movimentos liquidados. Manter vetores de pagamento diversos garante que o comércio flua suavemente."',
+  advice_pr_payment_method_none: '"Nenhuma transação liquidada com método de pagamento registrado existe em nossos arquivos ainda."',
+  pending_revenues: "Receitas Pendentes",
+  pending_expenses: "Despesas Pendentes / Atrasadas",
+  no_pending_revenues: "Nenhuma receita pendente. Todos os pagamentos foram cobrados!",
+  no_pending_expenses: "Nenhuma despesa pendente. O reino está livre de dívidas correntes!",
+  active_filters: "Filtros Ativos",
+  clear_all: "Limpar Todos",
+  year_label: "Ano",
+  month_label: "Mês",
+  quarter_label: "Trimestre",
+  type_label: "Tipo",
+  date_label: "Data",
+  category_label: "Categoria",
+  all_years: "Todos os Anos",
+  all_months: "Todos os Meses",
+  all_quarters: "Todos os Trimestres",
+  all_from: "Todas as Origens",
+  all_types: "Todos os Tipos",
+  all_categories: "Todas as Categorias",
+  filters_cleared: "Filtros limpos!",
+  hide_filters: "Ocultar Filtros",
+  show_filters: "Mostrar Filtros",
+  entidade_header: "Entidade",
+  total_header: "Total",
+  register_ledger: "Registar no Livro",
+  registering_ledger: "Registando...",
+  history_transactions: "Histórico de Transações",
+  "placeholder.item": "Ex: Novo Item",
+  "placeholder.amount": "Ex: 500",
+  "placeholder.notes": "Ex: Observações",
+  chart_horizon_all: "Todo o Tempo",
+  chart_horizon_moon: "Lua Atual",
+  chart_horizon_cycles: "Últimos 30 Ciclos",
+  chart_scale_absolute: "Ouro Absoluto",
+  chart_scale_percentage: "Percentagem",
+  chart_segment_percentage: "Fatia do Segmento",
+  chart_time_horizon: "Horizonte Temporal",
+  chart_scale_mode: "Modo de Escala",
+  savings: "Poupança",
+  debt: "Dívida",
+  kpi_total_debt: "Dívida Total",
+  kpi_to_be_paid: "A Ser Pago",
+  kpi_new_liabilities: "Novos Passivos",
+  kpi_amortizations: "Amortizações",
+  chart_liabilities_evolution: "Evolução de Passivos",
+  chart_debt_by_entity: "Dívida por Entidade",
+  chart_debt_composition: "Composição da Dívida por Tipo",
+  advice_liabilities_evolution: '"Meu suserano, nossos gráficos de spline rastreiam nossos passivos ao longo do tempo. Reembolsos e amortizações representam reduções saudáveis em nosso principal total. Vamos equilibrar nossa taxa de empréstimo com a velocidade de reembolso."',
+  advice_debt_by_entity: '"Este gráfico exibe a quem devemos ouro, meu suserano. {entity} é o nosso maior credor com {amount}. Priorizar pagamentos a ele preservará nossas relações comerciais."',
+  advice_debt_composition: '"Meu Senhor, esta rosca exibe a composição de nossa dívida ativa. Temos {amount} pendente, dividido entre várias categorias. Diversificar nossas linhas de crédito mantém a tesouraria estável."',
+  tpl_salary: "Salário",
+  tpl_blacksmith_payment: "Equipamentos e Ferramentas (Pagar Ferreiro)",
+  tpl_pay_blacksmith: "Equipamentos e Ferramentas (Pagar Ferreiro)",
+  tpl_tavern_feast: "Restaurante (Banquete na Taverna)",
+  tpl_borrow_gold: "Empréstimo Bancário (Pegar Ouro Emprestado)",
+  tpl_pay_landlord: "Aluguel (Pagar Proprietário)",
+  tpl_purchase_food: "Supermercado (Comprar Alimento)",
+  tpl_pay_interest: "Despesa de Juros (Pagar Juros)",
+  tpl_transfers: "Transferência Interna (Transferências)"
+};
+
+
+
+
+=========================================
+ARQUIVO: documentation\dashboard_configuration.md
+=========================================
+
+# 📊 Citadel Dashboard Configurations & Architectural Specification
+
+This document serves as the master technical reference and configuration guide for the Eldoria/Citadel Command Dashboard. It explains the mechanics, state synchronization, layout engines, and crucial workarounds implemented to ensure stability.
+
+---
+
+## 🗂️ Table of Contents
+1. [Core Layout Grid & CSS Scaling Engine](#1-core-layout-grid--css-scaling-engine)
+2. [Interaction Locking & Event Shielding](#2-interaction-locking--event-shielding)
+3. [Layout Collision & Grid Alignment Geometry](#3-layout-collision--grid-alignment-geometry)
+4. [Dashboard Store & Migration Lifecycle](#4-dashboard-store--migration-lifecycle)
+5. [Interactive Filters & State Syncing](#5-interactive-filters--state-syncing)
+
+---
+
+## 1. Core Layout Grid & CSS Scaling Engine
+
+The dashboard coordinates and rendering flow are handled inside [DashboardCanvas.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/dashboard/DashboardCanvas.jsx).
+
+### CSS Scale Math
+Rather than constantly reflowing the coordinates of `react-grid-layout` when drawers open or screens resize, the dashboard uses a virtual grid resolution of **1200px** and scales the container using a CSS transform matrix:
+* **ResizeObserver**: Observes the outer workspace width.
+* **Scale calculation**: `Math.min(newWidth / 1200, 1.0)`.
+* **Scaling Wrapper**:
+```javascript
+<div
+  style={{
+    transform: `scale(${scale})`,
+    transformOrigin: 'top left',
+    width: '1200px',
+    height: `${100 / scale}%`
+  }}
+>
+```
+* **Why `100 / scale` height is used**: Rescaling the container shrinks its visual height. Setting the height to `100 / scale %` mathematically forces the scaled grid to stretch back, filling the vertical viewport space and preventing layout truncation.
+
+### The Focus Scroll Lock Jitter Workaround
+Because the scaled container height `100 / scale %` makes the inner div taller than its parent bounding box (which is styled with `overflow-hidden`), clicking or focusing on elements in the bottom half of widgets causes the browser to natively trigger a focus scroll.
+* **The Symptom**: The entire grid shifts or "jumps" upwards, and cannot be scrolled back because there are no scrollbars.
+* **The Solution**: An explicit `onScroll` snap-back listener locks both scroll offsets to `0` on the parent container wrapper:
+```javascript
+onScroll={(e) => {
+  e.currentTarget.scrollTop = 0;
+  e.currentTarget.scrollLeft = 0;
+}}
+```
+
+---
+
+## 2. Interaction Locking & Event Shielding
+
+Grid movement (drag-and-drop / resizing) is strictly confined to **Edit Mode** (`isEditingLayout === true`).
+
+### RGL Lock Props
+Draggable and Resizable flags are bound to the store's edit state:
+```javascript
+isDraggable={isEditingLayout}
+isResizable={isEditingLayout}
+```
+
+### Event Shields (Mousedown / Touchstart)
+To prevent `react-grid-layout` from receiving interactions when in View Mode (`isEditingLayout === false`), we wrap the inner widget components in an event shield that intercepts and kills drag-initiating events before they bubble up to the parent grid item container:
+```javascript
+<div 
+  className={`w-full h-full ${isEditingLayout ? 'pointer-events-none select-none' : ''}`}
+  onMouseDown={(e) => {
+    if (!isEditingLayout) {
+      e.stopPropagation();
+    }
+  }}
+  onTouchStart={(e) => {
+    if (!isEditingLayout) {
+      e.stopPropagation();
+    }
+  }}
+>
+  <WidgetComponent />
+</div>
+```
+* **Edit Mode**: The `pointer-events-none` class disables interactions on the inner shield, letting mouse clicks pass directly to `react-grid-layout` for standard drag-and-drop.
+* **View Mode**: The shield is active. Mouse and touch clicks stop propagating at this div, completely locking the parent grid items while allowing internal buttons/filters to function.
+
+### Targeted Transitions vs. Transform Conflicts
+Tailwind's `transition-all` class causes animation conflicts because `react-grid-layout` handles position coordinates via inline `transform: translate(x, y)` values. When a widget updates its loading state (`isFetching`), it triggers a re-render where the transition animates the transform change, causing a "shake" or "jump".
+* **Solution**: Replace `transition-all` with targeted transitions:
+```scss
+transition-[border-color,box-shadow,background-color]
+```
+
+---
+
+## 3. Layout Collision & Grid Alignment Geometry
+
+The AP/AR Command Dashboard operates on a strict **12-column grid** layout defined in [useDashboardStore.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/store/useDashboardStore.js).
+
+### Layout Preset Sizing (`DEFAULT_INTERACTIVE_PRESET`)
+To prevent `react-grid-layout` from automatically triggering collision resolution (which pushes widgets down to lower rows and causes visual jumping), the layout coordinates must satisfy the minimum dimensions (`minW` and `minH`) defined in the registry:
+* **Row 0 (Header Controls)**: Total columns = 12.
+  * `inter_granularity-1`: `w: 4`, `x: 0`, `y: 0` (minW: 3)
+  * `inter_date_picker-1`: `w: 4`, `x: 4`, `y: 0` (minW: 4)
+  * `inter_status-1`: `w: 4`, `x: 8`, `y: 0` (minW: 3)
+* **Row 1 (Chronological Arrears)**: Total columns = 12.
+  * `inter_arrear-1`: `w: 12`, `h: 1`, `x: 0`, `y: 1` (minW: 6)
+* **Row 2 (Detailed Breakdown & Ledger)**: Total columns = 12.
+  * `inter_category-1`: `w: 4`, `h: 4`, `x: 0`, `y: 2` (minW: 3)
+  * `inter_entity-1`: `w: 4`, `h: 4`, `x: 4`, `y: 2` (minW: 3)
+  * `inter_ledger-1`: `w: 4`, `h: 4`, `x: 8`, `y: 2` (minW: 4)
+
+---
+
+## 4. Dashboard Store & Migration Lifecycle
+
+Layout configurations are persisted in Supabase (`profiles.dashboard_layouts`) and cached locally in `localStorage` under `eldoria_dashboard_layouts`.
+
+### Auto-Reset Migration Step
+If a user's cached layout coordinates contain old version values (e.g. if the Date Range Selector has `w < 4`), it will cause collisions and visual jumps. The store's hydration method `hydrateLayouts()` includes a migration step to automatically correct the cache:
+```javascript
+apar_interactive: (savedLayout?.apar_interactive && !savedLayout.apar_interactive.some(item => item.i === 'inter_date_picker-1' && item.w < 4)) 
+  ? JSON.parse(JSON.stringify(savedLayout.apar_interactive)) 
+  : JSON.parse(JSON.stringify(DEFAULT_INTERACTIVE_PRESET))
+```
+
+---
+
+## 5. Interactive Filters & State Syncing
+
+Interactive filtering updates are synchronized using Zustand (`useInteractiveStore`) and TanStack Query (`useInteractiveData`):
+
+### Zustand Store (`useInteractiveStore.js`)
+Stores date picker boundaries, category filter strings, granularity values, and statuses:
+```javascript
+setFilter: (key, value) => set((state) => {
+  const newFilters = { ...state.filters, [key]: value };
+  return { filters: newFilters };
+})
+```
+
+### TanStack Query Caching & DOM Preservation
+All widgets subscribe to the same query hook [useInteractiveData.js](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/hooks/useInteractiveData.js). To prevent widgets from collapsing or resetting their DOM height when a query is loading, the hook is configured with:
+```javascript
+placeholderData: keepPreviousData, // Keeps stale layout details visible during loading
+staleTime: 1000 * 60 * 5,          // Caches queries for 5 minutes
+```
+This guarantees that the widgets never unmount or trigger layout jumps during network requests.
+
+
+
+=========================================
+ARQUIVO: documentation\dashboard_migration_checklist.md
+=========================================
+
+# Eldoria V2.1 Dashboard Migration Checklist
+
+This unified master document merges your static component extraction with your dynamic layout engine architecture into a single, cohesive execution path.
+
+## Phase 1: The Aggregation Engine & Sandbox Base
+- [x] Create `utils/chartAnalytics.js`: Established the core data aggregation pipeline.
+- [x] Monthly Performance Parser: Implemented `generateCashFlowData()` to group monthly income vs. expenses.
+- [x] Chronological Trend Aggregator: Implemented `generateNetTrendData()` to calculate net position.
+- [x] COA Category Parser: Implemented `generateCategoryBreakdown()` using 8-digit COA prefix groupings.
+- [x] Dependency Check: Run `npm install recharts react-grid-layout @tanstack/react-query` in the client directory.
+
+## Phase 2: Component Extraction & Widget Registration
+Strip TypeScript types and reskin the legacy components into modular, registration-ready dashboard widgets using the dark-stone/amber aesthetic.
+- [ ] CashFlowChart.jsx Extraction:
+  - Apply dark-stone/amber base formatting.
+  - Implement dual-bar rendering utilizing Emerald (Income) and Rose (Expenses).
+- [ ] NetWorthChart.jsx Extraction:
+  - Implement chronological trend line styling utilizing Amber/Gold gradients.
+- [ ] AssetAllocationChart.jsx Extraction:
+  - Build custom Eldoria dark-fantasy palette arrays for pie slices.
+- [ ] The Widget Registry: Establish a `widgetRegistry.js` map configuration file detailing dimensions (`minW`, `maxW`, `minH`, `maxH`) and reference pointers for each extracted chart.
+
+## Phase 3: Server State & Client Configuration Layers
+Before building UI elements, establish the data management layer to ensure optimal performance.
+- [ ] TanStack Query Configuration: Set up the provider wrapper. Migrate chart data hooks to utilize React Query caching to deduplicate identical Supabase API calls across widgets.
+- [ ] System Configurations (`dashboard.config.js`): Create a frontend configuration file to store global invariants like `MAX_WIDGETS_PER_TAB` (set to 8) to maintain client-side rendering performance.
+- [ ] Zustand Store Expansion:
+  - Add `isEditingLayout` boolean toggle to trigger global "Stance Changes."
+  - Implement `draftLayout` tracking to hold live-preview alterations separate from saved production state.
+  - Add Submenu visibility state arrays handling visibility flags (`isVisible`) and naming strings for 6 available tabs.
+
+## Phase 4: The Dynamic Drag-and-Drop Canvas
+Replace the hardcoded grid structure inside your sandbox with a fluid layout system.
+- [ ] The App Header Stance Change: Program the Top Bar to read the `isEditingLayout` state. Morph the default "Settings" button into a green "Save Changes" and a red "Cancel / Revert" button combo.
+- [ ] `react-grid-layout` Integration: Implement the physics grid layer into the main canvas. Bind it to read from `draftLayout` during edit states.
+- [ ] Active Canvas Modifiers:
+  - Add code to display an absolute-positioned "X" deletion button over widgets when editing.
+  - Inject dynamic layout baseline defaults ("Standard 1") whenever a hidden tab is toggled to active, preventing blank canvas errors.
+- [ ] Layout Physics Verification: Verify items seamlessly swap positions, scale correctly to registry limits, and push non-selected visuals dynamically before dropping.
+- [ ] Responsive Breakpoints: Write a window listener that bypasses grid coordinate logic on small screens, forcing layout blocks into a legible, vertical single-column stack.
+
+## Phase 5: Configuration Panel UI & Adaptation
+Build the visual controls to alter the states configured in Phase 3.
+- [ ] Layout Shell: Create the settings menu interface.
+  - Desktop Mode: Animates out as a clean, right-side sliding panel.
+  - Mobile Mode: Renders as a bottom-sheet drawer covering only the bottom 45% of the viewport to preserve the upper canvas live preview.
+- [ ] Section A (Submenu Manager): Map Tabs 1–6 showing Eye icons (toggling visibility parameters) and Pencil icons (which morph text fields into text inputs for quick renaming).
+- [ ] Section B (Views Gallery): Build a gallery of predefined template configurations ("Standard 1", "Split Canvas") that overwrite `draftLayout` tracking arrays with a single click.
+- [ ] Section C (Draggable Widget List): Render lists of registry components styled as grabbable element boxes. Map their drag handles directly to append objects onto the grid engine canvas.
+
+## Phase 6: Sync & Database Persistence
+- [ ] Schema Definition: Generate the `dashboard_preferences` table in Supabase.
+- [ ] State Synchronization Hooks: Build the save trigger to write stringified master JSON configurations upstream to Supabase when the user clicks "Save Changes."
+- [ ] Component Migration Cleanups: Convert any leftover legacy components (such as FinSight metrics summary cards or recent transaction tables) into modular engine widgets.
+
+## 📌 Pinned Execution Directives
+- **Visual Polish**: Empty drop zones must render with a faint amber/gold glowing border indicating cell alignment previews during drag interactions.
+- **Z-Index Hierarchy**: Set active dragged elements to a higher Z-index layer than Recharts tooltip wrappers to prevent visual rendering glitches during layout re-arrangements.
+- **UX Notifications**: Tie state changes directly into toast popups ("Changes Saved to Vault", "Tab Slot Limit Encountered").
+
+
+
+=========================================
+ARQUIVO: documentation\Eldoria Architecture Rulebook.md
+=========================================
+
+# **🏰 Eldoria Architecture Rulebook & Refactoring Guide**
+
+**Version:** 3.0 (Server-Side Database Views, Optimistic UI, and Edge Function Gamification)  
+**Purpose:** This document is the absolute single source of truth for the Eldoria financial engine. All React components, Zustand stores, and database schemas MUST comply with the rules below.
+
+---
+
+## **1. The Core Paradigm: The Flat Matrix & Server-Side Views**
+
+We have completely migrated away from heavy client-side aggregation loops over transaction arrays. All analytical metrics and charts consume pre-aggregated database views or server-side RPC metrics.
+
+### **The Data Shape (dim_contas)**
+
+Every account is a flattened object representing the `dim_contas` table in Supabase:
+
+```json
+{  
+  "code": "11010001",                 // String (Exactly 8 digits)  
+  "account_name": "Checking Accounts CGD", // String  
+  "type": "Assets",                   // String (Assets, Liabilities, Income, Expenses)  
+  "subtype": "Liquid Assets",         // String  
+  "category": "Checking Accounts",    // String  
+  "entity": "CGD"                     // String  
+}
+```
+
+### **The Database Views (vw_*)**
+
+To prevent frontend performance lag under heavy transaction loads, chart aggregations must consume the following optimized views:
+* **`vw_monthly_analytics`**: Grouped monthly total sums of Inflows and Outflows.
+* **`vw_cumulative_trends`**: Running historical totals of Assets, Liabilities, and Net Worth.
+* **`vw_category_balances`**: Summed volumes of target categories for distribution analysis.
+* **`vw_entity_exposure`**: Aggregated concentration volumes grouped by counterparty.
+* **`vw_daily_analytics`**: Daily aggregated transaction patterns.
+
+---
+
+## **2. The 8-Digit Chart of Accounts (COA) Structure**
+
+We use a strict 8-digit account coding system. Legacy codes are obsolete.
+
+The COA is divided into four primary prefixes:
+
+* **1xxxxxxx (Assets):** Everything the Kingdom owns.  
+  * `1101xxxx`: Checking Accounts  
+  * `1102xxxx`: Savings & Wallets (Vaults)  
+  * `1103xxxx`: Cash (Physical)  
+  * `1201xxxx` / `1301xxxx` / `1401xxxx`: Sinking Funds, Investments, Real Estate.  
+* **2xxxxxxx (Liabilities):** Everything the Kingdom owes.  
+  * `2101xxxx`: Credit Cards  
+  * `2102xxxx`: Personal Loans  
+  * `2103xxxx`: State Debts  
+  * `2201xxxx`: Long-Term Loans  
+* **6xxxxxxx (Expenses):** Outflows.  
+* **7xxxxxxx (Income):** Inflows.
+
+---
+
+## **3. Double-Entry Mechanics & Business Logic**
+
+The frontend transaction forms must orchestrate data using the following mathematical and double-entry rules:
+
+### **Transaction Flow Matrix**
+
+Every transaction requires a base `target_account` (resolved from the Matrix). Transfers or Debt payments also require a `source_dest_bank`.
+
+| Transaction Type | Flow Direction | Mathematical Impact on Balances |
+| :--- | :--- | :--- |
+| **Income** (7xxxxxxx) | Inflow | Target Asset Balance + Amount |
+| **Expense** (6xxxxxxx) | Outflow | Source Asset Balance - Amount |
+| **Transfer (Internal)** | Neutral | Source Asset - Amount AND Target Asset + Amount |
+| **New Loan (Debt)** | Inflow | Target Liability + Amount AND Source Asset + Amount |
+| **Debt Payment** | Outflow | Target Liability - Amount AND Source Asset - Amount |
+
+### **Balance & Net Worth Calculations (Server-Side Aggregation)**
+
+Global financial metrics must **never** be calculated by iterating over local arrays in the browser.
+
+* **Backend RPCs & Views**: All top-level HUD metrics are calculated directly on the PostgreSQL server via Supabase RPCs (e.g., `get_dashboard_metrics` or analytical views).
+* **Optimistic Syncing**: When a transaction is added, updated, or deleted, the frontend must immediately trigger a non-blocking background fetch of the RPC and views (`fetchDashboardMetrics()` and `fetchAnalytics()`) to keep the UI perfectly synchronized.
+
+### **Transaction Mutations & State Synchronization (Optimistic UI)**
+
+To ensure a seamless user experience, write operations must implement Optimistic UI updates:
+
+* **Adding Transactions**:
+  1. Generate a temporary ID: `const tempId = 'temp-' + Date.now()`.
+  2. Prepend the transaction locally in Zustand state instantly.
+  3. Send request to Supabase.
+  4. On response, swap out the temporary ID with the real database record ID.
+* **Deleting Transactions**:
+  1. Store a backup of current transactions.
+  2. Remove the target transaction locally in Zustand state instantly.
+  3. Send delete request to Supabase.
+  4. Revert to the backup if the server request fails.
+
+### **Ledger Data Constraints**
+
+* **Strict Pagination**: All ledger queries must implement chunking via `fetchTransactions(limit, offset)`.
+* **Server-Side Filtering**: Text searches and category filters must be passed to Supabase as query parameters rather than filtering a massive array locally in React.
+* **Type Normalization**: Ensure transaction types are normalized before db transmission (e.g., mapping `'expenses'` to `'Expenses'` to satisfy postgres check constraints).
+
+---
+
+## **4. UI Constraints & The "Modern Dashboard" Layout**
+
+* **Tailwind & CSS Preserves**: Eldoria uses a dark, medieval-fantasy aesthetic with golds, deep browns, and custom scrollbars. Do not alter Tailwind styles unless specifically requested.
+* **Modern Dashboard Container bounds**:
+  * **Outer Void**: Exactly 100% width and dynamic viewport height (`w-full h-dvh bg-black flex justify-center overflow-hidden`).
+  * **Inner Canvas**: Exactly 100% height of the void, up to a maximum of 1280px wide, perfectly centered (`relative w-full max-w-7xl h-full mx-auto ...`).
+* **Settings Sidebar**: Left-side accordion menu (`SettingsSidebar.jsx`) mounts first inside the flex containment container. Responsive drawer on mobile/compact screen scopes.
+
+---
+
+## **5. Server-Side Gamification & Edge Functions**
+
+Gamification updates (Ouro, XP, Levels) are processed securely in the background:
+
+* **Supabase Webhooks**: Configured to capture new insertions into the `transactions` table.
+* **Edge Functions**: A Deno Edge Function (`process-gamification`) handles calculations server-side, verifying data, calculating modifiers, and securely updating profiles via the `increment_gamification_stats` RPC using an admin key.
+
+---
+
+## **6. Dashboard Layout Persistence & RLS Requirements**
+
+### **Layout Configurations**
+* **Primary Sync**: Dashboard preferences and drag-and-drop coordinate arrays are stored inside the `dashboard_layouts` jsonb column in `public.profiles`.
+* **Local Fallback**: If the user's connection to Supabase fails or a profile cannot be resolved, the application must fall back to a localized storage cache (`localStorage` item `eldoria_dashboard_layouts`) to prevent blank layouts.
+
+### **RLS & Seeding Dependencies**
+* **Chart of Accounts (`dim_contas`)**: Requires RLS select policies that permit authenticated or anonymous read access so the application can populate initial menus and dropdowns.
+* **Transaction Safety**: Because the `transactions` table enforces foreign keys on `target_account` and `source_account` pointing to `dim_contas.code`, the Chart of Accounts must be pre-populated (seeded) in the database before transactions can be successfully logged.
+
+
+
+
+
+
+=========================================
+ARQUIVO: documentation\sandbox_specs.md
+=========================================
+
+# 🧪 Eldoria Sandbox Specification & Control Center
+
+This document outlines the architecture, components, registry, and mock dataset configurations of the **Widget Sandbox Environment** in Eldoria.
+
+---
+
+## 1. Directory Structure
+
+All sandbox files reside within the isolated development workspace:
+*   [dashboard-widgets-sandbox.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/dashboard-widgets-sandbox.jsx): Staging workspace interface with viewport scale controls.
+*   [sandboxRegistry.jsx](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/client/src/components/sandbox/sandboxRegistry.jsx): Mount mapping registry associating widgets with metadata parameters.
