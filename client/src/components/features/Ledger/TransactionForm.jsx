@@ -119,7 +119,7 @@ export default function TransactionForm({ editingTransaction, onCancelEdit, onSu
     return true;
   });
 
-  const assetSourceAccounts = flatMatrix.filter((row) => row.type === 'Assets');
+  const allAccounts = [...flatMatrix].sort((a, b) => a.code.localeCompare(b.code));
 
   const handleEntityChange = (e) => {
     const val = e.target.value;
@@ -493,7 +493,7 @@ export default function TransactionForm({ editingTransaction, onCancelEdit, onSu
                 className="bg-stone-950 border border-stone-800 focus:border-amber-500 outline-none p-2 rounded text-xs text-stone-100 font-mono transition w-full"
               >
                 <option value="">-- Select Source Account --</option>
-                {assetSourceAccounts.map((row) => (
+                {allAccounts.map((row) => (
                   <option key={row.code} value={row.code}>
                     {row.code} - {row.account_name}
                   </option>
