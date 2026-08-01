@@ -15,13 +15,18 @@ const DEFAULT_INTERACTIVE_PRESET = [
   { i: 'inter_ledger-1', x: 8, y: 2, w: 4, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 8 }
 ];
 
+const DEFAULT_FPA_PRESET = [
+  { i: 'ratio_budget_actual-1', x: 0, y: 0, w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 },
+  { i: 'trend_cash_forecast-1', x: 6, y: 0, w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 }
+];
+
 const INITIAL_SUBMENUS = [
   { id: 'insights', name: 'Insights', isVisible: true, isActive: true },
   { id: 'apar_interactive', name: 'AP/AR Command', isVisible: true, isActive: false },
   { id: 'tab_1', name: 'Royal Treasury', isVisible: true, isActive: false },
   { id: 'tab_2', name: 'Campaign Ledger', isVisible: false, isActive: false },
   { id: 'tab_3', name: 'Citadel Reserves', isVisible: false, isActive: false },
-  { id: 'tab_4', name: 'Merchant Guild', isVisible: false, isActive: false },
+  { id: 'tab_4', name: 'F P & A', isVisible: false, isActive: false },
   { id: 'tab_5', name: 'Vassal Tributes', isVisible: false, isActive: false },
   { id: 'tab_6', name: 'War Fund', isVisible: false, isActive: false },
 ];
@@ -39,7 +44,7 @@ export const useDashboardStore = create((set, get) => ({
     tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
     tab_2: [],
     tab_3: [],
-    tab_4: [],
+    tab_4: JSON.parse(JSON.stringify(DEFAULT_FPA_PRESET)),
     tab_5: [],
     tab_6: [],
   },
@@ -50,7 +55,7 @@ export const useDashboardStore = create((set, get) => ({
     tab_1: JSON.parse(JSON.stringify(DEFAULT_PRESET)),
     tab_2: [],
     tab_3: [],
-    tab_4: [],
+    tab_4: JSON.parse(JSON.stringify(DEFAULT_FPA_PRESET)),
     tab_5: [],
     tab_6: [],
   },

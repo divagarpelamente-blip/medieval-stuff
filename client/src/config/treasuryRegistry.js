@@ -35,10 +35,11 @@ import {
 import {
   AvgMonthlyExpenseWidget, AvgDailyExpenseWidget, SurvivalMonthsWidget,
   SavingsRateWidget, BurnRateWidget, DtiRatioWidget, DebtRatioWidget,
-  WealthVarianceWidget, ExpenseVarianceWidget
+  WealthVarianceWidget, ExpenseVarianceWidget, BudgetVsActualWidget
 } from '../components/widgets/Phase3RatioWidgets';
 
 import { CostOfDebtWidget, YieldAssetsWidget } from '../components/widgets/Phase3FilteredWidgets';
+import { CashForecast90dWidget } from '../components/widgets/Phase3TrendWidgets';
 import { RecentTransactionsWidget, InternalTransfersWidget } from '../components/widgets/Phase4LedgerWidgets';
 
 // ==========================================
@@ -93,6 +94,10 @@ export const TREASURY_WIDGETS = {
   ratio_debt_ratio: { name: "Debt Ratio", component: DebtRatioWidget, description: "Liabilities divided by Assets.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
   ratio_wealth_variance: { name: "Monthly Wealth Variance", component: WealthVarianceWidget, description: "Delta shift in Net Worth.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
   ratio_exp_variance: { name: "Expense Variance (PoP)", component: ExpenseVarianceWidget, description: "Percentage shift in spending.", category: "ratio", layout: { w: 3, h: 2, minW: 2, maxW: 4, minH: 2, maxH: 3 } },
+  ratio_budget_actual: { name: "Budget vs Actual", component: BudgetVsActualWidget, description: "Category spend against defined budgets.", category: "ratio", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+
+  // --- FP&A FORECASTING (Standardized to w:6, h:4) ---
+  trend_cash_forecast: { name: "90-Day Cash Forecast", component: CashForecast90dWidget, description: "Projected liquid reserves trend.", category: "trend", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
 
   // --- OPERATIONAL LEDGERS (Standardized to w:6, h:4) ---
   table_top_merchants: { name: "Top 10 Merchants", component: TopMerchantsWidget, description: "Table of highest spending destinations.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },

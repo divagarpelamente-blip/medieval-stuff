@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 import { useKingdomStore } from '../../store/useKingdomStore';
-import { ArrowUp, ArrowDown, Shield } from 'lucide-react';
+import { ArrowUp, ArrowDown, Shield, Pencil } from 'lucide-react';
+import { BudgetModal } from '../features/settings/BudgetModal';
 
 const formatValue = (val, isPercentage = false, suffix = '', isDelta = false) => {
   const num = Number(val) || 0;
@@ -439,5 +441,102 @@ export const DtiRatioWidget = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+export const BudgetVsActualWidget = () => {
+  const categoryView = useKingdomStore(s => s.analytics?.category || []);
+  const user = useKingdomStore(s => s.user);
+  const [budgets, setBudgets] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchBudgets = async () => {
+      const { data } = await supabase.from('budgets').select('*').eq('profile_id', user.id);
+      if (data) setBudgets(data);
+    };
+    fetchBudgets();
+  }, [user?.id, refreshTrigger]);
+
+  const data = useMemo(() => {
+    const budgetMap = {};
+    budgets.forEach(b => { budgetMap[b.coa_category] = Number(b.monthly_limit); });
+
+    const expenses = categoryView.filter(c => c.type === 'Expenses' && budgetMap[c.category]);
+    
+    return expenses.map(c => {
+      const actual = Number(c.total_volume);
+      const budget = budgetMap[c.category] || 0;
+      const pct = budget > 0 ? (actual / budget) * 100 : 0;
+      const isOver = actual > budget;
+      return {
+        category: c.category,
+        actual,
+        budget,
+        pct: Math.min(pct, 100),
+        isOver
+      };
+    }).sort((a, b) => b.pct - a.pct).slice(0, 5); // top 5
+  }, [categoryView, budgets]);
+
+  return (
+    <>
+      <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-4 shadow-sm overflow-hidden">
+        <div className="mb-3 shrink-0 flex items-start justify-between">
+          <div>
+            <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Budget vs Actual</h3>
+            <p className="text-xs text-gray-400 mt-1">Top monitored categories vs defined limits</p>
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="p-1.5 text-gray-400 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors border border-transparent hover:border-amber-200"
+            title="Edit Limits"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto pr-2 scrollbar-thin scrollbar-thumb-amber-900/50">
+          {data.length > 0 ? (
+            <div className="space-y-4">
+              {data.map((item, idx) => (
+                <div key={idx} className="flex flex-col gap-1">
+                  <div className="flex justify-between text-xs font-semibold text-gray-700">
+                    <span>{item.category}</span>
+                    <span className={item.isOver ? 'text-rose-600' : 'text-emerald-600'}>
+                      {formatValue(item.actual)}g / {formatValue(item.budget)}g
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full ${item.isOver ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${item.pct}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <Shield className="w-8 h-8 text-gray-300 mb-2 stroke-[1.5]" />
+              <p className="text-xs text-gray-500 italic">No budget decrees established.</p>
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="mt-2 text-xs font-semibold text-amber-700 hover:text-amber-800 transition-colors"
+              >
+                Click 'Edit Limits' to set target caps.
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <BudgetModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSaved={() => setRefreshTrigger(prev => prev + 1)}
+      />
+    </>
   );
 };

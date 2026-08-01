@@ -36,5 +36,5 @@ Os workflows detalhados estão na pasta `.agents/workflows/`:
 6. [database-timeout-diagnostic.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/database-timeout-diagnostic.md): Roteiro padrão para auditar e corrigir queries lentas e garantir a performance das Views e RPCs do Supabase.
 7. [data-flow-compliance.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/data-flow-compliance.md): Regra de ouro que obriga ao uso de RPCs e Views do Supabase para cálculos, mantendo o front-end leve.
 8. [open-banking-integration.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/open-banking-integration.md): Arquitetura base para ligar contas reais da CGD e outros bancos europeus ao Eldoria via Edge Functions e GoCardless.
-
+9. [rls-security-compliance.md](file:///c:/Users/silva/.gemini/antigravity/Medieval%20Stuff/.agents/workflows/rls-security-compliance.md): Protocolo padrão para auditoria e aplicação global de RLS, `security_invoker` nas views, e restrições de unicidade obrigatórias para operações de UPSERT.
 
