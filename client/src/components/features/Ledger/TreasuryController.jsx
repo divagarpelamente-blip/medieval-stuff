@@ -8,43 +8,22 @@ import LedgerTable from './LedgerTable';
  * TreasuryController Component
  * 
  * Acts as the contextual router for the Royal Treasury module. 
- * Manages transition transitions between the root submenu and the 
- * placeholder double-entry worksheets.
- * 
- * @param {string} initialView - Bypasses the menu and loads a specific view directly
- * @param {function} onClose - Router termination callback returning to main hub
  */
 export default function TreasuryController({ initialView, onClose }) {
-  const [activeView, setActiveView] = useState(initialView || 'menu'); // 'menu' | 'ledger' | 'statements' | 'dashboard'
-  const [editingTransaction, setEditingTransaction] = useState(null); // Shared state for edit mode
+  const [activeView, setActiveView] = useState(initialView || 'menu');
+  const [editingTransaction, setEditingTransaction] = useState(null); 
+  const [activeTab, setActiveTab] = useState('ledger'); 
 
-  // Map view types for header configurations
   const viewMetadata = {
     ledger: { title: 'General Ledger', icon: '📖' },
     statements: { title: 'Financial Statements', icon: '📜' },
     dashboard: { title: 'Treasury Dashboard', icon: '📊' }
   };
 
-  // Define menu operations
   const menuItems = [
-    {
-      id: 'ledger',
-      icon: '📖',
-      label: 'General Ledger',
-      onClick: (id) => setActiveView(id)
-    },
-    {
-      id: 'statements',
-      icon: '📜',
-      label: 'Financial Statements',
-      onClick: (id) => setActiveView(id)
-    },
-    {
-      id: 'dashboard',
-      icon: '📊',
-      label: 'Treasury Dashboard',
-      onClick: (id) => setActiveView(id)
-    }
+    { id: 'ledger', icon: '📖', label: 'General Ledger', onClick: (id) => setActiveView(id) },
+    { id: 'statements', icon: '📜', label: 'Financial Statements', onClick: (id) => setActiveView(id) },
+    { id: 'dashboard', icon: '📊', label: 'Treasury Dashboard', onClick: (id) => setActiveView(id) }
   ];
 
   // --- STATE 1: THE MAIN MENU ---
@@ -60,45 +39,89 @@ export default function TreasuryController({ initialView, onClose }) {
     );
   }
 
-  // --- STATE 2: THE GENERAL LEDGER ---
+  // --- STATE 2: THE GENERAL LEDGER (Custom Frameless Window) ---
   if (activeView === 'ledger') {
     return (
-      <Modal
-        title="General Ledger"
-        icon="📖"
-        subtitle="Royal Treasury - General Ledger"
-        maxWidth="max-w-5xl" // Reduced width for a stacked layout
-        onClose={() => {
-          if (initialView) {
-            onClose(); // Closes the modal and goes back to the Main Menu map
-          } else {
-            setActiveView('menu'); // Falls back to the old internal selector menu
-          }
+      <div 
+        className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6" 
+        onClick={() => {
+          if (initialView) onClose();
+          else setActiveView('menu');
           setEditingTransaction(null);
+          setActiveTab('ledger');
         }}
       >
-        {/* Removed xl:flex-row to force a permanent vertical stack */}
-        <div className="flex flex-col gap-6 w-full">
-          {/* Top: Form */}
-          <div className="flex-1 w-full">
-            <TransactionForm
-              editingTransaction={editingTransaction}
-              onCancelEdit={() => setEditingTransaction(null)}
-            />
+        <div 
+          className="w-full h-full max-w-[1400px] bg-stone-950 rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.95)] border-2 border-amber-900/80 flex flex-col font-serif" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Top Bar: Tabs & Close Button */}
+          <div className="flex items-center justify-between p-4 border-b border-amber-900/50 bg-stone-900/90 shrink-0 shadow-lg">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setActiveTab('ledger')}
+                className={`px-4 py-2 font-bold uppercase tracking-widest text-xs rounded transition border ${
+                  activeTab === 'ledger'
+                    ? 'bg-amber-600 text-stone-950 border-amber-400'
+                    : 'bg-stone-900 text-stone-400 border-transparent hover:text-amber-500 hover:border-stone-700'
+                }`}
+              >
+                General Ledger
+              </button>
+              <button
+                onClick={() => setActiveTab('new_transaction')}
+                className={`px-4 py-2 font-bold uppercase tracking-widest text-xs rounded transition border ${
+                  activeTab === 'new_transaction'
+                    ? 'bg-amber-600 text-stone-950 border-amber-400'
+                    : 'bg-stone-900 text-stone-400 border-transparent hover:text-amber-500 hover:border-stone-700'
+                }`}
+              >
+                New Transaction
+              </button>
+            </div>
+            
+            <button 
+              onClick={() => {
+                if (initialView) onClose();
+                else setActiveView('menu');
+                setEditingTransaction(null);
+                setActiveTab('ledger');
+              }}
+              className="w-8 h-8 rounded-full bg-rose-950/40 border border-rose-900/60 flex items-center justify-center text-rose-400 hover:text-rose-300 hover:bg-rose-900/50 transition-colors focus:outline-none shadow"
+              title="Close"
+            >
+              ✕
+            </button>
           </div>
-          {/* Bottom: Table */}
-          <div className="flex-1 w-full">
-            <LedgerTable
-              onEditTransaction={(txn) => setEditingTransaction(txn)}
-            />
+
+          {/* Dynamic Body Content */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-stone-950 p-4 md:p-6">
+            {activeTab === 'ledger' && (
+              <LedgerTable
+                onEditTransaction={(txn) => {
+                  setEditingTransaction(txn);
+                  setActiveTab('new_transaction');
+                }}
+              />
+            )}
+            
+            {activeTab === 'new_transaction' && (
+              <TransactionForm
+                editingTransaction={editingTransaction}
+                onCancelEdit={() => {
+                  setEditingTransaction(null);
+                  setActiveTab('ledger');
+                }}
+                onSuccess={() => setActiveTab('ledger')}
+              />
+            )}
           </div>
         </div>
-      </Modal>
+      </div>
     );
   }
 
   // --- STATE 3: PLACEHOLDER VIEWS ---
-  // Active view metadata resolution for undeveloped sections
   const currentViewMeta = viewMetadata[activeView];
 
   return (
@@ -107,11 +130,8 @@ export default function TreasuryController({ initialView, onClose }) {
       icon={currentViewMeta?.icon || '🏦'}
       subtitle={`Royal Treasury - ${currentViewMeta?.title}`}
       onClose={() => {
-        if (initialView) {
-          onClose(); // Closes the modal and goes back to the Main Menu map
-        } else {
-          setActiveView('menu'); // Falls back to the old internal selector menu
-        }
+        if (initialView) onClose();
+        else setActiveView('menu');
       }}
     >
       <div className="flex flex-col items-center justify-center p-12 text-center opacity-50">
@@ -121,11 +141,8 @@ export default function TreasuryController({ initialView, onClose }) {
         </p>
         <button
           onClick={() => {
-            if (initialView) {
-              onClose();
-            } else {
-              setActiveView('menu');
-            }
+            if (initialView) onClose();
+            else setActiveView('menu');
           }}
           className="mt-8 text-amber-500 hover:text-amber-400 uppercase tracking-widest font-bold text-sm focus:outline-none"
         >

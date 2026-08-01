@@ -1,8 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useKingdomStore } from "../../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 
-export default function TransactionForm({ editingTransaction, onCancelEdit }) {
+const normalizeType = (type) => {
+  if (!type) return '';
+  const lower = type.trim().toLowerCase();
+  if (lower === 'asset' || lower === 'assets') return 'Assets';
+  if (lower === 'liability' || lower === 'liabilities') return 'Liabilities';
+  if (lower === 'income') return 'Income';
+  if (lower === 'expense' || lower === 'expenses') return 'Expenses';
+  return type;
+};
+
+export default function TransactionForm({ editingTransaction, onCancelEdit, onSuccess }) {
   const flatMatrix = useKingdomStore((state) => state.flatMatrix) || [];
   const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
   const fetchFlatMatrix = useKingdomStore((state) => state.fetchFlatMatrix);
@@ -56,16 +66,33 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
     .filter(type => validTypes.includes(type))
     .sort();
 
+  // Filter Subtypes
   const filteredSubtypes = selectedType
-    ? [...new Set(flatMatrix.filter((row) => row.type === selectedType).map((row) => row.subtype).filter(Boolean))].sort()
+    ? [...new Set(
+        flatMatrix
+          .filter((row) => normalizeType(row.type) === normalizeType(selectedType))
+          .map((row) => row.subtype)
+          .filter(Boolean)
+      )].sort()
     : [...new Set(flatMatrix.map((row) => row.subtype).filter(Boolean))].sort();
 
-  const filteredCategories = selectedSubtype
-    ? [...new Set(flatMatrix.filter((row) => row.subtype === selectedSubtype).map((row) => row.category).filter(Boolean))].sort()
-    : [...new Set(flatMatrix.map((row) => row.category).filter(Boolean))].sort();
+  // Filter Categories (must respect both Type and Subtype)
+  const filteredCategories = useMemo(() => {
+    return [...new Set(
+      flatMatrix
+        .filter((row) => {
+          if (selectedType && normalizeType(row.type) !== normalizeType(selectedType)) return false;
+          if (selectedSubtype && row.subtype !== selectedSubtype) return false;
+          return true;
+        })
+        .map((row) => row.category)
+        .filter(Boolean)
+    )].sort();
+  }, [flatMatrix, selectedType, selectedSubtype]);
 
+  // Filter Target Accounts
   const filteredAccounts = flatMatrix.filter((row) => {
-    if (selectedType && row.type !== selectedType) return false;
+    if (selectedType && normalizeType(row.type) !== normalizeType(selectedType)) return false;
     if (selectedSubtype && row.subtype !== selectedSubtype) return false;
     if (selectedCategory && row.category !== selectedCategory) return false;
     return true;
@@ -182,9 +209,11 @@ export default function TransactionForm({ editingTransaction, onCancelEdit }) {
       if (editingTransaction) {
         await updateTransaction(editingTransaction.id, payload);
         toast.success("Transaction Updated");
+        if (onSuccess) onSuccess();
       } else {
         await addTransaction(payload);
         toast.success("Transaction Added");
+        if (onSuccess) onSuccess();
       }
       resetForm();
     } catch (error) {
