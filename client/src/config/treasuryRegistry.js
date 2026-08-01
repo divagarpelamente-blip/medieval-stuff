@@ -40,6 +40,7 @@ import {
 
 import { CostOfDebtWidget, YieldAssetsWidget } from '../components/widgets/Phase3FilteredWidgets';
 import { CashForecast90dWidget } from '../components/widgets/Phase3TrendWidgets';
+import { RoyalAdvisorWidget } from '../components/widgets/RoyalAdvisorWidget';
 import { RecentTransactionsWidget, InternalTransfersWidget } from '../components/widgets/Phase4LedgerWidgets';
 
 // ==========================================
@@ -105,5 +106,8 @@ export const TREASURY_WIDGETS = {
   table_top_accounts: { name: "Top 5 Accounts", component: TopAccountsWidget, description: "Table ranking accounts by real-time balance.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
   table_bank_balances: { name: "Bank Balances", component: BankBalancesWidget, description: "List of checking accounts and current balances.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
   table_recent_tx: { name: "Last 10 Transactions", component: RecentTransactionsWidget, description: "Table of the latest ledger entries.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
-  table_internal_transfers: { name: "Internal Transfers", component: InternalTransfersWidget, description: "Table of internal vault movements.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } }
+  table_internal_transfers: { name: "Internal Transfers", component: InternalTransfersWidget, description: "Table of internal vault movements.", category: "ledger", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 } },
+
+  // --- ADVISOR ---
+  advisor_royal: { name: "Royal Advisor", component: RoyalAdvisorWidget, description: "AI Financial Counsel & Deterministic Health Packet", category: "advisor", layout: { w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 8 } }
 };

@@ -17,7 +17,8 @@ const DEFAULT_INTERACTIVE_PRESET = [
 
 const DEFAULT_FPA_PRESET = [
   { i: 'ratio_budget_actual-1', x: 0, y: 0, w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 },
-  { i: 'trend_cash_forecast-1', x: 6, y: 0, w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 }
+  { i: 'trend_cash_forecast-1', x: 6, y: 0, w: 6, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 6 },
+  { i: 'advisor_royal-1', x: 0, y: 4, w: 12, h: 4, minW: 4, maxW: 12, minH: 3, maxH: 8 }
 ];
 
 const INITIAL_SUBMENUS = [

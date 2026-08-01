@@ -461,24 +461,21 @@ export const BudgetVsActualWidget = () => {
   }, [user?.id, refreshTrigger]);
 
   const data = useMemo(() => {
-    const budgetMap = {};
-    budgets.forEach(b => { budgetMap[b.coa_category] = Number(b.monthly_limit); });
-
-    const expenses = categoryView.filter(c => c.type === 'Expenses' && budgetMap[c.category]);
-    
-    return expenses.map(c => {
-      const actual = Number(c.total_volume);
-      const budget = budgetMap[c.category] || 0;
+    return budgets.map(b => {
+      const cat = categoryView.find(c => c.category === b.coa_category && c.type === 'Expenses');
+      const actual = cat ? Number(cat.total_volume) : 0;
+      const budget = Number(b.monthly_limit) || 0;
       const pct = budget > 0 ? (actual / budget) * 100 : 0;
       const isOver = actual > budget;
+      
       return {
-        category: c.category,
+        category: b.coa_category,
         actual,
         budget,
         pct: Math.min(pct, 100),
         isOver
       };
-    }).sort((a, b) => b.pct - a.pct).slice(0, 5); // top 5
+    }).sort((a, b) => b.pct - a.pct);
   }, [categoryView, budgets]);
 
   return (
@@ -487,7 +484,7 @@ export const BudgetVsActualWidget = () => {
         <div className="mb-3 shrink-0 flex items-start justify-between">
           <div>
             <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">Budget vs Actual</h3>
-            <p className="text-xs text-gray-400 mt-1">Top monitored categories vs defined limits</p>
+            <p className="text-xs text-gray-400 mt-1">All monitored categories vs defined limits</p>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -497,7 +494,7 @@ export const BudgetVsActualWidget = () => {
             <Pencil className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-auto pr-2 scrollbar-thin scrollbar-thumb-amber-900/50">
+        <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-amber-900/50">
           {data.length > 0 ? (
             <div className="space-y-4">
               {data.map((item, idx) => (
