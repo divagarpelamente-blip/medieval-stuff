@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useKingdomStore } from "../../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
-import { ArrowUpDown, RefreshCw } from 'lucide-react';
+import { ArrowUpDown, RefreshCw, FilterX } from 'lucide-react';
 
 export default function LedgerTable({ onEditTransaction }) {
   const transactions = useKingdomStore((state) => state.transactions) || [];
@@ -85,6 +85,10 @@ export default function LedgerTable({ onEditTransaction }) {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
+  const resetFilters = () => {
+    setFilters({ year: '', month: '', type: '', category: '', flow: '', entity: '', minAmount: '', maxAmount: '' });
+  };
+
   // Sortable Header Component
   const TableHeader = ({ label, sortKey, align = "text-left" }) => (
     <th 
@@ -134,6 +138,14 @@ export default function LedgerTable({ onEditTransaction }) {
           <option value="">Entity</option>
           {uniqueEntities.map(e => <option key={e} value={e}>{e}</option>)}
         </select>
+
+        <button
+          onClick={resetFilters}
+          title="Reset Filters"
+          className="p-1.5 bg-stone-900/60 hover:bg-stone-800 border border-stone-800/50 rounded text-stone-400 transition ml-1 shadow"
+        >
+          <FilterX size={14} />
+        </button>
 
         <div className="flex items-center gap-1 ml-auto">
           <input type="number" name="minAmount" value={filters.minAmount} onChange={handleFilterChange} placeholder="Min 🪙" className="bg-stone-950 border border-stone-800 text-stone-300 text-[11px] p-1.5 rounded outline-none focus:border-amber-500 transition w-20 font-mono" />
