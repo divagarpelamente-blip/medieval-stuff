@@ -130,7 +130,7 @@ export const RoyalAdvisorWidget = () => {
         <RoyalAdvisorModal 
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)} 
-          contextPacket={packet} 
+          contextJson={packet} 
         />
       )}
     </>
