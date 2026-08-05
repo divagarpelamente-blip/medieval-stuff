@@ -1,0 +1,53 @@
+# Financial Advisor (Royal Advisor) System Architecture
+
+This document outlines the architecture, data flow, and behavior of the AI-powered Financial Advisor ("Royal Advisor") within the Eldoria financial system. This system acts as a virtual Chief Financial Officer (CFO), providing pragmatic, data-driven financial analysis with a medieval thematic overlay.
+
+## 1. Overview and Invocation
+
+The Financial Advisor is accessed via the **RoyalAdvisorWidget** and interacted with through the **RoyalAdvisorModal**. 
+When the advisor is invoked, the system first gathers a comprehensive, real-time snapshot of the user's financial health before initiating any AI generation.
+
+The flow is as follows:
+1. The client requests a financial health packet via the `fetchFinancialHealthPacket` service.
+2. This service executes a Supabase RPC (`get_financial_health_report`).
+3. The resulting JSON context is passed to the `RoyalAdvisorModal`.
+4. When the user sends a message, the modal packages the user's query, the conversation history, and a detailed system instruction containing the JSON context.
+5. This payload is sent to an Edge Function (acting as an AI Proxy), which generates and returns the advisor's response.
+
+## 2. Data Gathering (RPC: `get_financial_health_report`)
+
+Before the AI is queried, the system deterministically evaluates the user's data using the `get_financial_health_report` Postgres function. This ensures the AI's advice is grounded in hard mathematics rather than hallucinations.
+
+The RPC generates a JSON packet containing:
+* **KPI Summary**: Calculates liquid cash, monthly income, monthly expenses, savings rate, Debt-to-Income (DTI) ratio, and survival runway months.
+* **Deterministic Flags**: Automatically assigns a RED, YELLOW, or GREEN status to three critical metrics:
+  * **Runway**: < 3 months (RED), 3-6 months (YELLOW), > 6 months (GREEN).
+  * **DTI**: > 40% (RED), 30%-40% (YELLOW), < 30% (GREEN).
+  * **Savings Rate**: <= 0% (RED), < 10% (YELLOW), >= 10% (GREEN).
+* **Cash Flow Forecast**: Integrates projections for 30-day, 60-day, and 90-day cash flow (`vw_cash_flow_forecast_90d`).
+* **Budget Variances**: Analyzes budget limits versus actual spent, flagging categories that are over budget.
+
+## 3. System Instructions & Persona
+
+The frontend injects the generated JSON packet directly into the AI's system prompt along with strict behavioral directives. 
+
+**Core Directives Include:**
+* **Persona**: The Royal Advisor of Eldoria (Virtual CFO). Uses medieval terminology (Treasury, Citadel Reserves, War Fund) while maintaining professional financial rigor.
+* **Realism (Zero Magic)**: Instructed to never invent imaginary extra income, never assume 100% expense cuts on essential needs, and block mathematically impossible scenarios (e.g., paying massive debt with a small surplus).
+* **Concision & Structure**: Responses must be short, direct, and structured with:
+  1. A clear Header/Alert.
+  2. A single-sentence Analysis/Status.
+  3. A short bulleted list of 2-3 specific, actionable recommendations.
+* **Formatting**: Must format all numbers, currencies, and percentages using the European standard (comma for decimals, dot for thousands) and round to a maximum of 2 decimal places.
+
+## 4. AI Proxy Edge Function (`chat_advisor` / `ai-proxy`)
+
+The actual natural language generation is handled by a Supabase Edge Function that implements a resilience cascade to ensure high availability.
+
+1. **Primary Provider (Google Gemini)**: The proxy first attempts to use Gemini models. It iterates through a prioritized list (e.g., `gemini-1.5-flash`, `gemini-2.0-flash-exp`, `gemini-1.5-pro`).
+2. **Fallback Provider (Groq / Llama 3.3 70B)**: If all Gemini models fail or are unavailable, the proxy falls back to Groq's API, utilizing the `llama-3.3-70b-versatile` model.
+3. **Graceful UI Fallback**: If the Edge Function itself fails or is unreachable, the frontend intercepts the error and returns a themed mock response ("Alas, my Lord, the magical conduit... seems to be disconnected"), preventing a total UI crash.
+
+## 5. How It Reviews Data
+
+Because the AI is fed the deterministic JSON packet on *every* request via the system instruction, it acts purely as an analytical interpreter of the hard data provided by the RPC. It looks at the RED/YELLOW/GREEN flags and the raw balances to formulate realistic "next step" plans without having to query the database itself, ensuring fast, accurate, and secure financial advice.

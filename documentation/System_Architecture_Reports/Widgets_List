@@ -221,6 +221,10 @@ Below is a comprehensive list of all the widgets available in the system, organi
   * **Purpose:** Historical evolution of all Income vs Expenses.
   * **Category:** Global Chart
   * **Calculated:** Parses `monthlyView` into combined `income` and `expenses` over time, including global averages.
+* **HandDrawnCashFlowWidget**
+  * **Purpose:** Artistic, charcoal-style record of Income vs Expenses over time.
+  * **Category:** Global Chart
+  * **Calculated:** Generates cash flow data from `monthlyView` using `generateCashFlowData`.
 * **NetWorthChart**
   * **Purpose:** Tracks the total accumulated balance and financial position.
   * **Category:** Global Chart
