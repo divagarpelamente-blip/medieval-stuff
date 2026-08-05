@@ -26,26 +26,23 @@ const KpiCard = ({ title, amount, subtitle, colorClass }) => (
 const useKpiData = () => {
   const dashboardMetrics = useKingdomStore(state => state.dashboardMetrics);
   const categoryView = useKingdomStore(state => state.analytics?.category || []);
+  const balancesView = useKingdomStore(state => state.analytics?.balances || []);
 
   const derived = useMemo(() => {
     let totalIncome = 0;
     let totalExpenses = 0;
     let totalInvestments = 0;
-    let completedIncome = 0;
-    let completedExpenses = 0;
+    let computedNetCash = 0;
 
     // Em vez de iterar sobre 10.000 transações, iteramos apenas sobre o sumário das categorias (ex: ~15 linhas)
     categoryView.forEach(row => {
       const amt = Number(row.total_volume) || 0;
-      const status = row.payment_status || 'Completed';
-
+      
       if (row.type === 'Income') {
         totalIncome += amt;
-        if (status === 'Completed') completedIncome += amt;
       }
       if (row.type === 'Expenses') {
         totalExpenses += amt;
-        if (status === 'Completed') completedExpenses += amt;
       }
 
       // Heurística simples: se a categoria pertencer a Ativos e contiver a palavra "Invest", soma aos investimentos
@@ -54,14 +51,28 @@ const useKpiData = () => {
       }
     });
 
+    // Net Cash is the sum of all 1101**** and 1103**** accounts based on their balances
+    // Only affects transactions with payment status = completed
+    balancesView.forEach(row => {
+      const code = row.account || '';
+      const bal = Number(row.balance) || 0;
+      const status = row.payment_status || 'Completed'; // defaults to completed if view doesn't provide it
+      
+      if (status === 'Completed') {
+        if (code.startsWith('1101') || code.startsWith('1103')) {
+          computedNetCash += bal;
+        }
+      }
+    });
+
     return {
       totalIncome,
       totalExpenses,
       netCashFlow: totalIncome - totalExpenses, // pending + complete
-      netCash: completedIncome - completedExpenses, // complete only
+      netCash: computedNetCash,
       totalInvestments
     };
-  }, [categoryView]);
+  }, [categoryView, balancesView]);
 
   return {
     ...dashboardMetrics, // Traz total_assets, total_liabilities, net_worth, net_vault_cash

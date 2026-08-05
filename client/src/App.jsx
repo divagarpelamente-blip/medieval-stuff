@@ -3,6 +3,7 @@ import { useKingdomStore } from './store/useKingdomStore';
 import MainMenu from './pages/MainMenu';
 import Login from './components/auth/Login';
 import DashboardVisualSandbox from './components/sandbox/dashboard-visual-sandbox';
+import MainMenuSandbox from './components/sandbox/MainMenuSandbox';
 
 export default function App() {
   const initAuth = useKingdomStore((state) => state.initAuth);
@@ -20,11 +21,7 @@ export default function App() {
     }
   }, [initAuth]);
 
-  // Visual Sandbox Bypass (Placed BEFORE the Auth Barrier)
-  const path = window.location.pathname;
-  if (path === '/visual-sandbox') {
-    return <DashboardVisualSandbox />;
-  }
+
 
   // Barreira de Segurança: Se não há utilizador logado, mostra o Login.
   // Isto impede o "profile_id=is.null" que vimos no erro da rede.

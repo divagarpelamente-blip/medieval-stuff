@@ -112,7 +112,10 @@ const useAllRatios = () => {
     categoryView.forEach(row => {
       const amt = Number(row.total_volume) || 0;
       const catName = (row.category || '').toLowerCase();
-      if (row.type === 'Expenses' && (catName.includes('debt') || catName.includes('loan') || catName.includes('amorti') || catName.includes('credit') || catName.includes('liabilit'))) {
+      const isDebtCategory = catName.includes('debt') || catName.includes('loan') || catName.includes('amorti') || catName.includes('credit') || catName.includes('liabilit');
+      
+      // Amortization usually happens against Liabilities or specific Expense categories
+      if ((row.type === 'Liabilities' || row.type === 'Expenses') && isDebtCategory) {
         amortization += amt;
       }
     });
