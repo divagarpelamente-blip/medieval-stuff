@@ -8,6 +8,7 @@ import SettingsController from '../components/features/settings/SettingsControll
 import bgImage from '../assets/Medieval_Town_Backround.jfif';
 import advisorImage from '../assets/medieval_advisor.png';
 import { RoyalAdvisorWidget } from '../components/widgets/RoyalAdvisorWidget';
+import { useFormatting, formatCurrency } from '../context/FormattingContext';
 
 /**
  * MainMenu Component (V2.0 Core Shell)
@@ -17,6 +18,7 @@ import { RoyalAdvisorWidget } from '../components/widgets/RoyalAdvisorWidget';
  */
 export default function MainMenu() {
   const store = useKingdomStore();
+  const { prefs } = useFormatting();
   const fetchFlatMatrix = store?.fetchFlatMatrix;
   const transactions = store?.transactions || [];
   const dashboardMetrics = store?.dashboardMetrics || {};
@@ -94,10 +96,7 @@ export default function MainMenu() {
     return totalOutflow / weeks;
   }, [transactions]);
 
-  const formatValue = (val) => {
-    const num = Number(val) || 0;
-    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+
 
   const [activeModal, setActiveModal] = useState(null);
   const [viewMode, setViewMode] = useState('tablet'); 
@@ -226,16 +225,16 @@ export default function MainMenu() {
         {activeModal === null && (
           <div className="absolute top-6 right-[216px] z-50 w-44 bg-[#1e1b18] border-2 border-[#8b4513]/60 p-3 rounded-lg shadow-[inset_0_0_10px_rgba(0,0,0,0.8),0_4px_10px_rgba(0,0,0,0.5)] text-right font-serif animate-fade-in">
             <div className="text-[10px] uppercase tracking-wider text-amber-500/80 font-sans font-black">Total Income</div>
-            <div className="text-xl font-bold text-amber-100 mt-1">{formatValue(totalIncome)}g</div>
-            <div className="text-[10px] text-stone-400 font-sans mt-0.5 font-semibold">+{formatValue(goldEarnedPerWeek)}g / week</div>
+            <div className="text-xl font-bold text-amber-100 mt-1">{formatCurrency(totalIncome, prefs)}</div>
+            <div className="text-[10px] text-stone-400 font-sans mt-0.5 font-semibold">+{formatCurrency(goldEarnedPerWeek, prefs)} / week</div>
           </div>
         )}
 
         {activeModal === null && (
           <div className="absolute top-6 right-6 z-50 w-44 bg-[#1e1b18] border-2 border-[#8b4513]/60 p-3 rounded-lg shadow-[inset_0_0_10px_rgba(0,0,0,0.8),0_4px_10px_rgba(0,0,0,0.5)] text-right font-serif animate-fade-in">
             <div className="text-[10px] uppercase tracking-wider text-amber-500/80 font-sans font-black">Total Gold Used</div>
-            <div className="text-xl font-bold text-amber-100 mt-1">{formatValue(totalGoldUsed)}g</div>
-            <div className="text-[10px] text-stone-400 font-sans mt-0.5 font-semibold">-{formatValue(goldUsedPerWeek)}g / week</div>
+            <div className="text-xl font-bold text-amber-100 mt-1">{formatCurrency(totalGoldUsed, prefs)}</div>
+            <div className="text-[10px] text-stone-400 font-sans mt-0.5 font-semibold">-{formatCurrency(goldUsedPerWeek, prefs)} / week</div>
           </div>
         )}
 

@@ -1,13 +1,9 @@
 import React, { useMemo } from 'react';
 import { useKingdomStore } from '../../store/useKingdomStore';
 
-const formatValue = (val) => {
-  const num = Number(val) || 0;
-  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return num < 0 ? `(${formattedNum})` : formattedNum;
-};
+import { useFormatting, formatCurrency } from '../../context/FormattingContext';
 
-const FilteredKpiCard = ({ title, subtitle, value, tag }) => (
+const FilteredKpiCard = ({ title, subtitle, value, tag, prefs }) => (
   <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
     <div className="flex justify-between items-start">
       <div>
@@ -16,7 +12,7 @@ const FilteredKpiCard = ({ title, subtitle, value, tag }) => (
       </div>
     </div>
     <div className="mt-4">
-      <span className="text-3xl font-sans font-bold text-gray-900">{value}</span>
+      <span className="text-3xl font-sans font-bold text-gray-900">{formatCurrency(value, prefs)}</span>
     </div>
     <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] font-mono text-gray-500">
       <span>{tag}</span>
@@ -34,7 +30,9 @@ export const CostOfDebtWidget = () => {
     return targetAcc ? targetAcc.balance : 0;
   }, [balances]);
 
-  return <FilteredKpiCard subtitle="Interest expenses paid" tag="[69020003]" title="Cost of Debt" value={formatValue(costOfDebt)}/>;
+  const { prefs } = useFormatting();
+
+  return <FilteredKpiCard prefs={prefs} subtitle="Interest expenses paid" tag="[69020003]" title="Cost of Debt" value={costOfDebt}/>;
 };
 
 export const YieldAssetsWidget = () => {
@@ -47,5 +45,7 @@ export const YieldAssetsWidget = () => {
       .reduce((sum, b) => sum + Number(b.balance), 0);
   }, [balances]);
 
-  return <FilteredKpiCard subtitle="Yield-bearing vs sterile assets" tag="Class [1] - Cash" title="Income-Generating Assets" value={formatValue(yieldAssets)}/>;
+  const { prefs } = useFormatting();
+
+  return <FilteredKpiCard prefs={prefs} subtitle="Yield-bearing vs sterile assets" tag="Class [1] - Cash" title="Income-Generating Assets" value={yieldAssets}/>;
 };

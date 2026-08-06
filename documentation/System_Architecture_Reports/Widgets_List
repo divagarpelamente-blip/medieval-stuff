@@ -8,19 +8,19 @@ Below is a comprehensive list of all the widgets available in the system, organi
 * **TotalIncomeWidget**
   * **Purpose:** Displays gross revenue generated.
   * **Category:** Phase 1 KPI
-  * **Calculated:** Sum of transaction amounts where `type === 'Income'`.
+  * **Calculated:** Sum of transaction amounts where `type === 'Income'` (ignores payment status, includes pending and completed).
 * **TotalExpensesWidget**
   * **Purpose:** Displays total operational outflows.
   * **Category:** Phase 1 KPI
-  * **Calculated:** Sum of transaction amounts where `type === 'Expenses'`.
+  * **Calculated:** Sum of transaction amounts where `type === 'Expenses'` (ignores payment status, includes pending and completed).
 * **GrossCashflowWidget**
   * **Purpose:** Displays inflows minus outflows (pending + complete).
   * **Category:** Phase 1 KPI
-  * **Calculated:** `totalIncome - totalExpenses`.
+  * **Calculated:** `totalIncome - totalExpenses` (ignores payment status, includes pending and completed).
 * **NetCashWidget**
   * **Purpose:** Displays inflows minus outflows (completed only).
   * **Category:** Phase 1 KPI
-  * **Calculated:** `completedIncome - completedExpenses`.
+  * **Calculated:** Sum of balances where account is Cash/Equivalents ('1101' or '1103') AND `payment_status === 'Completed'` (strictly ignores pending).
 * **TotalAssetsWidget**
   * **Purpose:** Displays gross owned assets.
   * **Category:** Phase 1 KPI

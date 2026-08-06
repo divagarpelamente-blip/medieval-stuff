@@ -2,16 +2,11 @@ import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useKingdomStore } from '../../store/useKingdomStore';
 import { getEntityExposure } from '../../utils/chartAnalytics';
-
-const formatValue = (val) => {
-  const num = Number(val) || 0;
-  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return num < 0 ? `(${formattedNum})` : formattedNum;
-};
+import { useFormatting, formatCurrency } from '../../context/FormattingContext';
 
 // Removed getLargestTx to comply with data-flow rules
 
-const BarChartCard = ({ title, subtitle, data }) => (
+const BarChartCard = ({ title, subtitle, data, prefs }) => (
   <div className="w-full h-full min-h-[300px] flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
     <div className="mb-4">
       <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase">{title}</h3>
@@ -25,7 +20,7 @@ const BarChartCard = ({ title, subtitle, data }) => (
             <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
             <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
             <Tooltip 
-              formatter={(value) => [formatValue(value), 'Amount']}
+              formatter={(value) => [formatCurrency(value, prefs), 'Amount']}
               contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
               labelStyle={{ fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}
               cursor={{ fill: '#f3f4f6' }}
@@ -65,31 +60,35 @@ const TableCard = ({ title, subtitle, headers, children }) => (
 
 export const IncomeEntityWidget = () => {
   const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const { prefs } = useFormatting();
   const data = useMemo(() => getEntityExposure(entityView, 'Income', 10), [entityView]);
-  return <BarChartCard data={data} subtitle="Top 10 revenue sources" title="Income by Entity"/>;
+  return <BarChartCard prefs={prefs} data={data} subtitle="Top 10 revenue sources" title="Income by Entity"/>;
 };
 
 export const EntityExposureWidget = () => {
   const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const { prefs } = useFormatting();
   const data = useMemo(() => getEntityExposure(entityView, 'Assets', 10), [entityView]);
-  return <BarChartCard data={data} subtitle="Asset concentration across institutions" title="Entity Exposure (Risk)"/>;
+  return <BarChartCard prefs={prefs} data={data} subtitle="Asset concentration across institutions" title="Entity Exposure (Risk)"/>;
 };
 
 export const DebtCreditorWidget = () => {
   const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const { prefs } = useFormatting();
   const data = useMemo(() => getEntityExposure(entityView, 'Liabilities', 10), [entityView]);
-  return <BarChartCard data={data} subtitle="Concentration of owed liabilities" title="Debt by Creditor"/>;
+  return <BarChartCard prefs={prefs} data={data} subtitle="Concentration of owed liabilities" title="Debt by Creditor"/>;
 };
 
 export const TopMerchantsWidget = () => {
   const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const { prefs } = useFormatting();
   const data = useMemo(() => getEntityExposure(entityView, 'Expenses', 10), [entityView]);
   return (
     <TableCard headers={['Merchant', 'Total Spent']} subtitle="Highest cumulative spending destinations" title="Top 10 Merchants">
       {data.map((row, i) => (
         <tr key={i} className="hover:bg-gray-50 transition-colors">
           <td className="py-3 text-gray-900 font-medium">{row.name}</td>
-          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.value)}</td>
+          <td className="py-3 text-gray-600 text-right font-mono">{formatCurrency(row.value, prefs)}</td>
         </tr>
       ))}
     </TableCard>
@@ -98,6 +97,7 @@ export const TopMerchantsWidget = () => {
 
 export const LargestTransactionsWidget = () => {
   const entityView = useKingdomStore(s => s.analytics?.entity || []);
+  const { prefs } = useFormatting();
   const data = useMemo(() => {
     return [...entityView].sort((a, b) => b.value - a.value).slice(0, 10);
   }, [entityView]);
@@ -107,7 +107,7 @@ export const LargestTransactionsWidget = () => {
         <tr key={i} className="hover:bg-gray-50 transition-colors">
           <td className="py-3 text-gray-500 text-xs">{row.type}</td>
           <td className="py-3 text-gray-900 font-medium">{row.entity}</td>
-          <td className="py-3 text-gray-600 text-right font-mono">{formatValue(row.value)}</td>
+          <td className="py-3 text-gray-600 text-right font-mono">{formatCurrency(row.value, prefs)}</td>
         </tr>
       ))}
     </TableCard>
@@ -117,6 +117,7 @@ export const LargestTransactionsWidget = () => {
 export const TopAccountsWidget = () => {
   const balances = useKingdomStore(s => s.analytics?.balances || []);
   const flatMatrix = useKingdomStore(s => s.flatMatrix || []);
+  const { prefs } = useFormatting();
 
   const data = useMemo(() => {
     return balances
@@ -139,7 +140,7 @@ export const TopAccountsWidget = () => {
         <tr key={i} className="hover:bg-gray-50 transition-colors">
           <td className="py-3 text-gray-500 font-mono text-xs">{row.account}</td>
           <td className="py-3 text-gray-900 font-medium">{row.entity}</td>
-          <td className="py-3 text-gray-900 font-bold text-right font-mono">{formatValue(row.balance)}</td>
+          <td className="py-3 text-gray-900 font-bold text-right font-mono">{formatCurrency(row.balance, prefs)}</td>
         </tr>
       ))}
     </TableCard>
@@ -149,6 +150,7 @@ export const TopAccountsWidget = () => {
 export const BankBalancesWidget = () => {
   const balances = useKingdomStore(s => s.analytics?.balances || []);
   const flatMatrix = useKingdomStore(s => s.flatMatrix || []);
+  const { prefs } = useFormatting();
 
   const data = useMemo(() => {
     const checkingAccounts = flatMatrix.filter(m => m.category === 'Checking Accounts');
@@ -173,7 +175,7 @@ export const BankBalancesWidget = () => {
             <div>{row.entity}</div>
             <div className="text-xs text-gray-400 font-normal">{row.name}</div>
           </td>
-          <td className="py-3 text-gray-900 font-bold text-right font-mono">{formatValue(row.balance)}</td>
+          <td className="py-3 text-gray-900 font-bold text-right font-mono">{formatCurrency(row.balance, prefs)}</td>
         </tr>
       ))}
     </TableCard>

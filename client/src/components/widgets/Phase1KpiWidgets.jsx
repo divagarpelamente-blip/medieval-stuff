@@ -1,32 +1,36 @@
 import React, { useMemo } from 'react';
 import { useKingdomStore } from '../../store/useKingdomStore';
+import { useFormatting, formatCurrency } from '../../context/FormattingContext';
 
-// Utilitário simples para formatar os valores monetários com vírgulas e casas decimais
-const formatVal = (val) => {
-  const num = Number(val) || 0;
-  const formatted = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return num < 0 ? `(${formatted})` : formatted;
-};
+const EMPTY_ARRAY = [];
+const EMPTY_OBJ = {};
 
-// O Componente Base Visual para todos os cartões KPI (mantendo o design limpo que tinhas)
-const KpiCard = ({ title, amount, subtitle, colorClass }) => (
-  <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm justify-center">
-    <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-2">{title}</h3>
-    <div className={`text-3xl font-bold ${colorClass} mb-1 truncate`}>
-      {formatVal(amount)}
+// O Componente Base Visual para todos os cartões KPI
+const KpiCard = ({ title, amount, subtitle, colorClass }) => {
+  const { prefs } = useFormatting();
+  return (
+    <div className="w-full h-full flex flex-col bg-white border border-gray-200 rounded-xl p-6 shadow-sm justify-center">
+      <h3 className="text-sm font-sans font-semibold tracking-wide text-gray-500 uppercase mb-2">{title}</h3>
+      <div className={`text-3xl font-bold ${colorClass} mb-1 truncate`}>
+        {formatCurrency(amount || 0, prefs)}
+      </div>
+      <p className="text-xs text-gray-400">{subtitle}</p>
     </div>
-    <p className="text-xs text-gray-400">{subtitle}</p>
-  </div>
-);
+  );
+};
 
 // ==========================================
 // CENTRAL DE DADOS KPI (Otimizada)
 // ==========================================
 // Este hook consome as métricas que a base de dados já calculou
 const useKpiData = () => {
-  const dashboardMetrics = useKingdomStore(state => state.dashboardMetrics);
-  const categoryView = useKingdomStore(state => state.analytics?.category || []);
-  const balancesView = useKingdomStore(state => state.analytics?.balances || []);
+  const dashboardMetrics = useKingdomStore(state => state.dashboardMetrics) || EMPTY_OBJ;
+  const categoryView = useKingdomStore(state => state.analytics?.category) || EMPTY_ARRAY;
+  const balancesView = useKingdomStore(state => state.analytics?.balances) || EMPTY_ARRAY;
+  
+  // Stabilize kpiSummary selection
+  const storeKpiSummary = useKingdomStore(state => state.kpi_summary);
+  const kpiSummary = storeKpiSummary || dashboardMetrics.kpi_summary || EMPTY_OBJ;
 
   const derived = useMemo(() => {
     let totalIncome = 0;
@@ -34,29 +38,21 @@ const useKpiData = () => {
     let totalInvestments = 0;
     let computedNetCash = 0;
 
-    // Em vez de iterar sobre 10.000 transações, iteramos apenas sobre o sumário das categorias (ex: ~15 linhas)
     categoryView.forEach(row => {
       const amt = Number(row.total_volume) || 0;
       
-      if (row.type === 'Income') {
-        totalIncome += amt;
-      }
-      if (row.type === 'Expenses') {
-        totalExpenses += amt;
-      }
+      if (row.type === 'Income') totalIncome += amt;
+      if (row.type === 'Expenses') totalExpenses += amt;
 
-      // Heurística simples: se a categoria pertencer a Ativos e contiver a palavra "Invest", soma aos investimentos
       if (row.type === 'Assets' && row.category && row.category.toLowerCase().includes('invest')) {
         totalInvestments += amt;
       }
     });
 
-    // Net Cash is the sum of all 1101**** and 1103**** accounts based on their balances
-    // Only affects transactions with payment status = completed
     balancesView.forEach(row => {
       const code = row.account || '';
       const bal = Number(row.balance) || 0;
-      const status = row.payment_status || 'Completed'; // defaults to completed if view doesn't provide it
+      const status = row.payment_status || 'Completed'; 
       
       if (status === 'Completed') {
         if (code.startsWith('1101') || code.startsWith('1103')) {
@@ -66,17 +62,22 @@ const useKpiData = () => {
     });
 
     return {
-      totalIncome,
-      totalExpenses,
-      netCashFlow: totalIncome - totalExpenses, // pending + complete
+      netCashFlow: totalIncome - totalExpenses, 
       netCash: computedNetCash,
       totalInvestments
     };
   }, [categoryView, balancesView]);
 
   return {
-    ...dashboardMetrics, // Traz total_assets, total_liabilities, net_worth, net_vault_cash
-    ...derived           // Traz totalIncome, totalExpenses, netCashFlow, netCash, totalInvestments
+    ...dashboardMetrics, // Traz total_assets, total_liabilities, net_worth
+    ...derived,           // Traz netCashFlow, netCash, totalInvestments
+    
+    // NEW RPC MAPPINGS:
+    normalized_monthly_income: kpiSummary.normalized_monthly_income || 0,
+    avg_monthly_expense: kpiSummary.avg_monthly_expense || 0,
+    liquid_vault_cash: kpiSummary.liquid_vault_cash || dashboardMetrics?.net_vault_cash || 0,
+    state_debt_total: kpiSummary.state_debt_total || 0,
+    runway_months: kpiSummary.runway_months || 0
   };
 };
 
@@ -85,13 +86,13 @@ const useKpiData = () => {
 // ==========================================
 
 export const TotalIncomeWidget = () => {
-  const { totalIncome } = useKpiData();
-  return <KpiCard title="Total Income" amount={totalIncome} colorClass="text-emerald-500" subtitle="Gross revenue generated" />;
+  const { normalized_monthly_income } = useKpiData();
+  return <KpiCard title="Total Income" amount={normalized_monthly_income} colorClass="text-emerald-500" subtitle="Normalized monthly revenue" />;
 };
 
 export const TotalExpensesWidget = () => {
-  const { totalExpenses } = useKpiData();
-  return <KpiCard title="Total Expenses" amount={totalExpenses} colorClass="text-rose-500" subtitle="Total operational outflows" />;
+  const { avg_monthly_expense } = useKpiData();
+  return <KpiCard title="Total Expenses" amount={avg_monthly_expense} colorClass="text-rose-500" subtitle="Average monthly outflows" />;
 };
 
 export const GrossCashflowWidget = () => {
@@ -112,8 +113,8 @@ export const TotalAssetsWidget = () => {
 };
 
 export const ImmediateLiquidityWidget = () => {
-  const { net_vault_cash } = useKpiData();
-  return <KpiCard title="Immediate Liquidity" amount={net_vault_cash} colorClass="text-blue-500" subtitle="Accessible cash and equivalents" />;
+  const { liquid_vault_cash } = useKpiData();
+  return <KpiCard title="Immediate Liquidity" amount={liquid_vault_cash} colorClass="text-blue-500" subtitle="Accessible cash and equivalents" />;
 };
 
 export const TotalInvestmentsWidget = () => {
@@ -123,7 +124,13 @@ export const TotalInvestmentsWidget = () => {
 
 export const TotalLiabilitiesWidget = () => {
   const { total_liabilities } = useKpiData();
-  return <KpiCard title="Total Liabilities" amount={total_liabilities} colorClass="text-orange-500" subtitle="Gross outstanding debt" />;
+  return <KpiCard title="Total Liabilities" amount={total_liabilities} colorClass="text-orange-500" subtitle="Gross outstanding debt (Class 2)" />;
+};
+
+// NEW WIDGET AS REQUESTED
+export const StateDebtArrearsWidget = () => {
+  const { state_debt_total } = useKpiData();
+  return <KpiCard title="State Debt Arrears" amount={state_debt_total} colorClass="text-red-600" subtitle="Owed to the State (Tax/IRS)" />;
 };
 
 export const NetWorthWidget = () => {

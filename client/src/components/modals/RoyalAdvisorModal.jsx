@@ -2,8 +2,56 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, Send, Bot, User, Scroll } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '../../lib/supabaseClient';
+import { useFormatting } from '../../context/FormattingContext';
+
+/**
+ * Constructs the system prompt for the Royal Advisor AI, strictly enforcing 
+ * the user's localized formatting preferences.
+ * 
+ * @param {Object} userPrefs - The preferences object from FormattingContext
+ * @param {Object} contextJson - The financial data packet to review
+ * @returns {string} The formatted system prompt
+ */
+export const buildAdvisorPrompt = (userPrefs, contextJson) => {
+  const { numberFormat, currencySymbol, currencyType, dateFormat, negativeFormat } = userPrefs;
+
+  // 1. Determine base numeric format (decimals/thousands separators)
+  const isEU = numberFormat === 'EU';
+  const numericInstruction = isEU
+    ? `Use the European standard: a comma "," for decimals and a dot "." for thousands separators.`
+    : `Use the US standard: a dot "." for decimals and a comma "," for thousands separators.`;
+
+  // 2. Determine symbol placement based on fiat vs gaming
+  const isGaming = currencyType === 'gaming';
+  const placementInstruction = isGaming
+    ? `ALWAYS append the gaming symbol "${currencySymbol}" at the END of the amount, separated by a space (e.g., 1.250,50 ${currencySymbol}).`
+    : `Place the currency symbol "${currencySymbol}" according to standard convention (e.g., ${isEU ? `1.250,50 ${currencySymbol}` : `${currencySymbol}1,250.50`}).`;
+
+  // 3. Assemble the prompt
+  const negativeInstruction = negativeFormat === 'parentheses'
+    ? `For negative numbers, you MUST use parentheses (e.g., (100)).`
+    : `For negative numbers, you MUST use a minus sign (e.g., -100).`;
+
+  return `You are the Royal Advisor of Eldoria, the virtual Chief Financial Officer (CFO) of the realm. Your mission is to deliver high-precision, pragmatic financial analysis grounded in deterministic mathematical data.
+
+REALISM & FINANCIAL VIABILITY DIRECTIVES:
+1. Zero Magical Solutions: Base all advice purely on realistic metrics.
+2. Base Decisions on Real Data: Project scenarios using only the JSON payload provided below.
+3. Be EXTREMELY short, direct, and action-oriented. Keep responses brief.
+
+STRICT FORMATTING DIRECTIVES:
+- NUMBERS: You MUST format all numbers, currencies, and percentages exactly to the user's preference. ${numericInstruction}
+- CURRENCY: ${placementInstruction}
+- NEGATIVE NUMBERS: ${negativeInstruction}
+- DATES: You MUST format all dates as ${dateFormat}.
+- Round all metrics to a maximum of 2 decimal places.
+
+REAL-TIME FINANCIAL DATA (CONTEXT PACKET):
+${JSON.stringify(contextJson || {}, null, 2)}`;
+};
 
 export const RoyalAdvisorModal = ({ isOpen, onClose, contextJson }) => {
+  const { prefs } = useFormatting();
   const [localInput, setLocalInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,32 +118,7 @@ export const RoyalAdvisorModal = ({ isOpen, onClose, contextJson }) => {
       }]);
 
       // --- ADAPTED SYSTEM INSTRUCTION ---
-       const systemInstruction = `You are the Royal Advisor of Eldoria, the virtual Chief Financial Officer (CFO) of the realm. Your mission is to deliver high-precision, pragmatic financial analysis grounded in deterministic mathematical data.
-
-REALISM & FINANCIAL VIABILITY DIRECTIVES:
-1. Zero Magical Solutions: Never invent imaginary extra income, do not assume 100% expense cuts on essential needs (e.g. rent, food), and do not suggest investment returns outside realistic market standards.
-2. Base Decisions on Real Data: Project scenarios using only the numbers and balance provided. If data essential for a realistic calculation is completely missing, ask the user for it constructively without verbose disclaimers.
-3. Block Impossible Scenarios: If the user proposes a mathematically impossible goal (e.g. paying 5,000g of debt in 2 months with only 100g of monthly surplus), do not agree or encourage the plan. Explain mathematically why it is unfeasible and propose a realistic alternative plan and timeline.
-
-FORMAT & CONCISION DIRECTIVES:
-1. Be EXTREMELY short, direct, and action-oriented. Keep responses brief. Avoid conversational filler.
-2. Structure your response using this clean template style:
-   - **Header/Alert:** State the primary subject or query clearly.
-   - **Analysis/Status:** A single, brief sentence stating the current status (e.g. liquid cash level, debt-to-income ratio, or budget status).
-   - **Recommended Next Steps:** A short bulleted list of 2-3 specific, actionable recommendations.
-3. ALWAYS RESPOND IN THE SAME LANGUAGE USED BY THE USER (if asked in English, reply in English; if asked in Portuguese, reply in Portuguese, etc.).
-
-CRITICAL TONE & GREETING RULE:
-- DO NOT start your responses with formal or repetitive greetings (such as "Hello", "Greetings, My Lord", "Good day", etc.). Get straight to the point immediately.
-
-FINANCIAL ANALYSIS & CONTEXT:
-- Base your advice on the provided Financial Context JSON packet (Survival Runway, DSTI Debt-to-Income ratio, Savings Rate, Budget vs. Actuals).
-- NEVER start your response by complaining, stating, or explaining what information is missing from the Context JSON Packet. DO NOT output disclaimers like "The provided Context JSON Packet does not contain...".
-- Maintain a refined, friendly and helpful medieval CFO persona (referencing the Treasury, Citadel Reserves, Survival Runway, or War Fund where applicable), keeping all numerical figures strictly accurate and actionable.
-- NUMERIC FORMATTING: You MUST format all numbers, currencies, and percentages using the European standard (use a comma "," for decimals and a dot "." for thousands separators). Round all metrics (like Runway, DTI, etc.) to a maximum of 2 decimal places. For example, instead of 136.7594, write 136,76%.
-
-REAL-TIME FINANCIAL DATA (CONTEXT PACKET):
-${JSON.stringify(contextJson || {}, null, 2)}`;
+       const systemInstruction = buildAdvisorPrompt(prefs, contextJson);
       // ----------------------------------
 
       // Invoke the proxy Edge Function

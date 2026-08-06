@@ -3,19 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useKingdomStore } from '../../store/useKingdomStore';
 import { ArrowUp, ArrowDown, Shield, Pencil } from 'lucide-react';
 import { BudgetModal } from '../features/settings/BudgetModal';
-
-const formatValue = (val, isPercentage = false, suffix = '', isDelta = false) => {
-  const num = Number(val) || 0;
-  const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  
-  let baseStr = num < 0 ? `(${formattedNum})` : formattedNum;
-  if (isDelta && num > 0) baseStr = `+${baseStr}`;
-  
-  let finalStr = baseStr;
-  if (isPercentage) finalStr += '%';
-  if (suffix) finalStr += ` ${suffix}`;
-  return finalStr;
-};
+import { useFormatting, formatCurrency, formatNumber } from '../../context/FormattingContext';
 
 // Generic Monochromatic Ratio Card
 const RatioCard = ({ title, subtitle, valueStr, tag }) => (
@@ -137,8 +125,19 @@ const useAllRatios = () => {
 const withRatioData = (kpiKey, title, subtitle, tag, options = {}) => {
   return function WidgetComponent() {
     const ratios = useAllRatios();
+    const { prefs } = useFormatting();
     const rawValue = ratios[kpiKey] || 0;
-    const valueStr = formatValue(rawValue, options.isPercentage, options.suffix, options.isDelta);
+    
+    let valueStr = '';
+    if (options.isPercentage) {
+      valueStr = formatNumber(rawValue, prefs) + '%';
+      if (options.isDelta && rawValue > 0) valueStr = '+' + valueStr;
+    } else if (options.isDelta) {
+      valueStr = formatCurrency(rawValue, prefs);
+      if (rawValue > 0) valueStr = '+' + valueStr;
+    } else {
+      valueStr = formatCurrency(rawValue, prefs);
+    }
 
     return <RatioCard subtitle={subtitle} tag={tag} title={title} valueStr={valueStr}/>;
   };
@@ -156,6 +155,7 @@ export const DebtRatioWidget = withRatioData('debtRatio', 'Debt Ratio', 'Total L
 export const WealthVarianceWidget = withRatioData('monthlyWealthVariance', 'Wealth Variance (MoM)', 'Delta shift in Net Worth', 'Current - Prior', { isDelta: true });
 
 export const ExpenseVarianceWidget = () => {
+  const { prefs } = useFormatting();
   const { expenseVariancePop, currentExp, priorExp } = useAllRatios();
   
   const isPositive = expenseVariancePop > 0;
@@ -195,7 +195,7 @@ export const ExpenseVarianceWidget = () => {
       <div className="mt-2 xs:mt-3 flex flex-col justify-center z-10 flex-1">
         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
           <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold text-gray-900 leading-tight">
-            {formatValue(currentExp)}g
+            {formatCurrency(currentExp, prefs)}
           </span>
           <span className="text-[10px] xs:text-xs sm:text-sm text-gray-600 italic">Current Period</span>
         </div>
@@ -203,12 +203,12 @@ export const ExpenseVarianceWidget = () => {
         {/* Space between current period and previous period */}
         <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
-            Previous Period: <span className="font-semibold text-gray-800">{formatValue(priorExp)}g</span>
+            Previous Period: <span className="font-semibold text-gray-800">{formatCurrency(priorExp, prefs)}</span>
           </div>
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
             Absolute Change:{' '}
             <span className={`font-semibold ${textColorClass}`}>
-              {formatValue(currentExp - priorExp, false, 'g', true)}
+              {formatCurrency(currentExp - priorExp, prefs)}
             </span>
           </div>
         </div>
@@ -223,7 +223,7 @@ export const ExpenseVarianceWidget = () => {
         <div className={`flex items-center gap-1 px-2 py-0.5 xs:px-2.5 xs:py-1 rounded-lg border ${colorClass} transition-[border-color,background-color,color] duration-300`}>
           <Icon className="w-3.5 h-3.5 xs:w-4 h-4 stroke-[3]" />
           <span className="text-xs xs:text-sm font-bold font-mono tracking-tight">
-            {formatValue(expenseVariancePop, true, '', true)}
+            {(expenseVariancePop > 0 ? "+" : "") + formatNumber(expenseVariancePop, prefs) + "%"}
           </span>
         </div>
       </div>
@@ -232,6 +232,7 @@ export const ExpenseVarianceWidget = () => {
 };
 
 export const SavingsRateWidget = () => {
+  const { prefs } = useFormatting();
   const { savingsRate, totalIncome, totalExpenses } = useAllRatios();
   
   let classification = 'Deficit';
@@ -272,7 +273,7 @@ export const SavingsRateWidget = () => {
       <div className="mt-2 xs:mt-3 flex flex-col justify-center z-10 flex-1">
         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
           <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold text-gray-900 leading-tight">
-            {formatValue(savingsRate, true)}
+            {formatNumber(savingsRate, prefs)}%
           </span>
           <span className="text-[10px] xs:text-xs sm:text-sm text-gray-600 italic">Current Period</span>
         </div>
@@ -280,10 +281,10 @@ export const SavingsRateWidget = () => {
         {/* Space between current period and absolute data */}
         <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
-            Total Income: <span className="font-semibold text-gray-800">{formatValue(totalIncome)}g</span>
+            Total Income: <span className="font-semibold text-gray-800">{formatCurrency(totalIncome, prefs)}</span>
           </div>
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
-            Total Expenses: <span className="font-semibold text-gray-800">{formatValue(totalExpenses)}g</span>
+            Total Expenses: <span className="font-semibold text-gray-800">{formatCurrency(totalExpenses, prefs)}</span>
           </div>
         </div>
       </div>
@@ -306,6 +307,7 @@ export const SavingsRateWidget = () => {
 };
 
 export const SurvivalMonthsWidget = () => {
+  const { prefs } = useFormatting();
   const { survivalMonths, avgMonthlyExpense, netVaultCash } = useAllRatios();
   
   let runwayClass = 'Critical';
@@ -324,7 +326,7 @@ export const SurvivalMonthsWidget = () => {
 
   const isSecure = survivalMonths > 3;
   const symbol = isSecure ? '🌲' : '🔥';
-  const runwayStr = `${symbol}${Number(survivalMonths).toFixed(1)} Months`;
+  const runwayStr = `${symbol}${formatNumber(survivalMonths, prefs)} Months`;
 
   return (
     <div className="w-full h-full flex flex-col justify-between bg-white border border-gray-200 rounded-xl p-2.5 xs:p-4 sm:p-5 shadow-sm relative overflow-hidden">
@@ -353,10 +355,10 @@ export const SurvivalMonthsWidget = () => {
         {/* Space between current period and details */}
         <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
-            Amount per Month: <span className="font-semibold text-gray-800">{formatValue(avgMonthlyExpense)}g</span>
+            Amount per Month: <span className="font-semibold text-gray-800">{formatCurrency(avgMonthlyExpense, prefs)}</span>
           </div>
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
-            Liquid Cash: <span className="font-semibold text-gray-800">{formatValue(netVaultCash)}g</span>
+            Liquid Cash: <span className="font-semibold text-gray-800">{formatCurrency(netVaultCash, prefs)}</span>
           </div>
         </div>
       </div>
@@ -379,6 +381,7 @@ export const SurvivalMonthsWidget = () => {
 };
 
 export const DtiRatioWidget = () => {
+  const { prefs } = useFormatting();
   const { dtiRatio, amortization, totalIncome } = useAllRatios();
   
   let riskClass = 'Healthy';
@@ -415,17 +418,17 @@ export const DtiRatioWidget = () => {
       <div className="mt-2 xs:mt-3 flex flex-col justify-center z-10 flex-1">
         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
           <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold text-gray-900 leading-tight">
-            {formatValue(dtiRatio, true)}
+            {formatNumber(dtiRatio, prefs)}%
           </span>
         </div>
         
         {/* Space between current period and details */}
         <div className="flex flex-col gap-0.5 xs:gap-1 mt-2 xs:mt-3">
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
-            Amortization: <span className="font-semibold text-gray-800">{formatValue(amortization)}g</span>
+            Amortization: <span className="font-semibold text-gray-800">{formatCurrency(amortization, prefs)}</span>
           </div>
           <div className="text-[10px] xs:text-xs sm:text-sm md:text-base text-gray-600">
-            Total Income (net): <span className="font-semibold text-gray-800">{formatValue(totalIncome)}g</span>
+            Total Income (net): <span className="font-semibold text-gray-800">{formatCurrency(totalIncome, prefs)}</span>
           </div>
         </div>
       </div>
@@ -448,6 +451,7 @@ export const DtiRatioWidget = () => {
 };
 
 export const BudgetVsActualWidget = () => {
+  const { prefs } = useFormatting();
   const categoryView = useKingdomStore(s => s.analytics?.category || []);
   const user = useKingdomStore(s => s.user);
   const [budgets, setBudgets] = useState([]);
@@ -505,7 +509,7 @@ export const BudgetVsActualWidget = () => {
                   <div className="flex justify-between text-xs font-semibold text-gray-700">
                     <span>{item.category}</span>
                     <span className={item.isOver ? 'text-rose-600' : 'text-emerald-600'}>
-                      {formatValue(item.actual)}g / {formatValue(item.budget)}g
+                      {formatCurrency(item.actual, prefs)} / {formatCurrency(item.budget, prefs)}
                     </span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">

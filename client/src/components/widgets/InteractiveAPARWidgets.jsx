@@ -4,13 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useInteractiveStore } from '../../store/useInteractiveStore';
 import { useInteractiveData } from '../../hooks/useInteractiveData';
+import { useFormatting, formatCurrency, formatDate } from '../../context/FormattingContext';
 import { Loader2, FilterX } from 'lucide-react';
 
-const formatValue = (val) => {
-    const num = Number(val) || 0;
-    const formattedNum = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return num < 0 ? `(${formattedNum})` : formattedNum;
-};
+
 
 const LocalClearBtn = ({ onClear }) => (
     <button
@@ -128,6 +125,7 @@ export const InteractiveStatus = () => {
     const { data, isFetching } = useInteractiveData();
     const { filters, setFilter } = useInteractiveStore();
     const { ref, isCompact } = useWidgetResize(130);
+    const { prefs } = useFormatting();
 
     const statusData = data?.status_summary || [];
 
@@ -155,7 +153,7 @@ export const InteractiveStatus = () => {
                                 }`}
                         >
                             <span className={`font-serif font-bold text-gray-700 ${isCompact ? 'text-[10px] uppercase mb-1' : 'text-sm'}`}>{status}</span>
-                            <span className={`font-mono font-bold text-gray-900 ${isCompact ? 'text-xs' : ''}`}>{formatValue(sum)}</span>
+                            <span className={`font-mono font-bold text-gray-900 ${isCompact ? 'text-xs' : ''}`}>{formatCurrency(sum, prefs)}</span>
                         </button>
                     );
                 })}
@@ -171,6 +169,7 @@ export const InteractiveArrear = () => {
     const { data, isFetching } = useInteractiveData();
     const { filters, setFilter } = useInteractiveStore();
     const { ref, isCompact } = useWidgetResize(110);
+    const { prefs } = useFormatting();
 
     const arrearData = data?.arrear_summary || [];
 
@@ -207,7 +206,7 @@ export const InteractiveArrear = () => {
                                 }`}
                         >
                             <span className="text-[9px] font-bold uppercase tracking-wider opacity-70 mb-0.5">{arr.label}</span>
-                            <span className="font-mono font-bold text-xs">{formatValue(sum)}</span>
+                            <span className="font-mono font-bold text-xs">{formatCurrency(sum, prefs)}</span>
                         </button>
                     );
                 })}
@@ -222,6 +221,7 @@ export const InteractiveArrear = () => {
 export const InteractiveCategory = () => {
     const { data, isFetching } = useInteractiveData();
     const { filters, setFilter } = useInteractiveStore();
+    const { prefs } = useFormatting();
 
     const categoryData = data?.category_summary || [];
 
@@ -243,7 +243,7 @@ export const InteractiveCategory = () => {
                             <XAxis type="number" hide />
                             <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
                             <Tooltip
-                                formatter={(value) => [formatValue(value), 'Amount']}
+                                formatter={(value) => [formatCurrency(value, prefs), 'Amount']}
                                 contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                                 cursor={{ fill: '#f3f4f6' }}
                             />
@@ -278,6 +278,7 @@ export const InteractiveCategory = () => {
 export const InteractiveEntity = () => {
     const { data, isFetching } = useInteractiveData();
     const { filters, setFilter } = useInteractiveStore();
+    const { prefs } = useFormatting();
 
     const entityData = data?.entity_summary || [];
 
@@ -299,7 +300,7 @@ export const InteractiveEntity = () => {
                             <XAxis type="number" hide />
                             <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
                             <Tooltip
-                                formatter={(value) => [formatValue(value), 'Amount']}
+                                formatter={(value) => [formatCurrency(value, prefs), 'Amount']}
                                 contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                                 cursor={{ fill: '#f3f4f6' }}
                             />
@@ -333,6 +334,7 @@ export const InteractiveEntity = () => {
 // ==========================================
 export const InteractiveLedger = () => {
     const { data, isFetching } = useInteractiveData();
+    const { prefs } = useFormatting();
     const ledgerData = data?.ledger || [];
 
     return (
@@ -358,11 +360,11 @@ export const InteractiveLedger = () => {
                     <tbody className="text-xs divide-y divide-gray-100 font-mono">
                         {ledgerData.map((row, i) => (
                             <tr key={i} className="hover:bg-amber-50/50 transition-colors">
-                                <td className="py-2.5 text-gray-500">{row.posting_date}</td>
-                                <td className="py-2.5 text-gray-500">{row.value_date}</td>
+                                <td className="py-2.5 text-gray-500">{formatDate(row.posting_date, prefs)}</td>
+                                <td className="py-2.5 text-gray-500">{formatDate(row.value_date, prefs)}</td>
                                 <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[100px]">{row.entity || '-'}</td>
                                 <td className="py-2.5 text-gray-800 font-sans font-medium truncate max-w-[100px]">{row.category}</td>
-                                <td className="py-2.5 text-right font-bold text-gray-900">{formatValue(row.amount)}</td>
+                                <td className="py-2.5 text-right font-bold text-gray-900">{formatCurrency(row.amount, prefs)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -381,6 +383,7 @@ export const InteractiveLedger = () => {
 export const InteractiveMergedVolume = () => {
     const { data, isFetching } = useInteractiveData();
     const { filters, setFilter } = useInteractiveStore();
+    const { prefs } = useFormatting();
     const [viewMode, setViewMode] = useState('category');
 
     const rawData = viewMode === 'category' ? (data?.category_summary || []) : (data?.entity_summary || []);
@@ -435,7 +438,7 @@ export const InteractiveMergedVolume = () => {
                             <XAxis type="number" hide />
                             <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} width={90} />
                             <Tooltip
-                                formatter={(value) => [formatValue(value), 'Amount']}
+                                formatter={(value) => [formatCurrency(value, prefs), 'Amount']}
                                 contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                                 cursor={{ fill: '#f3f4f6' }}
                             />

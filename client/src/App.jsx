@@ -4,6 +4,7 @@ import MainMenu from './pages/MainMenu';
 import Login from './components/auth/Login';
 import DashboardVisualSandbox from './components/sandbox/dashboard-visual-sandbox';
 import MainMenuSandbox from './components/sandbox/MainMenuSandbox';
+import { FormattingProvider } from './context/FormattingContext';
 
 export default function App() {
   const initAuth = useKingdomStore((state) => state.initAuth);
@@ -33,10 +34,12 @@ export default function App() {
     );
   }
 
-  // Tudo seguro: O Utilizador existe. Carrega a UI.
+  // Tudo seguro: O Utilizador existe. Carrega a UI com o contexto de formatação.
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-200 antialiased selection:bg-amber-900 selection:text-amber-100">
-      <MainMenu />
-    </div>
+    <FormattingProvider>
+      <div className="min-h-screen bg-stone-950 text-stone-200 antialiased selection:bg-amber-900 selection:text-amber-100">
+        <MainMenu />
+      </div>
+    </FormattingProvider>
   );
 }

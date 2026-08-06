@@ -2,8 +2,10 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useKingdomStore } from "../../../store/useKingdomStore";
 import { toast } from 'react-hot-toast';
 import { ArrowUpDown, RefreshCw, FilterX } from 'lucide-react';
+import { useFormatting, formatCurrency, formatDate } from '../../../context/FormattingContext';
 
 export default function LedgerTable({ onEditTransaction }) {
+  const { prefs } = useFormatting();
   const transactions = useKingdomStore((state) => state.transactions) || [];
   const isLedgerLoading = useKingdomStore((state) => state.isLedgerLoading);
   const fetchTransactions = useKingdomStore((state) => state.fetchTransactions);
@@ -187,7 +189,7 @@ export default function LedgerTable({ onEditTransaction }) {
             <tbody className="divide-y divide-stone-800/30 font-sans">
               {processedTransactions.map((t) => (
                 <tr key={t.id} className="hover:bg-stone-800/40 transition-colors group">
-                  <td className="py-2.5 px-2 text-stone-300 font-mono text-[11px] whitespace-nowrap">{t.posting_date}</td>
+                  <td className="py-2.5 px-2 text-stone-300 font-mono text-[11px] whitespace-nowrap">{formatDate(t.posting_date, prefs)}</td>
                   <td className="py-2.5 px-2 text-stone-300 truncate max-w-[120px]" title={t.entity}>{t.entity || '-'}</td>
                   <td className="py-2.5 px-2 text-stone-400 truncate max-w-[120px]" title={t.category}>{t.category || '-'}</td>
                   <td className="py-2.5 px-2 text-amber-100/70 font-mono text-[11px] truncate max-w-[100px]">{t.target_account}</td>
@@ -196,7 +198,7 @@ export default function LedgerTable({ onEditTransaction }) {
                     {t.flow}
                   </td>
                   <td className="py-2.5 px-2 text-right text-amber-400 font-bold font-mono whitespace-nowrap">
-                    {Number(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    {formatCurrency(t.amount, prefs)}
                   </td>
                   <td className="py-2.5 px-2 text-center">
                     <div className="flex justify-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
