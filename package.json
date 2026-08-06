@@ -18,6 +18,10 @@
     "concurrently": "^9.2.1"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.35",
+    "@e2b/code-interpreter": "^2.7.0",
+    "@supabase/supabase-js": "^2.112.1",
+    "ai": "^7.0.54",
     "framer-motion": "^12.42.2",
     "puppeteer": "^25.1.0",
     "zustand": "^5.0.14"
